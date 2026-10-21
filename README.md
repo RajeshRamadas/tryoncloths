@@ -2,6 +2,10 @@
 
 Level 1 of `tryoncloths`: a store-assisted customer avatar workflow. Built with React, TypeScript, Vite, Express, and Sharp. Uses four generated adult male sample profiles: slim, regular, athletic, and broad.
 
+## See the app in action
+
+[Open the recorded walkthrough and example output](docs/demo/README.md). The recording shows the actual app selecting a profile, reviewing it, and downloading a PNG. It uses standard sample avatars; live face personalization is not configured in this demo.
+
 ## Run locally
 
 Requires Node.js 22.12+ (validated with Node.js 24).
