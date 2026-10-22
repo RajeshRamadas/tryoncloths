@@ -10,6 +10,8 @@ The Android app includes native camera/gallery selection, standard-body selectio
 
 ## See the app in action
 
+[See a separate visual example of the customer's face and skin tone on a standard body](docs/testing/visual-example/README.md). It was generated with Image Gen outside the app; the Gemini backend still requires configuration and live validation.
+
 [Open the recorded walkthrough and example output](docs/demo/README.md). The recording shows the actual app selecting a profile, reviewing it, and downloading a PNG. It uses standard sample avatars; live face personalization is not configured in this demo.
 
 ## Run locally
