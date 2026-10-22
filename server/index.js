@@ -10,6 +10,6 @@ createApp({ production }).listen(port, "0.0.0.0", (error) => {
     return;
   }
   console.log(
-    `Forme ${production ? "app" : "API"} listening on port ${port}. Face personalization: ${process.env.TRYON_GEMINI_API_KEY ? "configured" : "not configured"}.`,
+    `Forme ${production ? "app" : "API"} listening on port ${port}. Customer avatar generation: ${process.env.TRYON_GEMINI_API_KEY ? "configured" : "not configured"}.`,
   );
 });

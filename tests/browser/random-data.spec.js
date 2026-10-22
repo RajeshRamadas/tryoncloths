@@ -74,7 +74,18 @@ for (const row of scenarios) {
     const selected = names[row.index % names.length];
     await page.getByRole("button", { name: `Select ${selected} profile` }).click();
     await page.getByRole("button", { name: "Continue to match" }).click();
-    await expect(page.getByRole("button", { name: "Personalize face", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Generate customer avatar", exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Review avatar" })).toBeDisabled();
+    expect(await page.evaluate(() => window.__nativeCalls.some(c => c.method === "writeFile"))).toBe(false);
+    if (row.index < 3) await page.screenshot({ path: testInfo.outputPath("generation-required.png"), fullPage: true });
+    // The customer session cannot export a sample as its result. Start a separate
+    // empty demo session to exercise standard-library export without customer photos.
+    await page.getByRole("button", { name: "New session", exact: true }).click();
+    await page.getByRole("button", { name: "Start new session", exact: true }).click();
+    await expect(page.getByAltText("Customer face photo")).toHaveCount(0);
+    await expect(page.getByAltText("Customer full-body photo")).toHaveCount(0);
+    await page.getByRole("button", { name: `Select ${selected} profile` }).click();
+    await page.getByRole("button", { name: "Continue to match" }).click();
     await page.getByRole("button", { name: "Review avatar" }).click();
     await expect(page.getByText("Sample face · no customer face applied")).toBeVisible();
     const share = page.getByRole("button", { name: "Save or share avatar" });
@@ -103,7 +114,7 @@ for (const row of scenarios) {
     await expect(page.getByRole("checkbox", { name: consentLabel })).not.toBeChecked();
     expect(requests).toEqual([]);
     expect(errors).toEqual([]);
-    await testInfo.attach("scenario", { body: JSON.stringify({ seed, ...row, customerId: customerPhotos[row.customer].id, format: photos.format, normalized, selected, export: { width: meta.width, height: meta.height }, apiRequests: requests.length }), contentType: "application/json" });
+    await testInfo.attach("scenario", { body: JSON.stringify({ seed, ...row, customerId: customerPhotos[row.customer].id, format: photos.format, normalized, selected, customerExportBlockedWithoutGeneration: true, export: { scope: "separate-empty-demo-session", width: meta.width, height: meta.height }, apiRequests: requests.length }), contentType: "application/json" });
   });
 }
 

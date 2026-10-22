@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import sharp from "sharp";
+import { readFile } from "node:fs/promises";
+import { customerPhotos } from "./helpers/customer-photos.js";
 import { createApp, geminiPersonalize, standardAvatar } from "../server/app.js";
 
 async function withServer(options, run) {
@@ -17,15 +19,15 @@ async function post(base, body, origin = base) {
   return fetch(`${base}/api/personalize`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: origin },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...defaultRequest, ...body }),
   });
 }
-const faceBytes = await sharp({
-  create: { width: 150, height: 150, channels: 3, background: "#c8bca8" },
-})
-  .png()
-  .toBuffer();
-const face = `data:image/png;base64,${faceBytes.toString("base64")}`;
+const faceBytes = await readFile(customerPhotos[1].face);
+const bodyBytes = await readFile(customerPhotos[1].body);
+const face = `data:image/jpeg;base64,${faceBytes.toString("base64")}`;
+const bodyPhoto = `data:image/jpeg;base64,${bodyBytes.toString("base64")}`;
+const measurements = { heightCm: 175, weightKg: 72 };
+const defaultRequest = { consentScope: "face-and-body", measurements, body: bodyPhoto };
 
 test("mobile preflight allows only native origins, and store access codes protect API calls", async () => {
   const token = "test-mobile-access-code-32-characters";
@@ -70,7 +72,7 @@ test("mobile preflight allows only native origins, and store access codes protec
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ consent: true, profileId: "regular", face }),
+          body: JSON.stringify({ ...defaultRequest, consent: true, profileId: "regular", face }),
         });
         assert.equal(generated.status, 200);
       }
@@ -167,12 +169,34 @@ test("rejects corrupt images without calling provider", async () => {
     },
   );
 });
-test("passes normalized face and selected body to the provider, then requires review", async () => {
+test("full-body photo, supported measurements and explicit two-photo consent are required before generation", async () => {
+  let calls = 0;
+  await withServer({ apiKey: "test-only", rateLimit: false, personalize: async () => { calls++; return face; } }, async base => {
+    const valid = { consent: true, profileId: "regular", face };
+    for (const invalid of [
+      { body: undefined },
+      { body: "data:image/jpeg;base64,aGVsbG8=" },
+      { consentScope: "face-only" },
+      { measurements: { heightCm: 0, weightKg: 72 } },
+      { measurements: { heightCm: "175", weightKg: 72 } },
+      { measurements: { heightCm: 175, weightKg: 201 } },
+    ]) {
+      const response = await post(base, { ...valid, ...invalid });
+      assert.equal(response.status, 400);
+    }
+    assert.equal(calls, 0);
+  });
+});
+test("passes both normalized customer photos, measurements and selected template for face/body/skin-tone review", async () => {
   let calls = 0;
   await withServer(
     {
       apiKey: "test-only",
-      personalize: async ({ face: bytes, avatar }) => {
+      personalize: async ({ face: bytes, body, avatar, profileId, measurements: received }) => {
+        assert.equal((await sharp(body).metadata()).format, "jpeg");
+        assert.deepEqual(received, measurements);
+        assert.equal(profileId, "broad");
+        assert.equal((await sharp(body).metadata()).height, 1024);
         calls++;
         assert.equal((await sharp(bytes).metadata()).format, "jpeg");
         const meta = await sharp(avatar).metadata();
@@ -191,6 +215,8 @@ test("passes normalized face and selected body to the provider, then requires re
       const result = await response.json();
       assert.equal(result.profileId, "broad");
       assert.equal(result.needsReview, true);
+      assert.equal(result.kind, "customer-avatar");
+      assert.deepEqual(result.reviewChecks, ["face", "standard-body", "skin-tone"]);
       assert.equal(calls, 1);
       assert.equal(
         (await post(base, { consent: true, profileId: "broad", face })).status,
@@ -221,11 +247,14 @@ test("provider failures are sanitized and never automatically retried", async ()
     },
   );
 });
-test("Gemini adapter sends face and avatar once and decodes returned image", async () => {
+test("Gemini adapter sends face, full-body photo and template in one skin-tone-matching request", async () => {
   let calls = 0;
   const avatar = await standardAvatar("regular");
   const result = await geminiPersonalize({
     face: faceBytes,
+    body: bodyBytes,
+    profileId: "regular",
+    measurements,
     avatar,
     apiKey: "test-only",
     fetchImpl: async (url, options) => {
@@ -234,8 +263,15 @@ test("Gemini adapter sends face and avatar once and decodes returned image", asy
       const body = JSON.parse(options.body);
       assert.equal(
         body.contents[0].parts.filter((p) => p.inlineData).length,
-        2,
+        3,
       );
+      const parts = body.contents[0].parts;
+      assert.equal(parts[1].inlineData.data, avatar.toString("base64"));
+      assert.equal(parts[2].inlineData.data, faceBytes.toString("base64"));
+      assert.equal(parts[3].inlineData.data, bodyBytes.toString("base64"));
+      assert.match(parts[0].text, /MATCH THE CUSTOMER.S NATURAL SKIN TONE/);
+      assert.match(parts[0].text, /arms, hands, legs and feet/);
+      assert.match(parts[0].text, /selected standard body/);
       return new Response(
         JSON.stringify({
           candidates: [

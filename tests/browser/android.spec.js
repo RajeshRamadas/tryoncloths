@@ -29,8 +29,13 @@ test("Android offline workflow uses consented native camera and shares the selec
   await page.getByRole("button", { name: "Select Broad profile" }).click();
   await page.getByRole("button", { name: "Continue to match" }).click();
   await expect(
-    page.getByText("Face personalization unavailable", { exact: true }),
+    page.getByText("Customer avatar generation unavailable", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Review avatar" })).toBeDisabled();
+  await page.getByRole("button", { name: "New session", exact: true }).click();
+  await page.getByRole("button", { name: "Start new session", exact: true }).click();
+  await page.getByRole("button", { name: "Select Broad profile" }).click();
+  await page.getByRole("button", { name: "Continue to match" }).click();
   await page.getByRole("button", { name: "Review avatar" }).click();
   const exportButton = page.getByRole("button", {
     name: "Save or share avatar",
@@ -115,7 +120,7 @@ test("Android studio connection uses runtime authorization and clears it on rest
   await page.route("https://studio.example.test/api/health", async (route) => {
     headers.push(route.request().headers().authorization);
     await route.fulfill({
-      json: { status: "ok", personalizationAvailable: true },
+      json: { status: "ok", personalizationAvailable: true, personalizationContract: "customer-avatar-v2" },
     });
   });
   await page.goto("/");
@@ -132,7 +137,7 @@ test("Android studio connection uses runtime authorization and clears it on rest
   ).not.toBeVisible();
   await page.getByRole("button", { name: "Continue to match" }).click();
   await expect(
-    page.getByText("Face personalization available", { exact: true }),
+    page.getByText("Customer avatar generation available", { exact: true }),
   ).toBeVisible();
   expect(headers.length).toBeGreaterThan(0);
   expect(headers.every((value) => value === `Bearer ${token}`)).toBe(true);
@@ -143,7 +148,7 @@ test("Android studio connection uses runtime authorization and clears it on rest
   await page.reload();
   await page.getByRole("button", { name: "Continue to match" }).click();
   await expect(
-    page.getByText("Face personalization unavailable", { exact: true }),
+    page.getByText("Customer avatar generation unavailable", { exact: true }),
   ).toBeVisible();
   expect(headers.length).toBe(before);
 });

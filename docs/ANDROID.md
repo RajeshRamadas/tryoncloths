@@ -8,32 +8,35 @@ Forme Studio is an installable Android app for the Level 1 store-assisted avatar
 
 The app ID is `com.rajeshramadas.tryoncloths`. If Android reports a signing conflict with an older development copy, uninstall that copy before installing the new APK. Session photos are not durable app records; export anything you need first.
 
-## Try the offline workflow
+## Try sample browsing offline
 
 1. Open **Forme Studio**. The sample library loads without an internet connection.
 2. Enter approximate height/weight and inspect the suggested body profile. Staff can choose another profile.
-3. With consent, tap **Add face photo** or **Add full-body photo**. Android offers camera/gallery selection. Cancelling keeps the current session intact.
-4. Continue to match, then review. Without a connected studio the result is explicitly a standard sample, with a sample face.
+3. Leave customer photos empty for the sample-only demo.
+4. Continue to match, then review the explicitly labelled standard sample.
 5. Approve the avatar and tap **Save or share avatar**. Use an installed Android share target to send or save the PNG. Available destinations depend on your phone's installed apps; the app does not claim a gallery save simply because the share sheet closes.
 6. Start a new session to clear customer photos and app-owned export files.
 
-The full-body photo is still a manual staff reference. Automatic body-shape analysis and calibrated measurements are not implemented.
+If you add customer photos, generation is required before review/export. An offline sample cannot be exported as that customer's result. The full-body photo supports staff selection and, with separate consent, generation and skin-tone matching. Automatic body measurements are not implemented.
 
-## Optional face personalization
+## Customer face, body and skin tone
 
 The installed app never contains a Gemini key or a shared store access code. To enable generation:
 
 1. Run the included Express server behind HTTPS using a valid certificate. Configure `TRYON_GEMINI_API_KEY` and a randomly generated `TRYON_MOBILE_TOKEN` of at least 24 characters on the server.
 2. `TRYON_MOBILE_TOKEN` enables Android-origin CORS and requires bearer authorization for all API routes, including same-origin web requests. Do not treat CORS alone as authentication. This pilot uses a shared store code; per-user accounts, tenant isolation, and token rotation UI remain future work.
 3. In the app, tap the cloud icon (**Studio connection**) and enter the HTTPS studio origin and store access code. They are held in memory for the app session, not embedded in the APK or persisted to local storage.
-4. Capture consented photos, select the profile, then obtain separate consent to send the face photo to Gemini. Only an explicit **Personalize face** action calls the provider. Profile changes and ordinary preview actions do not generate AI requests.
-5. Review the generated result before export. Provider quality, body preservation, cost, and latency still require live evaluation with an authorized account.
+4. Capture a face and full-body photo with consent, enter approximate height/weight, and choose the nearest standard body. Obtain separate consent to send both photos and measurements to Gemini. Only an explicit **Generate customer avatar** action calls the provider. It sends the selected standard body, face and full-body photo in one request, asking for the customer's face and matching skin tone across all exposed skin. Profile changes and ordinary preview actions do not generate AI requests.
+5. Compare the result with the original photos and approve the face, body and skin tone before export. Provider quality, body preservation, skin-tone matching, cost and latency still require live evaluation with an authorized account.
+
+See [step-by-step API-key and backend setup](GENERATION_SETUP.md). Version 0.2.0 requires an updated backend advertising `customer-avatar-v2`; a legacy face-only server will not enable generation.
 
 Use the studio's real HTTPS origin, for example `https://studio.example.com`, without an API path. A phone cannot reach a computer's loopback address through its own loopback address. The APK does not contain a deployed backend URL.
 
 ## Data handling
 
 - Photo inputs, access codes, approval state, and generated results are held in JavaScript memory. Closing/reloading the app can clear them.
+- Explicit generation sends both customer photos, approximate measurements and the selected template to the provider. The server normalizes photos in memory and does not persist them. Provider retention follows the configured account's terms.
 - Camera capture uses `saveToGallery: false`. Android/camera providers may manage their own temporary data. Choosing a gallery photo does not delete or modify the original.
 - Exported PNGs are written only to the app cache for Android's share sheet. They remain there until the next export, new session, or app launch so recipients can finish reading the file. Files saved outside the app by a share target remain under that target's control.
 - Android backup is disabled. Cleartext network traffic is disabled. Capacitor bridge logging is disabled so photo payloads are not written to ordinary bridge logs.
@@ -57,7 +60,7 @@ For a hosted build, use **Actions → Build Android APK → Run workflow** on Gi
 
 ## Validation and release boundary
 
-- This delivery passed **14 unit/API tests** and **27 Playwright tests**, the production TypeScript/Vite build, and Android `assembleDebug lintDebug`. The expanded photo/data tests include 16 simulated Android sessions, invalid inputs, and all eight WebP orientations. See the [test report and screenshots](testing/random-data/README.md). Lint reported no errors; 28 warnings concern unused template resources and launcher/splash assets.
+- This delivery passed **15 unit/API tests** and **29 Playwright tests**, the production TypeScript/Vite build, and Android `assembleDebug lintDebug`. Tests include the three-image generation request, consent, skin-tone instructions, blocked customer export without generation, 16 simulated Android photo sessions, invalid inputs, and all eight WebP orientations. See the [current test report](testing/customer-generation/README.md). Lint reported no errors; 28 warnings concern unused template resources and launcher/splash assets.
 - `apksigner verify` passed. APK inspection confirmed app ID/version, minimum API 24, target API 36, and that bundled web assets match the production build. No provider key, store access code, or private signing key is bundled.
 - Node tests cover matching, input validation, API consent, exact native origins, bearer authorization, and provider error handling.
 - Playwright tests cover the browser workflow and mocked Android camera/filesystem/share contracts, including cancellation, consent, export bytes, clearing, and temporary studio credentials. Mocked bridges do not replace physical-device testing.

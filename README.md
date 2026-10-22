@@ -6,7 +6,7 @@ Level 1 of `tryoncloths`: a store-assisted customer avatar workflow. Built with 
 
 [Download the Android test APK](https://github.com/RajeshRamadas/tryoncloths/raw/refs/heads/main/downloads/forme-android-debug.apk) on your phone, open it, and allow installation from your browser if prompted. Android 7+ and an updated Android System WebView/Chrome (108+) are required. This is a debug build for testing.
 
-The Android app includes the sample avatar workflow offline, native camera/gallery selection, and PNG sharing. Optional AI face personalization connects to your own HTTPS studio server; no AI key is included. See [Android setup, testing, and build instructions](docs/ANDROID.md). Apple development is paused.
+The Android app includes native camera/gallery selection, standard-body selection, customer-avatar generation through your HTTPS studio, and PNG sharing. Generation sends both customer photos and matches the face and skin tone onto the selected standard body. **Actual generation requires a server-side Gemini API key**; see [backend setup](docs/GENERATION_SETUP.md). Offline sessions without customer photos can browse/export samples. See [Android installation and builds](docs/ANDROID.md). Apple development is paused.
 
 ## See the app in action
 
@@ -32,29 +32,29 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 - Consented face/full-body photo input, with camera capture offered on supported mobile browsers. JPEG, PNG, and WebP validation; 10 MB browser upload limit, client resizing, and removal controls.
 - Approximate standard-profile suggestion from height/weight, with staff correction. Athletic build is never inferred from weight alone.
 - Independent selection of all four standard sample profiles.
-- An optional, explicitly triggered Gemini face-personalization adapter, with server-side credentials and consent checks.
+- An explicitly triggered Gemini customer-avatar adapter using both customer photos, a selected body template, and whole-body skin-tone matching instructions, with server-side credentials and consent checks.
 - Review/approval, full-body PNG download, expanded preview, and new-session photo clearing.
 - Responsive layout and keyboard-accessible controls/dialogs.
 
-The full-body photo is a **staff reference**, held in browser memory. Automated body-shape analysis is not implemented. The current profile rule is illustrative, not calibrated to real measurements. Default height/weight inputs are sample values, not measured properties of the generated bodies.
+The full-body photo supports staff selection and, with separate consent, is sent to the provider as a visual and skin-tone reference. Automated body-shape measurements are not implemented. The current profile rule is illustrative, not calibrated to real measurements. Default height/weight inputs are sample values, not measured properties of the generated bodies.
 
-## Optional face personalization
+## Customer avatar generation
 
 Copy `.env.example` to `.env` and set `TRYON_GEMINI_API_KEY` securely. The default model is `gemini-2.5-flash-image`; `TRYON_GEMINI_MODEL` overrides it. Restart the API after configuration. Do not put credentials in `VITE_` variables or commit them. Network access to `generativelanguage.googleapis.com` is needed.
 
-The adapter sends the selected standard body and normalized customer face to Gemini in one request. The full-body reference stays in the browser. It asks the model to preserve the standard pose and body, but generative output can vary and must be reviewed. There are no automatic retries or per-selection AI requests. Repeating a generation is an explicit action and may incur another charge. This development server limits attempts to 20 per hour per client IP, at least 15 seconds apart, with at most two requests in flight globally. These are development limits, not a production quota system.
+The adapter sends three images in one request: the selected standard body, normalized customer face, and normalized full-body reference, plus approximate height/weight. It requests the customer's face/hair and consistent natural skin tone across the face, neck, arms, hands, legs and feet, preserving the selected standard body's proportions, pose, clothing and framing. Generative output can vary and must be reviewed. There are no automatic retries or per-selection AI requests. Repeating a generation is an explicit action and may incur another charge. This development server limits attempts to 20 per hour per client IP, at least 15 seconds apart, with at most two requests in flight globally. These are development limits, not a production quota system. See [generation setup and review](docs/GENERATION_SETUP.md).
 
-Without a key, the app reports personalization unavailable and supports the complete sample-avatar path. Provider integration is tested with a stubbed provider; real output quality, account/model access, cost, latency, and retention behavior must be verified with an authorized account. No claim of an actual personalized generation is made by the sample mode.
+Without a key, customer generation is unavailable. Sessions containing customer photos cannot approve or export a standard sample as the customer's result. Sample browsing/export remains available in sessions without photos. Provider integration is tested with a stubbed provider; real face fidelity, skin-tone matching, account/model access, cost, latency, and retention behavior must be verified with an authorized account. No claim of an actual personalized generation is made by sample mode or stubbed tests.
 
 ## Data handling
 
-The app does not use local storage or a customer database. Customer photo inputs and generated images remain in memory for the session. Android exports use temporary app-cache files for the native share sheet; these are cleared at the next export, new session, or app launch. Camera providers can manage their own temporary files. During an explicitly consented generation, the API temporarily decodes the face photo in memory and forwards it to the provider; it does not log or persist image data. Provider retention is governed separately by the configured account's terms. Start a new session, revoke photo consent, or reload to discard in-memory customer data. Downloaded/shared files remain under the recipient's control. See [Android data handling](docs/ANDROID.md#data-handling).
+The app does not use local storage or a customer database. Customer photo inputs and generated images remain in memory for the session. Android exports use temporary app-cache files for the native share sheet; these are cleared at the next export, new session, or app launch. Camera providers can manage their own temporary files. During an explicitly consented generation, the API temporarily decodes both customer photos in memory and forwards them, the selected template and approximate measurements to the provider; it does not log or persist image data. Provider retention is governed separately by the configured account's terms. Start a new session, revoke photo consent, or reload to discard in-memory customer data. Downloaded/shared files remain under the recipient's control. See [Android data handling](docs/ANDROID.md#data-handling).
 
 No retailer accounts, durable avatar storage, clothing compositing, fit prediction, or automatic measurements are included yet.
 
 ## Validation
 
-[See the independent-photo test report, screenshots, and exported avatars](docs/testing/random-data/README.md). The suite passes 14 unit/API tests and 27 browser tests using three synthetic customers generated separately from the avatar library, including simulated Android sessions. Testing found and fixed WebP photo rotation; the Android download includes the correction.
+The current suite passes **15 unit/API tests and 29 browser tests**, including the three-image generation contract, whole-body skin-tone instructions, separate consent, customer-export blocking, and approval of a stubbed provider result. [See current validation](docs/testing/customer-generation/README.md) and the [historical independent-photo screenshots](docs/testing/random-data/README.md). Test customers were generated separately from the avatar library. Live provider quality remains unverified. The Android download includes the WebP orientation correction.
 
 ```sh
 npm test

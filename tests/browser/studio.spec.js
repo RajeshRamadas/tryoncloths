@@ -23,10 +23,10 @@ test("sample workflow matches, allows correction, reviews and exports the select
   await page.getByRole("button", { name: /Select Athletic profile/ }).click();
   await page.getByRole("button", { name: "Continue to match" }).click();
   await expect(
-    page.getByText("Face personalization unavailable", { exact: true }),
+    page.getByText("Customer avatar generation unavailable", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Personalize face", exact: true }),
+    page.getByRole("button", { name: "Generate customer avatar", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Review avatar" }).click();
   await expect(
@@ -117,16 +117,20 @@ test("personalization is explicit, generates only on request, and approval reset
 }) => {
   let calls = 0;
   await page.route("**/api/health", (route) =>
-    route.fulfill({ json: { personalizationAvailable: true } }),
+    route.fulfill({ json: { personalizationAvailable: true, personalizationContract: "customer-avatar-v2" } }),
   );
   await page.route("**/api/personalize", async (route) => {
     calls++;
     expect(route.request().postDataJSON().consent).toBe(true);
-    expect(route.request().postDataJSON()).not.toHaveProperty("body");
+    const input = route.request().postDataJSON();
+    expect(input.body).toMatch(/^data:image\/jpeg;base64,/);
+    expect(input.face).toMatch(/^data:image\/jpeg;base64,/);
+    expect(input.consentScope).toBe("face-and-body");
+    expect(input.measurements).toEqual({ heightCm: 175, weightKg: 72 });
     const fs = await import("node:fs/promises");
     const image = await fs.readFile("public/avatar-library.png");
     await route.fulfill({
-      json: { image: `data:image/png;base64,${image.toString("base64")}` },
+      json: { image: `data:image/png;base64,${image.toString("base64")}`, kind: "customer-avatar", profileId: input.profileId },
     });
   });
   await page.goto("/");
@@ -149,7 +153,7 @@ test("personalization is explicit, generates only on request, and approval reset
     })
     .check();
   await page
-    .getByRole("button", { name: "Personalize face", exact: true })
+    .getByRole("button", { name: "Generate customer avatar", exact: true })
     .click();
   await expect(
     page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
@@ -157,7 +161,7 @@ test("personalization is explicit, generates only on request, and approval reset
   expect(calls).toBe(1);
   await page.getByRole("button", { name: "Review avatar" }).click();
   await page
-    .getByRole("checkbox", { name: "The customer approves this avatar." })
+    .getByRole("checkbox", { name: "The customer approves the face, body and skin tone of this avatar." })
     .check();
   await page.getByRole("button", { name: /Select Slim profile/ }).click();
   await expect(

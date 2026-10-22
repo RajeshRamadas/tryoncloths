@@ -216,6 +216,7 @@ export default function App() {
   const recommendation = recommendProfile(Number(height), Number(weight));
   const profile = profiles.find((p) => p.id === selected)!;
   const validMeasurements = recommendation !== null;
+  const needsCustomerGeneration = Boolean(face || body) && !personalized;
 
   function checkService() {
     setService("checking");
@@ -225,7 +226,7 @@ export default function App() {
         return r.json();
       })
       .then((data) =>
-        setService(data.personalizationAvailable ? "available" : "unavailable"),
+        setService(data.personalizationAvailable && data.personalizationContract === "customer-avatar-v2" ? "available" : "unavailable"),
       )
       .catch(() => setService("unavailable"));
   }
@@ -274,6 +275,7 @@ export default function App() {
   function invalidate() {
     setPersonalized(null);
     setApproved(false);
+    setAiConsent(false);
     setError("");
   }
   function updateMeasurement(field: "height" | "weight", value: string) {
@@ -293,6 +295,10 @@ export default function App() {
     setManual(true);
   }
   function goTo(next: number) {
+    if (next === 3 && needsCustomerGeneration) {
+      setError("Generate the customer avatar before review. The preview is still a standard sample.");
+      return;
+    }
     if (!validMeasurements) {
       setError("Enter a height from 140–210 cm and weight from 35–200 kg.");
       return;
@@ -334,7 +340,7 @@ export default function App() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ face, profileId: selected, consent: true }),
+          body: JSON.stringify({ face, body, profileId: selected, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body" }),
         },
         100000,
       );
@@ -344,10 +350,13 @@ export default function App() {
           data.error ||
             "Personalization failed. Your standard avatar is still available.",
         );
+      if (data.kind !== "customer-avatar" || data.profileId !== selected ||
+          typeof data.image !== "string" || !data.image.startsWith("data:image/png;base64,"))
+        throw new Error("The studio returned an unsupported result. Update the studio and try again.");
       setPersonalized(data.image);
       setAiConsent(false);
       setNotice(
-        "Personalized avatar created. Review the face and body before approval.",
+        "Customer avatar created. Review the face, standard body and skin tone before approval.",
       );
     } catch (e) {
       setError(
@@ -361,7 +370,7 @@ export default function App() {
     }
   }
   async function download() {
-    if (exporting) return;
+    if (exporting || !approved || needsCustomerGeneration) return;
     setExporting(true);
     try {
       const exported = await downloadAvatar(
@@ -588,8 +597,8 @@ export default function App() {
               ) : step === 2 ? (
                 <>
                   <p className="section-copy">
-                    Keep the selected body and add the customer’s face in one
-                    separate step.
+                    Generate the customer’s face and matching skin tone on the
+                    selected standard body using both customer photos.
                   </p>
                   <div className="summary-row">
                     <span>Selected profile</span>
@@ -612,7 +621,7 @@ export default function App() {
                     {body ? (
                       <img
                         src={body}
-                        alt="Customer full-body reference for staff review"
+                        alt="Customer full-body reference for avatar generation"
                       />
                     ) : (
                       <span>
@@ -625,7 +634,7 @@ export default function App() {
                       </strong>
                       <p>
                         {face && body
-                          ? "Full-body photo stays on this device."
+                          ? "Both photos are sent only when you generate."
                           : "Both photos are needed to personalize."}
                       </p>
                     </div>
@@ -637,15 +646,15 @@ export default function App() {
                     <div>
                       <strong>
                         {service === "checking"
-                          ? "Checking personalization…"
+                          ? "Checking avatar generation…"
                           : service === "available"
-                            ? "Face personalization available"
-                            : "Face personalization unavailable"}
+                            ? "Customer avatar generation available"
+                            : "Customer avatar generation unavailable"}
                       </strong>
                       <p>
                         {service === "available"
                           ? "One generation, then reuse the approved avatar."
-                          : "You can continue with the standard sample avatar."}
+                          : "Connect an updated studio with AI generation enabled. This preview has not used your photos."}
                       </p>
                     </div>
                   </div>
@@ -658,9 +667,10 @@ export default function App() {
                         onChange={(e) => setAiConsent(e.target.checked)}
                       />
                       <span>
-                        The customer agrees to send their face photo to Google’s
-                        Gemini service for this generation. Provider retention
-                        terms apply. The full-body photo stays here.
+                        The customer agrees to send their face photo, full-body
+                        photo and approximate height/weight to Google’s Gemini
+                        service to generate their avatar and match skin tone.
+                        Provider retention terms apply.
                       </span>
                     </label>
                   )}
@@ -684,7 +694,7 @@ export default function App() {
                       ? "Creating avatar…"
                       : personalized
                         ? "Create again"
-                        : "Personalize face"}
+                        : "Generate customer avatar"}
                   </button>
                   {personalized && (
                     <button
@@ -695,7 +705,7 @@ export default function App() {
                         setNotice("Returned to the standard sample avatar.");
                       }}
                     >
-                      Use standard avatar instead
+                      Discard generated avatar
                     </button>
                   )}
                   <p className="small-footnote">
@@ -708,6 +718,11 @@ export default function App() {
                   <p className="section-copy">
                     Check the result together before keeping it.
                   </p>
+                  {needsCustomerGeneration && (
+                    <p className="error-banner" role="alert">
+                      The photos or body profile changed. Go back and generate a new customer avatar before approving or exporting.
+                    </p>
+                  )}
                   <div className="review-type">
                     <span className="section-icon">
                       {personalized ? (
@@ -724,11 +739,18 @@ export default function App() {
                       </strong>
                       <p>
                         {personalized
-                          ? "Face generated for this session"
+                          ? "Customer face and skin tone on the selected standard body"
                           : "Sample face · no customer face applied"}
                       </p>
                     </div>
                   </div>
+                  {personalized && (
+                    <div className="mini-photos">
+                      <img src={face!} alt="Original customer face for skin-tone review" />
+                      <img src={body!} alt="Original customer body for skin-tone review" />
+                      <p>Compare the face and skin tone with the original photos. Check the neck, arms, hands, legs and feet.</p>
+                    </div>
+                  )}
                   <div className="summary-row">
                     <span>Body profile</span>
                     <strong>{profile.name}</strong>
@@ -741,30 +763,31 @@ export default function App() {
                   </div>
                   <ul className="review-list">
                     <li>
-                      <Check size={15} /> Check the face and overall appearance
+                      <Check size={15} /> Check the customer’s face and hair
                     </li>
                     <li>
                       <Check size={15} /> Confirm the approximate body profile
                     </li>
                     <li>
-                      <Check size={15} /> Keep a copy for future outfit previews
+                      <Check size={15} /> Confirm consistent skin tone across face and body
                     </li>
                   </ul>
                   <label className="consent approval-consent">
                     <input
                       type="checkbox"
                       checked={approved}
+                      disabled={needsCustomerGeneration || exporting}
                       onChange={(e) => setApproved(e.target.checked)}
                     />
                     <span>
                       {personalized
-                        ? "The customer approves this avatar."
+                        ? "The customer approves the face, body and skin tone of this avatar."
                         : "I have reviewed this standard sample avatar."}
                     </span>
                   </label>
                   <button
                     className="button primary full-width"
-                    disabled={!approved || exporting}
+                    disabled={!approved || exporting || needsCustomerGeneration}
                     onClick={() => void download()}
                   >
                     <ArrowDownToLine size={16} />{" "}
@@ -799,7 +822,7 @@ export default function App() {
                 {step < 3 && (
                   <button
                     className="button primary continue-button"
-                    disabled={!validMeasurements || generating || exporting}
+                    disabled={!validMeasurements || generating || exporting || (step === 2 && needsCustomerGeneration)}
                     onClick={() => goTo(step + 1)}
                   >
                     {step === 1 ? "Continue to match" : "Review avatar"}
@@ -813,8 +836,8 @@ export default function App() {
               <div>
                 <strong>A little care goes a long way.</strong>
                 <p>
-                  Photos stay in this session. Only an explicitly requested face
-                  generation sends a photo to the AI service.
+                  Photos stay in this session until you explicitly generate.
+                  Generation sends both photos and approximate measurements to the AI service.
                 </p>
               </div>
             </div>
@@ -978,7 +1001,7 @@ export default function App() {
             An approximate visual preview. Not a measurement or fit guarantee.
           </p>
           <span>
-            FORME STUDIO <span className="footer-dot">·</span> V0.1
+            FORME STUDIO <span className="footer-dot">·</span> LEVEL 1
           </span>
         </footer>
       </main>
@@ -1043,9 +1066,10 @@ export default function App() {
               <li>
                 <strong>Personalize, review, and download.</strong>
                 <p>
-                  When the service is available, send the face photo for a
-                  separately consented AI step. Otherwise, download a clearly
-                  labelled standard sample.
+                  With consent, generate the customer’s face and matching skin
+                  tone on the chosen standard body. Review all exposed skin and
+                  approve before export. Sample downloads are available only in
+                  sessions without customer photos.
                 </p>
               </li>
             </ol>

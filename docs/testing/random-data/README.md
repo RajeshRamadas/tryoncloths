@@ -1,5 +1,7 @@
 # Testing with different customer photos
 
+> Historical v0.1 report: the screenshots below recorded sample export with customer photos present. Version 0.2 now blocks that flow: customer-photo sessions require a generated avatar before approval/export. The repeatable tests now assert this block and test sample exports only after starting a separate empty session. See [the current generation contract and validation limits](../../GENERATION_SETUP.md).
+
 Re-run on 2026-10-22 with **three independently generated synthetic customers**, replacing the avatar-library crops used in the earlier run. **14 unit/API tests and 27 browser tests passed**, with no skipped tests or retries. This exercises the Level 1 Android interface in Chromium with simulated Capacitor camera, filesystem, and share APIs. The app code and APK did not need changes for this re-run.
 
 **These inputs are different from the avatar. Offline mode still returns a standard sample avatar, not the customer's face. No live face transfer or automatic body analysis was performed.**

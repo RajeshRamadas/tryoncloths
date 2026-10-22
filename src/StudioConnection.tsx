@@ -48,6 +48,8 @@ export default function StudioConnection({
       const health = await response.json();
       if (health.status !== "ok")
         throw new Error("This address is not a Forme studio.");
+      if (health.personalizationContract !== "customer-avatar-v2")
+        throw new Error("Update this studio server to support customer face, full-body and skin-tone generation.");
       onChange();
       setOpen(false);
     } catch (error) {
@@ -93,7 +95,7 @@ export default function StudioConnection({
           <span className="eyebrow">YOUR STORE</span>
           <h2>Connect your studio</h2>
           <p>
-            Connect to your store’s private studio for face personalization.
+            Connect to your store’s private studio for customer avatar generation.
             Sample avatars work without a connection.
           </p>
           <label>

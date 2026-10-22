@@ -30,7 +30,7 @@ export async function requestApi(
   if (!path.startsWith("/api/")) throw new Error("Invalid studio request.");
   if (Capacitor.isNativePlatform() && !studioUrl)
     throw new Error(
-      "Connect a studio to personalize a face. Sample avatars work offline.",
+      "Connect a studio to generate a customer avatar with matching skin tone. Sample browsing works offline.",
     );
   const headers = new Headers(init.headers);
   if (studioToken) headers.set("Authorization", `Bearer ${studioToken}`);
