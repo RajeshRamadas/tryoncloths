@@ -2,9 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import sharp from "sharp";
 import { webpOrientation, preparePhoto } from "../src/photo-orientation.js";
+import { customerPhotos } from "./helpers/customer-photos.js";
 
 test("WebP metadata correction is bounded and neutralizes orientation before browser decoding", async () => {
-  const image = await sharp("public/avatar-library.png").resize(384).withMetadata({ orientation: 8 }).webp().toBuffer();
+  const image = await sharp(customerPhotos[0].body).resize(384).withMetadata({ orientation: 8 }).webp().toBuffer();
   const arrayBuffer = bytes => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   assert.equal(webpOrientation(arrayBuffer(image)).orientation, 8);
   for (let length = 0; length < image.length; length += 19) {

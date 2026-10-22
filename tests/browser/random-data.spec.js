@@ -1,8 +1,9 @@
 import { test, expect } from "@playwright/test";
 import sharp from "sharp";
 import { nativeBridge } from "../helpers/native-bridge.js";
+import { customerPhotos } from "../helpers/customer-photos.js";
 
-// Repeatable randomized inputs. These are synthetic asset crops, not customer data.
+// Repeatable inputs from three independent synthetic customers, not avatar crops.
 const seed = 20261022;
 let state = seed;
 const random = (min, max) => {
@@ -20,18 +21,16 @@ const scenarios = [
     height: random(150, 200),
     weight: random(45, 130),
   })),
-].map((row, index) => ({ ...row, index, panel: random(0, 3) }));
+].map((row, index) => ({ ...row, index, customer: index < 3 ? index : random(0, 2) }));
 
 async function photosFor(row) {
   const format = ["jpeg", "png", "webp"][row.index % 3];
-  const face = await sharp("public/avatar-library.png")
-    .extract({ left: row.panel * 384 + 110, top: 20, width: 170, height: 190 })
+  const customer = customerPhotos[row.customer];
+  const face = await sharp(customer.face)
     .resize(row.index % 2 ? 340 : 170)
     .toFormat(format)
     .toBuffer();
-  let full = sharp("public/avatar-library.png").extract({
-    left: row.panel * 384, top: 0, width: 384, height: 942,
-  });
+  let full = sharp(customer.body);
   // Exercise camera EXIF orientation and downscaling of large phone images.
   if (row.index % 4 === 0) full = full.resize({ height: 3000 });
   if (row.index % 4 === 1) full = full.rotate(90).withMetadata({ orientation: 8 });
@@ -66,7 +65,7 @@ for (const row of scenarios) {
     const normalized = await bodyImage.evaluate(img => ({ width: img.naturalWidth, height: img.naturalHeight }));
     expect(Math.max(normalized.width, normalized.height)).toBeLessThanOrEqual(1600);
     expect(normalized.height).toBeGreaterThan(normalized.width);
-    if (row.index === 1) {
+    if (row.index < 3) {
       await page.screenshot({ path: testInfo.outputPath("photos-entered.png"), fullPage: true });
       await testInfo.attach("input-face", { body: photos.face, contentType: `image/${photos.format}` });
       await testInfo.attach("input-body", { body: photos.body, contentType: `image/${photos.format}` });
@@ -93,7 +92,7 @@ for (const row of scenarios) {
       .extract({ left: (row.index % 4) * 384, top: 0, width: 384, height: 942 })
       .removeAlpha().raw().toBuffer();
     expect(actual.equals(expected)).toBe(true);
-    if (row.index === 1) {
+    if (row.index < 3) {
       await page.screenshot({ path: testInfo.outputPath("review-approved.png"), fullPage: true });
       await testInfo.attach("exported-avatar", { body: png, contentType: "image/png" });
     }
@@ -104,7 +103,7 @@ for (const row of scenarios) {
     await expect(page.getByRole("checkbox", { name: consentLabel })).not.toBeChecked();
     expect(requests).toEqual([]);
     expect(errors).toEqual([]);
-    await testInfo.attach("scenario", { body: JSON.stringify({ seed, ...row, format: photos.format, normalized, selected, export: { width: meta.width, height: meta.height }, apiRequests: requests.length }), contentType: "application/json" });
+    await testInfo.attach("scenario", { body: JSON.stringify({ seed, ...row, customerId: customerPhotos[row.customer].id, format: photos.format, normalized, selected, export: { width: meta.width, height: meta.height }, apiRequests: requests.length }), contentType: "application/json" });
   });
 }
 
@@ -126,7 +125,7 @@ test("invalid measurements block continuation and recover after correction", asy
 test("invalid photo files preserve an existing photo and allow recovery", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("checkbox", { name: consentLabel }).check();
-  const { face } = await photosFor({ index: 0, panel: 0 });
+  const { face } = await photosFor({ index: 0, customer: 0 });
   const input = page.getByLabel("Upload face photo");
   await input.setInputFiles({ name: "valid.jpg", mimeType: "image/jpeg", buffer: face });
   const preview = page.getByAltText("Customer face photo");
@@ -155,8 +154,7 @@ test("all eight WebP orientations match independently decoded photos", async ({ 
   await page.goto("/");
   await page.getByRole("checkbox", { name: consentLabel }).check();
   for (let orientation = 1; orientation <= 8; orientation++) {
-    const buffer = await sharp("public/avatar-library.png")
-      .extract({ left: 0, top: 0, width: 384, height: 942 })
+    const buffer = await sharp(customerPhotos[2].body)
       .resize({ height: 480 }).withMetadata({ orientation }).webp({ lossless: true }).toBuffer();
     await page.getByLabel("Upload face photo").setInputFiles({ name: `orientation-${orientation}.webp`, mimeType: "image/webp", buffer });
     const preview = page.getByAltText("Customer face photo");

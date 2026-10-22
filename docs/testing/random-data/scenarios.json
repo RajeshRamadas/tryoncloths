@@ -5,10 +5,11 @@
     "weight": 55,
     "expected": "Slim",
     "index": 0,
-    "panel": 3,
+    "customer": 0,
+    "customerId": "red-plaid",
     "format": "jpeg",
     "normalized": {
-      "width": 652,
+      "width": 775,
       "height": 1600
     },
     "selected": "Slim",
@@ -24,11 +25,12 @@
     "weight": 72,
     "expected": "Regular",
     "index": 1,
-    "panel": 2,
+    "customer": 1,
+    "customerId": "blue-polo",
     "format": "png",
     "normalized": {
-      "width": 384,
-      "height": 942
+      "width": 496,
+      "height": 1024
     },
     "selected": "Regular",
     "export": {
@@ -43,11 +45,12 @@
     "weight": 95,
     "expected": "Broad",
     "index": 2,
-    "panel": 1,
+    "customer": 2,
+    "customerId": "green-sweater",
     "format": "webp",
     "normalized": {
-      "width": 384,
-      "height": 942
+      "width": 496,
+      "height": 1024
     },
     "selected": "Athletic",
     "export": {
@@ -61,11 +64,12 @@
     "height": 140,
     "weight": 35,
     "index": 3,
-    "panel": 0,
+    "customer": 0,
+    "customerId": "red-plaid",
     "format": "jpeg",
     "normalized": {
-      "width": 384,
-      "height": 942
+      "width": 496,
+      "height": 1024
     },
     "selected": "Broad",
     "export": {
@@ -79,10 +83,11 @@
     "height": 210,
     "weight": 200,
     "index": 4,
-    "panel": 3,
+    "customer": 1,
+    "customerId": "blue-polo",
     "format": "png",
     "normalized": {
-      "width": 652,
+      "width": 775,
       "height": 1600
     },
     "selected": "Slim",
@@ -97,11 +102,12 @@
     "height": 189,
     "weight": 93,
     "index": 5,
-    "panel": 2,
+    "customer": 1,
+    "customerId": "blue-polo",
     "format": "webp",
     "normalized": {
-      "width": 384,
-      "height": 942
+      "width": 496,
+      "height": 1024
     },
     "selected": "Regular",
     "export": {
@@ -115,11 +121,12 @@
     "height": 155,
     "weight": 125,
     "index": 6,
-    "panel": 1,
+    "customer": 2,
+    "customerId": "green-sweater",
     "format": "jpeg",
     "normalized": {
-      "width": 384,
-      "height": 942
+      "width": 496,
+      "height": 1024
     },
     "selected": "Athletic",
     "export": {
@@ -133,11 +140,12 @@
     "height": 152,
     "weight": 111,
     "index": 7,
-    "panel": 0,
+    "customer": 0,
+    "customerId": "red-plaid",
     "format": "png",
     "normalized": {
-      "width": 384,
-      "height": 942
+      "width": 496,
+      "height": 1024
     },
     "selected": "Broad",
     "export": {
@@ -151,10 +159,11 @@
     "height": 162,
     "weight": 111,
     "index": 8,
-    "panel": 3,
+    "customer": 1,
+    "customerId": "blue-polo",
     "format": "webp",
     "normalized": {
-      "width": 652,
+      "width": 775,
       "height": 1600
     },
     "selected": "Slim",
@@ -169,11 +178,12 @@
     "height": 169,
     "weight": 67,
     "index": 9,
-    "panel": 2,
+    "customer": 1,
+    "customerId": "blue-polo",
     "format": "jpeg",
     "normalized": {
-      "width": 384,
-      "height": 942
+      "width": 496,
+      "height": 1024
     },
     "selected": "Regular",
     "export": {
@@ -187,11 +197,12 @@
     "height": 187,
     "weight": 51,
     "index": 10,
-    "panel": 1,
+    "customer": 1,
+    "customerId": "blue-polo",
     "format": "png",
     "normalized": {
-      "width": 384,
-      "height": 942
+      "width": 496,
+      "height": 1024
     },
     "selected": "Athletic",
     "export": {
@@ -205,11 +216,12 @@
     "height": 182,
     "weight": 63,
     "index": 11,
-    "panel": 0,
+    "customer": 2,
+    "customerId": "green-sweater",
     "format": "webp",
     "normalized": {
-      "width": 384,
-      "height": 942
+      "width": 496,
+      "height": 1024
     },
     "selected": "Broad",
     "export": {
@@ -223,10 +235,11 @@
     "height": 167,
     "weight": 47,
     "index": 12,
-    "panel": 3,
+    "customer": 1,
+    "customerId": "blue-polo",
     "format": "jpeg",
     "normalized": {
-      "width": 652,
+      "width": 775,
       "height": 1600
     },
     "selected": "Slim",
@@ -241,11 +254,12 @@
     "height": 178,
     "weight": 71,
     "index": 13,
-    "panel": 2,
+    "customer": 0,
+    "customerId": "red-plaid",
     "format": "png",
     "normalized": {
-      "width": 384,
-      "height": 942
+      "width": 496,
+      "height": 1024
     },
     "selected": "Regular",
     "export": {
@@ -259,11 +273,12 @@
     "height": 162,
     "weight": 55,
     "index": 14,
-    "panel": 1,
+    "customer": 2,
+    "customerId": "green-sweater",
     "format": "webp",
     "normalized": {
-      "width": 384,
-      "height": 942
+      "width": 496,
+      "height": 1024
     },
     "selected": "Athletic",
     "export": {
@@ -277,11 +292,12 @@
     "height": 162,
     "weight": 73,
     "index": 15,
-    "panel": 0,
+    "customer": 0,
+    "customerId": "red-plaid",
     "format": "jpeg",
     "normalized": {
-      "width": 384,
-      "height": 942
+      "width": 496,
+      "height": 1024
     },
     "selected": "Broad",
     "export": {

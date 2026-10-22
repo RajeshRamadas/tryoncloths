@@ -1,8 +1,13 @@
 import { readFile } from "node:fs/promises";
+import { customerPhotos } from "./customer-photos.js";
 
 // Exercise the Android UI/bridge contract without pretending these are device tests.
 export async function nativeBridge(page, photos) {
-  const bytes = photos ? null : await readFile("public/avatar-library.png");
+  if (!photos) {
+    photos = await Promise.all([customerPhotos[0].face, customerPhotos[0].body].map(async path =>
+      `data:image/jpeg;base64,${(await readFile(path)).toString("base64")}`,
+    ));
+  }
   await page.addInitScript(
     ({ photos }) => {
       let nextPhoto = 0;
@@ -48,8 +53,7 @@ export async function nativeBridge(page, photos) {
         },
       };
     },
-    { photos: photos || [`data:image/png;base64,${bytes.toString("base64")}`] },
+    { photos },
   );
   await page.setViewportSize({ width: 412, height: 915 });
 }
-

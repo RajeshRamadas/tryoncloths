@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import path from "node:path";
+import { customerPhotos } from "../helpers/customer-photos.js";
 
 test("sample workflow matches, allows correction, reviews and exports the selected avatar", async ({
   page,
@@ -66,11 +67,11 @@ test("photos require consent, can be removed, and are cleared in a new session",
     .check();
   await page
     .getByLabel("Upload face photo")
-    .setInputFiles(path.resolve("public/avatar-library.png"));
+    .setInputFiles(path.resolve(customerPhotos[0].face));
   await expect(page.getByAltText("Customer face photo")).toBeVisible();
   await page
     .getByLabel("Upload full-body photo")
-    .setInputFiles(path.resolve("public/avatar-library.png"));
+    .setInputFiles(path.resolve(customerPhotos[0].body));
   await expect(page.getByAltText("Customer full-body photo")).toBeVisible();
   await page.getByRole("button", { name: "Remove face photo" }).click();
   await expect(page.getByAltText("Customer face photo")).toHaveCount(0);
@@ -137,7 +138,7 @@ test("personalization is explicit, generates only on request, and approval reset
   for (const label of ["Upload face photo", "Upload full-body photo"]) {
     await page
       .getByLabel(label)
-      .setInputFiles(path.resolve("public/avatar-library.png"));
+      .setInputFiles(path.resolve(label === "Upload face photo" ? customerPhotos[1].face : customerPhotos[1].body));
   }
   await expect(page.getByAltText("Customer full-body photo")).toBeVisible();
   await page.getByRole("button", { name: "Continue to match" }).click();
