@@ -23,6 +23,10 @@ import {
 } from "lucide-react";
 import { profiles, recommendProfile } from "./profiles";
 import { downloadAvatar, LIBRARY_URL, readPhoto } from "./images";
+import { isNative, capturePhoto, clearNativeExports } from "./native";
+import { requestApi } from "./api";
+import StudioConnection from "./StudioConnection";
+import { App as NativeApp } from "@capacitor/app";
 
 type PhotoKind = "face" | "body";
 type ServiceState = "checking" | "available" | "unavailable";
@@ -86,6 +90,26 @@ function PhotoInput({
       if (request === version.current) setReading(false);
     }
   }
+  async function openPhotoPicker() {
+    if (!isNative) {
+      input.current?.click();
+      return;
+    }
+    const request = ++version.current;
+    setReading(true);
+    setError("");
+    try {
+      const file = await capturePhoto();
+      if (file && request === version.current) {
+        const photo = await readPhoto(file);
+        if (request === version.current) onChange(photo);
+      }
+    } catch (e) {
+      if (request === version.current) setError((e as Error).message);
+    } finally {
+      if (request === version.current) setReading(false);
+    }
+  }
   return (
     <div className="photo-field">
       <input
@@ -105,7 +129,7 @@ function PhotoInput({
         className={`photo-upload ${value ? "has-photo" : ""}`}
         disabled={disabled || reading}
         aria-label={`${value ? "Replace" : "Add"} ${title.toLowerCase()}`}
-        onClick={() => input.current?.click()}
+        onClick={() => void openPhotoPicker()}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault();
@@ -178,6 +202,7 @@ export default function App() {
   const [service, setService] = useState<ServiceState>("checking");
   const [personalized, setPersonalized] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [approved, setApproved] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -192,8 +217,9 @@ export default function App() {
   const profile = profiles.find((p) => p.id === selected)!;
   const validMeasurements = recommendation !== null;
 
-  useEffect(() => {
-    fetch("/api/health")
+  function checkService() {
+    setService("checking");
+    requestApi("/api/health")
       .then((r) => {
         if (!r.ok) throw new Error();
         return r.json();
@@ -202,7 +228,33 @@ export default function App() {
         setService(data.personalizationAvailable ? "available" : "unavailable"),
       )
       .catch(() => setService("unavailable"));
+  }
+  useEffect(() => {
+    checkService();
+    void clearNativeExports().catch(() =>
+      setError(
+        "Temporary exports could not be cleared. Please restart the app before using customer photos.",
+      ),
+    );
   }, []);
+  useEffect(() => {
+    if (!isNative) return;
+    const listener = NativeApp.addListener("backButton", () => {
+      const openDialog =
+        document.querySelector<HTMLDialogElement>("dialog[open]");
+      if (openDialog) {
+        openDialog.dispatchEvent(new Event("cancel", { cancelable: true }));
+        return;
+      }
+      if (generating || exporting) return;
+      if (step > 1) goTo(step - 1);
+      else if (face || body) setConfirmReset(true);
+      else void NativeApp.minimizeApp();
+    });
+    return () => {
+      void listener.then((handle) => handle.remove());
+    };
+  }, [step, face, body, generating, exporting]);
   useEffect(() => {
     const dialog = dialogRef.current;
     if ((help || expanded || confirmReset) && dialog && !dialog.open) {
@@ -235,7 +287,7 @@ export default function App() {
     if (!manual && match) setSelected(match);
   }
   function changeProfile(id: string) {
-    if (id === selected) return;
+    if (id === selected || generating || exporting) return;
     invalidate();
     setSelected(id);
     setManual(true);
@@ -250,6 +302,11 @@ export default function App() {
     setTimeout(() => titleRef.current?.focus(), 0);
   }
   function reset() {
+    void clearNativeExports().catch(() =>
+      setError(
+        "Session cleared, but a temporary export could not be removed. Clear the app cache before the next customer.",
+      ),
+    );
     setFace(null);
     setBody(null);
     setConsent(false);
@@ -272,12 +329,15 @@ export default function App() {
     setError("");
     setApproved(false);
     try {
-      const response = await fetch("/api/personalize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ face, profileId: selected, consent: true }),
-        signal: AbortSignal.timeout(100000),
-      });
+      const response = await requestApi(
+        "/api/personalize",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ face, profileId: selected, consent: true }),
+        },
+        100000,
+      );
       const data = await response.json();
       if (!response.ok)
         throw new Error(
@@ -301,15 +361,25 @@ export default function App() {
     }
   }
   async function download() {
+    if (exporting) return;
+    setExporting(true);
     try {
-      await downloadAvatar(
+      const exported = await downloadAvatar(
         profile.index,
         personalized,
         `${profile.id}${personalized ? "-personalized" : "-sample"}`,
       );
-      setNotice("Avatar downloaded as a PNG.");
+      setNotice(
+        exported
+          ? isNative
+            ? "Share sheet closed. The avatar is ready to export again if needed."
+            : "Avatar downloaded as a PNG."
+          : "Export cancelled. Your avatar is still available.",
+      );
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setExporting(false);
     }
   }
   const preview = personalized ? (
@@ -334,6 +404,10 @@ export default function App() {
         <span className="brand-divider" />
         <span className="workspace-name">STORE STUDIO</span>
         <div className="topbar-right">
+          <StudioConnection
+            disabled={generating || exporting}
+            onChange={checkService}
+          />
           <span className="pilot-pill">
             <span /> Level 1 · Pilot
           </span>
@@ -358,7 +432,7 @@ export default function App() {
           </div>
           <button
             className="button secondary new-session"
-            disabled={generating}
+            disabled={generating || exporting}
             onClick={() => setConfirmReset(true)}
           >
             <Plus size={16} /> New session
@@ -412,7 +486,7 @@ export default function App() {
                     <input
                       type="checkbox"
                       checked={consent}
-                      disabled={generating}
+                      disabled={generating || exporting}
                       onChange={(e) => {
                         setConsent(e.target.checked);
                         if (!e.target.checked) {
@@ -580,7 +654,7 @@ export default function App() {
                       <input
                         type="checkbox"
                         checked={aiConsent}
-                        disabled={generating}
+                        disabled={generating || exporting}
                         onChange={(e) => setAiConsent(e.target.checked)}
                       />
                       <span>
@@ -615,7 +689,7 @@ export default function App() {
                   {personalized && (
                     <button
                       className="text-button"
-                      disabled={generating}
+                      disabled={generating || exporting}
                       onClick={() => {
                         invalidate();
                         setNotice("Returned to the standard sample avatar.");
@@ -690,14 +764,20 @@ export default function App() {
                   </label>
                   <button
                     className="button primary full-width"
-                    disabled={!approved}
+                    disabled={!approved || exporting}
                     onClick={() => void download()}
                   >
-                    <ArrowDownToLine size={16} /> Download avatar
+                    <ArrowDownToLine size={16} />{" "}
+                    {exporting
+                      ? "Preparing PNG…"
+                      : isNative
+                        ? "Save or share avatar"
+                        : "Download avatar"}
                   </button>
                   <p className="small-footnote">
-                    Downloads a PNG. Photos and results are held only in this
-                    browser session; download before leaving.
+                    {isNative
+                      ? "Save a PNG using the share sheet. Session photos stay in memory; temporary exports are cleared on the next session, export, or app launch."
+                      : "Downloads a PNG. Photos and results are held only in this browser session; download before leaving."}
                   </p>
                 </>
               )}
@@ -710,7 +790,7 @@ export default function App() {
                 {step > 1 && (
                   <button
                     className="button back-button"
-                    disabled={generating}
+                    disabled={generating || exporting}
                     onClick={() => goTo(step - 1)}
                   >
                     <ArrowLeft size={15} /> Back
@@ -719,7 +799,7 @@ export default function App() {
                 {step < 3 && (
                   <button
                     className="button primary continue-button"
-                    disabled={!validMeasurements || generating}
+                    disabled={!validMeasurements || generating || exporting}
                     onClick={() => goTo(step + 1)}
                   >
                     {step === 1 ? "Continue to match" : "Review avatar"}
@@ -803,15 +883,14 @@ export default function App() {
               </div>
               <p className="section-copy">
                 Start with a close match.
-                <br />{" "}
-                Adjust it together.
+                <br /> Adjust it together.
               </p>
               <div className="profile-grid">
                 {profiles.map((p) => (
                   <button
                     key={p.id}
                     className={`profile-option ${selected === p.id ? "selected" : ""}`}
-                    disabled={generating}
+                    disabled={generating || exporting}
                     aria-label={`Select ${p.name} profile`}
                     aria-pressed={selected === p.id}
                     onClick={() => changeProfile(p.id)}
@@ -857,7 +936,7 @@ export default function App() {
               {manual && recommendation && selected !== recommendation && (
                 <button
                   className="text-button"
-                  disabled={generating}
+                  disabled={generating || exporting}
                   onClick={() => {
                     invalidate();
                     setSelected(recommendation);
@@ -879,8 +958,7 @@ export default function App() {
               </div>
               <h3>
                 One avatar.
-                <br />{" "}
-                More possibilities.
+                <br /> More possibilities.
               </h3>
               <p>
                 An approved avatar becomes the starting point for future outfit
@@ -944,7 +1022,7 @@ export default function App() {
             <span className="eyebrow">WELCOME TO FORME</span>
             <h2>
               A familiar face.
-              <br />{" "}A simple starting point.
+              <br /> A simple starting point.
             </h2>
             <ol>
               <li>

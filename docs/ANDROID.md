@@ -1,0 +1,68 @@
+# Android app
+
+Forme Studio is an installable Android app for the Level 1 store-assisted avatar workflow. Its React interface and four standard avatars are packaged locally using Capacitor 8. The default sample workflow works offline.
+
+## Install the test app
+
+[Download forme-android-debug.apk](https://github.com/RajeshRamadas/tryoncloths/raw/refs/heads/main/downloads/forme-android-debug.apk) onto your Android phone. Open the file and, if Android asks, allow installation from the browser or file manager you used. This is a debug build for testing, not a Google Play release. Android 7.0/API 24 or newer is required, with Android System WebView/Chrome 108 or newer. Android 10+ with an updated WebView is recommended. The download's SHA-256 is recorded in [SHA256SUMS](../downloads/SHA256SUMS).
+
+The app ID is `com.rajeshramadas.tryoncloths`. If Android reports a signing conflict with an older development copy, uninstall that copy before installing the new APK. Session photos are not durable app records; export anything you need first.
+
+## Try the offline workflow
+
+1. Open **Forme Studio**. The sample library loads without an internet connection.
+2. Enter approximate height/weight and inspect the suggested body profile. Staff can choose another profile.
+3. With consent, tap **Add face photo** or **Add full-body photo**. Android offers camera/gallery selection. Cancelling keeps the current session intact.
+4. Continue to match, then review. Without a connected studio the result is explicitly a standard sample, with a sample face.
+5. Approve the avatar and tap **Save or share avatar**. Use an installed Android share target to send or save the PNG. Available destinations depend on your phone's installed apps; the app does not claim a gallery save simply because the share sheet closes.
+6. Start a new session to clear customer photos and app-owned export files.
+
+The full-body photo is still a manual staff reference. Automatic body-shape analysis and calibrated measurements are not implemented.
+
+## Optional face personalization
+
+The installed app never contains a Gemini key or a shared store access code. To enable generation:
+
+1. Run the included Express server behind HTTPS using a valid certificate. Configure `TRYON_GEMINI_API_KEY` and a randomly generated `TRYON_MOBILE_TOKEN` of at least 24 characters on the server.
+2. `TRYON_MOBILE_TOKEN` enables Android-origin CORS and requires bearer authorization for all API routes, including same-origin web requests. Do not treat CORS alone as authentication. This pilot uses a shared store code; per-user accounts, tenant isolation, and token rotation UI remain future work.
+3. In the app, tap the cloud icon (**Studio connection**) and enter the HTTPS studio origin and store access code. They are held in memory for the app session, not embedded in the APK or persisted to local storage.
+4. Capture consented photos, select the profile, then obtain separate consent to send the face photo to Gemini. Only an explicit **Personalize face** action calls the provider. Profile changes and ordinary preview actions do not generate AI requests.
+5. Review the generated result before export. Provider quality, body preservation, cost, and latency still require live evaluation with an authorized account.
+
+Use the studio's real HTTPS origin, for example `https://studio.example.com`, without an API path. A phone cannot reach a computer's loopback address through its own loopback address. The APK does not contain a deployed backend URL.
+
+## Data handling
+
+- Photo inputs, access codes, approval state, and generated results are held in JavaScript memory. Closing/reloading the app can clear them.
+- Camera capture uses `saveToGallery: false`. Android/camera providers may manage their own temporary data. Choosing a gallery photo does not delete or modify the original.
+- Exported PNGs are written only to the app cache for Android's share sheet. They remain there until the next export, new session, or app launch so recipients can finish reading the file. Files saved outside the app by a share target remain under that target's control.
+- Android backup is disabled. Cleartext network traffic is disabled. Capacitor bridge logging is disabled so photo payloads are not written to ordinary bridge logs.
+- Customer data is never included in the APK or the repository.
+
+## Build from source
+
+Install Node.js 22.12+ (24 recommended), JDK 21, and Android Studio/SDK with API 36 and Build Tools 35.0.0. Set `JAVA_HOME` and `ANDROID_HOME` to those installations, or let Android Studio manage them.
+
+```sh
+npm ci
+npm test
+npm run android:debug
+```
+
+The result is `android/app/build/outputs/apk/debug/app-debug.apk`. `npm run android:check` builds it and runs Android lint. `npm run android:open` opens the native project in Android Studio. After changing web code, use `npm run android:sync` before running the native project.
+
+The build wrapper supports Windows and Unix shells. Install the required JDK/SDK first. The Gradle distribution has a pinned SHA-256 checksum. Signing keys, SDK paths, generated web bundles, and Gradle caches are excluded from Git.
+
+For a hosted build, use **Actions → Build Android APK → Run workflow** on GitHub and download the resulting artifact. The workflow runs only when manually requested. It is a repeatable build recipe; a local build does not prove a GitHub Actions run succeeded.
+
+## Validation and release boundary
+
+- This delivery passed **13 unit/API tests**, **8 Playwright tests** (4 browser workflows and 4 mocked Android bridge tests), the production TypeScript/Vite build, and Android `assembleDebug lintDebug`. Lint reported no errors; 28 warnings concern unused template resources and launcher/splash assets.
+- `apksigner verify` passed. APK inspection confirmed app ID/version, minimum API 24, target API 36, and that bundled web assets match the production build. No provider key, store access code, or private signing key is bundled.
+- Node tests cover matching, input validation, API consent, exact native origins, bearer authorization, and provider error handling.
+- Playwright tests cover the browser workflow and mocked Android camera/filesystem/share contracts, including cancellation, consent, export bytes, clearing, and temporary studio credentials. Mocked bridges do not replace physical-device testing.
+- Android compilation and lint validate the native dependency and packaging configuration.
+- Runtime device validation is still pending. An Android 15 emulator was started in the cloud environment without hardware acceleration, but Android's package service did not become available during the check, so APK installation/launch could not be verified there. No physical Android phone was available. On a phone, verify cold launch offline, camera/gallery capture and cancellation, portrait/landscape layout, Android Back, approval-gated sharing, and new-session clearing before a store trial.
+- A release for Google Play needs an owner-controlled signing key, app listing, privacy/data-safety declarations, and real-device validation. This task delivers a test APK, not a published Play Store app.
+
+The iPhone draft is paused and is not part of the Android delivery.

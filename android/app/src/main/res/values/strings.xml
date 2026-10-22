@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Forme Studio</string>
+    <string name="title_activity_main">Forme Studio</string>
+    <string name="package_name">com.rajeshramadas.tryoncloths</string>
+    <string name="custom_url_scheme">com.rajeshramadas.tryoncloths</string>
+</resources>

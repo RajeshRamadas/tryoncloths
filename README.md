@@ -2,6 +2,12 @@
 
 Level 1 of `tryoncloths`: a store-assisted customer avatar workflow. Built with React, TypeScript, Vite, Express, and Sharp. Uses four generated adult male sample profiles: slim, regular, athletic, and broad.
 
+## Install on Android
+
+[Download the Android test APK](https://github.com/RajeshRamadas/tryoncloths/raw/refs/heads/main/downloads/forme-android-debug.apk) on your phone, open it, and allow installation from your browser if prompted. Android 7+ and an updated Android System WebView/Chrome (108+) are required. This is a debug build for testing.
+
+The Android app includes the sample avatar workflow offline, native camera/gallery selection, and PNG sharing. Optional AI face personalization connects to your own HTTPS studio server; no AI key is included. See [Android setup, testing, and build instructions](docs/ANDROID.md). Apple development is paused.
+
 ## See the app in action
 
 [Open the recorded walkthrough and example output](docs/demo/README.md). The recording shows the actual app selecting a profile, reviewing it, and downloading a PNG. It uses standard sample avatars; live face personalization is not configured in this demo.
@@ -42,7 +48,7 @@ Without a key, the app reports personalization unavailable and supports the comp
 
 ## Data handling
 
-The app does not use local storage, a database, or a customer-photo filesystem. Customer photos and generated images remain in browser memory for the session. During an explicitly consented generation, the API temporarily decodes the face photo in memory and forwards it to the provider; it does not log or persist image data. Provider retention is governed separately by the configured account's terms. Start a new session, revoke photo consent, or reload to discard browser-held customer data. Downloaded files remain under the customer's/store's control.
+The app does not use local storage or a customer database. Customer photo inputs and generated images remain in memory for the session. Android exports use temporary app-cache files for the native share sheet; these are cleared at the next export, new session, or app launch. Camera providers can manage their own temporary files. During an explicitly consented generation, the API temporarily decodes the face photo in memory and forwards it to the provider; it does not log or persist image data. Provider retention is governed separately by the configured account's terms. Start a new session, revoke photo consent, or reload to discard in-memory customer data. Downloaded/shared files remain under the recipient's control. See [Android data handling](docs/ANDROID.md#data-handling).
 
 No retailer accounts, durable avatar storage, clothing compositing, fit prediction, or automatic measurements are included yet.
 

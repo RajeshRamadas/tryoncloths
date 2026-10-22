@@ -1517,6 +1517,67 @@ dialog::backdrop {
 }
 
 /* Keep the complete body visible and the profile library compact. */
+.connection-form h2 {
+  margin: 12px 0 16px;
+}
+.connection-form > p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #6f8066;
+}
+.connection-form label {
+  display: block;
+  margin-top: 20px;
+  font-size: 12px;
+}
+.connection-form input {
+  display: block;
+  width: 100%;
+  border: 1px solid #ccd8c5;
+  border-radius: 6px;
+  background: white;
+  padding: 12px;
+  margin-top: 8px;
+  font-size: 16px;
+}
+.native-app .topbar {
+  padding-top: env(safe-area-inset-top);
+  height: calc(82px + env(safe-area-inset-top));
+  padding-left: max(20px, env(safe-area-inset-left));
+  padding-right: max(20px, env(safe-area-inset-right));
+}
+.native-app main {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.native-app .toast-region {
+  bottom: calc(24px + env(safe-area-inset-bottom));
+}
+.native-app .icon-button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.native-app input {
+  font-size: 16px;
+}
+.native-app .topbar-right {
+  gap: 4px;
+}
+.native-app .pilot-pill,
+.native-app .workspace-name {
+  display: none;
+}
+@media (max-width: 600px) {
+  .topbar-right {
+    gap: 3px;
+  }
+  .native-app .topbar {
+    height: calc(65px + env(safe-area-inset-top));
+  }
+  .native-app .consent,
+  .native-app .small-footnote {
+    font-size: 12px;
+  }
+}
 .avatar-crop {
   clip-path: inset(0 3px);
 }

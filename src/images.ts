@@ -1,3 +1,5 @@
+import { isNative, shareAvatar } from "./native";
+
 export const LIBRARY_URL = "/avatar-library.png";
 
 export async function loadImage(source: string): Promise<HTMLImageElement> {
@@ -74,6 +76,9 @@ export async function downloadAvatar(
     canvas.height = image.height;
     canvas.getContext("2d")!.drawImage(image, 0, 0);
   } else canvas = await avatarCanvas(index);
+  if (isNative) {
+    return await shareAvatar(canvas.toDataURL("image/png"), name);
+  }
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(
       (b) =>
@@ -89,4 +94,5 @@ export async function downloadAvatar(
   link.download = `forme-${name}-avatar.png`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
 }

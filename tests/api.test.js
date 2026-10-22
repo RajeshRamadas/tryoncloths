@@ -27,6 +27,81 @@ const faceBytes = await sharp({
   .toBuffer();
 const face = `data:image/png;base64,${faceBytes.toString("base64")}`;
 
+test("mobile preflight allows only native origins, and store access codes protect API calls", async () => {
+  const token = "test-mobile-access-code-32-characters";
+  let calls = 0;
+  await withServer(
+    {
+      apiKey: "test-only",
+      mobileToken: token,
+      rateLimit: false,
+      personalize: async () => {
+        calls++;
+        return face;
+      },
+    },
+    async (base) => {
+      for (const origin of ["capacitor://localhost", "https://localhost"]) {
+        const preflight = await fetch(`${base}/api/personalize`, {
+          method: "OPTIONS",
+          headers: {
+            Origin: origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,authorization",
+          },
+        });
+        assert.equal(preflight.status, 204);
+        assert.equal(
+          preflight.headers.get("access-control-allow-origin"),
+          origin,
+        );
+        const denied = await fetch(`${base}/api/health`, {
+          headers: { Origin: origin, Authorization: "Bearer wrong" },
+        });
+        assert.equal(denied.status, 401);
+        const health = await fetch(`${base}/api/health`, {
+          headers: { Origin: origin, Authorization: `Bearer ${token}` },
+        });
+        assert.equal(health.status, 200);
+        const generated = await fetch(`${base}/api/personalize`, {
+          method: "POST",
+          headers: {
+            Origin: origin,
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ consent: true, profileId: "regular", face }),
+        });
+        assert.equal(generated.status, 200);
+      }
+      // Even a spoofed same-origin header cannot bypass token authentication.
+      assert.equal(
+        (await post(base, { consent: true, profileId: "regular", face }))
+          .status,
+        401,
+      );
+      const unknown = await fetch(`${base}/api/health`, {
+        headers: {
+          Origin: "https://untrusted.example",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      assert.equal(unknown.headers.get("access-control-allow-origin"), null);
+      assert.equal(calls, 2);
+    },
+  );
+});
+
+test("native access remains disabled unless a strong mobile token is configured", async () => {
+  assert.throws(() => createApp({ mobileToken: "short" }));
+  await withServer({ apiKey: "test-only", mobileToken: "" }, async (base) => {
+    const response = await fetch(`${base}/api/health`, {
+      headers: { Origin: "capacitor://localhost" },
+    });
+    assert.equal(response.status, 403);
+  });
+});
+
 test("health reports missing provider honestly without exposing credentials", async () => {
   await withServer({ apiKey: "" }, async (base) => {
     const result = await fetch(`${base}/api/health`);

@@ -2,6 +2,7 @@ import express from "express";
 import sharp from "sharp";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { profiles } from "../src/profiles.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -126,12 +127,44 @@ export function createApp({
   personalize = geminiPersonalize,
   production = false,
   rateLimit = true,
+  mobileToken = process.env.TRYON_MOBILE_TOKEN || "",
 } = {}) {
+  if (mobileToken && mobileToken.length < 24)
+    throw new Error("TRYON_MOBILE_TOKEN must be at least 24 characters.");
   const app = express();
   app.disable("x-powered-by");
   app.use("/api", (_req, res, next) => {
     res.set("Cache-Control", "no-store");
     res.set("X-Content-Type-Options", "nosniff");
+    next();
+  });
+  const nativeOrigins = new Set(["capacitor://localhost", "https://localhost"]);
+  app.use("/api", (req, res, next) => {
+    const origin = req.get("origin");
+    if (origin && nativeOrigins.has(origin)) {
+      if (!mobileToken)
+        return res
+          .status(403)
+          .json({
+            error: "This studio is not configured for mobile connections.",
+          });
+      res.set("Access-Control-Allow-Origin", origin);
+      res.vary("Origin");
+      res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      if (req.method === "OPTIONS") return res.sendStatus(204);
+    }
+    // When mobile access is enabled, protect every API route, including same-origin
+    // calls. CORS is not authentication and must not allow a header-spoofing bypass.
+    if (mobileToken) {
+      const supplied = req.get("authorization") || "";
+      const digest = (value) => createHash("sha256").update(value).digest();
+      if (!timingSafeEqual(digest(supplied), digest(`Bearer ${mobileToken}`))) {
+        return res
+          .status(401)
+          .json({ error: "A valid store access code is required." });
+      }
+    }
     next();
   });
   app.use(express.json({ limit: "8mb" }));
@@ -149,7 +182,11 @@ export function createApp({
   app.post("/api/personalize", async (req, res) => {
     const origin = req.get("origin");
     try {
-      if (!origin || new URL(origin).host !== req.get("host"))
+      if (
+        !origin ||
+        (!(mobileToken && nativeOrigins.has(origin)) &&
+          new URL(origin).host !== req.get("host"))
+      )
         return res
           .status(403)
           .json({ error: "Open this workflow from the Avatar Studio app." });
@@ -157,29 +194,23 @@ export function createApp({
       return res.status(403).json({ error: "Invalid request origin." });
     }
     if (req.body?.consent !== true)
-      return res
-        .status(400)
-        .json({
-          error: "Customer consent is required before face personalization.",
-        });
+      return res.status(400).json({
+        error: "Customer consent is required before face personalization.",
+      });
     if (!profiles.some((p) => p.id === req.body?.profileId))
       return res
         .status(400)
         .json({ error: "Choose an available body profile." });
     if (!apiKey)
-      return res
-        .status(503)
-        .json({
-          error:
-            "Face personalization is not connected. Continue with a standard sample avatar.",
-        });
+      return res.status(503).json({
+        error:
+          "Face personalization is not connected. Continue with a standard sample avatar.",
+      });
     if (inFlight >= 2)
-      return res
-        .status(429)
-        .json({
-          error:
-            "The studio is processing another avatar. Please try again shortly.",
-        });
+      return res.status(429).json({
+        error:
+          "The studio is processing another avatar. Please try again shortly.",
+      });
     const now = Date.now();
     for (const [key, entry] of attempts)
       if (now - entry.started > 3600000) attempts.delete(key);
@@ -189,12 +220,10 @@ export function createApp({
       previous &&
       (now - previous.last < 15000 || previous.count >= 20)
     )
-      return res
-        .status(429)
-        .json({
-          error:
-            "Please wait before generating again. This pilot allows up to 20 attempts per hour.",
-        });
+      return res.status(429).json({
+        error:
+          "Please wait before generating again. This pilot allows up to 20 attempts per hour.",
+      });
     let face, avatar;
     try {
       face = await normalizeFace(req.body.face);
@@ -223,12 +252,10 @@ export function createApp({
       const image = await personalize({ face, avatar, apiKey, model });
       res.json({ image, profileId: req.body.profileId, needsReview: true });
     } catch {
-      res
-        .status(502)
-        .json({
-          error:
-            "Face personalization could not be completed. Your standard avatar is still available. A timed-out request may still incur a provider charge; retries are never automatic.",
-        });
+      res.status(502).json({
+        error:
+          "Face personalization could not be completed. Your standard avatar is still available. A timed-out request may still incur a provider charge; retries are never automatic.",
+      });
     } finally {
       inFlight--;
     }
@@ -243,14 +270,12 @@ export function createApp({
     );
   }
   app.use((error, _req, res, _next) => {
-    res
-      .status(error.type === "entity.too.large" ? 413 : 400)
-      .json({
-        error:
-          error.type === "entity.too.large"
-            ? "The upload is too large."
-            : "The request could not be read.",
-      });
+    res.status(error.type === "entity.too.large" ? 413 : 400).json({
+      error:
+        error.type === "entity.too.large"
+          ? "The upload is too large."
+          : "The request could not be read.",
+    });
   });
   return app;
 }
