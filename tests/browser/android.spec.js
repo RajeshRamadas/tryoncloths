@@ -1,57 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { readFile } from "node:fs/promises";
+import { nativeBridge } from "../helpers/native-bridge.js";
 
-// Exercise the Android UI/bridge contract without pretending these are device tests.
-async function nativeBridge(page) {
-  const bytes = await readFile("public/avatar-library.png");
-  await page.addInitScript(
-    ({ photo }) => {
-      window.CapacitorCustomPlatform = { name: "android" };
-      window.__nativeCalls = [];
-      window.__nativeErrors = {};
-      window.__nativeListeners = {};
-      window.Capacitor = {
-        PluginHeaders: [
-          { name: "Camera", methods: [{ name: "getPhoto", rtype: "promise" }] },
-          {
-            name: "Filesystem",
-            methods: ["rmdir", "writeFile"].map((name) => ({
-              name,
-              rtype: "promise",
-            })),
-          },
-          { name: "Share", methods: [{ name: "share", rtype: "promise" }] },
-          {
-            name: "App",
-            methods: [
-              { name: "addListener", rtype: "callback" },
-              { name: "removeListener", rtype: "promise" },
-              { name: "minimizeApp", rtype: "promise" },
-            ],
-          },
-        ],
-        nativePromise: async (plugin, method, options) => {
-          window.__nativeCalls.push({ plugin, method, options });
-          if (window.__nativeErrors[plugin])
-            throw new Error(window.__nativeErrors[plugin]);
-          if (plugin === "Camera") return { dataUrl: photo };
-          if (method === "writeFile")
-            return { uri: "file:///cache/forme-exports/approved-avatar.png" };
-          if (method === "removeListener")
-            delete window.__nativeListeners[options.callbackId];
-          return {};
-        },
-        nativeCallback: (plugin, method, options, callback) => {
-          const id = `listener-${Math.random()}`;
-          window.__nativeListeners[id] = callback;
-          return id;
-        },
-      };
-    },
-    { photo: `data:image/png;base64,${bytes.toString("base64")}` },
-  );
-  await page.setViewportSize({ width: 412, height: 915 });
-}
 
 test("Android offline workflow uses consented native camera and shares the selected PNG", async ({
   page,

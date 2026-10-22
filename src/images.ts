@@ -1,4 +1,5 @@
 import { isNative, shareAvatar } from "./native";
+import { preparePhoto, orientCanvas } from "./photo-orientation";
 
 export const LIBRARY_URL = "/avatar-library.png";
 
@@ -21,19 +22,23 @@ export async function readPhoto(file: File): Promise<string> {
     throw new Error("Choose a JPEG, PNG, or WebP photo.");
   if (file.size > 10 * 1024 * 1024)
     throw new Error("Choose a photo smaller than 10 MB.");
-  const url = URL.createObjectURL(file);
+  const { source, orientation } = await preparePhoto(file);
+  const url = URL.createObjectURL(source);
   try {
     const image = await loadImage(url);
     if (image.width < 128 || image.height < 128)
       throw new Error("Use a photo at least 128 × 128 pixels.");
     const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
     const canvas = document.createElement("canvas");
-    canvas.width = Math.round(image.width * scale);
-    canvas.height = Math.round(image.height * scale);
+    const swap = orientation >= 5;
+    canvas.width = Math.round((swap ? image.height : image.width) * scale);
+    canvas.height = Math.round((swap ? image.width : image.height) * scale);
     const ctx = canvas.getContext("2d")!;
     ctx.fillStyle = "#fff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    ctx.scale(scale, scale);
+    orientCanvas(ctx, orientation, image.width, image.height);
+    ctx.drawImage(image, 0, 0);
     return canvas.toDataURL("image/jpeg", 0.9);
   } finally {
     URL.revokeObjectURL(url);

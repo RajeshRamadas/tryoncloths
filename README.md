@@ -54,6 +54,8 @@ No retailer accounts, durable avatar storage, clothing compositing, fit predicti
 
 ## Validation
 
+[See the random-photo test report, screenshots, and exported avatar](docs/testing/random-data/README.md). The expanded suite passes 14 unit/API tests and 27 browser tests, including simulated Android sessions. Testing found and fixed WebP photo rotation; the Android download includes the correction.
+
 ```sh
 npm test
 npm run build

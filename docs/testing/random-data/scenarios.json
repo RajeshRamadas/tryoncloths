@@ -1,0 +1,293 @@
+[
+  {
+    "seed": 20261022,
+    "height": 175,
+    "weight": 55,
+    "expected": "Slim",
+    "index": 0,
+    "panel": 3,
+    "format": "jpeg",
+    "normalized": {
+      "width": 652,
+      "height": 1600
+    },
+    "selected": "Slim",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 175,
+    "weight": 72,
+    "expected": "Regular",
+    "index": 1,
+    "panel": 2,
+    "format": "png",
+    "normalized": {
+      "width": 384,
+      "height": 942
+    },
+    "selected": "Regular",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 175,
+    "weight": 95,
+    "expected": "Broad",
+    "index": 2,
+    "panel": 1,
+    "format": "webp",
+    "normalized": {
+      "width": 384,
+      "height": 942
+    },
+    "selected": "Athletic",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 140,
+    "weight": 35,
+    "index": 3,
+    "panel": 0,
+    "format": "jpeg",
+    "normalized": {
+      "width": 384,
+      "height": 942
+    },
+    "selected": "Broad",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 210,
+    "weight": 200,
+    "index": 4,
+    "panel": 3,
+    "format": "png",
+    "normalized": {
+      "width": 652,
+      "height": 1600
+    },
+    "selected": "Slim",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 189,
+    "weight": 93,
+    "index": 5,
+    "panel": 2,
+    "format": "webp",
+    "normalized": {
+      "width": 384,
+      "height": 942
+    },
+    "selected": "Regular",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 155,
+    "weight": 125,
+    "index": 6,
+    "panel": 1,
+    "format": "jpeg",
+    "normalized": {
+      "width": 384,
+      "height": 942
+    },
+    "selected": "Athletic",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 152,
+    "weight": 111,
+    "index": 7,
+    "panel": 0,
+    "format": "png",
+    "normalized": {
+      "width": 384,
+      "height": 942
+    },
+    "selected": "Broad",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 162,
+    "weight": 111,
+    "index": 8,
+    "panel": 3,
+    "format": "webp",
+    "normalized": {
+      "width": 652,
+      "height": 1600
+    },
+    "selected": "Slim",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 169,
+    "weight": 67,
+    "index": 9,
+    "panel": 2,
+    "format": "jpeg",
+    "normalized": {
+      "width": 384,
+      "height": 942
+    },
+    "selected": "Regular",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 187,
+    "weight": 51,
+    "index": 10,
+    "panel": 1,
+    "format": "png",
+    "normalized": {
+      "width": 384,
+      "height": 942
+    },
+    "selected": "Athletic",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 182,
+    "weight": 63,
+    "index": 11,
+    "panel": 0,
+    "format": "webp",
+    "normalized": {
+      "width": 384,
+      "height": 942
+    },
+    "selected": "Broad",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 167,
+    "weight": 47,
+    "index": 12,
+    "panel": 3,
+    "format": "jpeg",
+    "normalized": {
+      "width": 652,
+      "height": 1600
+    },
+    "selected": "Slim",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 178,
+    "weight": 71,
+    "index": 13,
+    "panel": 2,
+    "format": "png",
+    "normalized": {
+      "width": 384,
+      "height": 942
+    },
+    "selected": "Regular",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 162,
+    "weight": 55,
+    "index": 14,
+    "panel": 1,
+    "format": "webp",
+    "normalized": {
+      "width": 384,
+      "height": 942
+    },
+    "selected": "Athletic",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  },
+  {
+    "seed": 20261022,
+    "height": 162,
+    "weight": 73,
+    "index": 15,
+    "panel": 0,
+    "format": "jpeg",
+    "normalized": {
+      "width": 384,
+      "height": 942
+    },
+    "selected": "Broad",
+    "export": {
+      "width": 384,
+      "height": 942
+    },
+    "apiRequests": 0
+  }
+]

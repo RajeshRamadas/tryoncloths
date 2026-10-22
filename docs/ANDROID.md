@@ -57,7 +57,7 @@ For a hosted build, use **Actions → Build Android APK → Run workflow** on Gi
 
 ## Validation and release boundary
 
-- This delivery passed **13 unit/API tests**, **8 Playwright tests** (4 browser workflows and 4 mocked Android bridge tests), the production TypeScript/Vite build, and Android `assembleDebug lintDebug`. Lint reported no errors; 28 warnings concern unused template resources and launcher/splash assets.
+- This delivery passed **14 unit/API tests** and **27 Playwright tests**, the production TypeScript/Vite build, and Android `assembleDebug lintDebug`. The expanded photo/data tests include 16 simulated Android sessions, invalid inputs, and all eight WebP orientations. See the [test report and screenshots](testing/random-data/README.md). Lint reported no errors; 28 warnings concern unused template resources and launcher/splash assets.
 - `apksigner verify` passed. APK inspection confirmed app ID/version, minimum API 24, target API 36, and that bundled web assets match the production build. No provider key, store access code, or private signing key is bundled.
 - Node tests cover matching, input validation, API consent, exact native origins, bearer authorization, and provider error handling.
 - Playwright tests cover the browser workflow and mocked Android camera/filesystem/share contracts, including cancellation, consent, export bytes, clearing, and temporary studio credentials. Mocked bridges do not replace physical-device testing.
