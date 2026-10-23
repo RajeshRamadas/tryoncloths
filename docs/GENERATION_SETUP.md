@@ -4,6 +4,8 @@ Actual customer avatar generation needs a **Gemini API key on a backend server**
 
 ## Set up the backend
 
+For AWS Lightsail, follow the [step-by-step Lightsail deployment guide](AWS_LIGHTSAIL.md), which includes Docker, automatic HTTPS, server secrets, and Android connection steps.
+
 1. Create a key in [Google AI Studio](https://aistudio.google.com/apikey) for a project allowed to use Gemini image generation. Enable billing if your account/model requires it. Check current provider pricing and quotas; no fixed cost per avatar is assumed here.
 2. Deploy this repository to a Node.js 22.12+ host with a public HTTPS URL. Use build command `npm ci && npm run build` and start command `npm start`. The server reads the host's `PORT` variable (default 3001).
 3. In that host's **secret environment variables**, set `TRYON_GEMINI_API_KEY` to your key and `TRYON_MOBILE_TOKEN` to a separate random store access code of at least 24 characters. Do not paste the API key into chat, GitHub, frontend `VITE_` variables, or Android source. For local development, use an ignored `.env` file based on `.env.example`.

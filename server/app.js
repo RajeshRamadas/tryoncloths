@@ -140,10 +140,14 @@ export function createApp({
   production = false,
   rateLimit = true,
   mobileToken = process.env.TRYON_MOBILE_TOKEN || "",
+  trustProxy = false,
 } = {}) {
   if (mobileToken && mobileToken.length < 24)
     throw new Error("TRYON_MOBILE_TOKEN must be at least 24 characters.");
   const app = express();
+  if (trustProxy !== false && trustProxy !== 1)
+    throw new Error("Only the direct connection or one trusted reverse proxy is supported.");
+  app.set("trust proxy", trustProxy);
   app.disable("x-powered-by");
   app.use("/api", (_req, res, next) => {
     res.set("Cache-Control", "no-store");

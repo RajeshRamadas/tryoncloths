@@ -1,0 +1,52 @@
+name: forme-studio
+services:
+  app:
+    image: forme-studio:${FORME_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: deploy/lightsail/Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      TRYON_TRUST_PROXY_HOPS: "1"
+      TRYON_GEMINI_API_KEY: ${TRYON_GEMINI_API_KEY:?Set the Gemini API key in .env}
+      TRYON_MOBILE_TOKEN: ${TRYON_MOBILE_TOKEN:?Set a random store access code in .env}
+      TRYON_GEMINI_MODEL: ${TRYON_GEMINI_MODEL:-gemini-2.5-flash-image}
+    # No host port: only Caddy can reach the backend through this Docker network.
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 768m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      STUDIO_DOMAIN: ${STUDIO_DOMAIN:?Set your backend hostname in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Set your certificate contact email in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  caddy_data:
+  caddy_config:

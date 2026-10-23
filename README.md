@@ -42,6 +42,8 @@ The full-body photo supports staff selection and, with separate consent, is sent
 
 ## Customer avatar generation
 
+To host the backend on AWS, follow the [AWS Lightsail setup guide](docs/AWS_LIGHTSAIL.md).
+
 Copy `.env.example` to `.env` and set `TRYON_GEMINI_API_KEY` securely. The default model is `gemini-2.5-flash-image`; `TRYON_GEMINI_MODEL` overrides it. Restart the API after configuration. Do not put credentials in `VITE_` variables or commit them. Network access to `generativelanguage.googleapis.com` is needed.
 
 The adapter sends three images in one request: the selected standard body, normalized customer face, and normalized full-body reference, plus approximate height/weight. It requests the customer's face/hair and consistent natural skin tone across the face, neck, arms, hands, legs and feet, preserving the selected standard body's proportions, pose, clothing and framing. Generative output can vary and must be reviewed. There are no automatic retries or per-selection AI requests. Repeating a generation is an explicit action and may incur another charge. This development server limits attempts to 20 per hour per client IP, at least 15 seconds apart, with at most two requests in flight globally. These are development limits, not a production quota system. See [generation setup and review](docs/GENERATION_SETUP.md).
@@ -56,7 +58,7 @@ No retailer accounts, durable avatar storage, clothing compositing, fit predicti
 
 ## Validation
 
-The current suite passes **15 unit/API tests and 29 browser tests**, including the three-image generation contract, whole-body skin-tone instructions, separate consent, customer-export blocking, and approval of a stubbed provider result. [See current validation](docs/testing/customer-generation/README.md) and the [historical independent-photo screenshots](docs/testing/random-data/README.md). Test customers were generated separately from the avatar library. Live provider quality remains unverified. The Android download includes the WebP orientation correction.
+The current suite passes **16 unit/API tests and 29 browser tests**, including the three-image generation contract, whole-body skin-tone instructions, separate consent, customer-export blocking, and approval of a stubbed provider result. [See current validation](docs/testing/customer-generation/README.md) and the [historical independent-photo screenshots](docs/testing/random-data/README.md). Test customers were generated separately from the avatar library. Live provider quality remains unverified. The Android download includes the WebP orientation correction.
 
 ```sh
 npm test

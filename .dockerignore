@@ -1,0 +1,15 @@
+*
+!package.json
+!package-lock.json
+!tsconfig.json
+!vite.config.js
+!index.html
+!src/
+!src/**
+!server/
+!server/**
+!public/
+!public/**
+!deploy/
+!deploy/lightsail/
+!deploy/lightsail/Dockerfile

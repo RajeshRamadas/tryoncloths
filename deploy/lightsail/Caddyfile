@@ -1,0 +1,8 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$STUDIO_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3001
+}

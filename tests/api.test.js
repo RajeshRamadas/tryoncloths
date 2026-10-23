@@ -104,6 +104,24 @@ test("native access remains disabled unless a strong mobile token is configured"
   });
 });
 
+test("proxy-aware request limits separate clients only when one private reverse proxy is explicitly trusted", async () => {
+  assert.throws(() => createApp({ trustProxy: true }));
+  for (const trustProxy of [false, 1]) {
+    let calls = 0;
+    await withServer({ apiKey: "test-only", trustProxy, personalize: async () => { calls++; return face; } }, async base => {
+      const send = client => fetch(`${base}/api/personalize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Origin: base, "X-Forwarded-For": client },
+        body: JSON.stringify({ ...defaultRequest, consent: true, profileId: "regular", face }),
+      });
+      assert.equal((await send("192.0.2.10")).status, 200);
+      assert.equal((await send("192.0.2.11")).status, trustProxy === 1 ? 200 : 429);
+      assert.equal((await send("192.0.2.10")).status, 429);
+      assert.equal(calls, trustProxy === 1 ? 2 : 1);
+    });
+  }
+});
+
 test("health reports missing provider honestly without exposing credentials", async () => {
   await withServer({ apiKey: "" }, async (base) => {
     const result = await fetch(`${base}/api/health`);
