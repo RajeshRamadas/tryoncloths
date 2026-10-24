@@ -29,7 +29,7 @@ import StudioConnection from "./StudioConnection";
 import { App as NativeApp } from "@capacitor/app";
 
 type PhotoKind = "face" | "body";
-type ServiceState = "checking" | "available" | "unavailable";
+type ServiceState = "checking" | "available" | "unavailable" | "unauthorized";
 
 function AvatarImage({
   index,
@@ -220,13 +220,15 @@ export default function App() {
   function checkService() {
     setService("checking");
     requestApi("/api/health")
-      .then((r) => {
+      .then(async (r) => {
+        if (r.status === 401) {
+          setService("unauthorized");
+          return;
+        }
         if (!r.ok) throw new Error();
-        return r.json();
+        const data = await r.json();
+        setService(data.personalizationAvailable && data.personalizationContract === "customer-avatar-v2" ? "available" : "unavailable");
       })
-      .then((data) =>
-        setService(data.personalizationAvailable && data.personalizationContract === "customer-avatar-v2" ? "available" : "unavailable"),
-      )
       .catch(() => setService("unavailable"));
   }
   useEffect(() => {
@@ -648,12 +650,16 @@ export default function App() {
                           ? "Checking avatar generation…"
                           : service === "available"
                             ? "Customer avatar generation available"
-                            : "Customer avatar generation unavailable"}
+                            : service === "unauthorized"
+                              ? "Studio connection required"
+                              : "Customer avatar generation unavailable"}
                       </strong>
                       <p>
                         {service === "available"
                           ? "One generation, then reuse the approved avatar."
-                          : "Connect an updated studio with AI generation enabled. This preview has not used your photos."}
+                          : service === "unauthorized"
+                            ? "Open Studio connection (the cloud icon at the top) and enter your store access code. Then confirm generation consent. Your photos have not been sent."
+                            : "Connect an updated studio with AI generation enabled. This preview has not used your photos."}
                       </p>
                     </div>
                   </div>

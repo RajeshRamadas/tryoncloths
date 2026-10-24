@@ -14,6 +14,8 @@ For AWS Lightsail, follow the [step-by-step Lightsail deployment guide](AWS_LIGH
 
 An API key alone does not deploy the backend. No public backend has been deployed as part of this repository delivery.
 
+When `TRYON_MOBILE_TOKEN` is configured, **browser users also need to connect**: open the cloud icon (**Studio connection**), use the website's HTTPS origin, and enter the store access code. Removing a Caddy browser-password prompt does not remove API authentication. The code stays in memory, so reconnect after refreshing or reopening the page. An unauthenticated API response now shows **Studio connection required**, rather than suggesting the AI service itself is unavailable. If generation remains unavailable after connecting, check the server's Gemini configuration.
+
 ## Generate and review
 
 1. Capture a clear customer face photo and a full-body photo, with consent. Enter approximate height and weight.

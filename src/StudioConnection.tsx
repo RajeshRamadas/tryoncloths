@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Cloud, LoaderCircle, X } from "lucide-react";
+import { isNative } from "./native";
 import {
   disconnectStudio,
   requestApi,
@@ -23,7 +24,7 @@ export default function StudioConnection({
   const [message, setMessage] = useState("");
   useEffect(() => {
     if (open) {
-      setUrl(studioConnection().url);
+      setUrl(studioConnection().url || (!isNative && window.location.protocol === "https:" ? window.location.origin : ""));
       setMessage("");
       dialog.current?.showModal();
     } else {
