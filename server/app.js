@@ -140,8 +140,15 @@ export function createApp({
   production = false,
   rateLimit = true,
   mobileToken = process.env.TRYON_MOBILE_TOKEN || "",
+  accessMode = process.env.TRYON_ACCESS_MODE || "auto",
   trustProxy = false,
 } = {}) {
+  if (!["auto", "protected", "public"].includes(accessMode))
+    throw new Error("TRYON_ACCESS_MODE must be auto, protected, or public.");
+  // Public mode is an explicit operator choice for anonymous browser generation.
+  if (accessMode === "public") mobileToken = "";
+  if (accessMode === "protected" && !mobileToken)
+    throw new Error("Configure TRYON_MOBILE_TOKEN or explicitly select public access mode.");
   if (mobileToken && mobileToken.length < 24)
     throw new Error("TRYON_MOBILE_TOKEN must be at least 24 characters.");
   const app = express();

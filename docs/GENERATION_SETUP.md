@@ -14,7 +14,9 @@ For AWS Lightsail, follow the [step-by-step Lightsail deployment guide](AWS_LIGH
 
 An API key alone does not deploy the backend. No public backend has been deployed as part of this repository delivery.
 
-When `TRYON_MOBILE_TOKEN` is configured, **browser users also need to connect**: open the cloud icon (**Studio connection**), use the website's HTTPS origin, and enter the store access code. Removing a Caddy browser-password prompt does not remove API authentication. The code stays in memory, so reconnect after refreshing or reopening the page. An unauthenticated API response now shows **Studio connection required**, rather than suggesting the AI service itself is unavailable. If generation remains unavailable after connecting, check the server's Gemini configuration.
+In protected mode, **browser users also need to connect**: open the cloud icon (**Studio connection**), use the website's HTTPS origin, and enter the store access code. Removing a Caddy browser-password prompt does not remove API authentication. The code stays in memory, so reconnect after refreshing or reopening the page. An unauthenticated API response now shows **Studio connection required**, rather than suggesting the AI service itself is unavailable. If generation remains unavailable after connecting, check the server's Gemini configuration.
+
+For a website without a store access code, set `TRYON_ACCESS_MODE=public` and leave `TRYON_MOBILE_TOKEN=` empty in the server environment, then recreate the service. The browser uses its own backend automatically; no Studio connection step is needed. The Gemini key stays server-side. **Anyone who can reach the server can request generation against your Gemini quota**; request limits and origin checks do not authenticate visitors or cap spending. Public mode ignores any old store token. The existing native Android connection flow still requires protected mode and a code; public mode is for the website. Lightsail defaults to `protected` and refuses to start without a code unless public mode is explicitly selected.
 
 ## Generate and review
 

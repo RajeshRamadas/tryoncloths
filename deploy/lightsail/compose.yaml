@@ -12,7 +12,8 @@ services:
       PORT: "3001"
       TRYON_TRUST_PROXY_HOPS: "1"
       TRYON_GEMINI_API_KEY: ${TRYON_GEMINI_API_KEY:?Set the Gemini API key in .env}
-      TRYON_MOBILE_TOKEN: ${TRYON_MOBILE_TOKEN:?Set a random store access code in .env}
+      TRYON_ACCESS_MODE: ${TRYON_ACCESS_MODE:-protected}
+      TRYON_MOBILE_TOKEN: ${TRYON_MOBILE_TOKEN:-}
       TRYON_GEMINI_MODEL: ${TRYON_GEMINI_MODEL:-gemini-2.5-flash-image}
     # No host port: only Caddy can reach the backend through this Docker network.
     read_only: true

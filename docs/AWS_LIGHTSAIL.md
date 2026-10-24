@@ -117,6 +117,28 @@ For your first real test, add a consenting customer's face and full-body photos,
 
 ## Troubleshooting
 
+### Website without a store access code
+
+If you want public browser generation, update the repository and set these values in the deployment `.env`:
+
+```dotenv
+TRYON_ACCESS_MODE=public
+TRYON_MOBILE_TOKEN=
+```
+
+Keep the real `TRYON_GEMINI_API_KEY` on the server. Rebuild/recreate the backend with your deployment's Compose file. For the existing Beauty Studio shared-proxy setup:
+
+```sh
+sudo docker compose -f compose.shared.yaml up -d --build tryon
+sudo docker compose -f compose.shared.yaml exec -T tryon node --input-type=module < check.mjs
+```
+
+For the standalone setup in this guide, use `sudo docker compose up -d --build` instead. Reload the website; it connects to its own backend without a code. An existing Caddy Basic Auth rule, if present, must be handled separately.
+
+Public mode allows anyone who reaches the API to use your Gemini quota. The key is never sent to the browser, but request limits are not a spending cap. Native Android connections still require protected mode. To restore protected access, set `TRYON_ACCESS_MODE=protected`, configure a random `TRYON_MOBILE_TOKEN` of at least 24 characters, and recreate the service.
+
+### Diagnose a failed deployment
+
 Run these from the deployment directory:
 
 ```sh

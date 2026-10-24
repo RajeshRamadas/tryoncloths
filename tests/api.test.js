@@ -122,6 +122,24 @@ test("proxy-aware request limits separate clients only when one private reverse 
   }
 });
 
+test("public browser access is explicit and keeps consent and origin validation", async () => {
+  assert.throws(() => createApp({ accessMode: "protected", mobileToken: "" }));
+  assert.throws(() => createApp({ accessMode: "unknown" }));
+  let calls = 0;
+  await withServer({ accessMode: "public", mobileToken: "obsolete-token", apiKey: "test-only", personalize: async () => { calls++; return face; } }, async base => {
+    const health = await fetch(`${base}/api/health`);
+    assert.equal(health.status, 200);
+    assert.equal((await health.json()).personalizationAvailable, true);
+    const valid = { consent: true, profileId: "regular", face };
+    assert.equal((await post(base, { ...valid, consent: false })).status, 400);
+    assert.equal((await post(base, valid, "https://another-site.example")).status, 403);
+    assert.equal((await post(base, valid, "https://localhost")).status, 403);
+    assert.equal(calls, 0);
+    assert.equal((await post(base, valid)).status, 200);
+    assert.equal(calls, 1);
+  });
+});
+
 test("health reports missing provider honestly without exposing credentials", async () => {
   await withServer({ apiKey: "" }, async (base) => {
     const result = await fetch(`${base}/api/health`);
