@@ -65,14 +65,16 @@ test("photos require consent, can be removed, and are cleared in a new session",
       name: "The customer agrees to use their photos for this avatar session.",
     })
     .check();
-  await page
-    .getByLabel("Upload face photo")
-    .setInputFiles(path.resolve(customerPhotos[0].face));
-  await expect(page.getByAltText("Customer face photo")).toBeVisible();
-  await page
-    .getByLabel("Upload full-body photo")
-    .setInputFiles(path.resolve(customerPhotos[0].body));
-  await expect(page.getByAltText("Customer full-body photo")).toBeVisible();
+  for (const [label, file] of [
+    ["face photo", customerPhotos[0].face],
+    ["full-body photo", customerPhotos[0].body],
+  ]) {
+    const chooserOpened = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: `Add ${label}` }).click();
+    const chooser = await chooserOpened;
+    await chooser.setFiles(path.resolve(file));
+    await expect(page.getByAltText(`Customer ${label}`)).toBeVisible();
+  }
   await page.getByRole("button", { name: "Remove face photo" }).click();
   await expect(page.getByAltText("Customer face photo")).toHaveCount(0);
   await page.getByRole("button", { name: "New session", exact: true }).click();
