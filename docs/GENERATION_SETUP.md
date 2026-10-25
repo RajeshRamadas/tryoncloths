@@ -30,6 +30,17 @@ Selecting profiles and editing details make no AI calls. Generation and retries 
 
 ## Failure and offline behavior
 
+The app's hourly attempt limit and Gemini's limits are separate. A generation failure after the app accepted the request does not establish that the hourly limit was reached. Provider failures now distinguish rejected keys/access, unavailable models, Google quota, network failures, timeouts, blocked requests and responses without a usable image. Server logs contain only a fixed error category and provider HTTP status, never the provider response body, API key or customer images. There are no automatic retries.
+
+To check the running shared Lightsail backend without submitting photos or generating another image:
+
+```sh
+cd ~/tryoncloths/deploy/lightsail
+sudo docker compose -f compose.shared.yaml exec -T tryon node server/check-provider.js
+```
+
+Update/rebuild the backend first if that script is missing. The script requests metadata for the configured model using the running server's key. A successful metadata response confirms that endpoint is accessible, but **does not prove image-generation quota, billing eligibility or output quality**. Share its sanitized result when troubleshooting; do not share `.env` contents. After a generation failure, `sudo docker compose -f compose.shared.yaml logs --tail=30 tryon` includes an `avatar_provider_failure` event with its category and HTTP status. `quota` means Google's limit, not the app's 20-attempt limit; check the provider's project billing and model quotas.
+
 A session containing customer photos cannot proceed to approval/export without a generated customer result. Missing keys, connection errors, invalid inputs, or provider failures never substitute a standard sample as the customer's output. You can still browse/export standard samples in a separate session with no customer photos.
 
 Changing the photos, measurements or selected body invalidates the generated result and its approval. Generation consent is also reset. The app holds photos/results in memory and the backend does not persist them. Provider retention is governed by your account's terms; Android sharing uses temporary cache files as described in the [Android guide](ANDROID.md).

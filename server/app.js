@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { profiles, recommendProfile } from "../src/profiles.js";
+import { ProviderError, providerRequest, providerJson, providerErrorDetails } from "./provider-errors.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const maxPhotoBytes = 5 * 1024 * 1024;
@@ -71,11 +72,11 @@ export async function geminiPersonalize({
   fetchImpl = fetch,
 }) {
   if (!/^[a-zA-Z0-9.-]+$/.test(model))
-    throw new Error("Invalid model configuration.");
+    throw new ProviderError("configuration");
   if (!profiles.some(profile => profile.id === profileId) || !body ||
       !recommendProfile(measurements?.heightCm, measurements?.weightKg))
     throw new Error("Customer photos, measurements and a standard profile are required.");
-  const response = await fetchImpl(
+  const response = await providerRequest(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: "POST",
@@ -112,25 +113,24 @@ export async function geminiPersonalize({
         generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
       }),
     },
+    fetchImpl,
   );
-  if (!response.ok)
-    throw new Error(
-      "The personalization service could not complete this request. Your standard avatar is still available.",
-    );
-  const result = await response.json();
-  const output = result.candidates?.[0]?.content?.parts?.find((p) =>
+  const result = await providerJson(response);
+  if (result?.promptFeedback?.blockReason || ["SAFETY", "IMAGE_SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST"].includes(result?.candidates?.[0]?.finishReason))
+    throw new ProviderError("blocked");
+  const output = result?.candidates?.[0]?.content?.parts?.find((p) =>
     p.inlineData?.mimeType?.startsWith("image/"),
   )?.inlineData;
-  if (!output?.data || output.data.length > 28_000_000)
-    throw new Error(
-      "No usable avatar was returned. Your standard avatar is still available.",
-    );
-  const bytes = await sharp(Buffer.from(output.data, "base64"), {
-    limitInputPixels: 25_000_000,
-  })
-    .png()
-    .toBuffer();
-  return `data:image/png;base64,${bytes.toString("base64")}`;
+  if (!output?.data) throw new ProviderError("no_image");
+  if (typeof output.data !== "string" || output.data.length > 28_000_000) throw new ProviderError("invalid_image");
+  try {
+    const bytes = await sharp(Buffer.from(output.data, "base64"), {
+      limitInputPixels: 25_000_000,
+    }).png().toBuffer();
+    return `data:image/png;base64,${bytes.toString("base64")}`;
+  } catch {
+    throw new ProviderError("invalid_image");
+  }
 }
 
 export function createApp({
@@ -279,10 +279,12 @@ export function createApp({
     try {
       const image = await personalize({ face, body, avatar, profileId: req.body.profileId, measurements: req.body.measurements, apiKey, model });
       res.json({ image, profileId: req.body.profileId, kind: "customer-avatar", needsReview: true, reviewChecks: ["face", "standard-body", "skin-tone"] });
-    } catch {
+    } catch (error) {
+      const failure = providerErrorDetails(error);
+      console.error(JSON.stringify({ event: "avatar_provider_failure", code: failure.code, providerStatus: failure.providerStatus }));
       res.status(502).json({
-        error:
-          "Customer avatar generation could not be completed. No new customer avatar was created. A timed-out request may still incur a provider charge; retries are never automatic.",
+        error: failure.message,
+        code: failure.code,
       });
     } finally {
       inFlight--;

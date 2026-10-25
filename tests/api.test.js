@@ -4,6 +4,7 @@ import sharp from "sharp";
 import { readFile } from "node:fs/promises";
 import { customerPhotos } from "./helpers/customer-photos.js";
 import { createApp, geminiPersonalize, standardAvatar } from "../server/app.js";
+import { ProviderError } from "../server/provider-errors.js";
 
 async function withServer(options, run) {
   const server = createApp(options).listen(0, "127.0.0.1");
@@ -283,6 +284,34 @@ test("provider failures are sanitized and never automatically retried", async ()
     },
   );
 });
+test("provider quota errors reach the browser and logs without secrets or an automatic retry", async (t) => {
+  const logs = [];
+  t.mock.method(console, "error", value => logs.push(JSON.parse(value)));
+  let calls = 0;
+  await withServer({ apiKey: "test-secret", personalize: async () => { calls++; throw new ProviderError("quota", 429); } }, async base => {
+    const response = await post(base, { consent: true, profileId: "regular", face });
+    assert.equal(response.status, 502);
+    const data = await response.json();
+    assert.equal(data.code, "quota");
+    assert.match(data.error, /separate from the app/);
+    assert.doesNotMatch(JSON.stringify(data), /test-secret/);
+    assert.equal(calls, 1);
+    assert.deepEqual(logs, [{ event: "avatar_provider_failure", code: "quota", providerStatus: 429 }]);
+  });
+});
+
+test("Gemini success responses distinguish blocked, missing, corrupt and malformed images", async () => {
+  const avatar = await standardAvatar("regular");
+  for (const [payload, code] of [
+    [{ promptFeedback: { blockReason: "SAFETY" } }, "blocked"],
+    [{ candidates: [{ content: { parts: [{ text: "No image" }] } }] }, "no_image"],
+    [{ candidates: [{ content: { parts: [{ inlineData: { mimeType: "image/png", data: "invalid" } }] } }] }, "invalid_image"],
+  ]) {
+    await assert.rejects(geminiPersonalize({ face: faceBytes, body: bodyBytes, avatar, profileId: "regular", measurements, apiKey: "test-only", fetchImpl: async () => new Response(JSON.stringify(payload)) }), error => error.code === code);
+  }
+  await assert.rejects(geminiPersonalize({ face: faceBytes, body: bodyBytes, avatar, profileId: "regular", measurements, apiKey: "test-only", fetchImpl: async () => new Response("not-json") }), error => error.code === "response");
+});
+
 test("Gemini adapter sends face, full-body photo and template in one skin-tone-matching request", async () => {
   let calls = 0;
   const avatar = await standardAvatar("regular");
