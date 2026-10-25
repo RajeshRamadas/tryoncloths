@@ -227,7 +227,7 @@ export default function App() {
         }
         if (!r.ok) throw new Error();
         const data = await r.json();
-        setService(data.personalizationAvailable && data.personalizationContract === "customer-avatar-v2" ? "available" : "unavailable");
+        setService(data.personalizationAvailable && data.personalizationContract === "customer-avatar-v3" ? "available" : "unavailable");
       })
       .catch(() => setService("unavailable"));
   }
@@ -341,9 +341,9 @@ export default function App() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ face, body, profileId: selected, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body" }),
+          body: JSON.stringify({ face, body, profileId: selected, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body", consentProvider: "openai" }),
         },
-        100000,
+        200000,
       );
       const data = await response.json();
       if (!response.ok)
@@ -673,7 +673,7 @@ export default function App() {
                       />
                       <span>
                         The customer agrees to send their face photo, full-body
-                        photo and approximate height/weight to Google’s Gemini
+                        photo and approximate height/weight to OpenAI’s image-generation
                         service to generate their avatar and match skin tone.
                         Provider retention terms apply.
                       </span>

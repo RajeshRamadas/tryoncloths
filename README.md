@@ -6,11 +6,11 @@ Level 1 of `tryoncloths`: a store-assisted customer avatar workflow. Built with 
 
 [Download the Android test APK](https://github.com/RajeshRamadas/tryoncloths/raw/refs/heads/main/downloads/forme-android-debug.apk) on your phone, open it, and allow installation from your browser if prompted. Android 7+ and an updated Android System WebView/Chrome (108+) are required. This is a debug build for testing.
 
-The Android app includes native camera/gallery selection, standard-body selection, customer-avatar generation through your HTTPS studio, and PNG sharing. Generation sends both customer photos and matches the face and skin tone onto the selected standard body. **Actual generation requires a server-side Gemini API key**; see [backend setup](docs/GENERATION_SETUP.md). Offline sessions without customer photos can browse/export samples. See [Android installation and builds](docs/ANDROID.md). Apple development is paused.
+The Android app includes native camera/gallery selection, standard-body selection, customer-avatar generation through your HTTPS studio, and PNG sharing. Generation sends both customer photos and matches the face and skin tone onto the selected standard body. **Actual generation requires a server-side OpenAI API key**; see [backend setup](docs/GENERATION_SETUP.md). Offline sessions without customer photos can browse/export samples. See [Android installation and builds](docs/ANDROID.md). Apple development is paused.
 
 ## See the app in action
 
-[See a separate visual example of the customer's face and skin tone on a standard body](docs/testing/visual-example/README.md). It was generated with Image Gen outside the app; the Gemini backend still requires configuration and live validation.
+[See a separate visual example of the customer's face and skin tone on a standard body](docs/testing/visual-example/README.md). It was generated with Image Gen outside the app; the OpenAI backend still requires configuration and live validation.
 
 [Open the recorded walkthrough and example output](docs/demo/README.md). The recording shows the actual app selecting a profile, reviewing it, and downloading a PNG. It uses standard sample avatars; live face personalization is not configured in this demo.
 
@@ -25,7 +25,7 @@ npm ci
 npm run dev
 ```
 
-The frontend listens on port 5173 and proxies `/api` to the Express server on port 3001. The sample workflow needs no API keys. Fonts and avatar assets are bundled locally. For a production build, run `npm run build`, then `npm start` (port 3001). This is a development pilot; add authentication and complete a privacy/provider review before exposing a credentialed instance publicly.
+The frontend listens on port 5173 and proxies `/api` to the Express server on port 3001. The sample workflow needs no API keys. Fonts and avatar assets are bundled locally. For a production build, run `npm run build`, then `npm start` (port 3001). The deployment guide describes protected store access and public website mode for this pilot.
 
 In the Codex cloud environment, use the existing `/workspace/tryoncloths` checkout and run `npm ci --cache /workspace/.npm-cache` instead of cloning again.
 
@@ -34,7 +34,7 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 - Consented face/full-body photo input, with camera capture offered on supported mobile browsers. JPEG, PNG, and WebP validation; 10 MB browser upload limit, client resizing, and removal controls.
 - Approximate standard-profile suggestion from height/weight, with staff correction. Athletic build is never inferred from weight alone.
 - Independent selection of all four standard sample profiles.
-- An explicitly triggered Gemini customer-avatar adapter using both customer photos, a selected body template, and whole-body skin-tone matching instructions, with server-side credentials and consent checks.
+- An explicitly triggered OpenAI customer-avatar adapter using both customer photos, a selected body template, and whole-body skin-tone matching instructions, with server-side credentials and consent checks.
 - Review/approval, full-body PNG download, expanded preview, and new-session photo clearing.
 - Responsive layout and keyboard-accessible controls/dialogs.
 
@@ -44,7 +44,7 @@ The full-body photo supports staff selection and, with separate consent, is sent
 
 To host the backend on AWS, follow the [AWS Lightsail setup guide](docs/AWS_LIGHTSAIL.md).
 
-Copy `.env.example` to `.env` and set `TRYON_GEMINI_API_KEY` securely. The default model is `gemini-2.5-flash-image`; `TRYON_GEMINI_MODEL` overrides it. Restart the API after configuration. Do not put credentials in `VITE_` variables or commit them. Network access to `generativelanguage.googleapis.com` is needed.
+Copy `.env.example` to `.env` and set `OPENAI_API_KEY` securely. The defaults are `TRYON_OPENAI_MODEL=gpt-image-1.5` and `TRYON_OPENAI_QUALITY=low`, requesting one portrait per generation. OpenAI API billing is separate from ChatGPT subscriptions. Restart the API after configuration. Do not put credentials in `VITE_` variables or commit them. Network access to `api.openai.com` is needed. Existing deployments should follow the [OpenAI migration steps](docs/GENERATION_SETUP.md#switch-an-existing-lightsail-deployment-from-gemini). Version 0.3.0 requires renewed OpenAI consent and the `customer-avatar-v3` contract.
 
 The adapter sends three images in one request: the selected standard body, normalized customer face, and normalized full-body reference, plus approximate height/weight. It requests the customer's face/hair and consistent natural skin tone across the face, neck, arms, hands, legs and feet, preserving the selected standard body's proportions, pose, clothing and framing. Generative output can vary and must be reviewed. There are no automatic retries or per-selection AI requests. Repeating a generation is an explicit action and may incur another charge. This development server limits attempts to 20 per hour per client IP, at least 15 seconds apart, with at most two requests in flight globally. These are development limits, not a production quota system. See [generation setup and review](docs/GENERATION_SETUP.md).
 
@@ -58,7 +58,7 @@ No retailer accounts, durable avatar storage, clothing compositing, fit predicti
 
 ## Validation
 
-The current suite passes **16 unit/API tests and 29 browser tests**, including the three-image generation contract, whole-body skin-tone instructions, separate consent, customer-export blocking, and approval of a stubbed provider result. [See current validation](docs/testing/customer-generation/README.md) and the [historical independent-photo screenshots](docs/testing/random-data/README.md). Test customers were generated separately from the avatar library. Live provider quality remains unverified. The Android download includes the WebP orientation correction.
+Validation covers **23 unit/API tests and 30 browser scenarios**, including the OpenAI multipart request, provider-specific consent, whole-body skin-tone instructions, customer-export blocking, and approval of a stubbed provider result. One browser scenario timed out on initial page load and passed on a targeted rerun. [See OpenAI validation](docs/testing/openai/README.md) and the [historical independent-photo screenshots](docs/testing/random-data/README.md). Test customers were generated separately from the avatar library. Live provider quality remains unverified. The Android download is version 0.3.0 with OpenAI consent.
 
 ```sh
 npm test
@@ -76,7 +76,8 @@ Unit/API tests cover matching, invalid inputs, consent, request origin, decoded 
 - `src/App.tsx`: store workflow and session state.
 - `src/profiles.js`: sample library and matching rule.
 - `src/images.ts`: browser photo normalization and PNG export.
-- `server/app.js`: API, validation, and optional Gemini adapter.
+- `server/app.js`: API, consent, validation, and access controls.
+- `server/openai.js`: OpenAI image-edit request and PNG response handling.
 - `public/avatar-library.png`: generated conceptual sample contact sheet; UI/export selects the appropriate panel.
 - `docs/LEVEL_1.md`: current implementation scope and remaining validation.
 

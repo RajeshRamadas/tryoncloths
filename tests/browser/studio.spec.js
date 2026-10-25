@@ -119,7 +119,7 @@ test("personalization is explicit, generates only on request, and approval reset
 }) => {
   let calls = 0;
   await page.route("**/api/health", (route) =>
-    route.fulfill({ json: { personalizationAvailable: true, personalizationContract: "customer-avatar-v2" } }),
+    route.fulfill({ json: { personalizationAvailable: true, personalizationContract: "customer-avatar-v3" } }),
   );
   await page.route("**/api/personalize", async (route) => {
     calls++;
@@ -128,6 +128,7 @@ test("personalization is explicit, generates only on request, and approval reset
     expect(input.body).toMatch(/^data:image\/jpeg;base64,/);
     expect(input.face).toMatch(/^data:image\/jpeg;base64,/);
     expect(input.consentScope).toBe("face-and-body");
+    expect(input.consentProvider).toBe("openai");
     expect(input.measurements).toEqual({ heightCm: 175, weightKg: 72 });
     const fs = await import("node:fs/promises");
     const image = await fs.readFile("public/avatar-library.png");

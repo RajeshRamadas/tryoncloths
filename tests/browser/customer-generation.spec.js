@@ -9,7 +9,7 @@ test("Android sends both photos once with consent; failures block export; approv
   const output = await sharp(customerPhotos[0].body).png().toBuffer();
   const dataUrl = `data:image/png;base64,${output.toString("base64")}`;
   await page.route("https://studio.example.test/api/health", route => route.fulfill({
-    json: { status: "ok", personalizationAvailable: true, personalizationContract: "customer-avatar-v2" },
+    json: { status: "ok", personalizationAvailable: true, personalizationContract: "customer-avatar-v3" },
   }));
   const requests = [];
   await page.route("https://studio.example.test/api/personalize", async route => {
@@ -23,6 +23,7 @@ test("Android sends both photos once with consent; failures block export; approv
     expect(data.measurements).toEqual({ heightCm: 175, weightKg: 95 });
     expect(data.consent).toBe(true);
     expect(data.consentScope).toBe("face-and-body");
+    expect(data.consentProvider).toBe("openai");
     await route.fulfill(requests.length === 1
       ? { status: 502, json: { error: "Generation failed. Please try again." } }
       : { json: { image: dataUrl, kind: "customer-avatar", profileId: "broad", needsReview: true } });

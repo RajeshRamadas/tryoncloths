@@ -1,8 +1,8 @@
 # Host the Android backend on AWS Lightsail
 
-This guide runs the Forme backend and HTTPS proxy on one Ubuntu instance. The Android app sends customer photos to this backend; the backend calls Gemini. No GPU is needed. AWS hosting and Gemini usage are billed separately. These files prepare deployment; they do not create an AWS instance.
+This guide runs the Forme backend and HTTPS proxy on one Ubuntu instance. The Android app sends customer photos to this backend; the backend calls OpenAI. No GPU is needed. AWS hosting and OpenAI usage are billed separately. These files prepare deployment; they do not create an AWS instance.
 
-You need an AWS account, a domain you can edit, and a Gemini API key with access to an image-generation model. Create the key in [Google AI Studio](https://aistudio.google.com/apikey). Keep it on the server, never in the APK or GitHub.
+You need an AWS account, a domain you can edit, and an OpenAI API key with API billing and image-model access. Create the key in [OpenAI API keys](https://platform.openai.com/api-keys). ChatGPT subscriptions do not include API usage. Keep the key on the server, never in the APK or GitHub. For an existing Gemini deployment, follow the [migration steps](GENERATION_SETUP.md#switch-an-existing-lightsail-deployment-from-gemini).
 
 ## 1. Create an instance
 
@@ -54,7 +54,7 @@ cp .env.example .env
 openssl rand -hex 24
 ```
 
-The last command prints a new random **store access code**. Keep it securely for the server and Android app. It is separate from the Gemini API key.
+The last command prints a new random **store access code**. Keep it securely for the server and Android app. It is separate from the OpenAI API key.
 
 Open the configuration:
 
@@ -67,13 +67,14 @@ Fill in these values, replacing all placeholders:
 ```dotenv
 STUDIO_DOMAIN=api.yourdomain.com
 ACME_EMAIL=you@yourdomain.com
-TRYON_GEMINI_API_KEY=your_actual_gemini_key
+OPENAI_API_KEY=your_actual_openai_key
 TRYON_MOBILE_TOKEN=the_random_store_access_code_you_generated
-TRYON_GEMINI_MODEL=gemini-2.5-flash-image
+TRYON_OPENAI_MODEL=gpt-image-1.5
+TRYON_OPENAI_QUALITY=low
 FORME_IMAGE_TAG=local
 ```
 
-Use only the hostname for `STUDIO_DOMAIN`, without `https://` or a path. Use an image-capable Gemini model available to your project; change the model variable if necessary. In nano, save with **Ctrl+O**, Enter, then exit with **Ctrl+X**.
+Use only the hostname for `STUDIO_DOMAIN`, without `https://` or a path. Use an image-capable OpenAI model available to your project; change the model variable if necessary. In nano, save with **Ctrl+O**, Enter, then exit with **Ctrl+X**.
 
 ```sh
 chmod 600 .env
@@ -102,7 +103,7 @@ sudo docker compose exec -T app node --input-type=module < check.mjs
 curl -I https://api.yourdomain.com/
 ```
 
-The script checks authentication, Android CORS, and configured generation capability without printing secrets or making a paid AI request. It does **not** validate the Gemini key with Google. The `curl` command should complete with a valid HTTPS connection and a successful response. Opening `/api/health` without the store access code returns **401**, intentionally.
+The script checks authentication, Android CORS, and configured generation capability without printing secrets or making a paid AI request. It does **not** validate the OpenAI key with OpenAI. The `curl` command should complete with a valid HTTPS connection and a successful response. Opening `/api/health` without the store access code returns **401**, intentionally.
 
 ## 8. Connect the Android app
 
@@ -111,9 +112,9 @@ Install the [current Android test APK](https://github.com/RajeshRamadas/tryonclo
 - **Backend URL:** `https://api.yourdomain.com`
 - **Store access code:** the value you saved as `TRYON_MOBILE_TOKEN`.
 
-Connect. Never enter the Gemini API key into the app. Connection settings are kept in memory, so you may need to reconnect after restarting the app.
+Connect. Never enter the OpenAI API key into the app. Connection settings are kept in memory, so you may need to reconnect after restarting the app.
 
-For your first real test, add a consenting customer's face and full-body photos, enter height/weight, choose a standard body, confirm generation consent, and tap **Generate customer avatar**. Review the face, body and skin tone before approving/exporting. This makes a billable Gemini request; browsing profiles does not. The first live generation verifies provider access and output quality, which local configuration checks cannot establish.
+For your first real test, add a consenting customer's face and full-body photos, enter height/weight, choose a standard body, confirm generation consent, and tap **Generate customer avatar**. Review the face, body and skin tone before approving/exporting. This makes a billable OpenAI request; browsing profiles does not. The first live generation verifies provider access and output quality, which local configuration checks cannot establish.
 
 ## Troubleshooting
 
@@ -126,7 +127,7 @@ TRYON_ACCESS_MODE=public
 TRYON_MOBILE_TOKEN=
 ```
 
-Keep the real `TRYON_GEMINI_API_KEY` on the server. Rebuild/recreate the backend with your deployment's Compose file. For the existing Beauty Studio shared-proxy setup:
+Keep the real `OPENAI_API_KEY` on the server. Rebuild/recreate the backend with your deployment's Compose file. For the existing Beauty Studio shared-proxy setup:
 
 ```sh
 sudo docker compose -f compose.shared.yaml up -d --build tryon
@@ -135,7 +136,7 @@ sudo docker compose -f compose.shared.yaml exec -T tryon node --input-type=modul
 
 For the standalone setup in this guide, use `sudo docker compose up -d --build` instead. Reload the website; it connects to its own backend without a code. An existing Caddy Basic Auth rule, if present, must be handled separately.
 
-Public mode allows anyone who reaches the API to use your Gemini quota. The key is never sent to the browser, but request limits are not a spending cap. Native Android connections still require protected mode. To restore protected access, set `TRYON_ACCESS_MODE=protected`, configure a random `TRYON_MOBILE_TOKEN` of at least 24 characters, and recreate the service.
+Public mode allows anyone who reaches the API to use your OpenAI quota. The key is never sent to the browser, but request limits are not a spending cap. Native Android connections still require protected mode. To restore protected access, set `TRYON_ACCESS_MODE=protected`, configure a random `TRYON_MOBILE_TOKEN` of at least 24 characters, and recreate the service.
 
 ### Diagnose a failed deployment
 
@@ -149,9 +150,9 @@ sudo docker compose logs --tail=80 app caddy
 | Symptom | Check |
 | --- | --- |
 | HTTPS unavailable or certificate error | DNS points to the attached static IP; ports 80/443 are open; no incorrect AAAA record; inspect Caddy logs. |
-| App container unhealthy | Gemini key is present; store access code is at least 24 characters; inspect app logs. |
+| App container unhealthy | OpenAI key is present; store access code is at least 24 characters; inspect app logs. |
 | Android connection rejected | HTTPS URL has no `/api` suffix; store access code matches `.env`; use the current APK and backend. |
-| Generation fails after connection succeeds | Gemini key, billing, model availability and quota. A successful health check only confirms the key is configured. |
+| Generation fails after connection succeeds | OpenAI key, billing, model availability and quota. A successful health check only confirms the key is configured. |
 | Too many requests | Wait at least 15 seconds between attempts; the pilot also limits each client IP to 20 attempts/hour and allows two concurrent generations. |
 
 After editing `.env`, apply it with `sudo docker compose up -d`. Do not share logs without checking for sensitive information.
@@ -168,8 +169,8 @@ sudo docker compose exec -T app node --input-type=module < check.mjs
 
 Keep the Caddy named volumes: they hold certificate state. `sudo docker compose down` stops the services, but stopping containers or the instance does not by itself remove all AWS charges. Manage resource deletion and billing in AWS when retiring the deployment.
 
-Use Lightsail monitoring for resource usage and configure Gemini quotas/billing controls for your pilot. Request limits are not a spending cap. Customer photos/results are processed in memory; the backend does not save an avatar database. See [generation setup](GENERATION_SETUP.md) for provider data handling and current verification limits.
+Use Lightsail monitoring for resource usage and configure OpenAI quotas/billing controls for your pilot. Request limits are not a spending cap. Customer photos/results are processed in memory; the backend does not save an avatar database. See [generation setup](GENERATION_SETUP.md) for provider data handling and current verification limits.
 
 ## Deployment validation
 
-Validated locally on 2026-10-23: Docker production build; Compose configuration with dummy credentials; Caddy configuration; non-root, read-only container startup and healthy status; API authentication and Android CORS; frontend serving; Sharp avatar template rendering; and all 16 unit/API tests, including per-client limits behind one proxy. No AWS resources were created. Public DNS, certificate issuance, physical Android connectivity and live Gemini generation must be checked on your deployment.
+The initial Docker deployment was validated locally on 2026-10-23: production build, Compose and Caddy configuration, non-root read-only container startup, API authentication, Android CORS, frontend serving, and Sharp template rendering. The later OpenAI migration is covered by the [version 0.3.0 validation report](testing/openai/README.md). No AWS resources were created from this workspace. Public DNS, certificate issuance, physical Android connectivity and live OpenAI generation must be checked on your deployment.

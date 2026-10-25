@@ -3,7 +3,7 @@
 const origin = "http://127.0.0.1:3001";
 const token = process.env.TRYON_MOBILE_TOKEN;
 const publicAccess = process.env.TRYON_ACCESS_MODE === "public";
-if (!process.env.TRYON_GEMINI_API_KEY) throw new Error("Configure a Gemini API key on the server.");
+if (!process.env.OPENAI_API_KEY) throw new Error("Configure an OpenAI API key on the server.");
 if (!publicAccess && (!token || token.length < 24))
   throw new Error("Configure a store access code of at least 24 characters for protected access.");
 const anonymous = await fetch(`${origin}/api/health`, { signal: AbortSignal.timeout(5000) });
@@ -13,12 +13,12 @@ const response = await fetch(`${origin}/api/health`, {
   headers: publicAccess ? {} : { Origin: "https://localhost", Authorization: `Bearer ${token}` },
 });
 const health = await response.json();
-if (!response.ok || !health.personalizationAvailable || health.personalizationContract !== "customer-avatar-v2") {
+if (!response.ok || !health.personalizationAvailable || health.personalizationContract !== "customer-avatar-v3") {
   throw new Error("Generation configuration or server version is not ready.");
 }
 if (!publicAccess && response.headers.get("access-control-allow-origin") !== "https://localhost") {
   throw new Error("Android origin is not enabled.");
 }
 console.log(publicAccess
-  ? "Public browser access and generation configuration passed. Anyone can request generation against your quota. No AI call was made; key validity and HTTPS still need verification."
+  ? "Public browser access and OpenAI generation configuration passed. Anyone can request generation against your quota. No AI call was made; key validity and HTTPS still need verification."
   : "Backend authentication, Android CORS and generation configuration passed. No AI call was made; key validity and HTTPS still need verification.");

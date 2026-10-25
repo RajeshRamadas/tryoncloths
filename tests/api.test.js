@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import sharp from "sharp";
 import { readFile } from "node:fs/promises";
 import { customerPhotos } from "./helpers/customer-photos.js";
-import { createApp, geminiPersonalize, standardAvatar } from "../server/app.js";
+import { createApp, standardAvatar } from "../server/app.js";
+import { openaiPersonalize } from "../server/openai.js";
 import { ProviderError } from "../server/provider-errors.js";
 
 async function withServer(options, run) {
@@ -28,7 +29,7 @@ const bodyBytes = await readFile(customerPhotos[1].body);
 const face = `data:image/jpeg;base64,${faceBytes.toString("base64")}`;
 const bodyPhoto = `data:image/jpeg;base64,${bodyBytes.toString("base64")}`;
 const measurements = { heightCm: 175, weightKg: 72 };
-const defaultRequest = { consentScope: "face-and-body", measurements, body: bodyPhoto };
+const defaultRequest = { consentProvider: "openai", consentScope: "face-and-body", measurements, body: bodyPhoto };
 
 test("mobile preflight allows only native origins, and store access codes protect API calls", async () => {
   const token = "test-mobile-access-code-32-characters";
@@ -214,6 +215,8 @@ test("full-body photo, supported measurements and explicit two-photo consent are
       { body: undefined },
       { body: "data:image/jpeg;base64,aGVsbG8=" },
       { consentScope: "face-only" },
+      { consentProvider: undefined },
+      { consentProvider: "gemini" },
       { measurements: { heightCm: 0, weightKg: 72 } },
       { measurements: { heightCm: "175", weightKg: 72 } },
       { measurements: { heightCm: 175, weightKg: 201 } },
@@ -300,64 +303,69 @@ test("provider quota errors reach the browser and logs without secrets or an aut
   });
 });
 
-test("Gemini success responses distinguish blocked, missing, corrupt and malformed images", async () => {
+test("OpenAI responses distinguish missing, corrupt and malformed images", async () => {
   const avatar = await standardAvatar("regular");
   for (const [payload, code] of [
-    [{ promptFeedback: { blockReason: "SAFETY" } }, "blocked"],
-    [{ candidates: [{ content: { parts: [{ text: "No image" }] } }] }, "no_image"],
-    [{ candidates: [{ content: { parts: [{ inlineData: { mimeType: "image/png", data: "invalid" } }] } }] }, "invalid_image"],
+    [{ data: [] }, "no_image"],
+    [{ data: [{ b64_json: "invalid" }] }, "invalid_image"],
+    [{ data: [{ url: "https://untrusted.example/image.png" }] }, "no_image"],
   ]) {
-    await assert.rejects(geminiPersonalize({ face: faceBytes, body: bodyBytes, avatar, profileId: "regular", measurements, apiKey: "test-only", fetchImpl: async () => new Response(JSON.stringify(payload)) }), error => error.code === code);
+    await assert.rejects(openaiPersonalize({ face: faceBytes, body: bodyBytes, avatar, profileId: "regular", measurements, apiKey: "test-only", fetchImpl: async () => new Response(JSON.stringify(payload)) }), error => error.code === code);
   }
-  await assert.rejects(geminiPersonalize({ face: faceBytes, body: bodyBytes, avatar, profileId: "regular", measurements, apiKey: "test-only", fetchImpl: async () => new Response("not-json") }), error => error.code === "response");
+  await assert.rejects(openaiPersonalize({ face: faceBytes, body: bodyBytes, avatar, profileId: "regular", measurements, apiKey: "test-only", fetchImpl: async () => new Response("not-json") }), error => error.code === "response");
 });
 
-test("Gemini adapter sends face, full-body photo and template in one skin-tone-matching request", async () => {
+test("OpenAI edits sends three ordered image files and requests one portrait with face and skin-tone matching", async () => {
   let calls = 0;
   const avatar = await standardAvatar("regular");
-  const result = await geminiPersonalize({
-    face: faceBytes,
-    body: bodyBytes,
-    profileId: "regular",
-    measurements,
-    avatar,
-    apiKey: "test-only",
+  const result = await openaiPersonalize({
+    face: faceBytes, body: bodyBytes, profileId: "regular", measurements, avatar, apiKey: "test-only",
     fetchImpl: async (url, options) => {
       calls++;
-      assert.ok(url.startsWith("https://generativelanguage.googleapis.com/"));
-      const body = JSON.parse(options.body);
-      assert.equal(
-        body.contents[0].parts.filter((p) => p.inlineData).length,
-        3,
-      );
-      const parts = body.contents[0].parts;
-      assert.equal(parts[1].inlineData.data, avatar.toString("base64"));
-      assert.equal(parts[2].inlineData.data, faceBytes.toString("base64"));
-      assert.equal(parts[3].inlineData.data, bodyBytes.toString("base64"));
-      assert.match(parts[0].text, /MATCH THE CUSTOMER.S NATURAL SKIN TONE/);
-      assert.match(parts[0].text, /arms, hands, legs and feet/);
-      assert.match(parts[0].text, /selected standard body/);
-      return new Response(
-        JSON.stringify({
-          candidates: [
-            {
-              content: {
-                parts: [
-                  {
-                    inlineData: {
-                      mimeType: "image/png",
-                      data: faceBytes.toString("base64"),
-                    },
-                  },
-                ],
-              },
-            },
-          ],
-        }),
-        { status: 200 },
-      );
+      assert.equal(url, "https://api.openai.com/v1/images/edits");
+      assert.equal(options.method, "POST");
+      assert.equal(options.headers.Authorization, "Bearer test-only");
+      assert.equal(options.headers["Content-Type"], undefined);
+      assert.match(new Request(url, options).headers.get("content-type"), /^multipart\/form-data; boundary=/);
+      const form = options.body;
+      assert.equal(form.get("model"), "gpt-image-1.5");
+      assert.equal(form.get("n"), "1");
+      assert.equal(form.get("quality"), "low");
+      assert.equal(form.get("size"), "1024x1536");
+      assert.equal(form.get("output_format"), "png");
+      assert.equal(form.get("input_fidelity"), "high");
+      assert.equal(form.get("response_format"), null);
+      const files = form.getAll("image[]");
+      assert.equal(files.length, 3);
+      assert.deepEqual(files.map(file => file.name), ["standard-body.png", "customer-face.jpg", "customer-body.jpg"]);
+      assert.deepEqual(files.map(file => file.type), ["image/png", "image/jpeg", "image/jpeg"]);
+      for (const [index, expected] of [avatar, faceBytes, bodyBytes].entries())
+        assert.deepEqual(Buffer.from(await files[index].arrayBuffer()), expected);
+      assert.match(form.get("prompt"), /MATCH THE CUSTOMER.S NATURAL SKIN TONE/);
+      assert.match(form.get("prompt"), /arms, hands, legs and feet/);
+      assert.match(form.get("prompt"), /selected standard body/);
+      assert.match(form.get("prompt"), /175 cm and weight 72 kg/);
+      return new Response(JSON.stringify({ data: [{ b64_json: faceBytes.toString("base64") }] }));
     },
   });
   assert.ok(result.startsWith("data:image/png;base64,"));
   assert.equal(calls, 1);
+});
+
+test("OpenAI configurable models omit unsupported fidelity options and failures never trigger fallback", async () => {
+  const avatar = await standardAvatar("regular");
+  const input = { face: faceBytes, body: bodyBytes, avatar, profileId: "regular", measurements, apiKey: "test-only" };
+  for (const model of ["gpt-image-1-mini", "gpt-image-2"]) {
+    let calls = 0;
+    await assert.rejects(openaiPersonalize({ ...input, model, quality: "medium", fetchImpl: async (_url, options) => {
+      calls++;
+      assert.equal(options.body.get("input_fidelity"), null);
+      assert.equal(options.body.get("quality"), "medium");
+      return new Response(JSON.stringify({ error: { code: "insufficient_quota", message: "secret" } }), { status: 429 });
+    } }), error => error.code === "quota" && !error.message.includes("secret"));
+    assert.equal(calls, 1);
+  }
+  for (const config of [{ quality: "unsupported" }, { model: "gpt-4o" }, { apiKey: "" }]) {
+    await assert.rejects(openaiPersonalize({ ...input, ...config, fetchImpl: () => { throw new Error("Must not call provider"); } }), error => error.code === "configuration");
+  }
 });

@@ -12,6 +12,6 @@ createApp({ production, trustProxy: trustProxySetting === "1" ? 1 : false }).lis
     return;
   }
   console.log(
-    `Forme ${production ? "app" : "API"} listening on port ${port}. Customer avatar generation: ${process.env.TRYON_GEMINI_API_KEY ? "configured" : "not configured"}.`,
+    `Forme ${production ? "app" : "API"} listening on port ${port}. Customer avatar generation: ${process.env.OPENAI_API_KEY ? "configured" : "not configured"}.`,
   );
 });
