@@ -4,7 +4,7 @@ import { geminiAvatarPrompt } from "./avatar-prompt.js";
 import { geminiBodyReference } from "./gemini-reference.js";
 import { ProviderError, providerRequest, providerJson } from "./provider-errors.js";
 
-export const GEMINI_REFERENCE_VERSION = "customer-first-v1";
+export const GEMINI_REFERENCE_VERSION = "customer-first-v2";
 
 export async function geminiPersonalize({ face, body, avatar, profileId, measurements, apiKey, model = "gemini-2.5-flash-image", fetchImpl = fetch }) {
   if (!apiKey || !/^[a-zA-Z0-9.-]+$/.test(model)) throw new ProviderError("configuration");
@@ -22,7 +22,7 @@ export async function geminiPersonalize({ face, body, avatar, profileId, measure
         { inlineData: { mimeType: "image/jpeg", data: face.toString("base64") } },
         { text: "Image 2 — CUSTOMER FULL-BODY PHOTO. Supporting customer complexion reference." },
         { inlineData: { mimeType: "image/jpeg", data: body.toString("base64") } },
-        { text: "Image 3 — STANDARD BODY GEOMETRY ONLY. Head blanked and colours removed intentionally." },
+        { text: "Image 3 — STANDARD BODY TYPE AND POSE. Head covered; natural body colour and texture retained. Adapt all exposed skin to the customer." },
         { inlineData: { mimeType: "image/png", data: bodyReference.toString("base64") } },
       ] }],
       generationConfig: { responseModalities: ["TEXT", "IMAGE"], imageConfig: { aspectRatio: "2:3" } },

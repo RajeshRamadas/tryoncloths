@@ -40,7 +40,7 @@ test("the selected provider is advertised and only matching provider consent can
     await withServer({ provider, apiKey: "test-only", personalize: async () => { calls++; return face; } }, async base => {
       const health = await (await fetch(`${base}/api/health`)).json();
       assert.equal(health.provider, provider);
-      if (provider === "gemini") assert.equal(health.generationRevision, "customer-first-v1");
+      if (provider === "gemini") assert.equal(health.generationRevision, "customer-first-v2");
       assert.equal(health.personalizationContract, "customer-avatar-v4");
       const valid = { consent: true, profileId: "regular", face };
       assert.equal((await post(base, { ...valid, consentProvider: provider === "gemini" ? "openai" : "gemini" })).status, 400);
@@ -73,6 +73,9 @@ test("Gemini uses the chosen body template and both customer photos for face and
     assert.match(parts[0].text, /original head deliberately covered/);
     assert.match(parts[0].text, /Keep glasses if present/);
     assert.match(parts[0].text, /BOTH COMPLETE FEET AND TOES/);
+    assert.match(parts[0].text, /ONE natural full-colour photograph/);
+    assert.match(parts[0].text, /including the lower legs and feet/);
+    assert.match(parts[0].text, /not the target complexion/);
     assert.match(parts[0].text, /selected broad STANDARD BODY TEMPLATE/);
     assert.match(parts[0].text, /CUSTOMER FACE/);
     assert.match(parts[0].text, /MATCH THE CUSTOMER.S NATURAL SKIN TONE/);
@@ -433,7 +436,7 @@ test("OpenAI configurable models omit unsupported fidelity options and failures 
   }
 });
 
-test("every Gemini template hides identity, removes colour and retains body and feet without stretching", async () => {
+test("every Gemini template hides identity while preserving natural body colour, texture and geometry", async () => {
   for (const id of ["slim", "regular", "athletic", "broad"]) {
     const original = await standardAvatar(id);
     const before = Buffer.from(original);
@@ -444,19 +447,19 @@ test("every Gemini template hides identity, removes colour and retains body and 
     assert.equal(height, 1038);
     const { data, info } = await sharp(reference).removeAlpha().raw().toBuffer({ resolveWithObject: true });
     assert.equal(info.channels, 3);
-    for (let i = 0; i < data.length; i += 3) {
-      assert.equal(data[i], data[i + 1]);
-      assert.equal(data[i], data[i + 2]);
-    }
+    let colouredPixels = 0;
+    for (let i = 0; i < data.length; i += 3)
+      if (Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]) > 12) colouredPixels++;
+    assert.ok(colouredPixels > 10000, `${id}: body reference must not be desaturated`);
     const head = await sharp(reference).extract({ left: 154 + 112, top: 48 + 12, width: 160, height: 210 }).raw().toBuffer();
     assert.ok(head.every(channel => channel === 198), `${id}: no face, hair or neck pixels may survive the mask`);
     // From below the mask to the floor: all original geometry, including toes,
-    // must survive at original scale and coordinates, only converted to gray.
+    // must survive at original scale and coordinates, with natural skin colour and texture intact.
     const bodyRegion = { left: 0, top: 222, width: 384, height: 720 };
-    const expected = await sharp(original).grayscale().toColourspace("srgb").extract(bodyRegion).raw().toBuffer();
-    const actual = await sharp(reference).grayscale().extract({ ...bodyRegion, left: 154, top: 48 + 222 }).raw().toBuffer();
+    const expected = await sharp(original).removeAlpha().extract(bodyRegion).raw().toBuffer();
+    const actual = await sharp(reference).removeAlpha().extract({ ...bodyRegion, left: 154, top: 48 + 222 }).raw().toBuffer();
     assert.equal(actual.length, expected.length);
-    assert.ok(actual.equals(expected), `${id}: preserve body/feet geometry`);
+    assert.ok(actual.equals(expected), `${id}: preserve body/feet colour, texture and geometry`);
   }
   await assert.rejects(geminiBodyReference(await sharp({create:{width:400,height:900,channels:3,background:"white"}}).png().toBuffer()), /Review the identity mask/);
 });
