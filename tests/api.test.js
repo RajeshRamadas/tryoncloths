@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { customerPhotos } from "./helpers/customer-photos.js";
 import { createApp, standardAvatar } from "../server/app.js";
 import { openaiPersonalize } from "../server/openai.js";
+import { geminiBodyReference } from "../server/gemini-reference.js";
 import { geminiPersonalize } from "../server/gemini.js";
 import { ProviderError } from "../server/provider-errors.js";
 
@@ -39,6 +40,7 @@ test("the selected provider is advertised and only matching provider consent can
     await withServer({ provider, apiKey: "test-only", personalize: async () => { calls++; return face; } }, async base => {
       const health = await (await fetch(`${base}/api/health`)).json();
       assert.equal(health.provider, provider);
+      if (provider === "gemini") assert.equal(health.generationRevision, "customer-first-v1");
       assert.equal(health.personalizationContract, "customer-avatar-v4");
       const valid = { consent: true, profileId: "regular", face };
       assert.equal((await post(base, { ...valid, consentProvider: provider === "gemini" ? "openai" : "gemini" })).status, 400);
@@ -60,13 +62,23 @@ test("Gemini uses the chosen body template and both customer photos for face and
     assert.equal(options.headers["x-goog-api-key"], "test-only");
     const payload = JSON.parse(options.body);
     const parts = payload.contents[0].parts;
-    assert.equal(parts.length, 4);
-    assert.deepEqual(parts.slice(1).map(part => part.inlineData.data), [avatar, faceBytes, bodyBytes].map(bytes => bytes.toString("base64")));
+    const images = parts.filter(part => part.inlineData).map(part => part.inlineData);
+    assert.equal(images.length, 3);
+    assert.deepEqual(images.slice(0, 2).map(image => image.data), [faceBytes, bodyBytes].map(bytes => bytes.toString("base64")));
+    assert.equal(images[2].mimeType, "image/png");
+    assert.notEqual(images[2].data, avatar.toString("base64"));
+    const reference = await sharp(Buffer.from(images[2].data, "base64")).metadata();
+    assert.equal(reference.width / reference.height, 2 / 3);
+    assert.match(parts[0].text, /Image 1 = CUSTOMER FACE/);
+    assert.match(parts[0].text, /original head deliberately covered/);
+    assert.match(parts[0].text, /Keep glasses if present/);
+    assert.match(parts[0].text, /BOTH COMPLETE FEET AND TOES/);
     assert.match(parts[0].text, /selected broad STANDARD BODY TEMPLATE/);
     assert.match(parts[0].text, /CUSTOMER FACE/);
     assert.match(parts[0].text, /MATCH THE CUSTOMER.S NATURAL SKIN TONE/);
     assert.match(parts[0].text, /face, ears, neck, arms, hands, legs and feet/);
     assert.deepEqual(payload.generationConfig.responseModalities, ["TEXT", "IMAGE"]);
+    assert.equal(payload.generationConfig.imageConfig.aspectRatio, "2:3");
     return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: "image/png", data: faceBytes.toString("base64") } }] } }] }));
   } });
   assert.equal(calls, 1);
@@ -419,4 +431,32 @@ test("OpenAI configurable models omit unsupported fidelity options and failures 
   for (const config of [{ quality: "unsupported" }, { model: "gpt-4o" }, { apiKey: "" }]) {
     await assert.rejects(openaiPersonalize({ ...input, ...config, fetchImpl: () => { throw new Error("Must not call provider"); } }), error => error.code === "configuration");
   }
+});
+
+test("every Gemini template hides identity, removes colour and retains body and feet without stretching", async () => {
+  for (const id of ["slim", "regular", "athletic", "broad"]) {
+    const original = await standardAvatar(id);
+    const before = Buffer.from(original);
+    const reference = await geminiBodyReference(original);
+    assert.deepEqual(original, before, "the sample library input must remain intact");
+    const { width, height } = await sharp(reference).metadata();
+    assert.equal(width, 692);
+    assert.equal(height, 1038);
+    const { data, info } = await sharp(reference).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    assert.equal(info.channels, 3);
+    for (let i = 0; i < data.length; i += 3) {
+      assert.equal(data[i], data[i + 1]);
+      assert.equal(data[i], data[i + 2]);
+    }
+    const head = await sharp(reference).extract({ left: 154 + 112, top: 48 + 12, width: 160, height: 210 }).raw().toBuffer();
+    assert.ok(head.every(channel => channel === 198), `${id}: no face, hair or neck pixels may survive the mask`);
+    // From below the mask to the floor: all original geometry, including toes,
+    // must survive at original scale and coordinates, only converted to gray.
+    const bodyRegion = { left: 0, top: 222, width: 384, height: 720 };
+    const expected = await sharp(original).grayscale().toColourspace("srgb").extract(bodyRegion).raw().toBuffer();
+    const actual = await sharp(reference).grayscale().extract({ ...bodyRegion, left: 154, top: 48 + 222 }).raw().toBuffer();
+    assert.equal(actual.length, expected.length);
+    assert.ok(actual.equals(expected), `${id}: preserve body/feet geometry`);
+  }
+  await assert.rejects(geminiBodyReference(await sharp({create:{width:400,height:900,channels:3,background:"white"}}).png().toBuffer()), /Review the identity mask/);
 });

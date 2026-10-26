@@ -47,7 +47,7 @@ For a website without a store access code, set `TRYON_ACCESS_MODE=public` and le
 1. Capture a clear customer face photo and a full-body photo, with consent. Enter approximate height and weight.
 2. Choose the closest standard body. Height/weight gives a starting suggestion; staff compare the full-body photo and can select Slim, Regular, Athletic, or Broad. Automatic body measurements are not implemented.
 3. Confirm the separate consent to send **both photos and approximate measurements** to Gemini. Tap **Generate customer avatar**.
-4. One provider request sends the selected standard template, customer face, customer full-body reference, and measurements. It asks for the customer's face/hair and natural skin tone across all exposed skin while retaining the standard body's proportions, pose and clothing. Face and body photos are lighting-dependent references, not a biometric or calibrated skin-color measurement.
+4. Gemini receives the customer face first, full-body photo second, and a grayscale standard body with its original head covered last, plus measurements. The body reference is padded without stretching to keep head and feet in frame. It asks for the customer's face/hair and natural skin tone across all exposed skin while retaining the standard body's proportions, pose and clothing. Face and body photos are lighting-dependent references, not a biometric or calibrated skin-color measurement.
 5. Compare the generated result with both original photos. Review facial resemblance, selected body proportions, and consistent skin tone on the face, neck, arms, hands, legs and feet. Approve only after review, then save/share the PNG.
 
 Selecting profiles and editing details make no AI calls. Generation and retries are explicit; there are no automatic retries. A timeout can still incur a provider charge. The pilot limits attempts to 20 per hour per client IP, at least 15 seconds apart, with at most two provider calls in flight globally. These request limits are not a monetary budget cap; use provider quotas/billing controls too.
@@ -74,3 +74,8 @@ Changing the photos, measurements or selected body invalidates the generated res
 ## Current verification status
 
 Automated tests verify the three-image request, separate consent, measurements, selected template, skin-tone instructions, failure handling, approval gates, and export of the returned PNG. They use stubbed provider responses. **A real generated customer's appearance, skin-tone accuracy, latency, and price have not been verified through the live Gemini API**, because no backend key/account is configured in this environment. Physical Android testing also remains pending.
+
+
+## Customer-reference correction
+
+A live test returned HTTP 200 but failed facial resemblance. The updated Gemini request removes the template identity and prioritizes customer references; see [failure evidence and validation limits](testing/gemini-reference-fix/README.md). After rebuilding, `/api/health` must advertise `generationRevision: "customer-first-v1"`. This backend update works with the current v0.4.0 APK; no Android reinstall is required. Refresh the browser and generate a new result for visual review.

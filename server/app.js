@@ -6,7 +6,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { profiles, recommendProfile } from "../src/profiles.js";
 import { providerErrorDetails } from "./provider-errors.js";
 import { openaiPersonalize } from "./openai.js";
-import { geminiPersonalize } from "./gemini.js";
+import { geminiPersonalize, GEMINI_REFERENCE_VERSION } from "./gemini.js";
 import { providerConfig } from "./provider-config.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -131,6 +131,7 @@ export function createApp({
       status: "ok",
       personalizationAvailable: Boolean(apiKey),
       provider,
+      generationRevision: provider === "gemini" ? GEMINI_REFERENCE_VERSION : "template-first-v1",
       personalizationContract: "customer-avatar-v4",
       storage: "ephemeral",
       profileCount: profiles.length,
