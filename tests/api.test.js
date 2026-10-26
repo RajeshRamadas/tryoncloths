@@ -40,7 +40,7 @@ test("the selected provider is advertised and only matching provider consent can
     await withServer({ provider, apiKey: "test-only", personalize: async () => { calls++; return face; } }, async base => {
       const health = await (await fetch(`${base}/api/health`)).json();
       assert.equal(health.provider, provider);
-      if (provider === "gemini") assert.equal(health.generationRevision, "customer-first-v2");
+      if (provider === "gemini") assert.equal(health.generationRevision, "customer-first-v3");
       assert.equal(health.personalizationContract, "customer-avatar-v4");
       const valid = { consent: true, profileId: "regular", face };
       assert.equal((await post(base, { ...valid, consentProvider: provider === "gemini" ? "openai" : "gemini" })).status, 400);
@@ -70,12 +70,14 @@ test("Gemini uses the chosen body template and both customer photos for face and
     const reference = await sharp(Buffer.from(images[2].data, "base64")).metadata();
     assert.equal(reference.width / reference.height, 2 / 3);
     assert.match(parts[0].text, /Image 1 = CUSTOMER FACE/);
-    assert.match(parts[0].text, /original head deliberately covered/);
+    assert.match(parts[0].text, /featureless head-size guide/);
     assert.match(parts[0].text, /Keep glasses if present/);
     assert.match(parts[0].text, /BOTH COMPLETE FEET AND TOES/);
     assert.match(parts[0].text, /ONE natural full-colour photograph/);
     assert.match(parts[0].text, /including the lower legs and feet/);
     assert.match(parts[0].text, /not the target complexion/);
+    assert.match(parts[0].text, /Scale the customer head uniformly/);
+    assert.match(parts[0].text, /2:3 canvas ratio controls framing only/);
     assert.match(parts[0].text, /selected broad STANDARD BODY TEMPLATE/);
     assert.match(parts[0].text, /CUSTOMER FACE/);
     assert.match(parts[0].text, /MATCH THE CUSTOMER.S NATURAL SKIN TONE/);
@@ -440,7 +442,7 @@ test("every Gemini template hides identity while preserving natural body colour,
   for (const id of ["slim", "regular", "athletic", "broad"]) {
     const original = await standardAvatar(id);
     const before = Buffer.from(original);
-    const reference = await geminiBodyReference(original);
+    const reference = await geminiBodyReference(original, id);
     assert.deepEqual(original, before, "the sample library input must remain intact");
     const { width, height } = await sharp(reference).metadata();
     assert.equal(width, 692);
@@ -451,15 +453,20 @@ test("every Gemini template hides identity while preserving natural body colour,
     for (let i = 0; i < data.length; i += 3)
       if (Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]) > 12) colouredPixels++;
     assert.ok(colouredPixels > 10000, `${id}: body reference must not be desaturated`);
-    const head = await sharp(reference).extract({ left: 154 + 112, top: 48 + 12, width: 160, height: 210 }).raw().toBuffer();
-    assert.ok(head.every(channel => channel === 198), `${id}: no face, hair or neck pixels may survive the mask`);
-    // From below the mask to the floor: all original geometry, including toes,
-    // must survive at original scale and coordinates, with natural skin colour and texture intact.
-    const bodyRegion = { left: 0, top: 222, width: 384, height: 720 };
+    // Alter every original identity pixel. The prepared reference must be
+    // identical, proving the source face/hair cannot leak into the guide.
+    const centre = { slim: 185, regular: 192, athletic: 190, broad: 186 }[id];
+    const marker = await sharp({ create: { width: 148, height: 155, channels: 3, background: "#ff00ff" } }).png().toBuffer();
+    const alternate = await sharp(original).composite([{ input: marker, left: centre - 74, top: 20 }]).removeAlpha().png().toBuffer();
+    assert.ok((await geminiBodyReference(alternate, id)).equals(reference), `${id}: erase the complete template identity`);
+    const guideSkin = await sharp(reference).extract({ left: 154 + centre, top: 48 + 100, width: 1, height: 1 }).raw().toBuffer();
+    assert.ok(guideSkin[0] > guideSkin[2] + 12, `${id}: use the natural neck colour for the anatomy guide`);
+    // Source collar, shoulders and neck are no longer erased by a large block.
+    const bodyRegion = { left: 4, top: 175, width: 376, height: 767 };
     const expected = await sharp(original).removeAlpha().extract(bodyRegion).raw().toBuffer();
-    const actual = await sharp(reference).removeAlpha().extract({ ...bodyRegion, left: 154, top: 48 + 222 }).raw().toBuffer();
+    const actual = await sharp(reference).removeAlpha().extract({ ...bodyRegion, left: 158, top: 48 + 175 }).raw().toBuffer();
     assert.equal(actual.length, expected.length);
     assert.ok(actual.equals(expected), `${id}: preserve body/feet colour, texture and geometry`);
   }
-  await assert.rejects(geminiBodyReference(await sharp({create:{width:400,height:900,channels:3,background:"white"}}).png().toBuffer()), /Review the identity mask/);
+  await assert.rejects(geminiBodyReference(await sharp({create:{width:400,height:900,channels:3,background:"white"}}).png().toBuffer(), "regular"), /Review the anatomy guide/);
 });
