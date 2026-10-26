@@ -199,8 +199,10 @@ export default function App() {
   const [consent, setConsent] = useState(false);
   const [aiConsent, setAiConsent] = useState(false);
   const [service, setService] = useState<ServiceState>("checking");
+  const [provider, setProvider] = useState<"gemini" | "openai" | null>(null);
   const [personalized, setPersonalized] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [generationFailed, setGenerationFailed] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [approved, setApproved] = useState(false);
   const [error, setError] = useState("");
@@ -210,15 +212,18 @@ export default function App() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [session, setSession] = useState(0);
   const titleRef = useRef<HTMLHeadingElement>(null);
+  const previewRef = useRef<HTMLElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [dialogFocus, setDialogFocus] = useState<HTMLElement | null>(null);
   const recommendation = recommendProfile(Number(height), Number(weight));
   const profile = profiles.find((p) => p.id === selected)!;
   const validMeasurements = recommendation !== null;
   const needsCustomerGeneration = Boolean(face || body) && !personalized;
+  const providerLabel = provider === "gemini" ? "Google Gemini" : "OpenAI";
 
   function checkService() {
     setService("checking");
+    setAiConsent(false);
     requestApi("/api/health")
       .then(async (r) => {
         if (r.status === 401) {
@@ -227,7 +232,9 @@ export default function App() {
         }
         if (!r.ok) throw new Error();
         const data = await r.json();
-        setService(data.personalizationAvailable && data.personalizationContract === "customer-avatar-v3" ? "available" : "unavailable");
+        const supported = data.personalizationContract === "customer-avatar-v4" && ["gemini", "openai"].includes(data.provider);
+        setProvider(supported ? data.provider : null);
+        setService(data.personalizationAvailable && supported ? "available" : "unavailable");
       })
       .catch(() => setService("unavailable"));
   }
@@ -274,6 +281,7 @@ export default function App() {
   }, [notice]);
 
   function invalidate() {
+    setGenerationFailed(false);
     setPersonalized(null);
     setApproved(false);
     setAiConsent(false);
@@ -297,7 +305,7 @@ export default function App() {
   }
   function goTo(next: number) {
     if (next === 3 && needsCustomerGeneration) {
-      setError("Generate the customer avatar before review. The preview is still a standard sample.");
+      setError("Generate the customer avatar before review. No personalized result is ready yet.");
       return;
     }
     if (!validMeasurements) {
@@ -331,8 +339,10 @@ export default function App() {
     );
   }
   async function generate() {
-    if (!face || !body || !aiConsent || !consent || generating) return;
+    if (!face || !body || !aiConsent || !consent || !provider || service !== "available" || generating) return;
     setGenerating(true);
+    setGenerationFailed(false);
+    setPersonalized(null);
     setError("");
     setApproved(false);
     try {
@@ -341,7 +351,7 @@ export default function App() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ face, body, profileId: selected, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body", consentProvider: "openai" }),
+          body: JSON.stringify({ face, body, profileId: selected, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body", consentProvider: provider }),
         },
         200000,
       );
@@ -351,7 +361,7 @@ export default function App() {
           data.error ||
             "Personalization failed. Your standard avatar is still available.",
         );
-      if (data.kind !== "customer-avatar" || data.profileId !== selected ||
+      if (data.kind !== "customer-avatar" || data.profileId !== selected || data.provider !== provider ||
           typeof data.image !== "string" || !data.image.startsWith("data:image/png;base64,"))
         throw new Error("The studio returned an unsupported result. Update the studio and try again.");
       setPersonalized(data.image);
@@ -359,7 +369,9 @@ export default function App() {
       setNotice(
         "Customer avatar created. Review the face, standard body and skin tone before approval.",
       );
+      requestAnimationFrame(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     } catch (e) {
+      setGenerationFailed(true);
       setError(
         e instanceof Error &&
           (e.name === "TimeoutError" || e.name === "AbortError")
@@ -398,6 +410,21 @@ export default function App() {
       src={personalized}
       alt="Customer’s personalized avatar, awaiting visual review"
     />
+  ) : needsCustomerGeneration ? (
+    <div className="pending-avatar">
+      <ScanFace size={32} aria-hidden="true" />
+      <h3>{generationFailed ? "Generation did not complete" : "Customer avatar not generated yet"}</h3>
+      <p>Generate an avatar using your face and complexion with the selected {profile.name.toLowerCase()} body.</p>
+      <div className="pending-references">
+        {face && <figure><img src={face} alt="Customer identity reference" /><figcaption>Customer face</figcaption></figure>}
+        <figure><AvatarImage index={profile.index} /><figcaption>{profile.name} body template</figcaption></figure>
+      </div>
+      <p className="small-footnote">These are input references, not a generated result.</p>
+      {generationFailed && error && <p className="field-error">{error}</p>}
+      <button type="button" className="button secondary" disabled={generating || exporting} onClick={() => goTo(2)}>
+        Go to personalization
+      </button>
+    </div>
   ) : (
     <AvatarImage index={profile.index} />
   );
@@ -611,6 +638,14 @@ export default function App() {
                       {height} cm · {weight} kg
                     </strong>
                   </div>
+                  <div className="summary-row">
+                    <span>Face and hair</span>
+                    <strong>From the customer’s face photo</strong>
+                  </div>
+                  <div className="summary-row">
+                    <span>Skin tone</span>
+                    <strong>Match the customer’s photos</strong>
+                  </div>
                   <div className="mini-photos">
                     {face ? (
                       <img src={face} alt="Customer face reference" />
@@ -673,7 +708,7 @@ export default function App() {
                       />
                       <span>
                         The customer agrees to send their face photo, full-body
-                        photo and approximate height/weight to OpenAI’s image-generation
+                        photo and approximate height/weight to {providerLabel}’s image-generation
                         service to generate their avatar and match skin tone.
                         Provider retention terms apply.
                       </span>
@@ -701,13 +736,16 @@ export default function App() {
                         ? "Create again"
                         : "Generate customer avatar"}
                   </button>
+                  {service === "available" && face && body && !aiConsent && !personalized && !generating && (
+                    <p className="small-footnote">Check the consent box above to enable customer avatar generation.</p>
+                  )}
                   {personalized && (
                     <button
                       className="text-button"
                       disabled={generating || exporting}
                       onClick={() => {
                         invalidate();
-                        setNotice("Returned to the standard sample avatar.");
+                        setNotice("Generated avatar discarded. Generate again to create a customer result.");
                       }}
                     >
                       Discard generated avatar
@@ -740,12 +778,12 @@ export default function App() {
                       <strong>
                         {personalized
                           ? "Personalized avatar"
-                          : "Standard sample avatar"}
+                          : needsCustomerGeneration ? "New generation required" : "Standard sample avatar"}
                       </strong>
                       <p>
                         {personalized
                           ? "Customer face and skin tone on the selected standard body"
-                          : "Sample face · no customer face applied"}
+                          : needsCustomerGeneration ? "Generate again with the current photos and selected body." : "Sample face · no customer face applied"}
                       </p>
                     </div>
                   </div>
@@ -847,11 +885,11 @@ export default function App() {
               </div>
             </div>
           </aside>
-          <section className="preview-card" aria-label="Avatar preview">
+          <section ref={previewRef} className="preview-card" aria-label="Avatar preview">
             <div className="preview-top">
               <span>
                 <span className="live-dot" />{" "}
-                {personalized ? "PERSONALIZED PREVIEW" : "AVATAR PREVIEW"}
+                {personalized ? "PERSONALIZED PREVIEW" : needsCustomerGeneration ? "CUSTOMER AVATAR · NOT GENERATED" : "AVATAR PREVIEW"}
               </span>
               <button
                 className="icon-button"
@@ -861,12 +899,12 @@ export default function App() {
                 <Expand size={16} />
               </button>
             </div>
-            <div className="avatar-stage">
+            <div className={`avatar-stage ${needsCustomerGeneration ? "pending-stage" : ""}`}>
               {preview}
-              <span className="sample-badge">
+              {!needsCustomerGeneration && <span className="sample-badge">
                 {personalized ? "Review required" : "Sample avatar"}
-              </span>
-              <div className="avatar-meta">
+              </span>}
+              {!needsCustomerGeneration && <div className="avatar-meta">
                 <span>{profile.name} profile</span>
                 <strong>
                   {personalized
@@ -878,7 +916,7 @@ export default function App() {
                     ? "Created for this session"
                     : "Fixed pose · reusable body profile"}
                 </span>
-              </div>
+              </div>}
               {generating && (
                 <div className="generating-overlay">
                   <LoaderCircle className="spin" size={28} />
@@ -895,7 +933,7 @@ export default function App() {
                     ? "Reviewed and approved"
                     : personalized
                       ? "Ready for customer review"
-                      : "Standard avatar · face not personalized"}
+                      : needsCustomerGeneration ? "Waiting for customer avatar generation" : "Standard avatar · face not personalized"}
                 </span>
               </div>
               <span className="preview-ratio">FULL BODY</span>

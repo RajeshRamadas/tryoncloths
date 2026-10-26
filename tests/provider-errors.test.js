@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkOpenAIAccess, providerRequest, providerErrorDetails } from "../server/provider-errors.js";
+import { checkGeminiAccess, checkOpenAIAccess, providerRequest, providerErrorDetails } from "../server/provider-errors.js";
 
 test("provider HTTP failures have distinct safe categories and never retry", async () => {
   for (const [status, code] of [[400, "request"], [401, "credentials"], [403, "credentials"], [404, "model"], [429, "quota"], [500, "unavailable"], [503, "unavailable"], [504, "timeout"]]) {
@@ -57,4 +57,27 @@ test("OpenAI diagnostic requests only model metadata without photos or generatio
   await assert.rejects(checkOpenAIAccess({ apiKey: "" }), error => error.code === "configuration");
   await assert.rejects(checkOpenAIAccess({ apiKey: "test-key-only", model: "bad/model" }), error => error.code === "configuration");
   await assert.rejects(checkOpenAIAccess({ apiKey: "test-key-only", fetchImpl: async () => new Response("not-json") }), error => error.code === "response");
+});
+
+test("Gemini metadata check sends no photos and reports sanitized Gemini failures", async () => {
+  const result = await checkGeminiAccess({ apiKey: "test-only", fetchImpl: async (url, options) => {
+    assert.equal(url, "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image");
+    assert.equal(options.method, "GET");
+    assert.equal(options.body, undefined);
+    assert.equal(options.headers["x-goog-api-key"], "test-only");
+    return new Response(JSON.stringify({ supportedGenerationMethods: ["generateContent"] }));
+  } });
+  assert.equal(result.supportsGenerateContent, true);
+  assert.doesNotMatch(JSON.stringify(result), /test-only/);
+  for (const reason of ["API_KEY_INVALID", "API_KEY_EXPIRED"]) {
+    await assert.rejects(checkGeminiAccess({ apiKey: "test-only", fetchImpl: async () => new Response(JSON.stringify({
+      error: { details: [{ reason }], message: "PRIVATE PROVIDER MESSAGE" },
+    }), { status: 400 }) }), error => {
+      const details = providerErrorDetails(error, "gemini");
+      assert.equal(details.code, "credentials");
+      assert.match(details.message, /Gemini/);
+      assert.doesNotMatch(details.message, /OpenAI|PRIVATE|test-only/);
+      return true;
+    });
+  }
 });

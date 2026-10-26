@@ -5,6 +5,7 @@ import { readFile } from "node:fs/promises";
 import { customerPhotos } from "./helpers/customer-photos.js";
 import { createApp, standardAvatar } from "../server/app.js";
 import { openaiPersonalize } from "../server/openai.js";
+import { geminiPersonalize } from "../server/gemini.js";
 import { ProviderError } from "../server/provider-errors.js";
 
 async function withServer(options, run) {
@@ -29,7 +30,57 @@ const bodyBytes = await readFile(customerPhotos[1].body);
 const face = `data:image/jpeg;base64,${faceBytes.toString("base64")}`;
 const bodyPhoto = `data:image/jpeg;base64,${bodyBytes.toString("base64")}`;
 const measurements = { heightCm: 175, weightKg: 72 };
-const defaultRequest = { consentProvider: "openai", consentScope: "face-and-body", measurements, body: bodyPhoto };
+const defaultRequest = { consentProvider: "gemini", consentScope: "face-and-body", measurements, body: bodyPhoto };
+
+test("the selected provider is advertised and only matching provider consent can generate", async () => {
+  assert.throws(() => createApp({ provider: "unknown", apiKey: "test-only" }));
+  for (const provider of ["gemini", "openai"]) {
+    let calls = 0;
+    await withServer({ provider, apiKey: "test-only", personalize: async () => { calls++; return face; } }, async base => {
+      const health = await (await fetch(`${base}/api/health`)).json();
+      assert.equal(health.provider, provider);
+      assert.equal(health.personalizationContract, "customer-avatar-v4");
+      const valid = { consent: true, profileId: "regular", face };
+      assert.equal((await post(base, { ...valid, consentProvider: provider === "gemini" ? "openai" : "gemini" })).status, 400);
+      assert.equal(calls, 0);
+      const response = await post(base, { ...valid, consentProvider: provider });
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).provider, provider);
+      assert.equal(calls, 1);
+    });
+  }
+});
+
+test("Gemini uses the chosen body template and both customer photos for face and whole-body complexion", async () => {
+  const avatar = await standardAvatar("broad");
+  let calls = 0;
+  const result = await geminiPersonalize({ face: faceBytes, body: bodyBytes, avatar, profileId: "broad", measurements, apiKey: "test-only", fetchImpl: async (url, options) => {
+    calls++;
+    assert.equal(url, "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent");
+    assert.equal(options.headers["x-goog-api-key"], "test-only");
+    const payload = JSON.parse(options.body);
+    const parts = payload.contents[0].parts;
+    assert.equal(parts.length, 4);
+    assert.deepEqual(parts.slice(1).map(part => part.inlineData.data), [avatar, faceBytes, bodyBytes].map(bytes => bytes.toString("base64")));
+    assert.match(parts[0].text, /selected broad STANDARD BODY TEMPLATE/);
+    assert.match(parts[0].text, /CUSTOMER FACE/);
+    assert.match(parts[0].text, /MATCH THE CUSTOMER.S NATURAL SKIN TONE/);
+    assert.match(parts[0].text, /face, ears, neck, arms, hands, legs and feet/);
+    assert.deepEqual(payload.generationConfig.responseModalities, ["TEXT", "IMAGE"]);
+    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { mimeType: "image/png", data: faceBytes.toString("base64") } }] } }] }));
+  } });
+  assert.equal(calls, 1);
+  assert.match(result, /^data:image\/png;base64,/);
+});
+
+test("Gemini refuses blocked, missing or corrupt outputs without substituting a template", async () => {
+  const input = { face: faceBytes, body: bodyBytes, avatar: await standardAvatar("regular"), profileId: "regular", measurements, apiKey: "test-only" };
+  for (const [payload, code] of [
+    [{ promptFeedback: { blockReason: "SAFETY" } }, "blocked"],
+    [{ candidates: [{ content: { parts: [{ text: "no image" }] } }] }, "no_image"],
+    [{ candidates: [{ content: { parts: [{ inlineData: { mimeType: "image/png", data: "invalid" } }] } }] }, "invalid_image"],
+  ]) await assert.rejects(geminiPersonalize({ ...input, fetchImpl: async () => new Response(JSON.stringify(payload)) }), error => error.code === code);
+});
 
 test("mobile preflight allows only native origins, and store access codes protect API calls", async () => {
   const token = "test-mobile-access-code-32-characters";
@@ -216,7 +267,7 @@ test("full-body photo, supported measurements and explicit two-photo consent are
       { body: "data:image/jpeg;base64,aGVsbG8=" },
       { consentScope: "face-only" },
       { consentProvider: undefined },
-      { consentProvider: "gemini" },
+      { consentProvider: "openai" },
       { measurements: { heightCm: 0, weightKg: 72 } },
       { measurements: { heightCm: "175", weightKg: 72 } },
       { measurements: { heightCm: 175, weightKg: 201 } },
@@ -299,7 +350,7 @@ test("provider quota errors reach the browser and logs without secrets or an aut
     assert.match(data.error, /separate from the app/);
     assert.doesNotMatch(JSON.stringify(data), /test-secret/);
     assert.equal(calls, 1);
-    assert.deepEqual(logs, [{ event: "avatar_provider_failure", code: "quota", providerStatus: 429 }]);
+    assert.deepEqual(logs, [{ event: "avatar_provider_failure", provider: "gemini", code: "quota", providerStatus: 429 }]);
   });
 });
 

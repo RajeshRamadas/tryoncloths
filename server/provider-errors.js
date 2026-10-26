@@ -23,10 +23,13 @@ export class ProviderError extends Error {
   }
 }
 
-export function providerErrorDetails(error) {
+export function providerErrorDetails(error, provider = "openai") {
   // Never expose arbitrary provider bodies, SDK messages, keys, or customer data.
   const code = error instanceof ProviderError && Object.hasOwn(messages, error.code) ? error.code : "unknown";
-  return { code, message: messages[code], providerStatus: error instanceof ProviderError ? error.providerStatus : null };
+  const message = provider === "gemini"
+    ? messages[code].replaceAll("OpenAI", "Gemini").replaceAll("TRYON_OPENAI_MODEL", "TRYON_GEMINI_MODEL").replaceAll("api.openai.com", "generativelanguage.googleapis.com").replace(" and any required organization verification for image models", " and Google project access")
+    : messages[code];
+  return { code, message, providerStatus: error instanceof ProviderError ? error.providerStatus : null };
 }
 
 export async function providerRequest(url, options, fetchImpl = fetch) {
@@ -49,6 +52,7 @@ export async function providerRequest(url, options, fetchImpl = fetch) {
   else if (providerCode === "model_not_found") code = "model";
   else if (["insufficient_quota", "billing_hard_limit_reached", "billing_not_active"].includes(providerCode)) code = "quota";
   else if (providerCode === "content_policy_violation") code = "blocked";
+  if (body?.error?.details?.some(detail => ["API_KEY_INVALID", "API_KEY_EXPIRED"].includes(detail.reason))) code = "credentials";
   throw new ProviderError(code, status);
 }
 
@@ -70,4 +74,13 @@ export async function checkOpenAIAccess({ apiKey, model = "gpt-image-1.5", fetch
   const data = await providerJson(response);
   if (data?.object !== "model" || typeof data?.id !== "string") throw new ProviderError("response");
   return { model, providerStatus: response.status, modelAccessible: true };
+}
+
+export async function checkGeminiAccess({ apiKey, model = "gemini-2.5-flash-image", fetchImpl = fetch }) {
+  if (!apiKey || !/^[a-zA-Z0-9.-]+$/.test(model)) throw new ProviderError("configuration");
+  const response = await providerRequest(`https://generativelanguage.googleapis.com/v1beta/models/${model}`, {
+    method: "GET", headers: { "x-goog-api-key": apiKey }, signal: AbortSignal.timeout(15000),
+  }, fetchImpl);
+  const data = await providerJson(response);
+  return { model, providerStatus: response.status, supportsGenerateContent: data?.supportedGenerationMethods?.includes("generateContent") === true };
 }

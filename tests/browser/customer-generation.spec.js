@@ -9,7 +9,7 @@ test("Android sends both photos once with consent; failures block export; approv
   const output = await sharp(customerPhotos[0].body).png().toBuffer();
   const dataUrl = `data:image/png;base64,${output.toString("base64")}`;
   await page.route("https://studio.example.test/api/health", route => route.fulfill({
-    json: { status: "ok", personalizationAvailable: true, personalizationContract: "customer-avatar-v3" },
+    json: { status: "ok", personalizationAvailable: true, personalizationContract: "customer-avatar-v4", provider: "gemini" },
   }));
   const requests = [];
   await page.route("https://studio.example.test/api/personalize", async route => {
@@ -23,10 +23,10 @@ test("Android sends both photos once with consent; failures block export; approv
     expect(data.measurements).toEqual({ heightCm: 175, weightKg: 95 });
     expect(data.consent).toBe(true);
     expect(data.consentScope).toBe("face-and-body");
-    expect(data.consentProvider).toBe("openai");
+    expect(data.consentProvider).toBe("gemini");
     await route.fulfill(requests.length === 1
       ? { status: 502, json: { error: "Generation failed. Please try again." } }
-      : { json: { image: dataUrl, kind: "customer-avatar", profileId: "broad", needsReview: true } });
+      : { json: { image: dataUrl, kind: "customer-avatar", provider: "gemini", profileId: "broad", needsReview: true } });
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Studio connection", exact: true }).click();
@@ -42,15 +42,21 @@ test("Android sends both photos once with consent; failures block export; approv
   const generate = page.getByRole("button", { name: "Generate customer avatar", exact: true });
   await expect(generate).toBeDisabled();
   await expect(page.getByRole("button", { name: "Review avatar" })).toBeDisabled();
+  await expect(page.getByRole("heading", { name: "Customer avatar not generated yet" })).toBeVisible();
+  await expect(page.getByText("Sample avatar", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Match the customer’s photos", { exact: true })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: /The customer agrees to send their face photo/ })).toHaveAccessibleName(/Google Gemini/);
   expect(requests).toHaveLength(0);
   await page.getByRole("checkbox", { name: /The customer agrees to send their face photo, full-body/ }).check();
   await generate.click();
   await expect(page.getByRole("alert")).toContainText("Generation failed");
+  await expect(page.getByRole("heading", { name: "Generation did not complete" })).toBeVisible();
   expect(requests).toHaveLength(1);
   await expect(page.getByRole("button", { name: "Review avatar" })).toBeDisabled();
   expect(await page.evaluate(() => window.__nativeCalls.some(c => c.method === "writeFile"))).toBe(false);
   await generate.click();
   await expect(page.getByAltText("Customer’s personalized avatar, awaiting visual review")).toHaveAttribute("src", dataUrl);
+  await expect(page.getByRole("heading", { name: "Customer avatar not generated yet" })).toHaveCount(0);
   expect(requests).toHaveLength(2);
   await page.getByRole("button", { name: "Review avatar" }).click();
   await expect(page.getByAltText("Original customer face for skin-tone review")).toBeVisible();

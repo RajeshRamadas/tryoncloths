@@ -1,4 +1,5 @@
 import { createApp } from "./app.js";
+import { providerConfig } from "./provider-config.js";
 const port = Number(process.env.PORT || 3001);
 const production = process.argv.includes("--production");
 const trustProxySetting = process.env.TRYON_TRUST_PROXY_HOPS || "0";
@@ -12,6 +13,6 @@ createApp({ production, trustProxy: trustProxySetting === "1" ? 1 : false }).lis
     return;
   }
   console.log(
-    `Forme ${production ? "app" : "API"} listening on port ${port}. Customer avatar generation: ${process.env.OPENAI_API_KEY ? "configured" : "not configured"}.`,
+    `Forme ${production ? "app" : "API"} listening on port ${port}. Customer avatar generation: ${providerConfig().apiKey ? "configured" : "not configured"} (${providerConfig().label}).`,
   );
 });

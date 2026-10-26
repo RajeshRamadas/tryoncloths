@@ -615,6 +615,27 @@ h1 {
   width: auto;
   aspect-ratio: 384/942;
 }
+.avatar-stage.pending-stage {
+  height: auto;
+  min-height: 520px;
+  background: #f5f5ee;
+}
+.pending-avatar {
+  width: 100%;
+  align-self: center;
+  padding: 30px 22px;
+  text-align: center;
+  color: #354c41;
+}
+.pending-avatar h3 { font-size: 20px; margin: 12px 0; }
+.pending-avatar > p { line-height: 1.6; font-size: 13px; }
+.pending-references { display: flex; justify-content: center; gap: 20px; margin: 24px 0 12px; }
+.pending-references figure { margin: 0; width: 105px; }
+.pending-references figure > img { width: 105px; height: 140px; object-fit: cover; border-radius: 8px; }
+.pending-references .avatar-crop { height: 140px; width: 57px; margin: 0 auto; border-radius: 8px; }
+.pending-references figcaption { font-size: 11px; margin-top: 8px; }
+.pending-avatar .button { margin-top: 12px; }
+.expanded-preview > .pending-avatar { max-width: 480px; }
 .avatar-crop {
   position: relative;
   overflow: hidden;

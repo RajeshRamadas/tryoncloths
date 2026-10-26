@@ -119,7 +119,7 @@ test("personalization is explicit, generates only on request, and approval reset
 }) => {
   let calls = 0;
   await page.route("**/api/health", (route) =>
-    route.fulfill({ json: { personalizationAvailable: true, personalizationContract: "customer-avatar-v3" } }),
+    route.fulfill({ json: { personalizationAvailable: true, personalizationContract: "customer-avatar-v4", provider: "gemini" } }),
   );
   await page.route("**/api/personalize", async (route) => {
     calls++;
@@ -128,12 +128,12 @@ test("personalization is explicit, generates only on request, and approval reset
     expect(input.body).toMatch(/^data:image\/jpeg;base64,/);
     expect(input.face).toMatch(/^data:image\/jpeg;base64,/);
     expect(input.consentScope).toBe("face-and-body");
-    expect(input.consentProvider).toBe("openai");
+    expect(input.consentProvider).toBe("gemini");
     expect(input.measurements).toEqual({ heightCm: 175, weightKg: 72 });
     const fs = await import("node:fs/promises");
     const image = await fs.readFile("public/avatar-library.png");
     await route.fulfill({
-      json: { image: `data:image/png;base64,${image.toString("base64")}`, kind: "customer-avatar", profileId: input.profileId },
+      json: { image: `data:image/png;base64,${image.toString("base64")}`, kind: "customer-avatar", provider: "gemini", profileId: input.profileId },
     });
   });
   await page.goto("/");
@@ -168,7 +168,7 @@ test("personalization is explicit, generates only on request, and approval reset
     .check();
   await page.getByRole("button", { name: /Select Slim profile/ }).click();
   await expect(
-    page.getByText("Sample face · no customer face applied"),
+    page.getByText("Generate again with the current photos and selected body."),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Download avatar" }),

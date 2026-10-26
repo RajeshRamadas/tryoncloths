@@ -21,15 +21,15 @@ If you add customer photos, generation is required before review/export. An offl
 
 ## Customer face, body and skin tone
 
-The installed app never contains an OpenAI key or a shared store access code. To enable generation:
+The installed app never contains a provider API key or a shared store access code. To enable generation:
 
-1. Run the included Express server behind HTTPS using a valid certificate. Configure `OPENAI_API_KEY` and a randomly generated `TRYON_MOBILE_TOKEN` of at least 24 characters on the server.
+1. Run the included Express server behind HTTPS using a valid certificate. Configure `TRYON_GEMINI_API_KEY` (default provider) and a randomly generated `TRYON_MOBILE_TOKEN` of at least 24 characters on the server.
 2. `TRYON_MOBILE_TOKEN` enables Android-origin CORS and requires bearer authorization for all API routes, including same-origin web requests. Do not treat CORS alone as authentication. This pilot uses a shared store code; per-user accounts, tenant isolation, and token rotation UI remain future work.
 3. In the app, tap the cloud icon (**Studio connection**) and enter the HTTPS studio origin and store access code. They are held in memory for the app session, not embedded in the APK or persisted to local storage.
-4. Capture a face and full-body photo with consent, enter approximate height/weight, and choose the nearest standard body. Obtain separate consent to send both photos and measurements to OpenAI. Only an explicit **Generate customer avatar** action calls the provider. It sends the selected standard body, face and full-body photo in one request, asking for the customer's face and matching skin tone across all exposed skin. Profile changes and ordinary preview actions do not generate AI requests.
+4. Capture a face and full-body photo with consent, enter approximate height/weight, and choose the nearest standard body. Obtain separate consent to send both photos and measurements to the configured provider (Gemini by default). Only an explicit **Generate customer avatar** action calls the provider. It sends the selected standard body, face and full-body photo in one request, asking for the customer's face and matching skin tone across all exposed skin. Profile changes and ordinary preview actions do not generate AI requests.
 5. Compare the result with the original photos and approve the face, body and skin tone before export. Provider quality, body preservation, skin-tone matching, cost and latency still require live evaluation with an authorized account.
 
-See [step-by-step API-key and backend setup](GENERATION_SETUP.md). Version 0.3.0 requires an updated backend advertising `customer-avatar-v3` and consent naming OpenAI. Update older APKs before using the OpenAI backend; their Gemini consent is not accepted. Native connections require protected mode and a store code. The public website can operate without that code.
+See [step-by-step API-key and backend setup](GENERATION_SETUP.md). Version 0.4.0 requires an updated backend advertising `customer-avatar-v4` and consent naming its active provider. Update older APKs and backends together. Native connections require protected mode and a store code. The public website can operate without that code.
 
 Use the studio's real HTTPS origin, for example `https://studio.example.com`, without an API path. A phone cannot reach a computer's loopback address through its own loopback address. The APK does not contain a deployed backend URL.
 

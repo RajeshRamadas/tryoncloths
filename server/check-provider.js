@@ -1,10 +1,13 @@
-import { checkOpenAIAccess, providerErrorDetails } from "./provider-errors.js";
+import { checkGeminiAccess, checkOpenAIAccess, providerErrorDetails } from "./provider-errors.js";
+import { providerConfig } from "./provider-config.js";
+
+const config = providerConfig();
 
 try {
-  const result = await checkOpenAIAccess({ apiKey: process.env.OPENAI_API_KEY, model: process.env.TRYON_OPENAI_MODEL || "gpt-image-1.5" });
-  console.log(JSON.stringify(result));
+  const result = await (config.provider === "gemini" ? checkGeminiAccess : checkOpenAIAccess)(config);
+  console.log(JSON.stringify({ provider: config.provider, ...result }));
   console.log("Model metadata check completed. No photos were sent and no image was generated. This does not verify image-generation quota, billing or output quality.");
 } catch (error) {
-  console.error(JSON.stringify(providerErrorDetails(error)));
+  console.error(JSON.stringify(providerErrorDetails(error, config.provider)));
   process.exitCode = 1;
 }

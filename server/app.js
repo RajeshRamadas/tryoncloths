@@ -6,6 +6,8 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { profiles, recommendProfile } from "../src/profiles.js";
 import { providerErrorDetails } from "./provider-errors.js";
 import { openaiPersonalize } from "./openai.js";
+import { geminiPersonalize } from "./gemini.js";
+import { providerConfig } from "./provider-config.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const maxPhotoBytes = 5 * 1024 * 1024;
@@ -63,16 +65,18 @@ export async function standardAvatar(profileId) {
 }
 
 export function createApp({
-  apiKey = process.env.OPENAI_API_KEY,
-  model = process.env.TRYON_OPENAI_MODEL || "gpt-image-1.5",
+  provider = providerConfig().provider,
+  apiKey = providerConfig(provider).apiKey,
+  model = providerConfig(provider).model,
   quality = process.env.TRYON_OPENAI_QUALITY || "low",
-  personalize = openaiPersonalize,
+  personalize = provider === "gemini" ? geminiPersonalize : openaiPersonalize,
   production = false,
   rateLimit = true,
   mobileToken = process.env.TRYON_MOBILE_TOKEN || "",
   accessMode = process.env.TRYON_ACCESS_MODE || "auto",
   trustProxy = false,
 } = {}) {
+  const providerLabel = providerConfig(provider).label;
   if (!["auto", "protected", "public"].includes(accessMode))
     throw new Error("TRYON_ACCESS_MODE must be auto, protected, or public.");
   // Public mode is an explicit operator choice for anonymous browser generation.
@@ -126,8 +130,8 @@ export function createApp({
     res.json({
       status: "ok",
       personalizationAvailable: Boolean(apiKey),
-      provider: "openai",
-      personalizationContract: "customer-avatar-v3",
+      provider,
+      personalizationContract: "customer-avatar-v4",
       storage: "ephemeral",
       profileCount: profiles.length,
     }),
@@ -149,9 +153,9 @@ export function createApp({
     } catch {
       return res.status(403).json({ error: "Invalid request origin." });
     }
-    if (req.body?.consent !== true || req.body?.consentScope !== "face-and-body" || req.body?.consentProvider !== "openai")
+    if (req.body?.consent !== true || req.body?.consentScope !== "face-and-body" || req.body?.consentProvider !== provider)
       return res.status(400).json({
-        error: "Customer consent to send both photos and measurements to OpenAI is required. Refresh or update the app before generating.",
+        error: `Customer consent to send both photos and measurements to ${providerLabel} is required. Refresh or update the app before generating.`,
       });
     if (!profiles.some((p) => p.id === req.body?.profileId))
       return res
@@ -209,10 +213,10 @@ export function createApp({
     inFlight++;
     try {
       const image = await personalize({ face, body, avatar, profileId: req.body.profileId, measurements: req.body.measurements, apiKey, model, quality });
-      res.json({ image, profileId: req.body.profileId, kind: "customer-avatar", needsReview: true, reviewChecks: ["face", "standard-body", "skin-tone"] });
+      res.json({ image, provider, profileId: req.body.profileId, kind: "customer-avatar", needsReview: true, reviewChecks: ["face", "standard-body", "skin-tone"] });
     } catch (error) {
-      const failure = providerErrorDetails(error);
-      console.error(JSON.stringify({ event: "avatar_provider_failure", code: failure.code, providerStatus: failure.providerStatus }));
+      const failure = providerErrorDetails(error, provider);
+      console.error(JSON.stringify({ event: "avatar_provider_failure", provider, code: failure.code, providerStatus: failure.providerStatus }));
       res.status(502).json({
         error: failure.message,
         code: failure.code,

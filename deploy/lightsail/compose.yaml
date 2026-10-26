@@ -11,7 +11,10 @@ services:
       NODE_ENV: production
       PORT: "3001"
       TRYON_TRUST_PROXY_HOPS: "1"
-      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set the OpenAI API key in .env}
+      TRYON_PROVIDER: ${TRYON_PROVIDER:-gemini}
+      TRYON_GEMINI_API_KEY: ${TRYON_GEMINI_API_KEY:-}
+      TRYON_GEMINI_MODEL: ${TRYON_GEMINI_MODEL:-gemini-2.5-flash-image}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       TRYON_ACCESS_MODE: ${TRYON_ACCESS_MODE:-protected}
       TRYON_MOBILE_TOKEN: ${TRYON_MOBILE_TOKEN:-}
       TRYON_OPENAI_MODEL: ${TRYON_OPENAI_MODEL:-gpt-image-1.5}

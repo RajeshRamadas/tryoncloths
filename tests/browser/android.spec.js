@@ -120,7 +120,7 @@ test("Android studio connection uses runtime authorization and clears it on rest
   await page.route("https://studio.example.test/api/health", async (route) => {
     headers.push(route.request().headers().authorization);
     await route.fulfill({
-      json: { status: "ok", personalizationAvailable: true, personalizationContract: "customer-avatar-v3" },
+      json: { status: "ok", personalizationAvailable: true, personalizationContract: "customer-avatar-v4", provider: "gemini" },
     });
   });
   await page.goto("/");
