@@ -218,7 +218,7 @@ export function createApp({
     } catch (error) {
       const failure = providerErrorDetails(error, provider);
       console.error(JSON.stringify({ event: "avatar_provider_failure", provider, code: failure.code, providerStatus: failure.providerStatus }));
-      res.status(502).json({
+      res.status(failure.code === "face_input" ? 400 : 502).json({
         error: failure.message,
         code: failure.code,
       });

@@ -1,16 +1,17 @@
 import sharp from "sharp";
 import { profiles, recommendProfile } from "../src/profiles.js";
 import { geminiAvatarPrompt } from "./avatar-prompt.js";
+import { requireVisibleFace } from "./face-check.js";
 import { geminiBodyReference } from "./gemini-reference.js";
 import { ProviderError, providerRequest, providerJson } from "./provider-errors.js";
 
-export const GEMINI_REFERENCE_VERSION = "customer-first-v4";
+export const GEMINI_REFERENCE_VERSION = "customer-face-v5";
 
 export async function geminiPersonalize({ face, body, avatar, profileId, measurements, apiKey, model = "gemini-2.5-flash-image", fetchImpl = fetch }) {
   if (!apiKey || !/^[a-zA-Z0-9.-]+$/.test(model)) throw new ProviderError("configuration");
   if (!profiles.some(profile => profile.id === profileId) || !face || !body || !avatar || !recommendProfile(measurements?.heightCm, measurements?.weightKg))
     throw new Error("Customer photos, measurements and a standard profile are required.");
-  const bodyReference = await geminiBodyReference(avatar, profileId);
+  const bodyReference = await geminiBodyReference(avatar, profileId, face);
   const response = await providerRequest(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -22,7 +23,7 @@ export async function geminiPersonalize({ face, body, avatar, profileId, measure
         { inlineData: { mimeType: "image/jpeg", data: face.toString("base64") } },
         { text: "Image 2 — CUSTOMER FULL-BODY PHOTO. Supporting customer complexion reference." },
         { inlineData: { mimeType: "image/jpeg", data: body.toString("base64") } },
-        { text: "Image 3 — ANATOMY AND SCALE REFERENCE. Featureless head shows size and neck alignment only. Preserve head/body proportions, shoulders and pose; use the customer’s face and skin tone." },
+        { text: "Image 3 — CUSTOMER FACE ALIGNED TO SELECTED BODY. Keep this visible customer face and head position. Blend the face, hair, neck and skin naturally; preserve body proportions." },
         { inlineData: { mimeType: "image/png", data: bodyReference.toString("base64") } },
       ] }],
       generationConfig: { responseModalities: ["TEXT", "IMAGE"], imageConfig: { aspectRatio: "2:3" } },
@@ -34,10 +35,12 @@ export async function geminiPersonalize({ face, body, avatar, profileId, measure
   const output = result?.candidates?.[0]?.content?.parts?.find(part => part.inlineData?.mimeType?.startsWith("image/"))?.inlineData?.data;
   if (!output) throw new ProviderError("no_image");
   if (typeof output !== "string" || output.length > 28_000_000) throw new ProviderError("invalid_image");
+  let bytes;
   try {
-    const bytes = await sharp(Buffer.from(output, "base64"), { limitInputPixels: 25_000_000 }).png().toBuffer();
-    return `data:image/png;base64,${bytes.toString("base64")}`;
+    bytes = await sharp(Buffer.from(output, "base64"), { limitInputPixels: 25_000_000 }).rotate().png().toBuffer();
   } catch {
     throw new ProviderError("invalid_image");
   }
+  await requireVisibleFace(bytes);
+  return `data:image/png;base64,${bytes.toString("base64")}`;
 }

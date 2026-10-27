@@ -1,4 +1,7 @@
 const messages = {
+  face_input: "Use one clear, front-facing customer photo with the full head visible. No image-generation request was sent.",
+  face_check: "The studio could not complete its local face check. No customer avatar was accepted. Check the server installation before trying again.",
+  missing_face: "The generated image did not contain one clearly detectable face. It was rejected and cannot be approved or exported. A provider charge may still apply; no automatic retry was made.",
   configuration: "The server's OpenAI key or image-model configuration is missing or invalid.",
   credentials: "OpenAI rejected the server's API key or access permissions. Check the key, project permissions and any required organization verification for image models.",
   model: "The configured OpenAI model was not found or is unavailable to this project. Check TRYON_OPENAI_MODEL.",

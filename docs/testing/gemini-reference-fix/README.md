@@ -1,5 +1,17 @@
 # Gemini customer reference correction
 
+## Visible customer face correction (`customer-face-v5`)
+
+The user supplied a later result with no head, despite approval being available. The backend previously accepted any decodable image. The featureless-head reference strategy is replaced with the customer's actual face, locally aligned to the selected template using eye landmarks, uniform scaling and rotation. The reference is an intermediate composite for Gemini to blend; it is never returned as a generated fallback.
+
+Before sending a paid Gemini request, a local check requires one usable customer face and a visible face in the prepared reference. Both provider adapters now require one detectable face in the returned image. A headless result produces HTTP 502 with `missing_face`, without an image or customer-avatar success marker. The existing browser failure state blocks review/export. There is one provider request per explicit attempt, no automatic retries and no extra paid analysis call. Invalid customer face inputs return `face_input` before a provider call. A rejected provider output can still incur a charge.
+
+Only Tiny Face Detector and Tiny 68-point landmarks are loaded from the pinned `@vladmandic/face-api@1.7.15` package (MIT), using `@tensorflow/tfjs@4.22.0` and `@tensorflow/tfjs-backend-wasm@4.22.0` (Apache-2.0). Models and WASM are installed with npm and read locally, with one WASM thread and serialized inference. There are no runtime model downloads. No recognition, age, gender or emotion model is loaded. Only standard-template landmarks are cached; customer photos/landmarks remain transient.
+
+These checks establish face presence, not identity, skin-tone accuracy or anatomical correctness. Difficult photos may be rejected and false detections remain possible. Customer review is still required. The new output has **not** been validated through the live Gemini account after deployment.
+
+Local validation includes 31 unit/API tests, including all four reference profiles, preserved body pixels and eye alignment, rejection of headless provider responses through HTTP, and no paid call for a blank customer photo. Three independent synthetic customers passed reference preparation. Four focused browser tests passed, exercising rejection, disabled review/export and explicit retry. The production frontend and Docker builds passed. The production image also passed the three-customer reference check and headless-image rejection with networking disabled, one CPU and a 512 MiB memory limit. Observed process RSS was 242 MiB; first preparation/check took 1.28 seconds and subsequent samples 0.54–0.58 seconds in this environment. This is not a Lightsail latency or concurrent-load benchmark. Public-mode runtime health/configuration checks passed using a test key, without a provider call.
+
 ## Reproduced live failure
 
 On 26 October 2026, the public studio loaded successfully and `/api/health` reported Gemini configured with `customer-avatar-v4`. One live generation used the independent synthetic green-sweater customer, Regular template and 175 cm / 72 kg measurements. The API returned HTTP 200 and an image, but visual review failed: the result omitted the customer's glasses, retained the template's styled hair and appearance, and cropped the feet.
@@ -28,9 +40,9 @@ Version 4 fully removes source identity above that boundary, then fades the guid
 
 These are measurements of the prepared reference, **not proof of a seam-free Gemini result**. Live visual verification is still needed after deploying v4. The user's supplied image is not stored in this repository.
 
-## Backend change
+## Previous v4 request (superseded by v5 above)
 
-Gemini now receives three explicitly labelled references in this order:
+Version 4 sent three explicitly labelled references in this order:
 
 1. Unchanged customer face: primary identity, hair, glasses and complexion reference.
 2. Unchanged customer full-body photo: supporting appearance/complexion reference.
@@ -42,7 +54,7 @@ Instructions explicitly preserve customer glasses and hairstyle, match all expos
 
 There is still one provider call per explicit attempt, with no automatic retry, second AI pass, provider switch or extra AI analysis. OpenAI's optional adapter is unchanged. Existing v0.4 Android/browser clients remain compatible.
 
-## Verification and limits
+## Previous v4 verification and limits
 
 - 28 unit/API tests passed, including request image order, separate labels, unchanged customer bytes, complete source-identity removal, absence of the hard neck colour step, collar/shoulder preservation, natural colour/texture retention and unscaled body/feet preservation for all four templates.
 - The preceding version passed four focused browser scenarios. This change leaves the UI and request/response contract unchanged; no Android rebuild is required.
@@ -58,4 +70,4 @@ Keep the existing Gemini key and public-access settings. From Lightsail:
 cd ~/tryoncloths && git pull --ff-only origin main && cd deploy/lightsail && sudo docker compose -f compose.shared.yaml up -d --build tryon
 ```
 
-Then open `/api/health`. It must include `"generationRevision":"customer-first-v4"`. Refresh the app and generate a new result; existing images are not changed by deployment. Repeat the green-sweater test and visually compare face, glasses, hair, complexion and both feet before approving. Do not automatically retry a failure.
+Then open `/api/health`. It must include `"generationRevision":"customer-face-v5"`. Refresh the app and generate a new result; existing images are not changed by deployment. Repeat the green-sweater test and visually compare face, glasses, hair, complexion and both feet before approving. Do not automatically retry a failure.

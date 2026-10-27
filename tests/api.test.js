@@ -5,7 +5,8 @@ import { readFile } from "node:fs/promises";
 import { customerPhotos } from "./helpers/customer-photos.js";
 import { createApp, standardAvatar } from "../server/app.js";
 import { openaiPersonalize } from "../server/openai.js";
-import { geminiBodyReference } from "../server/gemini-reference.js";
+import { detectFaces, requireVisibleFace } from "../server/face-check.js";
+import { geminiBodyReference, facePlacement } from "../server/gemini-reference.js";
 import { geminiPersonalize } from "../server/gemini.js";
 import { ProviderError } from "../server/provider-errors.js";
 
@@ -40,7 +41,7 @@ test("the selected provider is advertised and only matching provider consent can
     await withServer({ provider, apiKey: "test-only", personalize: async () => { calls++; return face; } }, async base => {
       const health = await (await fetch(`${base}/api/health`)).json();
       assert.equal(health.provider, provider);
-      if (provider === "gemini") assert.equal(health.generationRevision, "customer-first-v4");
+      if (provider === "gemini") assert.equal(health.generationRevision, "customer-face-v5");
       assert.equal(health.personalizationContract, "customer-avatar-v4");
       const valid = { consent: true, profileId: "regular", face };
       assert.equal((await post(base, { ...valid, consentProvider: provider === "gemini" ? "openai" : "gemini" })).status, 400);
@@ -70,16 +71,16 @@ test("Gemini uses the chosen body template and both customer photos for face and
     const reference = await sharp(Buffer.from(images[2].data, "base64")).metadata();
     assert.equal(reference.width / reference.height, 2 / 3);
     assert.match(parts[0].text, /Image 1 = CUSTOMER FACE/);
-    assert.match(parts[0].text, /featureless head-size guide/);
+    assert.match(parts[0].text, /CUSTOMER FACE already aligned using eye landmarks/);
     assert.match(parts[0].text, /Keep glasses if present/);
     assert.match(parts[0].text, /BOTH COMPLETE FEET AND TOES/);
     assert.match(parts[0].text, /ONE natural full-colour photograph/);
     assert.match(parts[0].text, /including the lower legs and feet/);
-    assert.match(parts[0].text, /not the target complexion/);
-    assert.match(parts[0].text, /Scale the customer head uniformly/);
+    assert.match(parts[0].text, /body skin must be adapted/);
+    assert.match(parts[0].text, /Keep the head at its aligned scale and centre/);
     assert.match(parts[0].text, /2:3 canvas ratio controls framing only/);
-    assert.match(parts[0].text, /ENTIRE NECK down to the collar opening/);
-    assert.match(parts[0].text, /Do not paste a face crop/);
+    assert.match(parts[0].text, /entire neck and collar contact together/);
+    assert.match(parts[0].text, /Do not return a headless or featureless person/);
     assert.match(parts[0].text, /selected broad STANDARD BODY TEMPLATE/);
     assert.match(parts[0].text, /CUSTOMER FACE/);
     assert.match(parts[0].text, /MATCH THE CUSTOMER.S NATURAL SKIN TONE/);
@@ -440,50 +441,66 @@ test("OpenAI configurable models omit unsupported fidelity options and failures 
   }
 });
 
-test("every Gemini template hides identity while preserving natural body colour, texture and geometry", async () => {
+test("each body reference contains an aligned customer face and preserves the selected body", async () => {
   for (const id of ["slim", "regular", "athletic", "broad"]) {
     const original = await standardAvatar(id);
-    const before = Buffer.from(original);
-    const reference = await geminiBodyReference(original, id);
-    assert.deepEqual(original, before, "the sample library input must remain intact");
+    const reference = await geminiBodyReference(original, id, faceBytes);
     const { width, height } = await sharp(reference).metadata();
     assert.equal(width, 692);
     assert.equal(height, 1038);
-    const { data, info } = await sharp(reference).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-    assert.equal(info.channels, 3);
-    let colouredPixels = 0;
-    for (let i = 0; i < data.length; i += 3)
-      if (Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]) > 12) colouredPixels++;
-    assert.ok(colouredPixels > 10000, `${id}: body reference must not be desaturated`);
-    // Alter every original identity pixel. The prepared reference must be
-    // identical, proving the source face/hair cannot leak into the guide.
-    const centre = { slim: 185, regular: 192, athletic: 190, broad: 186 }[id];
-    const marker = await sharp({ create: { width: 148, height: 155, channels: 3, background: "#ff00ff" } }).png().toBuffer();
-    const alternate = await sharp(original).composite([{ input: marker, left: centre - 74, top: 20 }]).removeAlpha().png().toBuffer();
-    assert.ok((await geminiBodyReference(alternate, id)).equals(reference), `${id}: erase the complete template identity`);
-    const guideSkin = await sharp(reference).extract({ left: 154 + centre, top: 48 + 100, width: 1, height: 1 }).raw().toBuffer();
-    assert.ok(guideSkin[0] > guideSkin[2] + 12, `${id}: use the natural neck colour for the anatomy guide`);
-    // No abrupt colour step may remain at the former horizontal neck cut.
-    const seam = await sharp(reference).extract({ left: 154 + centre - 18, top: 48 + 174, width: 36, height: 2 }).removeAlpha().raw().toBuffer();
-    let jump = 0;
-    for (let i = 0; i < 108; i++) jump += Math.abs(seam[i] - seam[108 + i]);
-    assert.ok(jump / 108 < 2, `${id}: no hard colour jump at the head/neck boundary`);
-    // Feathering must not paint a pale background patch over the shoulders.
-    for (const region of [
-      { left: 4, top: 175, width: centre - 41, height: 28 },
-      { left: centre + 37, top: 175, width: 343 - centre, height: 28 },
-    ]) {
-      const expectedShoulder = await sharp(original).extract(region).removeAlpha().raw().toBuffer();
-      const actualShoulder = await sharp(reference).extract({ ...region, left: region.left + 154, top: region.top + 48 }).removeAlpha().raw().toBuffer();
-      assert.equal(actualShoulder.length, expectedShoulder.length);
-      assert.ok(actualShoulder.every((value, index) => Math.abs(value - expectedShoulder[index]) <= 1), `${id}: preserve shoulders/collar within alpha-rounding tolerance`);
+    await requireVisibleFace(reference);
+    const [target] = await detectFaces(original, { landmarks: true, upper: true });
+    const [placed] = await detectFaces(reference, { landmarks: true, upper: true });
+    for (const side of ["left", "right"]) {
+      assert.ok(Math.abs(placed.eyes[side].x - 154 - target.eyes[side].x) < 8, `${id}: align eyes horizontally`);
+      assert.ok(Math.abs(placed.eyes[side].y - 48 - target.eyes[side].y) < 8, `${id}: align eyes vertically`);
     }
-    // Only the neck overlap may change; the remainder of the body stays intact.
     const bodyRegion = { left: 4, top: 203, width: 376, height: 739 };
-    const expected = await sharp(original).removeAlpha().extract(bodyRegion).raw().toBuffer();
-    const actual = await sharp(reference).removeAlpha().extract({ ...bodyRegion, left: 158, top: 48 + 203 }).raw().toBuffer();
-    assert.equal(actual.length, expected.length);
-    assert.ok(actual.equals(expected), `${id}: preserve body/feet colour, texture and geometry`);
+    const expected = await sharp(original).extract(bodyRegion).removeAlpha().raw().toBuffer();
+    const actual = await sharp(reference).extract({ ...bodyRegion, left: 158, top: 251 }).removeAlpha().raw().toBuffer();
+    assert.ok(actual.equals(expected), "body pixels must not be rescaled or replaced");
   }
-  await assert.rejects(geminiBodyReference(await sharp({create:{width:400,height:900,channels:3,background:"white"}}).png().toBuffer(), "regular"), /Review the anatomy guide/);
+  const avatar = await standardAvatar("regular");
+  const other = await readFile(customerPhotos[2].face);
+  const a = await geminiBodyReference(avatar, "regular", faceBytes);
+  const b = await geminiBodyReference(avatar, "regular", other);
+  assert.ok(!a.equals(b), "the reference must contain the supplied customer, not a fixed face");
+});
+
+test("eye placement uses one scale and rotation rather than stretching the customer head", () => {
+  const source = { eyes: { left: {x:30,y:40}, right: {x:70,y:40} } };
+  const target = { eyes: { left: {x:170,y:100}, right: {x:190,y:100} } };
+  assert.deepEqual(facePlacement(source,target,{width:100,height:140},{width:100,height:140}), {width:50,height:70,left:155,top:80});
+});
+
+test("both providers reject a valid PNG with no face instead of returning a customer avatar", async () => {
+  // Historical featureless reference reproduces the failure, without user photos.
+  const blank = await readFile("docs/testing/gemini-reference-fix/anatomy-reference.png");
+  for (const provider of ["gemini", "openai"]) {
+    let calls = 0;
+    const adapter = provider === "gemini" ? geminiPersonalize : openaiPersonalize;
+    const fetchImpl = async () => {
+      calls++;
+      return new Response(JSON.stringify(provider === "gemini"
+        ? { candidates: [{ content: { parts: [{ inlineData: { mimeType: "image/png", data: blank.toString("base64") } }] } }] }
+        : { data: [{ b64_json: blank.toString("base64") }] }));
+    };
+    await withServer({ provider, apiKey: "test-only", personalize: args => adapter({ ...args, fetchImpl }) }, async base => {
+      const response = await post(base, { face, profileId: "regular", consent: true, consentProvider: provider });
+      assert.equal(response.status, 502);
+      const result = await response.json();
+      assert.equal(result.code, "missing_face");
+      assert.match(result.error, /cannot be approved or exported/);
+      assert.equal(result.image, undefined);
+      assert.equal(result.kind, undefined);
+    });
+    assert.equal(calls,1,"no automatic paid retry");
+  }
+});
+
+test("a photo without a face cannot trigger a paid Gemini request", async () => {
+  const noFace = await sharp({create:{width:256,height:256,channels:3,background:"#ccc"}}).jpeg().toBuffer();
+  let calls=0;
+  await assert.rejects(geminiPersonalize({face:noFace,body:bodyBytes,avatar:await standardAvatar("regular"),profileId:"regular",measurements,apiKey:"test-only",fetchImpl:async()=>{calls++;throw new Error("Must not be called");}}), error=>error.code==="face_input");
+  assert.equal(calls,0);
 });

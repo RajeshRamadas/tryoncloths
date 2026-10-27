@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import sharp from "sharp";
 import { nativeBridge } from "../helpers/native-bridge.js";
+import { ProviderError } from "../../server/provider-errors.js";
 import { customerPhotos } from "../helpers/customer-photos.js";
 
 test("Android sends both photos once with consent; failures block export; approved provider PNG is shared", async ({ page }) => {
@@ -25,7 +26,7 @@ test("Android sends both photos once with consent; failures block export; approv
     expect(data.consentScope).toBe("face-and-body");
     expect(data.consentProvider).toBe("gemini");
     await route.fulfill(requests.length === 1
-      ? { status: 502, json: { error: "Generation failed. Please try again." } }
+      ? { status: 502, json: { code: "missing_face", error: new ProviderError("missing_face").message } }
       : { json: { image: dataUrl, kind: "customer-avatar", provider: "gemini", profileId: "broad", needsReview: true } });
   });
   await page.goto("/");
@@ -49,7 +50,7 @@ test("Android sends both photos once with consent; failures block export; approv
   expect(requests).toHaveLength(0);
   await page.getByRole("checkbox", { name: /The customer agrees to send their face photo, full-body/ }).check();
   await generate.click();
-  await expect(page.getByRole("alert")).toContainText("Generation failed");
+  await expect(page.getByRole("alert")).toContainText("did not contain one clearly detectable face");
   await expect(page.getByRole("heading", { name: "Generation did not complete" })).toBeVisible();
   expect(requests).toHaveLength(1);
   await expect(page.getByRole("button", { name: "Review avatar" })).toBeDisabled();

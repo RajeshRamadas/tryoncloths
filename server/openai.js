@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import { profiles, recommendProfile } from "../src/profiles.js";
 import { avatarPrompt } from "./avatar-prompt.js";
+import { requireVisibleFace } from "./face-check.js";
 import { ProviderError, providerRequest, providerJson } from "./provider-errors.js";
 
 export async function openaiPersonalize({
@@ -36,10 +37,12 @@ export async function openaiPersonalize({
   const output = result?.data?.[0]?.b64_json;
   if (!output) throw new ProviderError("no_image");
   if (typeof output !== "string" || output.length > 28_000_000) throw new ProviderError("invalid_image");
+  let bytes;
   try {
-    const bytes = await sharp(Buffer.from(output, "base64"), { limitInputPixels: 25_000_000 }).png().toBuffer();
-    return `data:image/png;base64,${bytes.toString("base64")}`;
+    bytes = await sharp(Buffer.from(output, "base64"), { limitInputPixels: 25_000_000 }).rotate().png().toBuffer();
   } catch {
     throw new ProviderError("invalid_image");
   }
+  await requireVisibleFace(bytes);
+  return `data:image/png;base64,${bytes.toString("base64")}`;
 }
