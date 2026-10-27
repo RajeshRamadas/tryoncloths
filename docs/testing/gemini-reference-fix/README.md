@@ -20,6 +20,14 @@ The old 160 × 210 blank region erased neck/collar landmarks along with identity
 
 The latest live test used v2, not this new v3 code. [View that live output](live-v2-output.png). It does not establish that v3 resolves all proportion issues.
 
+## Neck-seam correction (`customer-first-v4`)
+
+The user supplied a result showing a straight horizontal cut across the neck. Inspection found that the v3 reference ended its head patch abruptly at template row 175. Across the four references, the mean RGB difference between rows 174 and 175 in the neck centre was about 21–35 intensity levels (out of 255). That artificial edge could be copied into a generated result.
+
+Version 4 fully removes source identity above that boundary, then fades the guide into the original neck over 28 rows using a smooth opacity curve. The original neck/collar image remains under the overlap so background colour does not wash out the shoulders. The old cut-row jump is now below one intensity level in the reference. Body pixels below the overlap remain unchanged, and shoulder/collar pixels outside the reconstructed neck differ by at most one level from alpha-compositing rounding. The prompt explicitly asks Gemini to re-render jaw, entire neck and collar contact together, removing straight crop edges and colour discontinuities.
+
+These are measurements of the prepared reference, **not proof of a seam-free Gemini result**. Live visual verification is still needed after deploying v4. The user's supplied image is not stored in this repository.
+
 ## Backend change
 
 Gemini now receives three explicitly labelled references in this order:
@@ -28,7 +36,7 @@ Gemini now receives three explicitly labelled references in this order:
 2. Unchanged customer full-body photo: supporting appearance/complexion reference.
 3. Selected standard body with natural colour, texture and shading preserved, its original face/hair removed, and a featureless head-size guide aligned to its neck. Padding gives the complete figure room on a 2:3 canvas, without cropping or stretching.
 
-![Prepared anatomy reference; not a customer output](anatomy-reference.png)
+![Prepared anatomy reference with blended neck; not a customer output](neck-blended-reference.png)
 
 Instructions explicitly preserve customer glasses and hairstyle, match all exposed skin to customer references, replace the head-size guide, and include both complete feet with floor below. They request one natural full-colour photograph with coherent lighting and neck blending; gray garments must not cause gray exposed skin. The template supplies shape and realistic shading, not the target complexion. The image configuration requests a 2:3 portrait. Original sample previews/exports remain intact. This transformation is specific to the four bundled templates and rejects different dimensions until mask placement is reviewed.
 
@@ -36,11 +44,11 @@ There is still one provider call per explicit attempt, with no automatic retry, 
 
 ## Verification and limits
 
-- 28 unit/API tests passed, including request image order, separate labels, unchanged customer bytes, complete source-identity removal, natural colour/texture retention and unscaled body/feet preservation for all four templates.
+- 28 unit/API tests passed, including request image order, separate labels, unchanged customer bytes, complete source-identity removal, absence of the hard neck colour step, collar/shoulder preservation, natural colour/texture retention and unscaled body/feet preservation for all four templates.
 - The preceding version passed four focused browser scenarios. This change leaves the UI and request/response contract unchanged; no Android rebuild is required.
 - Production Docker build and runtime checks passed, including public Gemini configuration and reference rendering inside the container.
 
-**The head-proportion correction has not yet been tested through the live Gemini account.** The available API key is on Lightsail, and this workspace cannot deploy that server. The live failure above is evidence for the defect, not proof that the new reference strategy solves facial fidelity. Gemini output can still vary; likeness, skin tone and full-body framing require a real generated result and customer review. HTTP 200 alone is not a quality check.
+**The neck-seam correction has not yet been tested through the live Gemini account.** The available API key is on Lightsail, and this workspace cannot deploy that server. The live failure above is evidence for the defect, not proof that the new reference strategy solves facial fidelity. Gemini output can still vary; likeness, skin tone and full-body framing require a real generated result and customer review. HTTP 200 alone is not a quality check.
 
 ## Deploy and verify
 
@@ -50,4 +58,4 @@ Keep the existing Gemini key and public-access settings. From Lightsail:
 cd ~/tryoncloths && git pull --ff-only origin main && cd deploy/lightsail && sudo docker compose -f compose.shared.yaml up -d --build tryon
 ```
 
-Then open `/api/health`. It must include `"generationRevision":"customer-first-v3"`. Refresh the app and generate a new result; existing images are not changed by deployment. Repeat the green-sweater test and visually compare face, glasses, hair, complexion and both feet before approving. Do not automatically retry a failure.
+Then open `/api/health`. It must include `"generationRevision":"customer-first-v4"`. Refresh the app and generate a new result; existing images are not changed by deployment. Repeat the green-sweater test and visually compare face, glasses, hair, complexion and both feet before approving. Do not automatically retry a failure.

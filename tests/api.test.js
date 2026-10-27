@@ -40,7 +40,7 @@ test("the selected provider is advertised and only matching provider consent can
     await withServer({ provider, apiKey: "test-only", personalize: async () => { calls++; return face; } }, async base => {
       const health = await (await fetch(`${base}/api/health`)).json();
       assert.equal(health.provider, provider);
-      if (provider === "gemini") assert.equal(health.generationRevision, "customer-first-v3");
+      if (provider === "gemini") assert.equal(health.generationRevision, "customer-first-v4");
       assert.equal(health.personalizationContract, "customer-avatar-v4");
       const valid = { consent: true, profileId: "regular", face };
       assert.equal((await post(base, { ...valid, consentProvider: provider === "gemini" ? "openai" : "gemini" })).status, 400);
@@ -78,6 +78,8 @@ test("Gemini uses the chosen body template and both customer photos for face and
     assert.match(parts[0].text, /not the target complexion/);
     assert.match(parts[0].text, /Scale the customer head uniformly/);
     assert.match(parts[0].text, /2:3 canvas ratio controls framing only/);
+    assert.match(parts[0].text, /ENTIRE NECK down to the collar opening/);
+    assert.match(parts[0].text, /Do not paste a face crop/);
     assert.match(parts[0].text, /selected broad STANDARD BODY TEMPLATE/);
     assert.match(parts[0].text, /CUSTOMER FACE/);
     assert.match(parts[0].text, /MATCH THE CUSTOMER.S NATURAL SKIN TONE/);
@@ -461,10 +463,25 @@ test("every Gemini template hides identity while preserving natural body colour,
     assert.ok((await geminiBodyReference(alternate, id)).equals(reference), `${id}: erase the complete template identity`);
     const guideSkin = await sharp(reference).extract({ left: 154 + centre, top: 48 + 100, width: 1, height: 1 }).raw().toBuffer();
     assert.ok(guideSkin[0] > guideSkin[2] + 12, `${id}: use the natural neck colour for the anatomy guide`);
-    // Source collar, shoulders and neck are no longer erased by a large block.
-    const bodyRegion = { left: 4, top: 175, width: 376, height: 767 };
+    // No abrupt colour step may remain at the former horizontal neck cut.
+    const seam = await sharp(reference).extract({ left: 154 + centre - 18, top: 48 + 174, width: 36, height: 2 }).removeAlpha().raw().toBuffer();
+    let jump = 0;
+    for (let i = 0; i < 108; i++) jump += Math.abs(seam[i] - seam[108 + i]);
+    assert.ok(jump / 108 < 2, `${id}: no hard colour jump at the head/neck boundary`);
+    // Feathering must not paint a pale background patch over the shoulders.
+    for (const region of [
+      { left: 4, top: 175, width: centre - 41, height: 28 },
+      { left: centre + 37, top: 175, width: 343 - centre, height: 28 },
+    ]) {
+      const expectedShoulder = await sharp(original).extract(region).removeAlpha().raw().toBuffer();
+      const actualShoulder = await sharp(reference).extract({ ...region, left: region.left + 154, top: region.top + 48 }).removeAlpha().raw().toBuffer();
+      assert.equal(actualShoulder.length, expectedShoulder.length);
+      assert.ok(actualShoulder.every((value, index) => Math.abs(value - expectedShoulder[index]) <= 1), `${id}: preserve shoulders/collar within alpha-rounding tolerance`);
+    }
+    // Only the neck overlap may change; the remainder of the body stays intact.
+    const bodyRegion = { left: 4, top: 203, width: 376, height: 739 };
     const expected = await sharp(original).removeAlpha().extract(bodyRegion).raw().toBuffer();
-    const actual = await sharp(reference).removeAlpha().extract({ ...bodyRegion, left: 158, top: 48 + 175 }).raw().toBuffer();
+    const actual = await sharp(reference).removeAlpha().extract({ ...bodyRegion, left: 158, top: 48 + 203 }).raw().toBuffer();
     assert.equal(actual.length, expected.length);
     assert.ok(actual.equals(expected), `${id}: preserve body/feet colour, texture and geometry`);
   }
