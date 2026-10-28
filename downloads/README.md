@@ -2,9 +2,9 @@
 
 [Download the APK](https://github.com/RajeshRamadas/tryoncloths/raw/refs/heads/main/downloads/forme-android-debug.apk)
 
-Version 0.4.0 (version code 4), app ID `com.rajeshramadas.tryoncloths`. Android 7+ with Android System WebView/Chrome 108+ is required. This APK uses a development signing certificate and is for testing.
+Version 0.5.0 (version code 5), app ID `com.rajeshramadas.tryoncloths`. Android 7+ with Android System WebView/Chrome 108+ is required. This APK uses a development signing certificate and is for testing.
 
-Version 0.4.0 adds explicit pending/error previews, automatic photo-based skin-tone instructions, Gemini as the default provider, and provider-specific consent. It includes the customer face/body/skin-tone generation contract and blocks customer export without a generated result. It also includes the WebP orientation fix. Actual generation requires an updated HTTPS backend with a server-side Gemini API key; see [setup instructions](../docs/GENERATION_SETUP.md). The SHA-256 identifies the updated APK.
+Version 0.5.0 adds local clothing try-on after avatar approval: separate tops and trousers, illustrated samples, transparent clothing-layer import, placement controls, reset, and reviewed outfit sharing. Clothing selections make no AI calls. See the [clothing guide](../docs/CLOTHING_TRYON.md). Customer avatar generation still requires an updated HTTPS backend and a server-side provider key; see [setup](../docs/GENERATION_SETUP.md).
 
 Open the download on your phone and allow installation from your browser/file manager if prompted. Sample avatars work offline. See [the Android guide](../docs/ANDROID.md) for the photo, approval, sharing, optional AI connection, and source-build workflow.
 

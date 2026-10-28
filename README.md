@@ -62,7 +62,7 @@ No retailer accounts, durable avatar storage, clothing compositing, fit predicti
 
 ## Validation
 
-Automated validation covers both provider adapters, provider-specific consent, whole-body skin-tone instructions, pending/error previews, customer-export blocking, and approval of a stubbed provider result. Test customer photos were generated independently of the avatar library. See [version 0.4 validation](docs/testing/avatar-v4/README.md). Live provider quality remains unverified. The Android download is version 0.4.0 with consent naming the configured provider.
+Automated validation covers both provider adapters, provider-specific consent, whole-body skin-tone instructions, pending/error previews, customer-export blocking, and approval of a stubbed provider result. Test customer photos were generated independently of the avatar library. See [version 0.4 validation](docs/testing/avatar-v4/README.md). Live provider quality remains unverified. The Android download is version 0.5.0 with local clothing try-on and consent naming the configured provider.
 
 ```sh
 npm test
@@ -87,3 +87,7 @@ Unit/API tests cover matching, invalid inputs, consent, request origin, decoded 
 - `docs/LEVEL_1.md`: current implementation scope and remaining validation.
 
 Cloud tasks already have an isolated checkout. Work in the existing repository; do not create a worktree unless explicitly requested.
+
+## Clothing try-on
+
+Version 0.5 adds **Try clothes** after avatar approval: independent tops/trousers, illustrated sample garments, transparent PNG/WebP import, placement controls, reset and reviewed PNG download/Android sharing. Clothing changes are composed locally with no AI requests. See [usage, layer preparation and limitations](docs/CLOTHING_TRYON.md). This is an approximate 2D preview, not a fit or drape simulation.

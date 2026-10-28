@@ -26,6 +26,7 @@ import { downloadAvatar, LIBRARY_URL, readPhoto } from "./images";
 import { isNative, capturePhoto, clearNativeExports } from "./native";
 import { requestApi } from "./api";
 import StudioConnection from "./StudioConnection";
+import OutfitStudio from "./OutfitStudio";
 import { App as NativeApp } from "@capacitor/app";
 
 type PhotoKind = "face" | "body";
@@ -190,6 +191,7 @@ function PhotoInput({
 
 export default function App() {
   const [step, setStep] = useState(1);
+  const [outfitOpen, setOutfitOpen] = useState(false);
   const [height, setHeight] = useState("175");
   const [weight, setWeight] = useState("72");
   const [selected, setSelected] = useState("regular");
@@ -256,6 +258,7 @@ export default function App() {
         return;
       }
       if (generating || exporting) return;
+      if (outfitOpen) { setOutfitOpen(false); return; }
       if (step > 1) goTo(step - 1);
       else if (face || body) setConfirmReset(true);
       else void NativeApp.minimizeApp();
@@ -263,7 +266,7 @@ export default function App() {
     return () => {
       void listener.then((handle) => handle.remove());
     };
-  }, [step, face, body, generating, exporting]);
+  }, [step, face, body, generating, exporting, outfitOpen]);
   useEffect(() => {
     const dialog = dialogRef.current;
     if ((help || expanded || confirmReset) && dialog && !dialog.open) {
@@ -281,6 +284,7 @@ export default function App() {
   }, [notice]);
 
   function invalidate() {
+    setOutfitOpen(false);
     setGenerationFailed(false);
     setPersonalized(null);
     setApproved(false);
@@ -430,6 +434,8 @@ export default function App() {
   );
 
   return (
+    <>
+    <div hidden={outfitOpen}>
     <div className="app-shell">
       <header className="topbar">
         <a className="brand" href="/" aria-label="Forme home">
@@ -840,6 +846,10 @@ export default function App() {
                         ? "Save or share avatar"
                         : "Download avatar"}
                   </button>
+                  <button className="button secondary full-width try-clothes-button" disabled={!approved || exporting || needsCustomerGeneration} onClick={() => setOutfitOpen(true)}>
+                    Try clothes <ArrowRight size={16}/>
+                  </button>
+                  <p className="small-footnote">Approve the avatar to try separate tops and trousers. Outfit changes use no AI calls.</p>
                   <p className="small-footnote">
                     {isNative
                       ? "Save a PNG using the share sheet. Session photos stay in memory; temporary exports are cleared on the next session, export, or app launch."
@@ -1153,5 +1163,8 @@ export default function App() {
         ) : null}
       </dialog>
     </div>
+    </div>
+    {approved && !needsCustomerGeneration && <OutfitStudio key={`${session}-${selected}`} active={outfitOpen} profile={profile} personalized={personalized} onBack={() => { setOutfitOpen(false); requestAnimationFrame(() => titleRef.current?.focus()); }} onBusy={setExporting}/>}
+    </>
   );
 }

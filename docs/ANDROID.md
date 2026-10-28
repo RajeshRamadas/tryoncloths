@@ -69,3 +69,7 @@ For a hosted build, use **Actions → Build Android APK → Run workflow** on Gi
 - A release for Google Play needs an owner-controlled signing key, app listing, privacy/data-safety declarations, and real-device validation. This task delivers a test APK, not a published Play Store app.
 
 The iPhone draft is paused and is not part of the Android delivery.
+
+## Clothing try-on (0.5.0)
+
+Approve the avatar, choose **Try clothes**, select or import prepared tops/trousers, adjust placement and review the result before **Save or share outfit**. Outfit composition uses no AI calls and keeps images in the session. See [layer requirements and preview limits](CLOTHING_TRYON.md).
