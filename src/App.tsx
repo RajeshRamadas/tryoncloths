@@ -27,6 +27,8 @@ import { isNative, capturePhoto, clearNativeExports } from "./native";
 import { requestApi } from "./api";
 import StudioConnection from "./StudioConnection";
 import OutfitStudio from "./OutfitStudio";
+import SavedAvatars from "./SavedAvatars";
+import { saveAvatar, type AvatarDetails } from "./saved-avatars";
 import { App as NativeApp } from "@capacitor/app";
 
 type PhotoKind = "face" | "body";
@@ -192,6 +194,10 @@ function PhotoInput({
 export default function App() {
   const [step, setStep] = useState(1);
   const [outfitOpen, setOutfitOpen] = useState(false);
+  const [restoredAvatar, setRestoredAvatar] = useState(false);
+  const [avatarSource, setAvatarSource] = useState<"generated" | "imported">("generated");
+  const [avatarName, setAvatarName] = useState("Customer avatar");
+  const [saveConsent, setSaveConsent] = useState(false);
   const [height, setHeight] = useState("175");
   const [weight, setWeight] = useState("72");
   const [selected, setSelected] = useState("regular");
@@ -220,7 +226,7 @@ export default function App() {
   const recommendation = recommendProfile(Number(height), Number(weight));
   const profile = profiles.find((p) => p.id === selected)!;
   const validMeasurements = recommendation !== null;
-  const needsCustomerGeneration = Boolean(face || body) && !personalized;
+  const needsCustomerGeneration = Boolean(face || body || restoredAvatar) && !personalized;
   const providerLabel = provider === "gemini" ? "Google Gemini" : "OpenAI";
 
   function checkService() {
@@ -284,6 +290,7 @@ export default function App() {
   }, [notice]);
 
   function invalidate() {
+    setSaveConsent(false);
     setOutfitOpen(false);
     setGenerationFailed(false);
     setPersonalized(null);
@@ -321,6 +328,9 @@ export default function App() {
     setTimeout(() => titleRef.current?.focus(), 0);
   }
   function reset() {
+    setRestoredAvatar(false);
+    setAvatarSource("generated");
+    setAvatarName("Customer avatar");
     void clearNativeExports().catch(() =>
       setError(
         "Session cleared, but a temporary export could not be removed. Clear the app cache before the next customer.",
@@ -345,6 +355,9 @@ export default function App() {
   async function generate() {
     if (!face || !body || !aiConsent || !consent || !provider || service !== "available" || generating) return;
     setGenerating(true);
+    setRestoredAvatar(false);
+    setAvatarSource("generated");
+    setSaveConsent(false);
     setGenerationFailed(false);
     setPersonalized(null);
     setError("");
@@ -385,6 +398,26 @@ export default function App() {
     } finally {
       setGenerating(false);
     }
+  }
+  function useSavedAvatar(image: string, details: AvatarDetails) {
+    invalidate();
+    setFace(null); setBody(null); setConsent(false);
+    setSession(s => s + 1);
+    setSelected(details.profileId); setManual(true);
+    setHeight(String(details.heightCm)); setWeight(String(details.weightKg));
+    setPersonalized(image); setRestoredAvatar(true); setAvatarSource(details.source); setAvatarName(details.name);
+    setStep(3);
+    setNotice("Avatar opened without an AI request. Review it, then choose Try clothes.");
+    requestAnimationFrame(() => titleRef.current?.focus());
+  }
+  async function keepAvatar() {
+    if (!personalized || !approved || !saveConsent || exporting || needsCustomerGeneration) return;
+    setExporting(true); setError("");
+    try {
+      await saveAvatar(personalized, { name: avatarName, profileId: selected, heightCm: Number(height), weightKg: Number(weight), source: avatarSource });
+      setNotice("Avatar saved on this device. Open Saved avatars next time; no generation is needed.");
+    } catch (e) { setError((e as Error).message); }
+    finally { setExporting(false); }
   }
   async function download() {
     if (exporting || !approved || needsCustomerGeneration) return;
@@ -481,6 +514,7 @@ export default function App() {
             <Plus size={16} /> New session
           </button>
         </section>
+        <div className="saved-avatars-entry"><SavedAvatars disabled={generating || exporting} onUse={useSavedAvatar}/><span>Already have an avatar? Reopen it here without generating again.</span></div>
         <nav className="steps" aria-label="Avatar creation steps">
           {["Customer details", "Match & personalize", "Review & save"].map(
             (label, i) => (
@@ -793,13 +827,14 @@ export default function App() {
                       </p>
                     </div>
                   </div>
-                  {personalized && (
+                  {personalized && face && body && (
                     <div className="mini-photos">
                       <img src={face!} alt="Original customer face for skin-tone review" />
                       <img src={body!} alt="Original customer body for skin-tone review" />
                       <p>Compare the face and skin tone with the original photos. Check the neck, arms, hands, legs and feet.</p>
                     </div>
                   )}
+                  {restoredAvatar && personalized && <p className="saved-avatar-note">{avatarSource === "imported" ? "Imported avatar PNG. Check that this is the correct full-body avatar and body profile." : "Reopened customer avatar. Original photos were not saved; review the avatar with the customer."} No new AI generation was used.</p>}
                   <div className="summary-row">
                     <span>Body profile</span>
                     <strong>{profile.name}</strong>
@@ -846,14 +881,20 @@ export default function App() {
                         ? "Save or share avatar"
                         : "Download avatar"}
                   </button>
+                  {personalized && <div className="save-avatar-box">
+                    <label>Avatar name<input maxLength={60} value={avatarName} disabled={exporting} onChange={e => setAvatarName(e.target.value)}/></label>
+                    <label className="consent"><input type="checkbox" checked={saveConsent} disabled={!approved || exporting} onChange={e => setSaveConsent(e.target.checked)}/><span>The customer agrees to save this avatar and measurements on this device for reuse.</span></label>
+                    <button className="button secondary full-width" disabled={!approved || !saveConsent || !avatarName.trim() || exporting || needsCustomerGeneration} onClick={() => void keepAvatar()}>Save avatar for reuse</button>
+                    <p className="small-footnote">Saves the avatar image, name, body profile and measurements here. Original photos are not saved. Anyone using this browser or app can open it. Delete it from Saved avatars when no longer needed.</p>
+                  </div>}
                   <button className="button secondary full-width try-clothes-button" disabled={!approved || exporting || needsCustomerGeneration} onClick={() => setOutfitOpen(true)}>
                     Try clothes <ArrowRight size={16}/>
                   </button>
-                  <p className="small-footnote">Approve the avatar to try separate tops and trousers. Outfit changes use no AI calls.</p>
+                  <p className="small-footnote">Approve the avatar to try separate tops, trousers and shoes. Outfit changes use no AI calls.</p>
                   <p className="small-footnote">
                     {isNative
                       ? "Save a PNG using the share sheet. Session photos stay in memory; temporary exports are cleared on the next session, export, or app launch."
-                      : "Downloads a PNG. Photos and results are held only in this browser session; download before leaving."}
+                      : "Downloads a PNG backup. To reopen here later, choose Save avatar for reuse. Original photos stay in this session."}
                   </p>
                 </>
               )}
@@ -923,7 +964,7 @@ export default function App() {
                 </strong>
                 <span>
                   {personalized
-                    ? "Created for this session"
+                    ? restoredAvatar ? "Reopened avatar · no new generation" : "Created for this session"
                     : "Fixed pose · reusable body profile"}
                 </span>
               </div>}
@@ -1127,9 +1168,9 @@ export default function App() {
               </li>
             </ol>
             <p className="small-footnote">
-              This pilot holds photos in memory. Starting a new session or
-              reloading clears them. Clothing swaps and saved customer accounts
-              are planned for a later phase.
+              Original photos stay in memory and are cleared on reload or a new session.
+              You can explicitly save approved avatars on this device and reuse them for clothing try-on.
+              The library is not synced across devices; keep a downloaded PNG backup.
             </p>
           </div>
         ) : confirmReset ? (
@@ -1137,8 +1178,8 @@ export default function App() {
             <h2>Start fresh?</h2>
             <p>
               The current photos and generated result will be cleared from this
-              browser session. Download an approved avatar first if you want to
-              keep it.
+              browser session. Avatars explicitly saved in Saved avatars stay on this device.
+              Save or download an approved avatar first if you want to keep it.
             </p>
             <div className="dialog-actions">
               <button

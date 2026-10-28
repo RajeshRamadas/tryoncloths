@@ -62,7 +62,7 @@ No retailer accounts, durable avatar storage, clothing compositing, fit predicti
 
 ## Validation
 
-Automated validation covers both provider adapters, provider-specific consent, whole-body skin-tone instructions, pending/error previews, customer-export blocking, and approval of a stubbed provider result. Test customer photos were generated independently of the avatar library. See [version 0.4 validation](docs/testing/avatar-v4/README.md). Live provider quality remains unverified. The Android download is version 0.6.0 with local clothing try-on and consent naming the configured provider.
+Automated validation covers both provider adapters, provider-specific consent, whole-body skin-tone instructions, pending/error previews, customer-export blocking, and approval of a stubbed provider result. Test customer photos were generated independently of the avatar library. See [version 0.4 validation](docs/testing/avatar-v4/README.md). Live provider quality remains unverified. The Android download is version 0.7.0 with saved-avatar reuse and local clothing try-on and consent naming the configured provider.
 
 ```sh
 npm test
@@ -91,3 +91,7 @@ Cloud tasks already have an isolated checkout. Work in the existing repository; 
 ## Clothing try-on
 
 Version 0.6 includes **Try clothes** after avatar approval: independent tops/trousers/shoes, nine realistic AI-created sample garments, transparent PNG/WebP import, placement controls, reset and reviewed PNG download/Android sharing. Clothing changes are composed locally with no AI requests. See [usage, layer preparation and limitations](docs/CLOTHING_TRYON.md). This is an approximate 2D preview, not a fit or drape simulation.
+
+## Reuse a customer avatar
+
+After approval, choose **Save avatar for reuse** and explicitly agree to local storage. Next time, open **Saved avatars**, choose the customer and use **Try clothes** without another generation. Existing downloaded avatar PNGs can also be opened from the library. The library stays on the same browser/app and can be deleted; original customer photos are never included. See [saving, reopening, backup and deletion](docs/SAVED_AVATARS.md).

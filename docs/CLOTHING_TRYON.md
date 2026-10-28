@@ -1,6 +1,6 @@
 # Clothing try-on — version 0.6
 
-Approve an avatar in **Review & save**, then choose **Try clothes**. You can use an approved sample offline or an approved generated customer avatar. The original avatar stays unchanged.
+Approve an avatar in **Review & save**, then choose **Try clothes**. You can use an approved sample offline or an approved generated customer avatar. The original avatar stays unchanged. Use **Saved avatars** to reopen a previously saved customer avatar or downloaded PNG without another generation; see [the reuse guide](SAVED_AVATARS.md).
 
 1. Choose a shirt/top, trousers and shoes independently. The catalogue includes navy and cream T-shirts, a blue button-down shirt, blue jeans, charcoal and sand chinos, white and black sneakers, and brown leather shoes. These are realistic AI-created sample assets, not photographs of store inventory.
 2. To use store garments, select the category and choose **Import top layer**, **Import trousers layer** or **Import shoes layer** (a left/right pair).
@@ -25,7 +25,7 @@ Website, on the existing Lightsail instance:
 cd ~/tryoncloths && git pull --ff-only origin main && cd deploy/lightsail && sudo docker compose -f compose.shared.yaml up -d --build tryon
 ```
 
-Refresh the page. No provider-key changes are needed for clothing selection. For Android, install the version 0.6.0 test APK from [downloads](../downloads/README.md). The backend generation contract remains `customer-avatar-v4`; the clothing feature is client-side.
+Refresh the page. No provider-key changes are needed for clothing selection. For Android, install the version 0.7.0 test APK from [downloads](../downloads/README.md). The backend generation contract remains `customer-avatar-v4`; the clothing feature is client-side.
 
 ## Validation
 

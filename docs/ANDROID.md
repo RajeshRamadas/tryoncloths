@@ -73,3 +73,7 @@ The iPhone draft is paused and is not part of the Android delivery.
 ## Clothing try-on (0.6.0)
 
 Approve the avatar, choose **Try clothes**, select or import prepared tops/trousers/shoes, adjust placement and review the result before **Save or share outfit**. Outfit composition uses no AI calls and keeps images in the session. See [layer requirements and preview limits](CLOTHING_TRYON.md).
+
+## Reuse saved avatars (0.7.0)
+
+After approval and explicit storage consent, **Save avatar for reuse** keeps the avatar PNG and basic details in this app's local library. Open **Saved avatars** on the next visit, review it and try clothes without another generation. A downloaded full-body PNG can also be imported. The library is separate from the website and is removed by clearing app data or uninstalling; keep PNG backups. See the [reuse guide](SAVED_AVATARS.md).

@@ -71,7 +71,7 @@ Generated images must pass a local face-presence check before reaching approval.
 
 A session containing customer photos cannot proceed to approval/export without a generated customer result. Missing keys, connection errors, invalid inputs, or provider failures never substitute a standard sample as the customer's output. You can still browse/export standard samples in a separate session with no customer photos.
 
-Changing the photos, measurements or selected body invalidates the generated result and its approval. Generation consent is also reset. The app holds photos/results in memory and the backend does not persist them. Provider retention is governed by your account's terms; Android sharing uses temporary cache files as described in the [Android guide](ANDROID.md).
+Changing the photos, measurements or selected body invalidates the generated result and its approval. Generation consent is also reset. Original photos remain in memory and the backend does not persist them. Version 0.7 adds an optional local saved-avatar library: with explicit consent, the approved avatar PNG, thumbnail, chosen name, profile and measurements are saved on this browser/app for reuse. Original photos and credentials are excluded. See [saved-avatar storage and deletion](SAVED_AVATARS.md). Provider retention is governed by your account's terms; Android sharing uses temporary cache files as described in the [Android guide](ANDROID.md).
 
 ## Current verification status
 

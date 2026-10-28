@@ -1691,3 +1691,23 @@ dialog::backdrop {
   .outfit-preview { height: 55vh; min-height: 350px; }
   .outfit-panel { padding: 20px; }
 }
+
+.saved-avatars-entry { display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin:18px 0; }
+.saved-avatars-entry > span { color:#6a796d; font-size:13px; }
+.saved-avatars-dialog { width:min(650px, calc(100vw - 32px)); max-height:85vh; padding:24px; border:1px solid #dce2d8; border-radius:18px; color:#2c5043; }
+.saved-avatars-dialog::backdrop { background:#122a24a8; }
+.saved-avatars-dialog > p, .saved-avatar-item p, .avatar-import p { line-height:1.6; font-size:13px; color:#69786b; }
+.saved-avatars-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.saved-avatars-heading h2 { font-size:23px; margin:0; }
+.saved-avatar-list { display:grid; gap:16px; margin:20px 0; }
+.saved-avatar-item { display:grid; grid-template-columns:85px minmax(0,1fr); gap:16px; border:1px solid #dce2d8; border-radius:12px; padding:14px; }
+.saved-avatar-item img { width:85px; height:150px; object-fit:contain; background:#f4f5ef; border-radius:8px; }
+.saved-avatar-item h3 { margin:0; font-size:17px; overflow-wrap:anywhere; }
+.saved-avatar-item button { margin:5px 5px 0 0; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+.saved-delete { border-top:1px solid #ddd; margin-top:12px; }
+.save-avatar-box, .avatar-import { border:1px solid #dce2d8; border-radius:12px; background:#f8faf5; padding:18px; margin:16px 0; }
+.save-avatar-box > label:first-child, .avatar-import label { display:block; color:#365647; font-size:13px; }
+.save-avatar-box input:not([type="checkbox"]), .avatar-import input, .avatar-import select { display:block; width:100%; box-sizing:border-box; border:1px solid #ccd7cc; border-radius:8px; background:white; color:#29493c; padding:11px; margin:7px 0 14px; }
+.avatar-import summary { cursor:pointer; font-weight:600; }
+.saved-avatar-note { background:#edf5ee; border-radius:10px; padding:14px; line-height:1.6; font-size:13px; color:#326953; }
+@media(max-width:480px) { .saved-avatars-dialog { padding:18px; } .saved-avatar-item { grid-template-columns:65px minmax(0,1fr); gap:10px; padding:10px; } .saved-avatar-item img { width:65px; height:125px; } }
