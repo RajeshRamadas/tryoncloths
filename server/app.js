@@ -9,6 +9,8 @@ import { openaiPersonalize } from "./openai.js";
 import { geminiPersonalize, GEMINI_REFERENCE_VERSION } from "./gemini.js";
 import { providerConfig } from "./provider-config.js";
 import { installAccountRoutes, accountUser } from "./accounts.js";
+import { geminiTryOn, garmentTypes, normalizeAvatar, TRYON_CONTRACT } from "./gemini-tryon.js";
+import { readProductLink, normalizeGarmentImage, LinkError } from "./product-link.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const maxPhotoBytes = 5 * 1024 * 1024;
@@ -78,6 +80,8 @@ export function createApp({
   trustProxy = false,
   accountStore = null,
   allowSignup = true,
+  tryOn = geminiTryOn,
+  productLink = readProductLink,
 } = {}) {
   const providerLabel = providerConfig(provider).label;
   if (!["auto", "protected", "public"].includes(accessMode))
@@ -141,6 +145,9 @@ export function createApp({
       storage: accountStore ? "account" : "ephemeral",
       accountsAvailable: Boolean(accountStore),
       profileCount: profiles.length,
+      tryOnAvailable: provider === "gemini" && Boolean(apiKey),
+      tryOnContract: TRYON_CONTRACT,
+      garmentTypes: Object.keys(garmentTypes),
     }),
   );
 
@@ -247,6 +254,92 @@ export function createApp({
       inFlight--;
     }
   });
+  const sameStudio = (req) => {
+    const origin = req.get("origin");
+    try {
+      return Boolean(origin) && ((mobileToken && nativeOrigins.has(origin)) || new URL(origin).host === req.get("host"));
+    } catch {
+      return false;
+    }
+  };
+
+  // Product links: no AI call, but outbound fetches are rate limited per client.
+  const linkAttempts = new Map();
+  let linksInFlight = 0;
+  app.post("/api/product-link", async (req, res) => {
+    req.body ||= {};
+    if (accountStore && !accountUser(accountStore, req)) return res.status(401).json({ error: "Sign in to the store account before reading product links.", code: "account_required" });
+    if (!sameStudio(req)) return res.status(403).json({ error: "Open this workflow from the Avatar Studio app." });
+    const now = Date.now();
+    for (const [key, entry] of linkAttempts) if (now - entry.started > 3600000) linkAttempts.delete(key);
+    const entry = linkAttempts.get(req.ip) || { started: now, last: 0, count: 0 };
+    if (rateLimit && (now - entry.last < 2000 || entry.count >= 60))
+      return res.status(429).json({ error: "Please wait a moment before reading another link." });
+    if (linksInFlight >= 4) return res.status(429).json({ error: "The studio is reading other links. Please try again shortly." });
+    linkAttempts.set(req.ip, { started: entry.started, last: now, count: entry.count + 1 });
+    linksInFlight++;
+    try {
+      res.json(await productLink(req.body.url));
+    } catch (error) {
+      const failure = error instanceof LinkError ? error : new LinkError("unknown");
+      console.error(JSON.stringify({ event: "product_link_failure", code: failure.code }));
+      res.status(["invalid_url", "blocked_address"].includes(failure.code) ? 400 : failure.code === "no_images" ? 422 : 502)
+        .json({ error: failure.message, code: failure.code });
+    } finally {
+      linksInFlight--;
+    }
+  });
+
+  // Garment try-on: one paid provider call, sharing the generation limits.
+  app.post("/api/tryon", async (req, res) => {
+    req.body ||= {};
+    if (accountStore && !accountUser(accountStore, req)) return res.status(401).json({ error: "Sign in to the store account before trying on clothes.", code: "account_required" });
+    if (!sameStudio(req)) return res.status(403).json({ error: "Open this workflow from the Avatar Studio app." });
+    if (req.body.consent !== true || req.body.consentScope !== "avatar-and-garment" || req.body.consentProvider !== provider)
+      return res.status(400).json({ error: `Customer consent to send the avatar and garment image to ${providerLabel} is required.` });
+    if (!Object.hasOwn(garmentTypes, req.body.garmentType))
+      return res.status(400).json({ error: "Choose what to put on: shirt, T-shirt, trousers, jeans, shoes or another listed type." });
+    if (provider !== "gemini" || !apiKey)
+      return res.status(503).json({ error: "Clothing try-on from product images needs the Gemini provider to be configured on the studio." });
+    if (inFlight >= 2) return res.status(429).json({ error: "The studio is processing another image. Please try again shortly." });
+    const now = Date.now();
+    for (const [key, entry] of attempts) if (now - entry.started > 3600000) attempts.delete(key);
+    const previous = attempts.get(req.ip);
+    if (rateLimit && previous && (now - previous.last < 15000 || previous.count >= 20))
+      return res.status(429).json({ error: "Please wait before generating again. This pilot allows up to 20 AI attempts per hour." });
+    let avatar, garment;
+    try {
+      avatar = await normalizeAvatar(req.body.avatar);
+    } catch (e) {
+      return res.status(400).json({ error: e.message });
+    }
+    try {
+      const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(typeof req.body.garment === "string" && req.body.garment.length < maxPhotoBytes * 1.4 ? req.body.garment : "");
+      if (!match) throw new Error();
+      garment = await normalizeGarmentImage(Buffer.from(match[2], "base64"));
+    } catch {
+      return res.status(400).json({ error: "Use a JPEG, PNG or WebP garment image under 5 MB and at least 160 × 160 pixels." });
+    }
+    const latest = attempts.get(req.ip);
+    if (inFlight >= 2 || (rateLimit && latest && (Date.now() - latest.last < 15000 || latest.count >= 20)))
+      return res.status(429).json({ error: "Please wait before generating again." });
+    attempts.set(req.ip, { started: latest?.started || now, last: Date.now(), count: (latest?.count || 0) + 1 });
+    inFlight++;
+    try {
+      const image = await tryOn({ avatar, garment, garmentType: req.body.garmentType, title: req.body.title, apiKey, model });
+      res.json({ image, provider, kind: "garment-tryon", garmentType: req.body.garmentType, needsReview: true });
+    } catch (error) {
+      const failure = providerErrorDetails(error, provider);
+      console.error(JSON.stringify({ event: "tryon_provider_failure", provider, code: failure.code, providerStatus: failure.providerStatus }));
+      res.status(502).json({
+        error: failure.code === "missing_face" ? "The try-on image lost the customer's face and was rejected. A provider charge may still apply; no automatic retry was made." : failure.message.replace("Customer avatar generation", "Clothing try-on").replace("No customer avatar was created", "The avatar is unchanged"),
+        code: failure.code,
+      });
+    } finally {
+      inFlight--;
+    }
+  });
+
   app.use("/api", (_req, res) =>
     res.status(404).json({ error: "API route not found." }),
   );

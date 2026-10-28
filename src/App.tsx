@@ -212,6 +212,7 @@ export default function App() {
   const [aiConsent, setAiConsent] = useState(false);
   const [service, setService] = useState<ServiceState>("checking");
   const [provider, setProvider] = useState<"gemini" | "openai" | null>(null);
+  const [tryOnAvailable, setTryOnAvailable] = useState(false);
   const [personalized, setPersonalized] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generationFailed, setGenerationFailed] = useState(false);
@@ -235,6 +236,7 @@ export default function App() {
 
   function checkService() {
     setService("checking");
+    setTryOnAvailable(false);
     setAiConsent(false);
     requestApi("/api/health")
       .then(async (r) => {
@@ -247,6 +249,7 @@ export default function App() {
         if (data.accountsAvailable) setAccountState(s => ({...s,enabled:true}));
         const supported = data.personalizationContract === "customer-avatar-v4" && ["gemini", "openai"].includes(data.provider);
         setProvider(supported ? data.provider : null);
+        setTryOnAvailable(data.tryOnAvailable === true && data.tryOnContract === "garment-tryon-v1");
         setService(data.personalizationAvailable && supported ? "available" : "unavailable");
       })
       .catch(() => setService("unavailable"));
@@ -1219,7 +1222,7 @@ export default function App() {
       </dialog>
     </div>
     </div>
-    {approved && !needsCustomerGeneration && <OutfitStudio key={`${session}-${selected}`} active={outfitOpen} profile={profile} personalized={personalized} onBack={() => { setOutfitOpen(false); requestAnimationFrame(() => titleRef.current?.focus()); }} onBusy={setExporting}/>}
+    {approved && !needsCustomerGeneration && <OutfitStudio key={`${session}-${selected}`} active={outfitOpen} profile={profile} personalized={personalized} tryOn={{ available: tryOnAvailable, providerLabel }} onBack={() => { setOutfitOpen(false); requestAnimationFrame(() => titleRef.current?.focus()); }} onBusy={setExporting}/>}
     </>
   );
 }

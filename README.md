@@ -92,6 +92,10 @@ Cloud tasks already have an isolated checkout. Work in the existing repository; 
 
 Version 0.6 includes **Try clothes** after avatar approval: independent tops/trousers/shoes, nine realistic AI-created sample garments, transparent PNG/WebP import, placement controls, reset and reviewed PNG download/Android sharing. Clothing changes are composed locally with no AI requests. See [usage, layer preparation and limitations](docs/CLOTHING_TRYON.md). This is an approximate 2D preview, not a fit or drape simulation.
 
+## Try clothes from any website
+
+**Web 0.9:** in **Try clothes**, paste a product link from any clothing website (or upload a product photo/screenshot), choose the photo and what to put on (shirt, T-shirt, trousers, jeans, shoes, kurta, jacket, full outfit…), and Gemini dresses the saved avatar in that garment with one AI request. Add garments one after another to build an outfit; undo goes back without another request. The link reader blocks private/internal addresses. See [product-link try-on](docs/LINK_TRYON.md).
+
 ## Reuse a customer avatar
 
 **Web 0.8:** enable [store accounts](docs/STORE_ACCOUNTS.md), create a store account and sign in before generating. With customer consent, generated avatars save automatically to that account. Sign in from another browser, open **Saved avatars**, choose the customer and use **Try clothes** without another generation. Older local avatars and downloaded PNGs can be opened, reviewed and explicitly saved to the account. The deployment needs the account Compose override and persistent volume described in the guide.
