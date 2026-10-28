@@ -2,6 +2,8 @@
 
 Version 0.9 lets store staff dress a saved or approved avatar in a garment from **any clothing website**.
 
+See also: [requirements and design](LINK_TRYON_DESIGN.md) · [implementation guide for an LLM](LINK_TRYON_IMPLEMENTATION.md).
+
 ## Workflow
 
 1. Open an approved or saved avatar and choose **Try clothes**.
