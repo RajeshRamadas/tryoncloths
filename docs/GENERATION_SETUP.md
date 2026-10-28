@@ -1,5 +1,7 @@
 # Enable customer avatar generation
 
+**Web 0.8 account storage:** see [store accounts](STORE_ACCOUNTS.md) for sign-in, automatic saving, reuse across browsers and the persistent-volume deployment command. This web update does not rebuild the Android APK. Local-library instructions below apply when account storage is disabled.
+
 The backend uses **Gemini by default**. Keep the API key on the server; do not enter it in the app. Skin tone is matched automatically from customer photos, using the face as the primary reference and the full-body photo as supporting evidence. The selected standard body supplies proportions, pose, clothing and framing.
 
 ## Update your existing Gemini deployment

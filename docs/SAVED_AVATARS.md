@@ -1,5 +1,7 @@
 # Reuse an avatar — version 0.7.0
 
+**Web 0.8 account storage:** see [store accounts](STORE_ACCOUNTS.md) for sign-in, automatic saving, reuse across browsers and the persistent-volume deployment command. This web update does not rebuild the Android APK. Local-library instructions below apply when account storage is disabled.
+
 You do not need to generate a new avatar each time you try clothes.
 
 ## Save once, reuse later

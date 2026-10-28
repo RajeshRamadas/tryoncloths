@@ -8,6 +8,7 @@ import { providerErrorDetails } from "./provider-errors.js";
 import { openaiPersonalize } from "./openai.js";
 import { geminiPersonalize, GEMINI_REFERENCE_VERSION } from "./gemini.js";
 import { providerConfig } from "./provider-config.js";
+import { installAccountRoutes, accountUser } from "./accounts.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const maxPhotoBytes = 5 * 1024 * 1024;
@@ -75,6 +76,8 @@ export function createApp({
   mobileToken = process.env.TRYON_MOBILE_TOKEN || "",
   accessMode = process.env.TRYON_ACCESS_MODE || "auto",
   trustProxy = false,
+  accountStore = null,
+  allowSignup = true,
 } = {}) {
   const providerLabel = providerConfig(provider).label;
   if (!["auto", "protected", "public"].includes(accessMode))
@@ -125,7 +128,9 @@ export function createApp({
     next();
   });
   // Two <=5 MB photos, base64-encoded, plus small metadata. Each is checked below.
+  app.use("/api/account", express.json({ limit: "4kb" }));
   app.use(express.json({ limit: "15mb" }));
+  installAccountRoutes(app, accountStore, { production, allowSignup });
   app.get("/api/health", (_req, res) =>
     res.json({
       status: "ok",
@@ -133,7 +138,8 @@ export function createApp({
       provider,
       generationRevision: provider === "gemini" ? GEMINI_REFERENCE_VERSION : "template-first-v1",
       personalizationContract: "customer-avatar-v4",
-      storage: "ephemeral",
+      storage: accountStore ? "account" : "ephemeral",
+      accountsAvailable: Boolean(accountStore),
       profileCount: profiles.length,
     }),
   );
@@ -141,7 +147,11 @@ export function createApp({
   let inFlight = 0;
   const attempts = new Map();
   app.post("/api/personalize", async (req, res) => {
+    req.body ||= {};
     const origin = req.get("origin");
+    const owner = accountUser(accountStore, req);
+    if (accountStore && !owner) return res.status(401).json({ error: "Sign in to the store account before generating an avatar.", code: "account_required" });
+    if (accountStore && req.body.accountStorageConsent !== true) return res.status(400).json({ error: "Confirm customer agreement to save the generated avatar in the store account." });
     try {
       if (
         !origin ||
@@ -214,7 +224,18 @@ export function createApp({
     inFlight++;
     try {
       const image = await personalize({ face, body, avatar, profileId: req.body.profileId, measurements: req.body.measurements, apiKey, model, quality });
-      res.json({ image, provider, profileId: req.body.profileId, kind: "customer-avatar", needsReview: true, reviewChecks: ["face", "standard-body", "skin-tone"] });
+      let accountSaved = false;
+      if (accountStore) {
+        try {
+          await accountStore.save(owner, { image, name: typeof req.body.avatarName === "string" && req.body.avatarName.trim() ? req.body.avatarName.trim().slice(0,60) : "Customer avatar", profileId: req.body.profileId, heightCm: req.body.measurements.heightCm, weightKg: req.body.measurements.weightKg, source: "generated" });
+          accountSaved = true;
+        } catch {
+          // Preserve the paid result for manual saving/download. Never retry AI
+          // generation because a database write failed.
+          console.error(JSON.stringify({event:"avatar_account_save_failed"}));
+        }
+      }
+      res.json({ image, provider, profileId: req.body.profileId, kind: "customer-avatar", needsReview: true, reviewChecks: ["face", "standard-body", "skin-tone"], ...(accountStore ? {accountSaved, accountSaveError: accountSaved ? null : "Avatar created, but saving to your account failed. Download it now or review and save it again; do not regenerate."} : {}) });
     } catch (error) {
       const failure = providerErrorDetails(error, provider);
       console.error(JSON.stringify({ event: "avatar_provider_failure", provider, code: failure.code, providerStatus: failure.providerStatus }));

@@ -1,5 +1,7 @@
 # Host the Android backend on AWS Lightsail
 
+**Web 0.8 account storage:** see [store accounts](STORE_ACCOUNTS.md) for sign-in, automatic saving, reuse across browsers and the persistent-volume deployment command. This web update does not rebuild the Android APK. Local-library instructions below apply when account storage is disabled.
+
 This guide runs the Forme backend and HTTPS proxy on one Ubuntu instance. The Android app sends customer photos to this backend; the backend calls Gemini. No GPU is needed. AWS hosting and Gemini usage are billed separately. These files prepare deployment; they do not create an AWS instance.
 
 You need an AWS account, a domain you can edit, and a Gemini API key with API billing and image-model access. Create the key in [Gemini API keys](https://aistudio.google.com/apikey). Keep the key on the server, never in the APK or GitHub. For an existing Gemini deployment, follow the [existing-instance update steps](GENERATION_SETUP.md#update-your-existing-gemini-deployment).

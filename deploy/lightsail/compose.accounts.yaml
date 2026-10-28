@@ -1,0 +1,12 @@
+# Add this file to the existing shared-Caddy deployment with both -f flags.
+# Keep the named volume across rebuilds; do not use `down -v`.
+services:
+  tryon:
+    environment:
+      TRYON_DATA_DIR: /app/data
+      TRYON_TRUST_PROXY_HOPS: "1"
+      TRYON_ALLOW_SIGNUP: ${TRYON_ALLOW_SIGNUP:-true}
+    volumes:
+      - tryon_accounts:/app/data
+volumes:
+  tryon_accounts:

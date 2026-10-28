@@ -1,5 +1,7 @@
 # Clothing try-on — version 0.6
 
+**Web 0.8 account storage:** see [store accounts](STORE_ACCOUNTS.md) for sign-in, automatic saving, reuse across browsers and the persistent-volume deployment command. This web update does not rebuild the Android APK. Local-library instructions below apply when account storage is disabled.
+
 Approve an avatar in **Review & save**, then choose **Try clothes**. You can use an approved sample offline or an approved generated customer avatar. The original avatar stays unchanged. Use **Saved avatars** to reopen a previously saved customer avatar or downloaded PNG without another generation; see [the reuse guide](SAVED_AVATARS.md).
 
 1. Choose a shirt/top, trousers and shoes independently. The catalogue includes navy and cream T-shirts, a blue button-down shirt, blue jeans, charcoal and sand chinos, white and black sneakers, and brown leather shoes. These are realistic AI-created sample assets, not photographs of store inventory.

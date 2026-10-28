@@ -17,6 +17,8 @@ const health = await response.json();
 if (!response.ok || !health.personalizationAvailable || health.provider !== provider || health.personalizationContract !== "customer-avatar-v4") {
   throw new Error("Generation configuration or server version is not ready.");
 }
+if (process.env.TRYON_DATA_DIR && (!health.accountsAvailable || health.storage !== "account"))
+  throw new Error("Account storage is not active. Check the persistent-volume deployment override.");
 if (provider === "gemini" && health.generationRevision !== "customer-neck-v6")
   throw new Error("Update the backend to the aligned customer-face Gemini reference pipeline.");
 if (!publicAccess && response.headers.get("access-control-allow-origin") !== "https://localhost") {

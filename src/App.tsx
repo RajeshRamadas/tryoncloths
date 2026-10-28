@@ -28,6 +28,8 @@ import { requestApi } from "./api";
 import StudioConnection from "./StudioConnection";
 import OutfitStudio from "./OutfitStudio";
 import SavedAvatars from "./SavedAvatars";
+import StoreAccount, { type AccountState } from "./StoreAccount";
+import { saveAccountAvatar } from "./account-avatars";
 import { saveAvatar, type AvatarDetails } from "./saved-avatars";
 import { App as NativeApp } from "@capacitor/app";
 
@@ -193,6 +195,8 @@ function PhotoInput({
 
 export default function App() {
   const [step, setStep] = useState(1);
+  const [accountState, setAccountState] = useState<AccountState>({enabled:false,account:null});
+  const accountIdentity = useRef<string | null>(null);
   const [outfitOpen, setOutfitOpen] = useState(false);
   const [restoredAvatar, setRestoredAvatar] = useState(false);
   const [avatarSource, setAvatarSource] = useState<"generated" | "imported">("generated");
@@ -240,6 +244,7 @@ export default function App() {
         }
         if (!r.ok) throw new Error();
         const data = await r.json();
+        if (data.accountsAvailable) setAccountState(s => ({...s,enabled:true}));
         const supported = data.personalizationContract === "customer-avatar-v4" && ["gemini", "openai"].includes(data.provider);
         setProvider(supported ? data.provider : null);
         setService(data.personalizationAvailable && supported ? "available" : "unavailable");
@@ -289,6 +294,11 @@ export default function App() {
     return () => clearTimeout(id);
   }, [notice]);
 
+  function accountChanged(next: AccountState) {
+    if (accountIdentity.current !== (next.account?.id || null)) reset();
+    accountIdentity.current = next.account?.id || null;
+    setAccountState(next);
+  }
   function invalidate() {
     setSaveConsent(false);
     setOutfitOpen(false);
@@ -353,7 +363,7 @@ export default function App() {
     );
   }
   async function generate() {
-    if (!face || !body || !aiConsent || !consent || !provider || service !== "available" || generating) return;
+    if (!face || !body || !aiConsent || !consent || !provider || service !== "available" || generating || (accountState.enabled && !accountState.account)) return;
     setGenerating(true);
     setRestoredAvatar(false);
     setAvatarSource("generated");
@@ -368,11 +378,12 @@ export default function App() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ face, body, profileId: selected, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body", consentProvider: provider }),
+          body: JSON.stringify({ face, body, profileId: selected, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body", consentProvider: provider, ...(accountState.enabled ? {accountStorageConsent:aiConsent,avatarName} : {}) }),
         },
         200000,
       );
       const data = await response.json();
+      if (!response.ok && data.code === "account_required") window.dispatchEvent(new Event("forme-account-expired"));
       if (!response.ok)
         throw new Error(
           data.error ||
@@ -383,9 +394,8 @@ export default function App() {
         throw new Error("The studio returned an unsupported result. Update the studio and try again.");
       setPersonalized(data.image);
       setAiConsent(false);
-      setNotice(
-        "Customer avatar created. Review the face, standard body and skin tone before approval.",
-      );
+      if (data.accountSaveError) setError(data.accountSaveError);
+      setNotice(data.accountSaved ? "Avatar saved to your store account. Review the result before trying clothes." : "Customer avatar created. Review the face, standard body and skin tone before approval.");
       requestAnimationFrame(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     } catch (e) {
       setGenerationFailed(true);
@@ -414,8 +424,9 @@ export default function App() {
     if (!personalized || !approved || !saveConsent || exporting || needsCustomerGeneration) return;
     setExporting(true); setError("");
     try {
-      await saveAvatar(personalized, { name: avatarName, profileId: selected, heightCm: Number(height), weightKg: Number(weight), source: avatarSource });
-      setNotice("Avatar saved on this device. Open Saved avatars next time; no generation is needed.");
+      const save = accountState.enabled ? saveAccountAvatar : saveAvatar;
+      await save(personalized, { name: avatarName, profileId: selected, heightCm: Number(height), weightKg: Number(weight), source: avatarSource });
+      setNotice(accountState.enabled ? "Avatar saved to your store account. Sign in to this account on another browser to reopen it." : "Avatar saved on this device. Open Saved avatars next time; no generation is needed.");
     } catch (e) { setError((e as Error).message); }
     finally { setExporting(false); }
   }
@@ -514,7 +525,8 @@ export default function App() {
             <Plus size={16} /> New session
           </button>
         </section>
-        <div className="saved-avatars-entry"><SavedAvatars disabled={generating || exporting} onUse={useSavedAvatar}/><span>Already have an avatar? Reopen it here without generating again.</span></div>
+        {!isNative && <StoreAccount available={accountState.enabled} disabled={generating || exporting} onChange={accountChanged}/>}
+        <div className="saved-avatars-entry"><SavedAvatars key={accountState.account?.id || "local"} cloud={accountState.enabled} disabled={generating || exporting || (accountState.enabled && !accountState.account)} onUse={useSavedAvatar}/><span>Already have an avatar? Reopen it here without generating again.</span></div>
         <nav className="steps" aria-label="Avatar creation steps">
           {["Customer details", "Match & personalize", "Review & save"].map(
             (label, i) => (
@@ -738,6 +750,7 @@ export default function App() {
                       </p>
                     </div>
                   </div>
+                  {accountState.enabled && <div className="save-avatar-box"><label>Customer / avatar name<input maxLength={60} value={avatarName} disabled={generating || exporting} onChange={e=>setAvatarName(e.target.value)}/></label><p>{accountState.account ? `The generated avatar and measurements will be saved to ${accountState.account.name}. Original photos are not kept.` : "Sign in to a store account above before generating. Your avatar will be saved to that account."}</p></div>}
                   {service === "available" && (
                     <label className="consent">
                       <input
@@ -750,7 +763,7 @@ export default function App() {
                         The customer agrees to send their face photo, full-body
                         photo and approximate height/weight to {providerLabel}’s image-generation
                         service to generate their avatar and match skin tone.
-                        Provider retention terms apply.
+                        Provider retention terms apply. {accountState.enabled && "The customer also agrees to save the generated avatar and measurements to this store account."}
                       </span>
                     </label>
                   )}
@@ -761,6 +774,7 @@ export default function App() {
                       !face ||
                       !body ||
                       !aiConsent ||
+                      (accountState.enabled && !accountState.account) ||
                       generating
                     }
                     onClick={() => void generate()}
@@ -883,9 +897,9 @@ export default function App() {
                   </button>
                   {personalized && <div className="save-avatar-box">
                     <label>Avatar name<input maxLength={60} value={avatarName} disabled={exporting} onChange={e => setAvatarName(e.target.value)}/></label>
-                    <label className="consent"><input type="checkbox" checked={saveConsent} disabled={!approved || exporting} onChange={e => setSaveConsent(e.target.checked)}/><span>The customer agrees to save this avatar and measurements on this device for reuse.</span></label>
+                    <label className="consent"><input type="checkbox" checked={saveConsent} disabled={!approved || exporting} onChange={e => setSaveConsent(e.target.checked)}/><span>{accountState.enabled ? "The customer agrees to save this avatar and measurements to the store account for reuse." : "The customer agrees to save this avatar and measurements on this device for reuse."}</span></label>
                     <button className="button secondary full-width" disabled={!approved || !saveConsent || !avatarName.trim() || exporting || needsCustomerGeneration} onClick={() => void keepAvatar()}>Save avatar for reuse</button>
-                    <p className="small-footnote">Saves the avatar image, name, body profile and measurements here. Original photos are not saved. Anyone using this browser or app can open it. Delete it from Saved avatars when no longer needed.</p>
+                    <p className="small-footnote">{accountState.enabled ? "Saved privately to the signed-in store account. Reopen from any browser signed in to that account. Original photos are not stored." : "Saves the avatar image, name, body profile and measurements here. Original photos are not saved. Anyone using this browser or app can open it."} Delete saved copies from Saved avatars when no longer needed.</p>
                   </div>}
                   <button className="button secondary full-width try-clothes-button" disabled={!approved || exporting || needsCustomerGeneration} onClick={() => setOutfitOpen(true)}>
                     Try clothes <ArrowRight size={16}/>
@@ -1169,8 +1183,8 @@ export default function App() {
             </ol>
             <p className="small-footnote">
               Original photos stay in memory and are cleared on reload or a new session.
-              You can explicitly save approved avatars on this device and reuse them for clothing try-on.
-              The library is not synced across devices; keep a downloaded PNG backup.
+              {accountState.enabled ? "Generated avatars are saved to the signed-in store account with customer consent. Reopen them from another browser using the same account." : "You can explicitly save approved avatars on this device and reuse them for clothing try-on. This local library is not synced across devices."}
+              Keep a downloaded PNG backup.
             </p>
           </div>
         ) : confirmReset ? (
@@ -1178,7 +1192,7 @@ export default function App() {
             <h2>Start fresh?</h2>
             <p>
               The current photos and generated result will be cleared from this
-              browser session. Avatars explicitly saved in Saved avatars stay on this device.
+              browser session. Saved copies remain in the avatar library.
               Save or download an approved avatar first if you want to keep it.
             </p>
             <div className="dialog-actions">

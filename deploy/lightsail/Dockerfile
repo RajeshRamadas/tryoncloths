@@ -25,7 +25,7 @@ COPY src/profiles.js ./src/profiles.js
 COPY public/avatar-library.png ./public/avatar-library.png
 # Source checkouts may use restrictive permissions; the runtime user must read
 # the root-owned application and assets without gaining write access.
-RUN chmod -R a+rX /app
+RUN chmod -R a+rX /app && mkdir -p /app/data && chown node:node /app/data && chmod 700 /app/data
 USER node
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

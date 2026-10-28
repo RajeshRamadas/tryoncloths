@@ -15,3 +15,5 @@ playwright-report/
 *.mobileprovision
 *.p12
 !downloads/forme-android-debug.apk
+
+.forme-data/

@@ -41,7 +41,7 @@ export async function requestApi(
       ...init,
       headers,
       signal: controller.signal,
-      credentials: "omit",
+      credentials: Capacitor.isNativePlatform() ? "omit" : "same-origin",
     });
   } finally {
     clearTimeout(timer);

@@ -1711,3 +1711,9 @@ dialog::backdrop {
 .avatar-import summary { cursor:pointer; font-weight:600; }
 .saved-avatar-note { background:#edf5ee; border-radius:10px; padding:14px; line-height:1.6; font-size:13px; color:#326953; }
 @media(max-width:480px) { .saved-avatars-dialog { padding:18px; } .saved-avatar-item { grid-template-columns:65px minmax(0,1fr); gap:10px; padding:10px; } .saved-avatar-item img { width:65px; height:125px; } }
+.store-account { border:1px solid #d5e1d4; background:#f3f7ef; border-radius:14px; padding:20px; margin:20px 0; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:15px; }
+.store-account h2 { margin:0; font-size:21px; }
+.store-account p { font-size:13px; line-height:1.6; color:#587160; margin:7px 0; }
+.store-account form { display:flex; flex-wrap:wrap; align-items:end; gap:12px; width:100%; }
+.store-account label { display:block; flex:1 1 180px; font-size:13px; }
+.store-account input { display:block; box-sizing:border-box; width:100%; padding:12px; border:1px solid #c8d7c7; border-radius:8px; margin-top:6px; background:white; }

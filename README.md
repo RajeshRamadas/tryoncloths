@@ -56,7 +56,7 @@ Without a key, customer generation is unavailable. Sessions containing customer 
 
 ## Data handling
 
-The app does not use local storage or a customer database. Customer photo inputs and generated images remain in memory for the session. Android exports use temporary app-cache files for the native share sheet; these are cleared at the next export, new session, or app launch. Camera providers can manage their own temporary files. During an explicitly consented generation, the API temporarily decodes both customer photos in memory and forwards them, the selected template and approximate measurements to the provider; it does not log or persist image data. Provider retention is governed separately by the configured account's terms. Start a new session, revoke photo consent, or reload to discard in-memory customer data. Downloaded/shared files remain under the recipient's control. See [Android data handling](docs/ANDROID.md#data-handling).
+Original customer photo inputs stay in memory and are sent to the configured provider only with generation consent. Web 0.8 can save generated avatar PNGs, names, profiles and measurements to a signed-in store account using a persistent server database. Account generation asks for storage consent and saves successful results automatically. Original input photos and credentials are excluded from avatar records. Without account storage enabled, the optional local library saves approved avatars on the same browser/app with explicit consent. Downloaded files remain under the recipient's control. Provider retention is governed separately by its terms. See [store accounts and retention](docs/STORE_ACCOUNTS.md), [local storage](docs/SAVED_AVATARS.md) and [Android data handling](docs/ANDROID.md#data-handling).
 
 No retailer accounts, durable avatar storage, clothing compositing, fit prediction, or automatic measurements are included yet.
 
@@ -94,4 +94,6 @@ Version 0.6 includes **Try clothes** after avatar approval: independent tops/tro
 
 ## Reuse a customer avatar
 
-After approval, choose **Save avatar for reuse** and explicitly agree to local storage. Next time, open **Saved avatars**, choose the customer and use **Try clothes** without another generation. Existing downloaded avatar PNGs can also be opened from the library. The library stays on the same browser/app and can be deleted; original customer photos are never included. See [saving, reopening, backup and deletion](docs/SAVED_AVATARS.md).
+**Web 0.8:** enable [store accounts](docs/STORE_ACCOUNTS.md), create a store account and sign in before generating. With customer consent, generated avatars save automatically to that account. Sign in from another browser, open **Saved avatars**, choose the customer and use **Try clothes** without another generation. Older local avatars and downloaded PNGs can be opened, reviewed and explicitly saved to the account. The deployment needs the account Compose override and persistent volume described in the guide.
+
+The existing Android APK remains 0.7.0; no APK was built for this web release. Without account storage enabled, the [local library](docs/SAVED_AVATARS.md) remains available on the same browser/app.
