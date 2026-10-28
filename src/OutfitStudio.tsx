@@ -10,7 +10,7 @@ const layerNames = { shirt: "top", trousers: "trousers", shoes: "shoes" };
 const originalNames = { shirt: "Original top", trousers: "Original bottoms", shoes: "Bare feet" };
 
 type Props = { active: boolean; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
-type Dressed = { image: string; label: string };
+type Dressed = { image: string; label: string; previousLayers: Layer[] };
 export default function OutfitStudio({ active, profile, personalized, tryOn, onBack, onBusy }: Props) {
   const catalogue = useMemo(() => sampleCatalogue(profile.id, !!personalized), [profile.id, personalized]);
   const [imports, setImports] = useState<Garment[]>([]);
@@ -45,11 +45,11 @@ export default function OutfitStudio({ active, profile, personalized, tryOn, onB
   }, [current, layers]);
   function dress(image: string, label: string) {
     // Sample layers were included in the AI input, so they are now part of the image.
-    setDressed(items => [...items, { image, label }]);
+    setDressed(items => [...items, { image, label, previousLayers: layers }]);
     update([]);
     setNotice("Try-on created. Check the face, body and garment before keeping this look.");
   }
-  function undoDress() { setDressed(items => items.slice(0, -1)); update([]); }
+  function undoDress() { const previous = dressed.at(-1); if (!previous) return; setDressed(items => items.slice(0, -1)); update(previous.previousLayers); }
   function update(next: Layer[]) { setLayers(next); setReviewed(false); setError(""); setNotice(""); setRendering(true); }
   function select(garment: Garment) { update([...layers.filter(l => l.garment.category !== category), { garment, placement: { ...garment.placement } }]); }
   function adjust(field: keyof Placement, value: number) {

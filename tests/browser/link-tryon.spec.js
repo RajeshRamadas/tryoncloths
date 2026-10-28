@@ -34,7 +34,7 @@ test("a product link is read, the garment type is confirmed, and one try-on requ
     await route.fulfill({ json: { image, provider: "gemini", kind: "garment-tryon", garmentType: "shirt", needsReview: true } });
   });
   await openStudio(page);
-  await page.getByLabel("Product link").fill("https://shop.example/p/1");
+  await page.getByLabel("Product link", { exact: true }).fill("https://shop.example/p/1");
   await page.getByRole("button", { name: "Find" }).click();
   await expect(page.getByText("Men Slim Fit Blue Oxford Shirt")).toBeVisible();
   const types = page.getByRole("group", { name: "Garment type" });
@@ -60,7 +60,7 @@ test("a product link is read, the garment type is confirmed, and one try-on requ
 test("link failures show the server message and an uploaded photo can be used instead", async ({ page }) => {
   await page.route("**/api/product-link", route => route.fulfill({ status: 502, json: { code: "site_refused", error: "This website didn't allow the studio to read the page. Save the product image and upload it instead." } }));
   await openStudio(page);
-  await page.getByLabel("Product link").fill("https://blocked.example/p");
+  await page.getByLabel("Product link", { exact: true }).fill("https://blocked.example/p");
   await page.getByRole("button", { name: "Find" }).click();
   await expect(page.getByRole("alert")).toContainText("didn't allow the studio");
   const photo = await sharp({ create: { width: 300, height: 400, channels: 3, background: "#333" } }).jpeg().toBuffer();
@@ -74,8 +74,41 @@ test("without a Gemini studio the link try-on cannot generate", async ({ page })
   await page.route("**/api/product-link", route => route.fulfill({ json: { title: "Shirt", url: "https://shop.example", images: [{ source: "a", image: garment }] } }));
   await openStudio(page, { tryOnAvailable: false });
   await expect(page.getByText("needs the Gemini provider")).toBeVisible();
-  await page.getByLabel("Product link").fill("https://shop.example/p");
+  await page.getByLabel("Product link", { exact: true }).fill("https://shop.example/p");
   await page.getByRole("button", { name: "Find" }).click();
   await expect(page.getByRole("button", { name: "Put on avatar" })).toBeDisabled();
   expect(calls).toBe(0);
+});
+
+
+test("undo restores local layers worn before an AI edit", async ({page}) => {
+  const image=await dressedAvatar();
+  await page.route("**/api/product-link", r=>r.fulfill({json:{title:"Shirt",images:[{source:"test",image:garment}]}}));
+  await page.route("**/api/tryon", r=>r.fulfill({json:{image,kind:"garment-tryon"}}));
+  await openStudio(page);
+  await page.getByRole("button",{name:"Navy T-shirt Sample",exact:true}).click();
+  await page.getByLabel("Product link",{exact:true}).fill("https://shop.example/p");
+  await page.getByRole("button",{name:"Find",exact:true}).click();
+  await page.getByLabel(/send their avatar and this product photo/).check();
+  const preview=page.getByAltText("Avatar wearing the selected outfit");
+  const before=await preview.getAttribute("src");
+  await page.getByRole("button",{name:"Put on avatar"}).click();
+  await page.getByRole("button",{name:"Undo last garment"}).click();
+  await expect(preview).toHaveAttribute("src",before);
+  await expect(page.getByRole("button",{name:"Navy T-shirt Sample",exact:true})).toHaveAttribute("aria-pressed","true");
+});
+
+test("failed try-on requires fresh consent before a manual retry", async ({page}) => {
+  let calls=0;
+  await page.route("**/api/product-link", r=>r.fulfill({json:{title:"Shirt",images:[{source:"test",image:garment}]}}));
+  await page.route("**/api/tryon", r=>{calls++;return r.fulfill({status:502,json:{error:"Test provider failure"}});});
+  await openStudio(page);
+  await page.getByLabel("Product link",{exact:true}).fill("https://shop.example/p");
+  await page.getByRole("button",{name:"Find",exact:true}).click();
+  await page.getByLabel(/send their avatar and this product photo/).check();
+  await page.getByRole("button",{name:"Put on avatar"}).click();
+  await expect(page.getByRole("alert")).toContainText("Test provider failure");
+  await expect(page.getByLabel(/send their avatar and this product photo/)).not.toBeChecked();
+  await expect(page.getByRole("button",{name:"Put on avatar"})).toBeDisabled();
+  expect(calls).toBe(1);
 });

@@ -44,3 +44,11 @@ are treated as untrusted: only a sanitized product name is passed to the model, 
 - Some websites block automated reading or load images with scripts; use the upload fallback.
 - Male standard bodies only for now.
 - Try-on results are not yet saved to the store account; download or share them.
+
+## Reliability update
+
+Undo restores the sample layers worn before each AI garment edit. Consent clears
+when a paid request starts (including failed requests) and when the selected photo
+or garment type changes. Validation: 46 backend tests, production build and all 46
+browser tests passed with stubbed provider responses; live garment quality remains
+unverified.

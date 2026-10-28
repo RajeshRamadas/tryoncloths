@@ -82,6 +82,7 @@ export default function LinkTryOn({ base, disabled, available, providerLabel, on
   async function putOn() {
     if (!chosen || !garmentType || !consent || !base || busy || !available) return;
     begin("generating");
+    setConsent(false);
     try {
       const response = await requestApi("/api/tryon", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -116,12 +117,12 @@ export default function LinkTryOn({ base, disabled, available, providerLabel, on
     {images.length > 0 && <>
       {title && <p className="product-title"><strong>{title}</strong></p>}
       <div className="product-images" role="group" aria-label="Product photos">
-        {images.map((item, index) => <button key={item.image.slice(-40) + index} className="garment-tile" disabled={busy} aria-pressed={chosen === item.image} onClick={() => setChosen(item.image)}>
+        {images.map((item, index) => <button key={item.image.slice(-40) + index} className="garment-tile" disabled={busy} aria-pressed={chosen === item.image} onClick={() => { setChosen(item.image); setConsent(false); }}>
           <img src={item.image} alt={`Product photo ${index + 1}`}/></button>)}
       </div>
       <h3 className="link-question">What should the avatar wear from this?</h3>
       <div className="garment-chips" role="group" aria-label="Garment type">
-        {garmentChoices.map(([id, label]) => <button key={id} disabled={busy} aria-pressed={garmentType === id} onClick={() => setGarmentType(id)}>{label}</button>)}
+        {garmentChoices.map(([id, label]) => <button key={id} disabled={busy} aria-pressed={garmentType === id} onClick={() => { setGarmentType(id); setConsent(false); }}>{label}</button>)}
       </div>
       <label className="consent"><input type="checkbox" checked={consent} disabled={busy || !available} onChange={e => setConsent(e.target.checked)}/>
         <span>The customer agrees to send their avatar and this product photo to {providerLabel} to create the try-on.</span></label>
