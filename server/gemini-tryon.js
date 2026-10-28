@@ -6,6 +6,11 @@ export const TRYON_CONTRACT = "garment-tryon-v1";
 
 // What each garment type replaces on the avatar. Keys are the API contract.
 export const garmentTypes = {
+  dress: {label:"dress",region:"upper and lower clothing covered by the dress",keep:"footwear and any clothing outside the dress"},
+  skirt: {label:"skirt",region:"the lower-body garment",keep:"the current top and footwear"},
+  saree: {label:"saree",region:"the draped saree and matching blouse if shown",keep:"footwear and the customer's identity"},
+  lehenga: {label:"lehenga outfit",region:"the lehenga skirt, choli and dupatta shown",keep:"footwear unless shown"},
+  blouse: {label:"blouse",region:"the upper-body garment",keep:"lower garment, saree drape if present, footwear"},
   shirt: { label: "shirt", region: "the upper-body garment (current top or T-shirt)", keep: "trousers or shorts, footwear" },
   tshirt: { label: "T-shirt", region: "the upper-body garment (current top or T-shirt)", keep: "trousers or shorts, footwear" },
   top: { label: "top", region: "the upper-body garment (current top or T-shirt)", keep: "trousers or shorts, footwear" },

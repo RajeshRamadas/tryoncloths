@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { profiles, recommendProfile } from "./profiles";
-import { downloadAvatar, LIBRARY_URL, readPhoto } from "./images";
+import { downloadAvatar, libraryForIndex, readPhoto } from "./images";
 import { isNative, capturePhoto, clearNativeExports } from "./native";
 import { requestApi } from "./api";
 import StudioConnection from "./StudioConnection";
@@ -47,13 +47,13 @@ function AvatarImage({
     <div
       className={`avatar-crop ${className}`}
       role="img"
-      aria-label={`${profiles[index].name} standard male avatar`}
+      aria-label={`${profiles[index].name} standard ${profiles[index].body} avatar`}
     >
       <img
-        src={LIBRARY_URL}
+        src={libraryForIndex(index)}
         alt=""
         draggable={false}
-        style={{ left: `${index * -100}%` }}
+        style={{ left: `${(index % 4) * -100}%` }}
       />
     </div>
   );
@@ -214,6 +214,7 @@ export default function App() {
   const [aiConsent, setAiConsent] = useState(false);
   const [service, setService] = useState<ServiceState>("checking");
   const [provider, setProvider] = useState<"gemini" | "openai" | null>(null);
+  const [femaleEnabled,setFemaleEnabled]=useState(false);
   const [tryOnAvailable, setTryOnAvailable] = useState(false);
   const [personalized, setPersonalized] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -230,7 +231,8 @@ export default function App() {
   const previewRef = useRef<HTMLElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [dialogFocus, setDialogFocus] = useState<HTMLElement | null>(null);
-  const recommendation = recommendProfile(Number(height), Number(weight));
+  const bodyType = selected.startsWith("f-") ? "female" : "male";
+  const recommendation = recommendProfile(Number(height), Number(weight), bodyType);
   const profile = profiles.find((p) => p.id === selected)!;
   const validMeasurements = recommendation !== null;
   const needsCustomerGeneration = Boolean(face || body || restoredAvatar) && !personalized;
@@ -249,6 +251,7 @@ export default function App() {
         if (!r.ok) throw new Error();
         const data = await r.json();
         if (data.accountsAvailable) setAccountState(s => ({...s,enabled:true}));
+        setFemaleEnabled(data.supportedBodies?.includes("female") === true);
         const supported = data.personalizationContract === "customer-avatar-v4" && ["gemini", "openai"].includes(data.provider);
         setProvider(supported ? data.provider : null);
         setTryOnAvailable(data.tryOnAvailable === true && data.tryOnContract === "garment-tryon-v1");
@@ -320,7 +323,7 @@ export default function App() {
     else setWeight(value);
     const match = recommendProfile(
       Number(field === "height" ? value : height),
-      Number(field === "weight" ? value : weight),
+      Number(field === "weight" ? value : weight), bodyType,
     );
     if (!manual && match) setSelected(match);
   }
@@ -336,7 +339,7 @@ export default function App() {
       return;
     }
     if (!validMeasurements) {
-      setError("Enter a height from 140–210 cm and weight from 35–200 kg.");
+      setError(`Enter a height from 140–${bodyType === "female" ? 200 : 210} cm and weight from 35–200 kg.`);
       return;
     }
     setError("");
@@ -629,6 +632,7 @@ export default function App() {
                     <h3>Body measurements</h3>
                     <span>Approximate is okay</span>
                   </div>
+                  {(femaleEnabled || bodyType === "female") && <label>Body library<select aria-label="Body library" value={bodyType} disabled={generating || exporting} onChange={e=>{invalidate();setManual(false);setSelected(recommendProfile(Number(height),Number(weight),e.target.value) || (e.target.value === "female" ? "f-regular" : "regular"));}}><option value="male">Male</option><option value="female">Female</option></select></label>}
                   <div className="measurement-grid">
                     <label>
                       Height
@@ -637,7 +641,7 @@ export default function App() {
                           aria-label="Height in centimeters"
                           type="number"
                           min="140"
-                          max="210"
+                          max={bodyType === "female" ? 200 : 210}
                           value={height}
                           onChange={(e) =>
                             updateMeasurement("height", e.target.value)
@@ -665,14 +669,14 @@ export default function App() {
                   </div>
                   {!validMeasurements && (
                     <p className="field-error">
-                      Use 140–210 cm and 35–200 kg for this adult sample
+                      Use 140–{bodyType === "female" ? 200 : 210} cm and 35–200 kg for this adult sample
                       library.
                     </p>
                   )}
                   <div className="library-label">
                     <span>Avatar library</span>
                     <span>
-                      Adult male · 4 profiles <ChevronDown size={13} />
+                      Adult {bodyType} · 4 profiles <ChevronDown size={13} />
                     </span>
                   </div>
                   <div className="inline-note">
@@ -1026,7 +1030,7 @@ export default function App() {
                 <br /> Adjust it together.
               </p>
               <div className="profile-grid">
-                {profiles.map((p) => (
+                {profiles.filter(p=>p.body===bodyType).map((p) => (
                   <button
                     key={p.id}
                     className={`profile-option ${selected === p.id ? "selected" : ""}`}

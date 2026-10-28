@@ -4,6 +4,7 @@ services:
   tryon:
     environment:
       TRYON_DATA_DIR: /app/data
+      TRYON_FEMALE_PROFILES: ${TRYON_FEMALE_PROFILES:-false}
       TRYON_TRUST_PROXY_HOPS: "1"
       TRYON_ALLOW_SIGNUP: ${TRYON_ALLOW_SIGNUP:-true}
     volumes:

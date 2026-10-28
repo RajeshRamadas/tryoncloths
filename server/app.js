@@ -53,12 +53,12 @@ export async function normalizePhoto(dataUrl, kind = "face") {
 export async function standardAvatar(profileId) {
   const profile = profiles.find((p) => p.id === profileId);
   if (!profile) throw new Error("Choose an available body profile.");
-  const source = sharp(path.join(root, "public/avatar-library.png"));
+  const source = sharp(path.join(root, profile.body === "female" ? "public/avatar-library-female.png" : "public/avatar-library.png"));
   const metadata = await source.metadata();
   const panelWidth = Math.floor(metadata.width / 4);
   return source
     .extract({
-      left: profile.index * panelWidth,
+      left: (profile.index % 4) * panelWidth,
       top: 0,
       width: panelWidth,
       height: Math.round(metadata.height * 0.92),
@@ -80,6 +80,7 @@ export function createApp({
   trustProxy = false,
   accountStore = null,
   allowSignup = true,
+  femaleEnabled = process.env.TRYON_FEMALE_PROFILES === "true",
   tryOn = geminiTryOn,
   productLink = readProductLink,
 } = {}) {
@@ -144,7 +145,8 @@ export function createApp({
       personalizationContract: "customer-avatar-v4",
       storage: accountStore ? "account" : "ephemeral",
       accountsAvailable: Boolean(accountStore),
-      profileCount: profiles.length,
+      profileCount: femaleEnabled ? profiles.length : 4,
+      supportedBodies: femaleEnabled ? ["male","female"] : ["male"],
       tryOnAvailable: provider === "gemini" && Boolean(apiKey),
       tryOnContract: TRYON_CONTRACT,
       garmentTypes: Object.keys(garmentTypes),
@@ -158,6 +160,7 @@ export function createApp({
     const origin = req.get("origin");
     const owner = accountUser(accountStore, req);
     if (accountStore && !owner) return res.status(401).json({ error: "Sign in to the store account before generating an avatar.", code: "account_required" });
+    if (!femaleEnabled && profiles.find(p=>p.id===req.body.profileId)?.body === "female") return res.status(400).json({error:"Female body profiles are not enabled on this studio."});
     if (accountStore && req.body.accountStorageConsent !== true) return res.status(400).json({ error: "Confirm customer agreement to save the generated avatar in the store account." });
     try {
       if (
@@ -179,7 +182,7 @@ export function createApp({
       return res
         .status(400)
         .json({ error: "Choose an available body profile." });
-    if (!recommendProfile(req.body?.measurements?.heightCm, req.body?.measurements?.weightKg))
+    if (!recommendProfile(req.body?.measurements?.heightCm, req.body?.measurements?.weightKg, profiles.find(p=>p.id===req.body.profileId)?.body))
       return res.status(400).json({ error: "Enter a height from 140–210 cm and weight from 35–200 kg." });
     if (!apiKey)
       return res.status(503).json({
@@ -299,7 +302,9 @@ export function createApp({
     if (!sameStudio(req)) return res.status(403).json({ error: "Open this workflow from the Avatar Studio app." });
     if (req.body.consent !== true || req.body.consentScope !== "avatar-and-garment" || req.body.consentProvider !== provider)
       return res.status(400).json({ error: `Customer consent to send the avatar and garment image to ${providerLabel} is required.` });
-    if (!Object.hasOwn(garmentTypes, req.body.garmentType))
+    const bodyType = req.body.bodyType || "male";
+    if (!["male","female"].includes(bodyType) || (bodyType === "female" && !femaleEnabled)) return res.status(400).json({error:"Choose an enabled body library."});
+    if (!Object.hasOwn(garmentTypes, req.body.garmentType) || (["dress","skirt","saree","lehenga","blouse"].includes(req.body.garmentType) && bodyType !== "female"))
       return res.status(400).json({ error: "Choose what to put on: shirt, T-shirt, trousers, jeans, shoes or another listed type." });
     if (provider !== "gemini" || !apiKey)
       return res.status(503).json({ error: "Clothing try-on from product images needs the Gemini provider to be configured on the studio." });

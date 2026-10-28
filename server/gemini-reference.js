@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { customerFace, detectFaces, requireVisibleFace } from "./face-check.js";
 import { ProviderError } from "./provider-errors.js";
 
-const headCentres = { slim: 185, regular: 192, athletic: 190, broad: 186 };
+const headCentres = { slim: 185, regular: 192, athletic: 190, broad: 186, "f-slim": 196, "f-regular": 191, "f-athletic": 190, "f-curvy": 191 };
 const templateEyes = new Map();
 const smoothstep = value => {
   const t = Math.max(0, Math.min(1, value));
@@ -21,7 +21,7 @@ export function neckBlend(x, y) {
 async function targetFace(avatar, profileId) {
   const key = `${profileId}:${createHash("sha256").update(avatar).digest("hex")}`;
   if (!templateEyes.has(key)) {
-    if (templateEyes.size >= 4) templateEyes.clear();
+    if (templateEyes.size >= 8) templateEyes.clear();
     templateEyes.set(key, detectFaces(avatar, { landmarks: true, upper: true }).then(faces => {
       if (faces.length !== 1) throw new ProviderError("face_check");
       return faces[0];

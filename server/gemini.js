@@ -9,7 +9,7 @@ export const GEMINI_REFERENCE_VERSION = "customer-neck-v6";
 
 export async function geminiPersonalize({ face, body, avatar, profileId, measurements, apiKey, model = "gemini-2.5-flash-image", fetchImpl = fetch }) {
   if (!apiKey || !/^[a-zA-Z0-9.-]+$/.test(model)) throw new ProviderError("configuration");
-  if (!profiles.some(profile => profile.id === profileId) || !face || !body || !avatar || !recommendProfile(measurements?.heightCm, measurements?.weightKg))
+  if (!profiles.some(profile => profile.id === profileId) || !face || !body || !avatar || !recommendProfile(measurements?.heightCm, measurements?.weightKg, profiles.find(p=>p.id===profileId)?.body))
     throw new Error("Customer photos, measurements and a standard profile are required.");
   const bodyReference = await geminiBodyReference(avatar, profileId, face);
   const response = await providerRequest(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
