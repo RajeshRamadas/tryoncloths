@@ -12,6 +12,20 @@ const lifetime = 30 * 24 * 3600 * 1000;
 const error = (message, status = 400) => Object.assign(new Error(message), { status });
 const emailValue = value => typeof value === "string" ? value.trim().toLowerCase() : "";
 
+async function savedImage(value) {
+    if (typeof value !== "string" || value.length > 14_000_000 || !/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(value)) throw error("Use an avatar PNG under 10 MB.");
+    let image, thumbnail;
+    try {
+      const source = sharp(Buffer.from(value.split(",")[1],"base64"), {limitInputPixels:16_000_000});
+      const meta = await source.metadata();
+      if(meta.format!=="png" || meta.width<128 || meta.height<256 || meta.width>=meta.height) throw new Error();
+      image = await source.rotate().png().toBuffer();
+      if(image.length>10*1024*1024) throw new Error();
+      thumbnail = await sharp(image).resize({height:160}).png().toBuffer();
+    } catch { throw error("Use a valid full-body portrait PNG under 10 MB and at most 16 megapixels."); }
+    return {image, thumbnail};
+}
+
 export class AccountStore {
   constructor(directory) {
     mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -21,7 +35,9 @@ export class AccountStore {
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, salt TEXT NOT NULL, password BLOB NOT NULL);
       CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, expires INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS avatars(id TEXT NOT NULL, account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, name TEXT NOT NULL, profileId TEXT NOT NULL, heightCm REAL NOT NULL, weightKg REAL NOT NULL, source TEXT NOT NULL, savedAt INTEGER NOT NULL, image BLOB NOT NULL, thumbnail BLOB NOT NULL, PRIMARY KEY(account,id));`);
+      CREATE TABLE IF NOT EXISTS avatars(id TEXT NOT NULL, account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, name TEXT NOT NULL, profileId TEXT NOT NULL, heightCm REAL NOT NULL, weightKg REAL NOT NULL, source TEXT NOT NULL, savedAt INTEGER NOT NULL, image BLOB NOT NULL, thumbnail BLOB NOT NULL, PRIMARY KEY(account,id));
+      CREATE TABLE IF NOT EXISTS looks(id TEXT NOT NULL, account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, avatarId TEXT NOT NULL, name TEXT NOT NULL, garments TEXT NOT NULL, image BLOB NOT NULL, thumbnail BLOB NOT NULL, savedAt INTEGER NOT NULL, PRIMARY KEY(account,id), FOREIGN KEY(account,avatarId) REFERENCES avatars(account,id) ON DELETE CASCADE);
+      CREATE INDEX IF NOT EXISTS looks_avatar ON looks(account,avatarId);`);
   }
   close() { this.db.close(); }
   async register(input) {
@@ -68,16 +84,7 @@ export class AccountStore {
     const { profileId, heightCm, weightKg } = input;
     const name = typeof input.name === "string" ? input.name.trim() : "";
     if (!name || name.length>60 || !profiles.some(p=>p.id===profileId) || !recommendProfile(heightCm,weightKg) || !["generated","imported"].includes(input.source)) throw error("Use a name, body profile and valid measurements.");
-    if (typeof input.image !== "string" || input.image.length > 14_000_000 || !/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(input.image)) throw error("Use an avatar PNG under 10 MB.");
-    let image, thumbnail;
-    try {
-      const source = sharp(Buffer.from(input.image.split(",")[1],"base64"), {limitInputPixels:16_000_000});
-      const meta = await source.metadata();
-      if(meta.format!=="png" || meta.width<128 || meta.height<256 || meta.width>=meta.height) throw new Error();
-      image = await source.rotate().png().toBuffer();
-      if(image.length>10*1024*1024) throw new Error();
-      thumbnail = await sharp(image).resize({height:160}).png().toBuffer();
-    } catch { throw error("Use a valid full-body portrait PNG under 10 MB and at most 16 megapixels."); }
+    const {image, thumbnail} = await savedImage(input.image);
     const id = digest(image), savedAt = Date.now();
     const exists = this.db.prepare("SELECT id FROM avatars WHERE account=? AND id=?").get(account.id,id);
     const count = this.db.prepare("SELECT count(*) AS total FROM avatars WHERE account=?").get(account.id).total;
@@ -86,8 +93,33 @@ export class AccountStore {
     return {id,savedAt};
   }
   list(account) {
-    return this.db.prepare("SELECT id,name,profileId,heightCm,weightKg,source,savedAt,thumbnail FROM avatars WHERE account=? ORDER BY savedAt DESC").all(account.id).map(row=>({...row,thumbnail:`data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`}));
+    return this.db.prepare("SELECT id,name,profileId,heightCm,weightKg,source,savedAt,thumbnail,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC").all(account.id).map(row=>({...row,thumbnail:`data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`}));
   }
+  async saveLook(account, input) {
+    const name = typeof input.name === "string" ? input.name.trim() : "";
+    if (!name || name.length > 60 || !Array.isArray(input.garments) || input.garments.length > 10 || input.garments.some(x => typeof x !== "string" || !x.trim() || x.length > 120)) throw error("Use a look name and up to 10 garment labels of at most 120 characters.");
+    this.requireAvatar(account, input.avatarId);
+    const {image, thumbnail} = await savedImage(input.image);
+    // Recheck after decoding: the avatar may have been deleted meanwhile.
+    this.requireAvatar(account, input.avatarId);
+    const id = digest(image), savedAt = Date.now();
+    const exists = this.db.prepare("SELECT id FROM looks WHERE account=? AND id=?").get(account.id,id);
+    if (!exists && this.db.prepare("SELECT count(*) AS total FROM looks WHERE account=?").get(account.id).total >= 200) throw error("Your account holds up to 200 looks. Delete one before adding another.",409);
+    this.db.prepare(`INSERT INTO looks VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET avatarId=excluded.avatarId,name=excluded.name,garments=excluded.garments,savedAt=excluded.savedAt`).run(id,account.id,input.avatarId,name,JSON.stringify(input.garments),image,thumbnail,savedAt);
+    return {id,avatarId:input.avatarId,savedAt};
+  }
+  requireAvatar(account,id) {
+    if (typeof id !== "string" || !this.db.prepare("SELECT id FROM avatars WHERE account=? AND id=?").get(account.id,id)) throw error("Avatar not found.",404);
+  }
+  listLooks(account,avatarId) {
+    if (avatarId !== undefined) this.requireAvatar(account,avatarId);
+    const rows = avatarId === undefined
+      ? this.db.prepare("SELECT id,avatarId,name,garments,thumbnail,savedAt FROM looks WHERE account=? ORDER BY savedAt DESC").all(account.id)
+      : this.db.prepare("SELECT id,avatarId,name,garments,thumbnail,savedAt FROM looks WHERE account=? AND avatarId=? ORDER BY savedAt DESC").all(account.id,avatarId);
+    return rows.map(row=>({...row,garments:JSON.parse(row.garments),thumbnail:`data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`}));
+  }
+  lookImage(account,id) { const row=this.db.prepare("SELECT image FROM looks WHERE account=? AND id=?").get(account.id,id);return row?Buffer.from(row.image):null; }
+  removeLook(account,id) { return this.db.prepare("DELETE FROM looks WHERE account=? AND id=?").run(account.id,id).changes>0; }
   image(account,id) { const row=this.db.prepare("SELECT image FROM avatars WHERE account=? AND id=?").get(account.id,id); return row ? Buffer.from(row.image) : null; }
   remove(account,id) { return this.db.prepare("DELETE FROM avatars WHERE account=? AND id=?").run(account.id,id).changes>0; }
 }
@@ -120,6 +152,17 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
     } finally { hashes--; }
   }));
   app.post("/api/account/logout",sameOrigin,wrap((req,res)=>{ store.logout(token(req)); cookie(res,"",0);res.json({ok:true}); }));
+  app.get("/api/looks",requireUser,wrap((req,res)=>res.json({looks:store.listLooks(req.account,req.query.avatar)})));
+  app.get("/api/looks/:id/image",requireUser,wrap((req,res)=>{
+    const image=store.lookImage(req.account,req.params.id);if(!image)throw error("Look not found.",404);res.type("png").send(image);
+  }));
+  app.post("/api/looks",sameOrigin,requireUser,wrap(async(req,res)=>{
+    if(req.body?.storageConsent!==true)throw error("Confirm customer agreement before saving this look to the store account.");
+    res.json(await store.saveLook(req.account,req.body));
+  }));
+  app.delete("/api/looks/:id",sameOrigin,requireUser,wrap((req,res)=>{
+    if(!store.removeLook(req.account,req.params.id))throw error("Look not found.",404);res.json({ok:true});
+  }));
   app.get("/api/avatars",requireUser,wrap((req,res)=>res.json({avatars:store.list(req.account)})));
   app.get("/api/avatars/:id/image",requireUser,wrap((req,res)=>{
     const image=store.image(req.account,req.params.id);if(!image)throw error("Avatar not found.",404);res.type("png").send(image);

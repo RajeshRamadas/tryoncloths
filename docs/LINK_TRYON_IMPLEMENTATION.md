@@ -4,7 +4,7 @@ As of 2026-10-29 · Rajesh Ramadas
 
 ## How to use this guide
 
-Give a coding LLM (Claude Code or similar) one task at a time, in order; each task lists the goal, files, steps and acceptance checks, and the prompt template below wraps them. Tasks 1–9 match what [PR #1](https://github.com/RajeshRamadas/tryoncloths/pull/1) built and can be used to rebuild or extend it; tasks 10–12 are not built yet. Requirements and design: [`LINK_TRYON_DESIGN.md`](LINK_TRYON_DESIGN.md).
+Give a coding LLM (Claude Code or similar) one task at a time, in order; each task lists the goal, files, steps and acceptance checks, and the prompt template below wraps them. Tasks 1–9 match what [PR #1](https://github.com/RajeshRamadas/tryoncloths/pull/1) built and can be used to rebuild or extend it; task 10 is now implemented; tasks 11–12 remain planned. Requirements and design: [`LINK_TRYON_DESIGN.md`](LINK_TRYON_DESIGN.md).
 
 ### Repo context to give the LLM first
 
@@ -300,6 +300,8 @@ npm run test:e2e
 These are not built yet; each is sized as one PR and depends on tasks 1–9 being merged.
 
 ### Task 10 — save try-on looks to the store account
+
+Implemented in web 0.10 on `feature/account-saved-looks`.
 
 **Goal.** Staff save an approved look against the customer's avatar and reopen it on any device without another AI call.
 

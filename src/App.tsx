@@ -30,7 +30,7 @@ import OutfitStudio from "./OutfitStudio";
 import SavedAvatars from "./SavedAvatars";
 import StoreAccount, { type AccountState } from "./StoreAccount";
 import { saveAccountAvatar } from "./account-avatars";
-import { saveAvatar, type AvatarDetails } from "./saved-avatars";
+import { saveAvatar, type AvatarDetails, type OpenedLook } from "./saved-avatars";
 import { App as NativeApp } from "@capacitor/app";
 
 type PhotoKind = "face" | "body";
@@ -197,6 +197,8 @@ export default function App() {
   const [step, setStep] = useState(1);
   const [accountState, setAccountState] = useState<AccountState>({enabled:false,account:null});
   const accountIdentity = useRef<string | null>(null);
+  const [avatarId, setAvatarId] = useState<string | null>(null);
+  const [openedLook, setOpenedLook] = useState<OpenedLook | undefined>();
   const [outfitOpen, setOutfitOpen] = useState(false);
   const [restoredAvatar, setRestoredAvatar] = useState(false);
   const [avatarSource, setAvatarSource] = useState<"generated" | "imported">("generated");
@@ -303,6 +305,7 @@ export default function App() {
     setAccountState(next);
   }
   function invalidate() {
+    setAvatarId(null); setOpenedLook(undefined);
     setSaveConsent(false);
     setOutfitOpen(false);
     setGenerationFailed(false);
@@ -396,6 +399,7 @@ export default function App() {
           typeof data.image !== "string" || !data.image.startsWith("data:image/png;base64,"))
         throw new Error("The studio returned an unsupported result. Update the studio and try again.");
       setPersonalized(data.image);
+      setAvatarId(data.avatarId || null);
       setAiConsent(false);
       if (data.accountSaveError) setError(data.accountSaveError);
       setNotice(data.accountSaved ? "Avatar saved to your store account. Review the result before trying clothes." : "Customer avatar created. Review the face, standard body and skin tone before approval.");
@@ -416,6 +420,7 @@ export default function App() {
     invalidate();
     setFace(null); setBody(null); setConsent(false);
     setSession(s => s + 1);
+    setAvatarId(details.avatarId || null); setOpenedLook(details.look);
     setSelected(details.profileId); setManual(true);
     setHeight(String(details.heightCm)); setWeight(String(details.weightKg));
     setPersonalized(image); setRestoredAvatar(true); setAvatarSource(details.source); setAvatarName(details.name);
@@ -428,7 +433,8 @@ export default function App() {
     setExporting(true); setError("");
     try {
       const save = accountState.enabled ? saveAccountAvatar : saveAvatar;
-      await save(personalized, { name: avatarName, profileId: selected, heightCm: Number(height), weightKg: Number(weight), source: avatarSource });
+      const saved = await save(personalized, { name: avatarName, profileId: selected, heightCm: Number(height), weightKg: Number(weight), source: avatarSource });
+      if (saved?.id) setAvatarId(saved.id);
       setNotice(accountState.enabled ? "Avatar saved to your store account. Sign in to this account on another browser to reopen it." : "Avatar saved on this device. Open Saved avatars next time; no generation is needed.");
     } catch (e) { setError((e as Error).message); }
     finally { setExporting(false); }
@@ -1222,7 +1228,7 @@ export default function App() {
       </dialog>
     </div>
     </div>
-    {approved && !needsCustomerGeneration && <OutfitStudio key={`${session}-${selected}`} active={outfitOpen} profile={profile} personalized={personalized} tryOn={{ available: tryOnAvailable, providerLabel }} onBack={() => { setOutfitOpen(false); requestAnimationFrame(() => titleRef.current?.focus()); }} onBusy={setExporting}/>}
+    {approved && !needsCustomerGeneration && <OutfitStudio key={`${session}-${selected}`} active={outfitOpen} avatarId={accountState.account ? avatarId : null} openedLook={openedLook} profile={profile} personalized={personalized} tryOn={{ available: tryOnAvailable, providerLabel }} onBack={() => { setOutfitOpen(false); requestAnimationFrame(() => titleRef.current?.focus()); }} onBusy={setExporting}/>}
     </>
   );
 }

@@ -232,9 +232,11 @@ export function createApp({
     try {
       const image = await personalize({ face, body, avatar, profileId: req.body.profileId, measurements: req.body.measurements, apiKey, model, quality });
       let accountSaved = false;
+      let avatarId = null;
       if (accountStore) {
         try {
-          await accountStore.save(owner, { image, name: typeof req.body.avatarName === "string" && req.body.avatarName.trim() ? req.body.avatarName.trim().slice(0,60) : "Customer avatar", profileId: req.body.profileId, heightCm: req.body.measurements.heightCm, weightKg: req.body.measurements.weightKg, source: "generated" });
+          const saved = await accountStore.save(owner, { image, name: typeof req.body.avatarName === "string" && req.body.avatarName.trim() ? req.body.avatarName.trim().slice(0,60) : "Customer avatar", profileId: req.body.profileId, heightCm: req.body.measurements.heightCm, weightKg: req.body.measurements.weightKg, source: "generated" });
+          avatarId = saved.id;
           accountSaved = true;
         } catch {
           // Preserve the paid result for manual saving/download. Never retry AI
@@ -242,7 +244,7 @@ export function createApp({
           console.error(JSON.stringify({event:"avatar_account_save_failed"}));
         }
       }
-      res.json({ image, provider, profileId: req.body.profileId, kind: "customer-avatar", needsReview: true, reviewChecks: ["face", "standard-body", "skin-tone"], ...(accountStore ? {accountSaved, accountSaveError: accountSaved ? null : "Avatar created, but saving to your account failed. Download it now or review and save it again; do not regenerate."} : {}) });
+      res.json({ image, provider, profileId: req.body.profileId, kind: "customer-avatar", needsReview: true, reviewChecks: ["face", "standard-body", "skin-tone"], ...(accountStore ? {accountSaved, avatarId, accountSaveError: accountSaved ? null : "Avatar created, but saving to your account failed. Download it now or review and save it again; do not regenerate."} : {}) });
     } catch (error) {
       const failure = providerErrorDetails(error, provider);
       console.error(JSON.stringify({ event: "avatar_provider_failure", provider, code: failure.code, providerStatus: failure.providerStatus }));

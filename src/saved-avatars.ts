@@ -1,8 +1,9 @@
 import { loadImage } from "./images";
 import { profiles, recommendProfile } from "./profiles";
 
-export type AvatarDetails = { name: string; profileId: string; heightCm: number; weightKg: number; source: "generated" | "imported" };
-export type SavedAvatar = AvatarDetails & { id: string; image: Blob; thumbnail: string; savedAt: number };
+export type OpenedLook = { image: string; name: string; garments: string[] };
+export type AvatarDetails = { avatarId?: string; look?: OpenedLook; name: string; profileId: string; heightCm: number; weightKg: number; source: "generated" | "imported" };
+export type SavedAvatar = AvatarDetails & { id: string; image: Blob; thumbnail: string; savedAt: number; looksCount?: number };
 const database = "forme-saved-avatars";
 const storeName = "avatars";
 const storageError = () => new Error("Could not access saved avatars. Allow site storage or free some space, then try again. You can still download the PNG as a backup.");

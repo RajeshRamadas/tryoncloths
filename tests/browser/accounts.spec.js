@@ -57,6 +57,20 @@ test("web store accounts automatically save generated avatars and reopen them in
   await second.getByRole("button",{name:"Try clothes"}).click();
   await second.getByRole("button",{name:"Navy T-shirt Sample"}).click();
   await expect(second.getByAltText("Avatar wearing the selected outfit")).toBeVisible();
+  await second.getByLabel("I have checked clothing placement and approve this outfit preview.").check();
+  await second.getByLabel("Look name",{exact:true}).fill("Anil navy outfit");
+  await second.getByLabel("The customer agrees to save this outfit to the store account.").check();
+  await second.getByRole("button",{name:"Save look to account",exact:true}).click();
+  await expect(second.getByText("Look saved to your store account. Open it under this avatar in Saved avatars.")).toBeVisible();
+  // Reload and reopen from the saved customer's looks, without another AI request.
+  await second.reload();
+  await second.getByRole("button",{name:"Saved avatars",exact:true}).click();
+  await second.getByRole("button",{name:"View looks (1) for Customer Anil",exact:true}).click();
+  await second.getByRole("button",{name:"Open look Anil navy outfit",exact:true}).click();
+  await second.getByLabel("The customer approves the face, body and skin tone of this avatar.").check();
+  await second.getByRole("button",{name:"Try clothes",exact:true}).click();
+  await expect(second.getByRole("region",{name:"Clothing try-on",exact:true}).getByText("Anil navy outfit",{exact:true})).toBeVisible();
+  await expect(second.getByAltText("Avatar wearing the selected outfit")).toBeVisible();
   expect(generations).toBe(1);
  } finally {await other.close();await new Promise(r=>server.close(r));store.close();await rm(directory,{recursive:true,force:true});}
 });
