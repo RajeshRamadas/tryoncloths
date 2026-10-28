@@ -70,6 +70,6 @@ For a hosted build, use **Actions → Build Android APK → Run workflow** on Gi
 
 The iPhone draft is paused and is not part of the Android delivery.
 
-## Clothing try-on (0.5.0)
+## Clothing try-on (0.6.0)
 
-Approve the avatar, choose **Try clothes**, select or import prepared tops/trousers, adjust placement and review the result before **Save or share outfit**. Outfit composition uses no AI calls and keeps images in the session. See [layer requirements and preview limits](CLOTHING_TRYON.md).
+Approve the avatar, choose **Try clothes**, select or import prepared tops/trousers/shoes, adjust placement and review the result before **Save or share outfit**. Outfit composition uses no AI calls and keeps images in the session. See [layer requirements and preview limits](CLOTHING_TRYON.md).

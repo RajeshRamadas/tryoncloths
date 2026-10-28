@@ -23,7 +23,9 @@ test("outfits select independently, export displayed pixels without AI calls, an
   const original = await outputBytes(page);
   await page.getByRole("button", { name: "Navy T-shirt Sample" }).click();
   await page.getByRole("button", { name: "Trousers", exact: true }).click();
-  await page.getByRole("button", { name: "Sand trousers Sample" }).click();
+  await page.getByRole("button", { name: "Sand chinos Sample" }).click();
+  await page.getByRole("button", { name: "Shoes", exact: true }).click();
+  await page.getByRole("button", { name: "White sneakers Sample" }).click();
   await expect(page.getByRole("button", { name: "Download outfit" })).toBeDisabled();
   await approve(page);
   const composed = await outputBytes(page);
@@ -39,11 +41,12 @@ test("outfits select independently, export displayed pixels without AI calls, an
   const file = await downloaded;
   expect(file.suggestedFilename()).toBe("forme-regular-outfit-avatar.png");
   expect((await sharp(await file.path()).raw().toBuffer()).equals(await sharp(composed).raw().toBuffer())).toBe(true);
+  await page.getByRole("button", { name: "Trousers", exact: true }).click();
   await page.getByLabel("trousers Left / right").fill("25");
   await expect(page.getByRole("button", { name: "Download outfit" })).toBeDisabled();
   await page.getByRole("button", { name: "Back to avatar" }).click();
   await page.getByRole("button", { name: "Try clothes" }).click();
-  await expect(page.getByRole("button", { name: "Sand trousers Sample" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Sand chinos Sample" })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Reset outfit", exact: true }).click();
   await expect.poll(async () => (await outputBytes(page)).equals(original)).toBe(true);
   expect(aiCalls).toBe(0);
@@ -100,7 +103,9 @@ test("customer outfit reuses the approved generated image without another provid
 test("Android shares the composed outfit through the existing native export path", async ({ page }) => {
   await nativeBridge(page);
   await sampleStudio(page);
-  await page.getByRole("button", { name: "Sage T-shirt Sample" }).click();
+  await page.getByRole("button", { name: "Blue button-down shirt Sample" }).click();
+  await page.getByRole("button", { name: "Shoes", exact: true }).click();
+  await page.getByRole("button", { name: "Brown leather shoes Sample" }).click();
   await approve(page);
   const composed = await outputBytes(page);
   await page.getByRole("button", { name: "Save or share outfit" }).click();
@@ -108,4 +113,28 @@ test("Android shares the composed outfit through the existing native export path
   const file = await page.evaluate(() => window.__nativeCalls.find(c => c.method === "writeFile").options);
   expect(file.path).toContain("regular-outfit-avatar.png");
   expect((await sharp(Buffer.from(file.data,"base64")).raw().toBuffer()).equals(await sharp(composed).raw().toBuffer())).toBe(true);
+});
+
+test("footwear can switch or clear independently without changing the upper body", async ({ page }) => {
+  const missing = [];
+  page.on("response", response => { if (response.url().includes("/garments/") && !response.ok()) missing.push(response.url()); });
+  await sampleStudio(page);
+  await page.getByRole("button", { name: "Navy T-shirt Sample" }).click();
+  await approve(page);
+  const withoutShoes = await outputBytes(page);
+  await page.getByRole("button", { name: "Shoes", exact: true }).click();
+  for (const name of ["White sneakers Sample", "Black sneakers Sample", "Brown leather shoes Sample"]) {
+    await page.getByRole("button", { name }).click();
+    await expect(page.getByRole("button", { name: "Download outfit" })).toBeDisabled();
+    await approve(page);
+    const withShoes = await outputBytes(page);
+    expect(withShoes.equals(withoutShoes)).toBe(false);
+    const upper = {left:0,top:0,width:384,height:820};
+    expect((await sharp(withShoes).extract(upper).raw().toBuffer()).equals(await sharp(withoutShoes).extract(upper).raw().toBuffer())).toBe(true);
+  }
+  await page.getByRole("button", { name: "Bare feet", exact: true }).click();
+  await expect.poll(async () => (await outputBytes(page)).equals(withoutShoes)).toBe(true);
+  await page.getByRole("button", { name: "Shirts & tops", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Navy T-shirt Sample" })).toHaveAttribute("aria-pressed", "true");
+  expect(missing).toEqual([]);
 });

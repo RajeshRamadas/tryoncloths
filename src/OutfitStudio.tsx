@@ -4,6 +4,10 @@ import { baseAvatar, importGarment, renderOutfit, sampleCatalogue, type Category
 import { downloadAvatar } from "./images";
 import { isNative } from "./native";
 
+const categoryNames = { shirt: "Shirts & tops", trousers: "Trousers", shoes: "Shoes" };
+const layerNames = { shirt: "top", trousers: "trousers", shoes: "shoes" };
+const originalNames = { shirt: "Original top", trousers: "Original bottoms", shoes: "Bare feet" };
+
 type Props = { active: boolean; profile: { id: string; name: string; index: number }; personalized: string | null; onBack: () => void; onBusy: (busy: boolean) => void };
 export default function OutfitStudio({ active, profile, personalized, onBack, onBusy }: Props) {
   const catalogue = useMemo(() => sampleCatalogue(profile.id, !!personalized), [profile.id, personalized]);
@@ -56,22 +60,22 @@ export default function OutfitStudio({ active, profile, personalized, onBack, on
   }
   return <section className="outfit-studio" hidden={!active} aria-label="Clothing try-on">
     <header className="outfit-header"><button className="button secondary" disabled={busy} onClick={onBack}><ArrowLeft size={17}/> Back to avatar</button><span className="outfit-free">Instant outfit changes · No AI calls</span></header>
-    <div className="outfit-intro"><span className="eyebrow">YOUR FITTING ROOM</span><h1 ref={heading} tabIndex={-1}>Find an outfit that feels right.</h1><p>Keep your avatar. Choose a top and trousers, then check the look together.</p></div>
+    <div className="outfit-intro"><span className="eyebrow">YOUR FITTING ROOM</span><h1 ref={heading} tabIndex={-1}>Find an outfit that feels right.</h1><p>Keep your avatar. Choose a top, trousers and shoes, then check the look together.</p></div>
     <div className="outfit-layout">
       <div className="outfit-preview-card"><div className="outfit-preview-title"><strong>{profile.name} · {personalized ? "Customer avatar" : "Sample avatar"}</strong><span>Outfit preview</span></div>
         <div className="outfit-preview" aria-busy={rendering}>{result && <img src={result} alt="Avatar wearing the selected outfit"/>}{rendering && <span className="outfit-rendering" role="status">Updating preview…</span>}</div>
         <p className="outfit-caption">Approximate visual styling. This preview does not predict size, fit or fabric drape.</p>
       </div>
       <div className="outfit-controls">
-        <section className="outfit-panel"><h2><Shirt size={20}/> Choose your clothes</h2><p>Illustrated samples are included. Import prepared layers to preview your store’s garments.</p>
-          <div className="outfit-tabs" role="group" aria-label="Clothing category">{(["shirt", "trousers"] as Category[]).map(c => <button key={c} disabled={busy} aria-pressed={category === c} onClick={() => setCategory(c)}>{c === "shirt" ? "Shirts & tops" : "Trousers"}</button>)}</div>
-          <div className="garment-grid"><button className="garment-tile" disabled={busy} aria-pressed={!selected} onClick={() => update(layers.filter(l => l.garment.category !== category))}><span className="garment-original"><RotateCcw/></span><strong>Original {category === "shirt" ? "top" : "bottoms"}</strong></button>
+        <section className="outfit-panel"><h2><Shirt size={20}/> Choose your clothes</h2><p>Realistic AI-created samples are included. Import prepared layers to preview your store’s garments.</p>
+          <div className="outfit-tabs" role="group" aria-label="Clothing category">{(["shirt", "trousers", "shoes"] as Category[]).map(c => <button key={c} disabled={busy} aria-pressed={category === c} onClick={() => setCategory(c)}>{categoryNames[c]}</button>)}</div>
+          <div className="garment-grid"><button className="garment-tile" disabled={busy} aria-pressed={!selected} onClick={() => update(layers.filter(l => l.garment.category !== category))}><span className="garment-original"><RotateCcw/></span><strong>{originalNames[category]}</strong></button>
             {[...catalogue, ...imports].filter(g => g.category === category).map(g => <button key={g.id} className="garment-tile" disabled={busy} aria-pressed={selected?.garment.id === g.id} onClick={() => select(g)}><img src={g.source} alt=""/><strong>{g.name}</strong><small>{g.imported ? "Your layer" : "Sample"}</small></button>)}</div>
           <input ref={input} type="file" accept="image/png,image/webp" aria-label="Import clothing layer" className="outfit-file" disabled={busy} onChange={e => { void upload(e.target.files?.[0]); e.target.value = ""; }}/>
-          <button className="button secondary full-width" disabled={busy} onClick={() => input.current?.click()}><Upload size={16}/> Import {category === "shirt" ? "top" : "trousers"} layer</button>
-          <p className="small-footnote">Transparent PNG or WebP, front view in the avatar’s pose. Layers stay in this session. Importing does not remove backgrounds or reshape garments.</p>
+          <button className="button secondary full-width" disabled={busy} onClick={() => input.current?.click()}><Upload size={16}/> Import {layerNames[category]} layer</button>
+          <p className="small-footnote">Transparent PNG or WebP; import footwear as a pair. Front view in the avatar’s pose. Layers stay in this session. Importing does not remove backgrounds or reshape garments.</p>
         </section>
-        {selected && <section className="outfit-panel"><h2>Adjust placement</h2><p>Line up the neckline or waistband. Check that the original clothes are covered.</p>
+        {selected && <section className="outfit-panel"><h2>Adjust placement</h2><p>Line up the neckline, waistband or shoes. Check that the original clothes are covered.</p>
           {([['x', 'Left / right', -30, 100], ['y', 'Up / down', -30, 100], ['width', 'Width', 5, 150], ['height', 'Length', 5, 150]] as const).map(([key, label, min, max]) => <label className="outfit-slider" key={key}><span>{label}<output>{Math.round(selected.placement[key] * 100)}%</output></span><input aria-label={`${category} ${label}`} type="range" min={min} max={max} step="0.5" value={selected.placement[key] * 100} disabled={busy} onChange={e => adjust(key, Number(e.target.value))}/></label>)}
           <button className="button secondary" disabled={busy} onClick={() => select(selected.garment)}>Reset placement</button>
           {selected.garment.imported && <button className="button back-button" disabled={busy} onClick={() => { setImports(items => items.filter(g => g.id !== selected.garment.id)); update(layers.filter(l => l !== selected)); }}>Remove imported layer</button>}
