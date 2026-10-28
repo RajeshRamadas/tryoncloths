@@ -76,3 +76,48 @@ test("admin password recovery revokes all previous sessions",async()=>fixture(as
  assert.equal((await request("/api/account/login","POST",credentials("reset@example.com"))).status,401);
  assert.equal((await request("/api/account/login","POST",{email:"reset@example.com",password:"replacement-password-long"})).status,200);
 }));
+
+test("saved looks remain owned by their avatar account and persist across reopen",async()=>fixture(async({request,store,directory})=>{
+ const ca=cookie(await request("/api/account/register","POST",credentials("looks-a@example.com")));
+ const cb=cookie(await request("/api/account/register","POST",credentials("looks-b@example.com")));
+ const image=await avatar();const {id:avatarId}=await (await request("/api/avatars","POST",image,ca)).json();
+ const input={avatarId,image:image.image,name:"Blue outfit",garments:["Blue shirt","Jeans"],storageConsent:true};
+ assert.equal((await request("/api/looks","POST",input)).status,401);
+ assert.equal((await request("/api/looks","POST",input,cb)).status,404);
+ assert.equal((await request("/api/looks","POST",{...input,storageConsent:false},ca)).status,400);
+ assert.equal((await request("/api/looks","POST",input,ca,"https://evil.example")).status,403);
+ const saved=await request("/api/looks","POST",input,ca);assert.equal(saved.status,200);const {id}=await saved.json();
+ assert.equal((await request(`/api/looks?avatar=${avatarId}`,"GET",undefined,cb)).status,404);
+ assert.equal((await request(`/api/looks/${id}/image`,"GET",undefined,cb)).status,404);
+ assert.equal((await request(`/api/looks/${id}`,"DELETE",undefined,cb)).status,404);
+ assert.equal((await (await request("/api/looks","GET",undefined,cb)).json()).looks.length,0);
+ const second=cookie(await request("/api/account/login","POST",credentials("looks-a@example.com")));
+ assert.equal((await request(`/api/looks/${id}/image`,"GET",undefined,second)).status,200);
+ const reopened=new AccountStore(directory);try{const owner=reopened.user(second.split("=")[1]);assert.equal(reopened.listLooks(owner,avatarId)[0].name,"Blue outfit");assert.equal(reopened.list(owner)[0].looksCount,1);}finally{reopened.close();}
+ // Duplicates update metadata, never create another copy.
+ await request("/api/looks","POST",{...input,name:"Updated outfit"},ca);
+ assert.equal((await (await request("/api/looks","GET",undefined,ca)).json()).looks.length,1);
+ assert.equal((await request(`/api/looks/${id}`,"DELETE",undefined,ca)).status,200);
+ assert.equal((await request(`/api/looks/${id}/image`,"GET",undefined,ca)).status,404);
+ await request("/api/looks","POST",input,ca);
+ await request(`/api/avatars/${avatarId}`,"DELETE",undefined,ca);
+ assert.equal((await (await request("/api/looks","GET",undefined,ca)).json()).looks.length,0);
+}));
+
+test("look validation, capacity, account cascade and old database upgrade",async()=>fixture(async({store,request,directory})=>{
+ const c=cookie(await request("/api/account/register","POST",credentials("look-limits@example.com")));
+ const owner=store.user(c.split("=")[1]);const image=await avatar();const {id:avatarId}=await store.save(owner,image);
+ // Simulate a pre-feature database: avatar data must survive adding the table.
+ store.db.exec("DROP TABLE looks");const upgraded=new AccountStore(directory);upgraded.close();assert.equal(store.list(owner).length,1);
+ const input={avatarId,image:image.image,name:"Look",garments:["Shirt"]};
+ await assert.rejects(store.saveLook(owner,{...input,garments:Array(11).fill("Shirt")}),{status:400});
+ await assert.rejects(store.saveLook(owner,{...input,image:"data:image/png;base64,ZmFrZQ=="}),{status:400});
+ const {id}=await store.saveLook(owner,input);
+ const insert=store.db.prepare("INSERT INTO looks SELECT ?,account,avatarId,name,garments,image,thumbnail,savedAt FROM looks WHERE account=? AND id=?");
+ for(let i=0;i<199;i++)insert.run(`copy-${i}`,owner.id,id);
+ await store.saveLook(owner,{...input,name:"Renamed at limit"});
+ store.db.prepare("UPDATE looks SET id='different-id' WHERE id=? AND account=?").run(id,owner.id);
+ await assert.rejects(store.saveLook(owner,input),{status:409});
+ store.db.prepare("DELETE FROM accounts WHERE id=?").run(owner.id);
+ assert.equal(store.db.prepare("SELECT count(*) AS total FROM looks").get().total,0);
+}));

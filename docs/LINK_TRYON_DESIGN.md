@@ -4,7 +4,7 @@ As of 2026-10-29 · Rajesh Ramadas
 
 ## Overview
 
-Store staff can dress a customer's saved avatar in a garment from any clothing website by pasting its product link, choosing the photo and saying what to put on; one Gemini request produces the try-on. The feature ships in Forme web **0.9.0** on branch `feature/link-tryon` ([PR #1](https://github.com/RajeshRamadas/tryoncloths/pull/1)), awaiting browser tests and live validation before merge.
+Store staff can dress a customer's saved avatar in a garment from any clothing website by pasting its product link, choosing the photo and saying what to put on; one Gemini request produces the try-on. The feature ships in Forme web **0.9.0** on branch `feature/link-tryon` ([PR #1](https://github.com/RajeshRamadas/tryoncloths/pull/1)), merged into main; live provider validation remains outstanding.
 
 | Item | Value |
 | --- | --- |
@@ -42,7 +42,7 @@ Staff must get a reviewed try-on from a pasted link in one AI request, with cons
 | FR-11 | Sample overlay layers keep working locally on top of a try-on result. | Should |
 | FR-12 | Staff review and approve before download or share (existing flow). | Must |
 | FR-13 | Advertise availability via `/api/health` (`tryOnAvailable`, `garment-tryon-v1`). | Must |
-| FR-14 | Save try-on looks to the store account. | Later |
+| FR-14 | Save try-on looks to the store account. | Implemented in web 0.10 |
 
 ### Non-functional
 
@@ -202,7 +202,7 @@ Unit tests and the build pass (46 of 46, 9 new); browser tests and live Gemini q
 
 ### Next steps
 
-- [ ] Save try-on looks to the store account (FR-14).
+- [x] Save try-on looks to the store account (FR-14).
 - [ ] Add female standard bodies.
 - [ ] Optional headless-browser reader for script-rendered product pages.
 - [ ] Evaluate a dedicated try-on model as a provider option if garment fidelity falls short.

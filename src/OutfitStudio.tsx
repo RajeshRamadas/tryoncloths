@@ -4,26 +4,30 @@ import { baseAvatar, importGarment, renderOutfit, sampleCatalogue, type Category
 import { downloadAvatar } from "./images";
 import { isNative } from "./native";
 import LinkTryOn from "./LinkTryOn";
+import { saveLook } from "./account-avatars";
+import { type OpenedLook } from "./saved-avatars";
 
 const categoryNames = { shirt: "Shirts & tops", trousers: "Trousers", shoes: "Shoes" };
 const layerNames = { shirt: "top", trousers: "trousers", shoes: "shoes" };
 const originalNames = { shirt: "Original top", trousers: "Original bottoms", shoes: "Bare feet" };
 
-type Props = { active: boolean; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
+type Props = { active: boolean; avatarId?:string|null; openedLook?:OpenedLook; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
 type Dressed = { image: string; label: string; previousLayers: Layer[] };
-export default function OutfitStudio({ active, profile, personalized, tryOn, onBack, onBusy }: Props) {
+export default function OutfitStudio({ active, avatarId, openedLook, profile, personalized, tryOn, onBack, onBusy }: Props) {
   const catalogue = useMemo(() => sampleCatalogue(profile.id, !!personalized), [profile.id, personalized]);
   const [imports, setImports] = useState<Garment[]>([]);
   const [layers, setLayers] = useState<Layer[]>([]);
   const [category, setCategory] = useState<Category>("shirt");
   const [base, setBase] = useState("");
   // AI try-on results stack on the avatar; each one becomes the next base.
-  const [dressed, setDressed] = useState<Dressed[]>([]);
+  const [dressed, setDressed] = useState<Dressed[]>(openedLook ? [{image:openedLook.image,label:openedLook.name,previousLayers:[]}] : []);
   const current = dressed.at(-1)?.image || base;
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [rendering, setRendering] = useState(true);
+  const [lookName,setLookName]=useState(openedLook?.name || "Customer outfit");
+  const [storageConsent,setStorageConsent]=useState(false);
   const [reviewed, setReviewed] = useState(false);
   const [notice, setNotice] = useState("");
   const input = useRef<HTMLInputElement>(null);
@@ -50,7 +54,7 @@ export default function OutfitStudio({ active, profile, personalized, tryOn, onB
     setNotice("Try-on created. Check the face, body and garment before keeping this look.");
   }
   function undoDress() { const previous = dressed.at(-1); if (!previous) return; setDressed(items => items.slice(0, -1)); update(previous.previousLayers); }
-  function update(next: Layer[]) { setLayers(next); setReviewed(false); setError(""); setNotice(""); setRendering(true); }
+  function update(next: Layer[]) { setStorageConsent(false); setLayers(next); setReviewed(false); setError(""); setNotice(""); setRendering(true); }
   function select(garment: Garment) { update([...layers.filter(l => l.garment.category !== category), { garment, placement: { ...garment.placement } }]); }
   function adjust(field: keyof Placement, value: number) {
     update(layers.map(l => l.garment.category === category ? { ...l, placement: { ...l.placement, [field]: value / 100 } } : l));
@@ -61,6 +65,17 @@ export default function OutfitStudio({ active, profile, personalized, tryOn, onB
     setBusy(true); onBusy(true); setError("");
     try { const garment = await importGarment(file, category, profile.id, !!personalized); setImports(items => [...items, garment]); select(garment); }
     catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); onBusy(false); }
+  }
+  async function keepLook() {
+    if (!avatarId || !result || !reviewed || !storageConsent || !lookName.trim() || busy || rendering) return;
+    setBusy(true); onBusy(true); setError("");
+    try {
+      const labels = [...(openedLook && dressed.length ? openedLook.garments : []), ...dressed.slice(openedLook ? 1 : 0).map(x=>x.label), ...layers.map(x=>x.garment.name)].map(x=>x.slice(0,120));
+      await saveLook(result,avatarId,lookName,labels);
+      setNotice("Look saved to your store account. Open it under this avatar in Saved avatars.");
+      setStorageConsent(false);
+    } catch(e) { setError((e as Error).message); }
     finally { setBusy(false); onBusy(false); }
   }
   async function save() {
@@ -99,6 +114,11 @@ export default function OutfitStudio({ active, profile, personalized, tryOn, onB
         </section>}
         <section className="outfit-panel"><h2>Keep this look</h2><label className="consent"><input type="checkbox" checked={reviewed} disabled={busy || rendering || !result || (!layers.length && !dressed.length)} onChange={e => setReviewed(e.target.checked)}/><span>I have checked clothing placement and approve this outfit preview.</span></label>
           <button className="button primary full-width" disabled={!reviewed || !result || rendering || busy || (!layers.length && !dressed.length)} onClick={() => void save()}><Download size={17}/>{busy ? "Preparing…" : isNative ? "Save or share outfit" : "Download outfit"}</button>
+          {avatarId && <div className="save-avatar-box">
+            <label>Look name<input maxLength={60} value={lookName} disabled={busy} onChange={e=>setLookName(e.target.value)}/></label>
+            <label className="consent"><input type="checkbox" checked={storageConsent} disabled={!reviewed || busy || rendering} onChange={e=>setStorageConsent(e.target.checked)}/><span>The customer agrees to save this outfit to the store account.</span></label>
+            <button className="button secondary full-width" disabled={!reviewed || !storageConsent || !result || busy || rendering || !lookName.trim()} onClick={()=>void keepLook()}>Save look to account</button>
+          </div>}
           <button className="button back-button full-width" disabled={busy || (!layers.length && !dressed.length)} onClick={() => { setDressed([]); update([]); }}><RotateCcw size={16}/> Reset outfit</button>
           {error && <p role="alert" className="error-banner">{error}</p>}{notice && <p role="status">{notice}</p>}
         </section>
