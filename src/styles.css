@@ -1717,3 +1717,18 @@ dialog::backdrop {
 .store-account form { display:flex; flex-wrap:wrap; align-items:end; gap:12px; width:100%; }
 .store-account label { display:block; flex:1 1 180px; font-size:13px; }
 .store-account input { display:block; box-sizing:border-box; width:100%; padding:12px; border:1px solid #c8d7c7; border-radius:8px; margin-top:6px; background:white; }
+
+/* Product-link try-on */
+.link-tryon .link-row { display: flex; gap: 8px; margin: 16px 0 10px; }
+.link-tryon .link-row input { flex: 1; min-width: 0; padding: 12px 14px; border: 1px solid #cfd8cb; border-radius: 10px; font: inherit; background: #fff; }
+.link-tryon .link-row input:focus-visible { outline: 2px solid #245a49; outline-offset: 1px; }
+.product-title { margin: 18px 0 8px; color: #254c3e; overflow-wrap: anywhere; }
+.product-images { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
+.product-images .garment-tile img { height: 120px; }
+.link-question { font-size: 15px; margin: 18px 0 10px; color: #254c3e; }
+.garment-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.garment-chips button { padding: 9px 14px; border: 1px solid #dce2d8; border-radius: 999px; background: #f7f8f3; color: #2c5043; cursor: pointer; font: inherit; font-size: 14px; }
+.garment-chips button[aria-pressed="true"] { background: #245a49; color: #fff; border-color: #245a49; }
+.garment-chips button:disabled, .link-tryon .link-row input:disabled { opacity: .6; cursor: not-allowed; }
+.dressed-list { margin: 8px 0 14px; padding-left: 20px; color: #254c3e; line-height: 1.7; overflow-wrap: anywhere; }
+@media (max-width: 480px) { .link-tryon .link-row { flex-direction: column; } }

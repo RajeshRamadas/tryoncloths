@@ -1,20 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Download, RotateCcw, Shirt, Upload } from "lucide-react";
+import { ArrowLeft, Download, RotateCcw, Shirt, Undo2, Upload } from "lucide-react";
 import { baseAvatar, importGarment, renderOutfit, sampleCatalogue, type Category, type Garment, type Layer, type Placement } from "./outfits";
 import { downloadAvatar } from "./images";
 import { isNative } from "./native";
+import LinkTryOn from "./LinkTryOn";
 
 const categoryNames = { shirt: "Shirts & tops", trousers: "Trousers", shoes: "Shoes" };
 const layerNames = { shirt: "top", trousers: "trousers", shoes: "shoes" };
 const originalNames = { shirt: "Original top", trousers: "Original bottoms", shoes: "Bare feet" };
 
-type Props = { active: boolean; profile: { id: string; name: string; index: number }; personalized: string | null; onBack: () => void; onBusy: (busy: boolean) => void };
-export default function OutfitStudio({ active, profile, personalized, onBack, onBusy }: Props) {
+type Props = { active: boolean; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
+type Dressed = { image: string; label: string };
+export default function OutfitStudio({ active, profile, personalized, tryOn, onBack, onBusy }: Props) {
   const catalogue = useMemo(() => sampleCatalogue(profile.id, !!personalized), [profile.id, personalized]);
   const [imports, setImports] = useState<Garment[]>([]);
   const [layers, setLayers] = useState<Layer[]>([]);
   const [category, setCategory] = useState<Category>("shirt");
   const [base, setBase] = useState("");
+  // AI try-on results stack on the avatar; each one becomes the next base.
+  const [dressed, setDressed] = useState<Dressed[]>([]);
+  const current = dressed.at(-1)?.image || base;
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -31,13 +36,20 @@ export default function OutfitStudio({ active, profile, personalized, onBack, on
     return () => { cancelled = true; };
   }, [profile.index, personalized]);
   useEffect(() => {
-    if (!base) return;
+    if (!current) return;
     let cancelled = false;
     setRendering(true); setResult("");
-    renderOutfit(base, layers).then(canvas => { if (!cancelled) { setResult(canvas.toDataURL("image/png")); setRendering(false); } })
+    renderOutfit(current, layers).then(canvas => { if (!cancelled) { setResult(canvas.toDataURL("image/png")); setRendering(false); } })
       .catch(e => { if (!cancelled) { setError(e.message); setRendering(false); } });
     return () => { cancelled = true; };
-  }, [base, layers]);
+  }, [current, layers]);
+  function dress(image: string, label: string) {
+    // Sample layers were included in the AI input, so they are now part of the image.
+    setDressed(items => [...items, { image, label }]);
+    update([]);
+    setNotice("Try-on created. Check the face, body and garment before keeping this look.");
+  }
+  function undoDress() { setDressed(items => items.slice(0, -1)); update([]); }
   function update(next: Layer[]) { setLayers(next); setReviewed(false); setError(""); setNotice(""); setRendering(true); }
   function select(garment: Garment) { update([...layers.filter(l => l.garment.category !== category), { garment, placement: { ...garment.placement } }]); }
   function adjust(field: keyof Placement, value: number) {
@@ -59,14 +71,19 @@ export default function OutfitStudio({ active, profile, personalized, onBack, on
     finally { setBusy(false); onBusy(false); }
   }
   return <section className="outfit-studio" hidden={!active} aria-label="Clothing try-on">
-    <header className="outfit-header"><button className="button secondary" disabled={busy} onClick={onBack}><ArrowLeft size={17}/> Back to avatar</button><span className="outfit-free">Instant outfit changes · No AI calls</span></header>
-    <div className="outfit-intro"><span className="eyebrow">YOUR FITTING ROOM</span><h1 ref={heading} tabIndex={-1}>Find an outfit that feels right.</h1><p>Keep your avatar. Choose a top, trousers and shoes, then check the look together.</p></div>
+    <header className="outfit-header"><button className="button secondary" disabled={busy} onClick={onBack}><ArrowLeft size={17}/> Back to avatar</button><span className="outfit-free">Sample layers: no AI · Product links: one AI request per garment</span></header>
+    <div className="outfit-intro"><span className="eyebrow">YOUR FITTING ROOM</span><h1 ref={heading} tabIndex={-1}>Find an outfit that feels right.</h1><p>Keep your avatar. Paste a product link from any clothing website, or choose a sample top, trousers and shoes, then check the look together.</p></div>
     <div className="outfit-layout">
       <div className="outfit-preview-card"><div className="outfit-preview-title"><strong>{profile.name} · {personalized ? "Customer avatar" : "Sample avatar"}</strong><span>Outfit preview</span></div>
         <div className="outfit-preview" aria-busy={rendering}>{result && <img src={result} alt="Avatar wearing the selected outfit"/>}{rendering && <span className="outfit-rendering" role="status">Updating preview…</span>}</div>
         <p className="outfit-caption">Approximate visual styling. This preview does not predict size, fit or fabric drape.</p>
       </div>
       <div className="outfit-controls">
+        <LinkTryOn base={result} disabled={busy || rendering} available={tryOn.available} providerLabel={tryOn.providerLabel} onBusy={value => { setBusy(value); onBusy(value); }} onResult={dress}/>
+        {dressed.length > 0 && <section className="outfit-panel"><h2>Wearing from product links</h2>
+          <ol className="dressed-list">{dressed.map((item, index) => <li key={index}>{item.label}</li>)}</ol>
+          <button className="button secondary" disabled={busy} onClick={undoDress}><Undo2 size={16}/> Undo last garment</button>
+        </section>}
         <section className="outfit-panel"><h2><Shirt size={20}/> Choose your clothes</h2><p>Realistic AI-created samples are included. Import prepared layers to preview your store’s garments.</p>
           <div className="outfit-tabs" role="group" aria-label="Clothing category">{(["shirt", "trousers", "shoes"] as Category[]).map(c => <button key={c} disabled={busy} aria-pressed={category === c} onClick={() => setCategory(c)}>{categoryNames[c]}</button>)}</div>
           <div className="garment-grid"><button className="garment-tile" disabled={busy} aria-pressed={!selected} onClick={() => update(layers.filter(l => l.garment.category !== category))}><span className="garment-original"><RotateCcw/></span><strong>{originalNames[category]}</strong></button>
@@ -80,9 +97,9 @@ export default function OutfitStudio({ active, profile, personalized, onBack, on
           <button className="button secondary" disabled={busy} onClick={() => select(selected.garment)}>Reset placement</button>
           {selected.garment.imported && <button className="button back-button" disabled={busy} onClick={() => { setImports(items => items.filter(g => g.id !== selected.garment.id)); update(layers.filter(l => l !== selected)); }}>Remove imported layer</button>}
         </section>}
-        <section className="outfit-panel"><h2>Keep this look</h2><label className="consent"><input type="checkbox" checked={reviewed} disabled={busy || rendering || !result || !layers.length} onChange={e => setReviewed(e.target.checked)}/><span>I have checked clothing placement and approve this outfit preview.</span></label>
-          <button className="button primary full-width" disabled={!reviewed || !result || rendering || busy || !layers.length} onClick={() => void save()}><Download size={17}/>{busy ? "Preparing…" : isNative ? "Save or share outfit" : "Download outfit"}</button>
-          <button className="button back-button full-width" disabled={busy || !layers.length} onClick={() => update([])}><RotateCcw size={16}/> Reset outfit</button>
+        <section className="outfit-panel"><h2>Keep this look</h2><label className="consent"><input type="checkbox" checked={reviewed} disabled={busy || rendering || !result || (!layers.length && !dressed.length)} onChange={e => setReviewed(e.target.checked)}/><span>I have checked clothing placement and approve this outfit preview.</span></label>
+          <button className="button primary full-width" disabled={!reviewed || !result || rendering || busy || (!layers.length && !dressed.length)} onClick={() => void save()}><Download size={17}/>{busy ? "Preparing…" : isNative ? "Save or share outfit" : "Download outfit"}</button>
+          <button className="button back-button full-width" disabled={busy || (!layers.length && !dressed.length)} onClick={() => { setDressed([]); update([]); }}><RotateCcw size={16}/> Reset outfit</button>
           {error && <p role="alert" className="error-banner">{error}</p>}{notice && <p role="status">{notice}</p>}
         </section>
       </div>
