@@ -94,12 +94,12 @@ export default function OutfitStudio({ active, avatarId, openedLook, profile, pe
         <p className="outfit-caption">Approximate visual styling. This preview does not predict size, fit or fabric drape.</p>
       </div>
       <div className="outfit-controls">
-        <LinkTryOn base={result} disabled={busy || rendering} available={tryOn.available} providerLabel={tryOn.providerLabel} onBusy={value => { setBusy(value); onBusy(value); }} onResult={dress}/>
+        <LinkTryOn bodyType={profile.id.startsWith("f-") ? "female" : "male"} base={result} disabled={busy || rendering} available={tryOn.available} providerLabel={tryOn.providerLabel} onBusy={value => { setBusy(value); onBusy(value); }} onResult={dress}/>
         {dressed.length > 0 && <section className="outfit-panel"><h2>Wearing from product links</h2>
           <ol className="dressed-list">{dressed.map((item, index) => <li key={index}>{item.label}</li>)}</ol>
           <button className="button secondary" disabled={busy} onClick={undoDress}><Undo2 size={16}/> Undo last garment</button>
         </section>}
-        <section className="outfit-panel"><h2><Shirt size={20}/> Choose your clothes</h2><p>Realistic AI-created samples are included. Import prepared layers to preview your store’s garments.</p>
+        <section className="outfit-panel"><h2><Shirt size={20}/> Choose your clothes</h2><p>{profile.id.startsWith("f-") ? "Use product-photo try-on or import prepared layers. Female sample garments are being prepared." : "Realistic AI-created samples are included. Import prepared layers to preview your store’s garments."}</p>
           <div className="outfit-tabs" role="group" aria-label="Clothing category">{(["shirt", "trousers", "shoes"] as Category[]).map(c => <button key={c} disabled={busy} aria-pressed={category === c} onClick={() => setCategory(c)}>{categoryNames[c]}</button>)}</div>
           <div className="garment-grid"><button className="garment-tile" disabled={busy} aria-pressed={!selected} onClick={() => update(layers.filter(l => l.garment.category !== category))}><span className="garment-original"><RotateCcw/></span><strong>{originalNames[category]}</strong></button>
             {[...catalogue, ...imports].filter(g => g.category === category).map(g => <button key={g.id} className="garment-tile" disabled={busy} aria-pressed={selected?.garment.id === g.id} onClick={() => select(g)}><img src={g.source} alt=""/><strong>{g.name}</strong><small>{g.imported ? "Your layer" : "Sample"}</small></button>)}</div>

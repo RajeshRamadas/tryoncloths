@@ -10,6 +10,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3001"
+      TRYON_FEMALE_PROFILES: ${TRYON_FEMALE_PROFILES:-false}
       TRYON_TRUST_PROXY_HOPS: "1"
       TRYON_PROVIDER: ${TRYON_PROVIDER:-gemini}
       TRYON_GEMINI_API_KEY: ${TRYON_GEMINI_API_KEY:-}

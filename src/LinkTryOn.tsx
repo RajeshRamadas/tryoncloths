@@ -4,6 +4,7 @@ import { requestApi } from "./api";
 import { readPhoto } from "./images";
 
 export const garmentChoices = [
+  ["dress","Dress"], ["skirt","Skirt"], ["saree","Saree"], ["lehenga","Lehenga"], ["blouse","Blouse"],
   ["shirt", "Shirt"], ["tshirt", "T-shirt"], ["top", "Top"], ["jacket", "Jacket"], ["kurta", "Kurta"],
   ["trousers", "Trousers"], ["jeans", "Jeans"], ["shorts", "Shorts"], ["shoes", "Shoes"], ["outfit", "Full outfit"],
 ] as const;
@@ -13,6 +14,11 @@ type ProductImage = { source: string; image: string };
 /** Best guess from the product name; staff always confirm before generating. */
 export function guessGarmentType(title: string): GarmentType | null {
   const t = title.toLowerCase();
+  if (/saree|sari/.test(title.toLowerCase())) return "saree";
+  if (/lehenga/.test(title.toLowerCase())) return "lehenga";
+  if (/blouse/.test(title.toLowerCase())) return "blouse";
+  if (/\bdress\b(?!\s+(shirt|shoes|pants|trousers))/.test(t)) return "dress";
+  if (/skirt/.test(title.toLowerCase())) return "skirt";
   if (/\b(jeans|denim pant)/.test(t)) return "jeans";
   if (/\b(t-?shirts?|tees?|polo)\b/.test(t)) return "tshirt";
   if (/\bkurta/.test(t)) return "kurta";
@@ -26,6 +32,7 @@ export function guessGarmentType(title: string): GarmentType | null {
 }
 
 type Props = {
+  bodyType?: "male" | "female";
   base: string;
   disabled: boolean;
   available: boolean;
@@ -34,7 +41,7 @@ type Props = {
   onResult: (image: string, label: string) => void;
 };
 
-export default function LinkTryOn({ base, disabled, available, providerLabel, onBusy, onResult }: Props) {
+export default function LinkTryOn({ bodyType = "male", base, disabled, available, providerLabel, onBusy, onResult }: Props) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [images, setImages] = useState<ProductImage[]>([]);
@@ -51,7 +58,7 @@ export default function LinkTryOn({ base, disabled, available, providerLabel, on
   function accountExpired(code?: string) { if (code === "account_required") window.dispatchEvent(new Event("forme-account-expired")); }
   function applyProduct(nextTitle: string, nextImages: ProductImage[]) {
     setTitle(nextTitle); setImages(nextImages); setChosen(nextImages[0]?.image ?? null);
-    setGarmentType(guessGarmentType(nextTitle)); setConsent(false);
+    const guess=guessGarmentType(nextTitle); setGarmentType(bodyType === "male" && ["dress","skirt","saree","lehenga","blouse"].includes(guess || "") ? null : guess); setConsent(false);
   }
 
   async function findProduct() {
@@ -86,7 +93,7 @@ export default function LinkTryOn({ base, disabled, available, providerLabel, on
     try {
       const response = await requestApi("/api/tryon", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatar: base, garment: chosen, garmentType, title, consent: true, consentScope: "avatar-and-garment", consentProvider: "gemini" }),
+        body: JSON.stringify({ avatar: base, bodyType, garment: chosen, garmentType, title, consent: true, consentScope: "avatar-and-garment", consentProvider: "gemini" }),
       }, 200000);
       const data = await response.json();
       accountExpired(data.code);
@@ -122,7 +129,7 @@ export default function LinkTryOn({ base, disabled, available, providerLabel, on
       </div>
       <h3 className="link-question">What should the avatar wear from this?</h3>
       <div className="garment-chips" role="group" aria-label="Garment type">
-        {garmentChoices.map(([id, label]) => <button key={id} disabled={busy} aria-pressed={garmentType === id} onClick={() => { setGarmentType(id); setConsent(false); }}>{label}</button>)}
+        {garmentChoices.filter(([id])=>bodyType === "female" || !["dress","skirt","saree","lehenga","blouse"].includes(id)).map(([id, label]) => <button key={id} disabled={busy} aria-pressed={garmentType === id} onClick={() => { setGarmentType(id); setConsent(false); }}>{label}</button>)}
       </div>
       <label className="consent"><input type="checkbox" checked={consent} disabled={busy || !available} onChange={e => setConsent(e.target.checked)}/>
         <span>The customer agrees to send their avatar and this product photo to {providerLabel} to create the try-on.</span></label>

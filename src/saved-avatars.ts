@@ -20,7 +20,7 @@ function open(): Promise<IDBDatabase> {
 }
 function validDetails(details: AvatarDetails) {
   return typeof details?.name === "string" && details.name.trim().length > 0 && details.name.length <= 60 && profiles.some(p => p.id === details.profileId)
-    && recommendProfile(details.heightCm, details.weightKg) && ["generated", "imported"].includes(details.source);
+    && recommendProfile(details.heightCm, details.weightKg, profiles.find(p=>p.id===details.profileId)?.body) && ["generated", "imported"].includes(details.source);
 }
 export async function listAvatars(): Promise<SavedAvatar[]> {
   const db = await open();

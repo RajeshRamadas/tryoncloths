@@ -1,6 +1,9 @@
 import { isNative, shareAvatar } from "./native";
 import { preparePhoto, orientCanvas } from "./photo-orientation";
 
+import { profiles } from "./profiles";
+export function libraryForIndex(index:number) { return profiles[index]?.body === "female" ? "/avatar-library-female.png" : LIBRARY_URL; }
+
 export const LIBRARY_URL = "/avatar-library.png";
 
 export async function loadImage(source: string): Promise<HTMLImageElement> {
@@ -46,7 +49,7 @@ export async function readPhoto(file: File): Promise<string> {
 }
 
 export async function avatarCanvas(index: number): Promise<HTMLCanvasElement> {
-  const image = await loadImage(LIBRARY_URL);
+  const image = await loadImage(libraryForIndex(index));
   const panelWidth = image.width / 4;
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(panelWidth);
@@ -56,7 +59,7 @@ export async function avatarCanvas(index: number): Promise<HTMLCanvasElement> {
     .getContext("2d")!
     .drawImage(
       image,
-      index * panelWidth,
+      (index % 4) * panelWidth,
       0,
       panelWidth,
       canvas.height,

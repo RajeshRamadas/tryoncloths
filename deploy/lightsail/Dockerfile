@@ -22,7 +22,7 @@ RUN --mount=type=secret,id=proxy_ca \
 COPY --from=build /app/dist ./dist
 COPY server ./server
 COPY src/profiles.js ./src/profiles.js
-COPY public/avatar-library.png ./public/avatar-library.png
+COPY public/avatar-library*.png ./public/
 # Source checkouts may use restrictive permissions; the runtime user must read
 # the root-owned application and assets without gaining write access.
 RUN chmod -R a+rX /app && mkdir -p /app/data && chown node:node /app/data && chmod 700 /app/data

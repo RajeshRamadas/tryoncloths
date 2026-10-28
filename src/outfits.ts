@@ -8,7 +8,7 @@ export type Layer = { garment: Garment; placement: Placement };
 // Coordinates use the original 384 × 942 standard pose. Generated portraits
 // use the padded 692 × 1038 reference; staff can adjust for generation drift.
 export function defaultPlacement(category: Category, profile: string, personalized: boolean): Placement {
-  const broad = profile === "broad" ? 1.17 : profile === "athletic" ? 1.1 : profile === "slim" ? 0.9 : 1;
+  const broad = profile === "f-curvy" ? 1.2 : profile === "f-athletic" ? 1.08 : profile === "f-slim" ? 0.92 : profile === "broad" ? 1.17 : profile === "athletic" ? 1.1 : profile === "slim" ? 0.9 : 1;
   const box = category === "shirt"
     ? { x: 186 - 155 * broad, y: 176, width: 310 * broad, height: 316 }
     : category === "trousers"
@@ -19,6 +19,7 @@ export function defaultPlacement(category: Category, profile: string, personaliz
 }
 
 export function sampleCatalogue(profile: string, personalized: boolean): Garment[] {
+  if (profile.startsWith("f-")) return [];
   return ([
     ["shirt", "navy-tee", "Navy T-shirt"],
     ["shirt", "cream-tee", "Cream T-shirt"],

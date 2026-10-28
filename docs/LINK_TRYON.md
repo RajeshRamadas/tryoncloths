@@ -42,7 +42,7 @@ are treated as untrusted: only a sanitized product name is passed to the model, 
 
 - Results are approximate visual previews, not size or fit predictions. Garment fidelity (prints, logos) varies.
 - Some websites block automated reading or load images with scripts; use the upload fallback.
-- Male standard bodies only for now.
+- Male bodies are enabled by default; the [female body pilot](FEMALE_PROFILES.md) is opt-in pending live validation.
 - Web 0.10 saves reviewed looks under a saved customer avatar. Use **Save look to account**, then reopen from **Saved avatars → View looks**. Download/share remains available.
 
 ## Reliability update
