@@ -5,7 +5,7 @@ import { requireVisibleFace } from "./face-check.js";
 import { geminiBodyReference } from "./gemini-reference.js";
 import { ProviderError, providerRequest, providerJson } from "./provider-errors.js";
 
-export const GEMINI_REFERENCE_VERSION = "customer-face-v5";
+export const GEMINI_REFERENCE_VERSION = "customer-neck-v6";
 
 export async function geminiPersonalize({ face, body, avatar, profileId, measurements, apiKey, model = "gemini-2.5-flash-image", fetchImpl = fetch }) {
   if (!apiKey || !/^[a-zA-Z0-9.-]+$/.test(model)) throw new ProviderError("configuration");

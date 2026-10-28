@@ -5,6 +5,18 @@ import { ProviderError } from "./provider-errors.js";
 
 const headCentres = { slim: 185, regular: 192, athletic: 190, broad: 186 };
 const templateEyes = new Map();
+const smoothstep = value => {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
+};
+
+// Coordinates are local to the fixed head patch. The curved lower boundary
+// follows the neck into the collar without a single horizontal cut line.
+export function neckBlend(x, y) {
+  const side = Math.min(1, Math.abs(x - 74) / 46);
+  const finish = 182 - 20 * side * side;
+  return 1 - smoothstep((y - (finish - 50)) / 50);
+}
 
 async function targetFace(avatar, profileId) {
   const key = `${profileId}:${createHash("sha256").update(avatar).digest("hex")}`;
@@ -59,18 +71,27 @@ export async function geminiBodyReference(avatar, profileId, face) {
   const patch = { left: centre - 74, top: 20, width: 148, height: 183 };
   const background = await sharp(avatar).extract({ left: 16, top: 20, width: 24, height: 183 })
     .resize(148, 183, { fit: "fill" }).png().toBuffer();
-  const neck = await sharp(avatar).extract({ left: patch.left, top: 175, width: 148, height: 28 }).png().toBuffer();
-  const base = await sharp(background).composite([{ input: neck, left: 0, top: 155 }]).png().toBuffer();
+  // Fade the underlying template neck in too: a hard start at row 175
+  // remained visible through the customer's translucent lower edge in v5.
+  const neckTop = 150;
+  const neckHeight = patch.top + patch.height - neckTop;
+  const neckPixels = await sharp(avatar)
+    .extract({ left: patch.left, top: neckTop, width: patch.width, height: neckHeight })
+    .ensureAlpha().raw().toBuffer();
+  for (let y = 0; y < neckHeight; y++) for (let x = 0; x < patch.width; x++) {
+    neckPixels[(y * patch.width + x) * 4 + 3] *= smoothstep(y / 30);
+  }
+  const neck = await sharp(neckPixels, { raw: { width: patch.width, height: neckHeight, channels: 4 } }).png().toBuffer();
+  const base = await sharp(background).composite([{ input: neck, left: 0, top: neckTop - patch.top }]).png().toBuffer();
   const { data } = await sharp(aligned).extract(patch).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   // Keep a real customer face in the reference. Soft edges are only guidance for
   // Gemini to blend hair/background and neck; this composite is never returned.
   for (let y = 0; y < patch.height; y++) for (let x = 0; x < patch.width; x++) {
     const radius = Math.hypot((x - 74) / 70, (y - 80) / 88);
-    const head = Math.max(0, Math.min(1, (1 - radius) / 0.12));
-    const neckWidth = Math.max(0, Math.min(1, (40 - Math.abs(x - 74)) / 10));
-    const neckMask = y >= 120 ? neckWidth : 0;
-    const t = Math.max(0, Math.min(1, (y - 154) / 28));
-    const opacity = Math.max(head, neckMask) * (1 - t * t * (3 - 2 * t));
+    const head = smoothstep((1 - radius) / 0.18);
+    const neckWidth = smoothstep((40 - Math.abs(x - 74)) / 14);
+    const neckMask = smoothstep((y - 108) / 24) * neckWidth;
+    const opacity = Math.max(head, neckMask) * neckBlend(x, y);
     data[(y * patch.width + x) * 4 + 3] *= opacity;
   }
   const customer = await sharp(data, { raw: { width: patch.width, height: patch.height, channels: 4 } }).png().toBuffer();

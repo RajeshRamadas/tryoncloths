@@ -6,7 +6,7 @@ import { customerPhotos } from "./helpers/customer-photos.js";
 import { createApp, standardAvatar } from "../server/app.js";
 import { openaiPersonalize } from "../server/openai.js";
 import { detectFaces, requireVisibleFace } from "../server/face-check.js";
-import { geminiBodyReference, facePlacement } from "../server/gemini-reference.js";
+import { geminiBodyReference, facePlacement, neckBlend } from "../server/gemini-reference.js";
 import { geminiPersonalize } from "../server/gemini.js";
 import { ProviderError } from "../server/provider-errors.js";
 
@@ -41,7 +41,7 @@ test("the selected provider is advertised and only matching provider consent can
     await withServer({ provider, apiKey: "test-only", personalize: async () => { calls++; return face; } }, async base => {
       const health = await (await fetch(`${base}/api/health`)).json();
       assert.equal(health.provider, provider);
-      if (provider === "gemini") assert.equal(health.generationRevision, "customer-face-v5");
+      if (provider === "gemini") assert.equal(health.generationRevision, "customer-neck-v6");
       assert.equal(health.personalizationContract, "customer-avatar-v4");
       const valid = { consent: true, profileId: "regular", face };
       assert.equal((await post(base, { ...valid, consentProvider: provider === "gemini" ? "openai" : "gemini" })).status, 400);
@@ -503,4 +503,21 @@ test("a photo without a face cannot trigger a paid Gemini request", async () => 
   let calls=0;
   await assert.rejects(geminiPersonalize({face:noFace,body:bodyBytes,avatar:await standardAvatar("regular"),profileId:"regular",measurements,apiKey:"test-only",fetchImpl:async()=>{calls++;throw new Error("Must not be called");}}), error=>error.code==="face_input");
   assert.equal(calls,0);
+});
+
+
+test("neck blend preserves the face and ends gradually along a curved collar boundary", () => {
+  for (const x of [28, 51, 74, 97, 120]) {
+    assert.equal(neckBlend(x, 100), 1, "facial features stay opaque");
+    assert.equal(neckBlend(x, 182), 0, "no customer photo remains below the collar transition");
+    let previous = neckBlend(x, 100);
+    for (let y = 101; y <= 183; y++) {
+      const opacity = neckBlend(x, y);
+      assert.ok(opacity >= 0 && opacity <= previous, "fade is bounded and monotonic");
+      assert.ok(previous - opacity < 0.031, "no abrupt one-row opacity jump");
+      previous = opacity;
+    }
+  }
+  assert.ok(neckBlend(74, 160) > neckBlend(28, 160), "neck centre extends below the sides instead of a straight cut");
+  assert.equal(neckBlend(28, 160), neckBlend(120, 160), "transition is symmetric");
 });

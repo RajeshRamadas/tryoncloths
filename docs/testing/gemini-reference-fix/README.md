@@ -1,5 +1,13 @@
 # Gemini customer reference correction
 
+## Neck transition correction (`customer-neck-v6`)
+
+After v5 restored the visible customer face, the user reported a rough head/body join. The reference still introduced the underlying template neck at a fixed horizontal row. V6 fades that underlying neck in over 30 rows and blends the customer layer out over a wider 50-row curved boundary. The neck mask also grows gradually instead of switching on at one row. Face placement and scaling are unchanged; no blur is applied to the face or provider output.
+
+Gemini is instructed to reconstruct and relight the jaw, entire neck, collarbones and fabric contact together, retaining identity and eye alignment while removing inherited seam pixels, halos and duplicate collar edges. This is still one paid generation call, with no automatic retry. The existing face-presence rejection remains active.
+
+Validation: 32 unit/API tests and the production frontend build passed. Reference preparation succeeded for three independent synthetic customers across all four profiles. Tests verify face presence, eye alignment, unchanged body pixels below the blend, and a gradual curved transition. These checks do not establish final image quality: the intermediate reference still needs Gemini to reconcile lighting, background and complexion. A newly generated live result must be visually reviewed after deployment; no live v6 generation was performed here.
+
 ## Visible customer face correction (`customer-face-v5`)
 
 The user supplied a later result with no head, despite approval being available. The backend previously accepted any decodable image. The featureless-head reference strategy is replaced with the customer's actual face, locally aligned to the selected template using eye landmarks, uniform scaling and rotation. The reference is an intermediate composite for Gemini to blend; it is never returned as a generated fallback.
@@ -70,4 +78,4 @@ Keep the existing Gemini key and public-access settings. From Lightsail:
 cd ~/tryoncloths && git pull --ff-only origin main && cd deploy/lightsail && sudo docker compose -f compose.shared.yaml up -d --build tryon
 ```
 
-Then open `/api/health`. It must include `"generationRevision":"customer-face-v5"`. Refresh the app and generate a new result; existing images are not changed by deployment. Repeat the green-sweater test and visually compare face, glasses, hair, complexion and both feet before approving. Do not automatically retry a failure.
+Then open `/api/health`. It must include `"generationRevision":"customer-neck-v6"`. Refresh the app and generate a new result; existing images are not changed by deployment. Repeat the green-sweater test and visually compare face, glasses, hair, complexion and both feet before approving. Do not automatically retry a failure.
