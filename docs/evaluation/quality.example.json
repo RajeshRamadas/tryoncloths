@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "gemini",
+      "label": "Google Gemini",
+      "model": "gemini-2.5-flash-image",
+      "kind": "general",
+      "evidence": "live"
+    },
+    {
+      "id": "candidate",
+      "label": "Chosen dedicated try-on provider",
+      "model": "replace-with-exact-model-version",
+      "kind": "dedicated",
+      "evidence": "live"
+    }
+  ],
+  "cases": [
+    {
+      "id": "female-shirt-01",
+      "task": "tryon",
+      "profileId": "f-regular",
+      "storageConsent": true,
+      "references": {
+        "avatar": "inputs/avatar.png",
+        "garment": "inputs/shirt.jpg"
+      },
+      "results": [
+        {
+          "providerId": "gemini",
+          "image": "outputs/gemini.png",
+          "latencyMs": null,
+          "costUsd": null
+        }
+      ]
+    }
+  ]
+}

@@ -4,7 +4,7 @@ As of 2026-10-29 · Rajesh Ramadas
 
 ## How to use this guide
 
-Give a coding LLM (Claude Code or similar) one task at a time, in order; each task lists the goal, files, steps and acceptance checks, and the prompt template below wraps them. Tasks 1–9 match what [PR #1](https://github.com/RajeshRamadas/tryoncloths/pull/1) built and can be used to rebuild or extend it; task 10 is now implemented; task 11 is implemented behind a pilot flag; task 12 is implemented as an optional isolated service, disabled by default. Requirements and design: [`LINK_TRYON_DESIGN.md`](LINK_TRYON_DESIGN.md).
+Give a coding LLM (Claude Code or similar) one task at a time, in order; each task lists the goal, files, steps and acceptance checks, and the prompt template below wraps them. Tasks 1–9 match what [PR #1](https://github.com/RajeshRamadas/tryoncloths/pull/1) built and can be used to rebuild or extend it; task 10 is now implemented; task 11 is implemented behind a pilot flag; task 12 is implemented as an optional isolated service, disabled by default. Tasks 13–14 add the release benchmark and private quality-review tools; live results and a candidate-provider choice remain outstanding. Requirements and design: [`LINK_TRYON_DESIGN.md`](LINK_TRYON_DESIGN.md).
 
 ### Repo context to give the LLM first
 
@@ -396,3 +396,41 @@ write a private, non-overwriting report bound to a manifest hash.
 - [x] Comparison reuses static responses; reports never retain images or raw errors.
 - [x] Fewer than 20 products cannot mark the benchmark complete.
 - [ ] Run against 20 real retailer products and review photo correctness and memory.
+
+
+## Task 14 — private avatar/try-on review and candidate-provider comparison
+
+Implemented in web 0.13 on `feature/tryon-quality-evaluation`. See
+[dataset format and commands](RELEASE_VALIDATION.md#task-14--avatar-and-provider-quality-review).
+
+**Goal.** Complete the evidence-gathering workflow required by female rollout and
+conditional dedicated-provider evaluation without changing the active provider.
+
+**Files.** `server/evaluation/quality.js`, `quality-cli.js`, `review.html`,
+`review.js`, `review.css`; `docs/evaluation/quality.example.json`;
+`tests/quality-evaluation.test.js`, `tests/browser/quality-review.spec.js`.
+
+**Steps.**
+
+1. Validate case ids, profiles, storage consent, providers and result metadata.
+2. Load only bounded local JPEG/PNG/WebP images underneath the manifest directory;
+   strip metadata and copy them into a new private report directory.
+3. Bind reports to input/output hashes, reject duplicate input sets, run the existing
+   face detector and check portrait orientation; retain rejected results for review.
+4. Display references and each provider output side by side with the same visual
+   rubric; export and reload complete ratings without network requests or storage.
+5. Verify report/image hashes when summarizing. Retain failures and unrun cases in
+   denominators and report cost/latency coverage explicitly.
+6. Require live rather than fixture evidence for female targets and paired candidate
+   comparisons. Never automatically approve rollout, retry or switch providers.
+
+**Acceptance.**
+
+- [x] Missing consent, duplicate ids, unsafe file references and repeated input sets fail.
+- [x] Missing faces, malformed images and unrun attempts cannot be approved.
+- [x] Ratings for another report, edited image or incomplete score set are rejected.
+- [x] Fixture evidence cannot satisfy live quality targets.
+- [x] A phone-width browser can review, download and reload scores with no external calls.
+- [ ] Collect and review ten independent live female cases at each stage.
+- [ ] If Gemini fidelity is inadequate, select and compare a dedicated provider on ten paired try-ons.
+- [ ] Decide on rollout or a provider adapter from the measured evidence; no candidate is selected yet.

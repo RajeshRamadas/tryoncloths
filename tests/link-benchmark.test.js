@@ -24,10 +24,12 @@ test('benchmark measures all twenty successes and failures without storing image
 });
 test('comparison reuses static responses and reports browser improvement separately', async () => {
   let reads = 0;
-  const report = await benchmarkLinks({ version: 1, links: manifest.links.slice(0, 2) }, { compare: true, wait: async () => {},
+  const times = [0, 2, 3, 10, 14, 16];
+  const report = await benchmarkLinks({ version: 1, links: manifest.links.slice(0, 2) }, { compare: true, wait: async () => {}, now: () => times.shift(),
     staticReader: async () => { if (++reads === 1) throw new LinkError('no_images'); return { images: [{}] }; },
     fallbackReader: async (_url, { staticReader, enabled }) => { assert.equal(enabled, true); try { return await staticReader(); } catch { return { images: [{}, {}] }; } },
   });
   assert.equal(reads, 2); assert.equal(report.summary.static.passed, 1); assert.equal(report.summary.withBrowser.passed, 2);
+  assert.equal(report.summary.static.medianMs, 3); assert.equal(report.summary.withBrowser.medianMs, 4.5);
   assert.equal(report.benchmarkComplete, false);
 });
