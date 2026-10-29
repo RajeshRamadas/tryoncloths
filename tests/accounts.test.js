@@ -113,7 +113,7 @@ test("look validation, capacity, account cascade and old database upgrade",async
  await assert.rejects(store.saveLook(owner,{...input,garments:Array(11).fill("Shirt")}),{status:400});
  await assert.rejects(store.saveLook(owner,{...input,image:"data:image/png;base64,ZmFrZQ=="}),{status:400});
  const {id}=await store.saveLook(owner,input);
- const insert=store.db.prepare("INSERT INTO looks SELECT ?,account,avatarId,name,garments,image,thumbnail,savedAt FROM looks WHERE account=? AND id=?");
+ const insert=store.db.prepare("INSERT INTO looks(id,account,avatarId,name,garments,image,thumbnail,savedAt) SELECT ?,account,avatarId,name,garments,image,thumbnail,savedAt FROM looks WHERE account=? AND id=?");
  for(let i=0;i<199;i++)insert.run(`copy-${i}`,owner.id,id);
  await store.saveLook(owner,{...input,name:"Renamed at limit"});
  store.db.prepare("UPDATE looks SET id='different-id' WHERE id=? AND account=?").run(id,owner.id);

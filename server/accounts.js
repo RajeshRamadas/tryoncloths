@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import sharp from "sharp";
 import { profiles, recommendProfile, validTemplateTone, DEFAULT_TEMPLATE_TONE } from "../src/profiles.js";
 import { GarmentStore } from "./garment-store.js";
+import { migrateTenancy } from "./tenancy.js";
 const scrypt = promisify(scryptCallback);
 const digest = value => createHash("sha256").update(value).digest("hex");
 const cookieName = "forme_session";
@@ -42,6 +43,8 @@ export class AccountStore {
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     this.garments = new GarmentStore(this);
+    try { migrateTenancy(this.db); }
+    catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
   async register(input) {
@@ -111,7 +114,7 @@ export class AccountStore {
     const id = digest(image), savedAt = Date.now();
     const exists = this.db.prepare("SELECT id FROM looks WHERE account=? AND id=?").get(account.id,id);
     if (!exists && this.db.prepare("SELECT count(*) AS total FROM looks WHERE account=?").get(account.id).total >= 200) throw error("Your account holds up to 200 looks. Delete one before adding another.",409);
-    this.db.prepare(`INSERT INTO looks VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET avatarId=excluded.avatarId,name=excluded.name,garments=excluded.garments,savedAt=excluded.savedAt`).run(id,account.id,input.avatarId,name,JSON.stringify(input.garments),image,thumbnail,savedAt);
+    this.db.prepare(`INSERT INTO looks(id,account,avatarId,name,garments,image,thumbnail,savedAt) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET avatarId=excluded.avatarId,name=excluded.name,garments=excluded.garments,savedAt=excluded.savedAt`).run(id,account.id,input.avatarId,name,JSON.stringify(input.garments),image,thumbnail,savedAt);
     return {id,avatarId:input.avatarId,savedAt};
   }
   requireAvatar(account,id) {
