@@ -44,3 +44,5 @@ No Android APK was rebuilt.
 Automated validation for this branch: 52 backend tests, 48 browser tests and the
 TypeScript/Vite production build passed. Provider responses in browser tests are
 stubbed, so the screenshots demonstrate UI behavior rather than Gemini quality.
+
+Use the [private quality review tool](RELEASE_VALIDATION.md#task-14--avatar-and-provider-quality-review) to record female avatar and clothing results against their exact input references. The tool does not enable the pilot flag.

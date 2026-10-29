@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Forme — Quality review</title>
+  <link rel="stylesheet" href="review.css">
+  <script src="data.js" defer></script>
+  <script src="review.js" defer></script>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">FORME · PRIVATE EVALUATION</p>
+    <h1>Review avatar and outfit quality</h1>
+    <p>Compare each output with its references. A detected face does not prove likeness or a natural neck join. Review all visible skin, proportions and clothing details.</p>
+    <p>No photos are uploaded by this page. Keep this folder private. Download a review to keep your scores; reloading clears unsaved scores.</p>
+    <p><strong>Score guide:</strong> 1 unusable · 2 major errors · 3 noticeable errors · 4 acceptable with minor differences · 5 faithful and natural.</p>
+    <div class="actions">
+      <button id="download" type="button">Download review scores</button>
+      <label class="import">Load previous review<input id="import" type="file" accept="application/json,.json"></label>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+    <p id="error" role="alert"></p>
+  </header>
+  <main>
+    <nav aria-label="Evaluation cases"><button id="previous" type="button">Previous case</button><span id="position"></span><button id="next" type="button">Next case</button></nav>
+    <section id="case" aria-labelledby="case-title"></section>
+  </main>
+</body>
+</html>

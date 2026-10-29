@@ -105,3 +105,15 @@ The existing Android APK remains 0.7.0; no APK was built for this web release. W
 ## Web 0.12 updates
 
 Reviewed outfits can be saved under customer avatars and reopened from the store account. Undo restores previous sample layers, and failed try-on requests require fresh consent. The [female body library](docs/FEMALE_PROFILES.md) and [isolated browser reader](docs/BROWSER_LINK_READER.md) are optional pilots, disabled by default pending live validation. No Android APK was rebuilt.
+
+## Web 0.13 release validation
+
+Operators can run a fixed 20-product-link benchmark with `npm run benchmark:links`,
+and prepare a private image-review page with `npm run evaluate:quality`. The review
+compares avatar/garment references with provider outputs, scores face and skin-tone
+fidelity, proportions, neck joins and clothing, and reports failures, measured cost
+and latency. It supports imported dedicated-provider results for evaluation; Gemini
+remains active. Neither tool makes paid AI calls. See [instructions and examples](docs/RELEASE_VALIDATION.md).
+
+Live rollout checks remain outstanding; female profiles and the browser worker are
+still opt-in pilots. This is a web/operator-tool update; the APK is unchanged.

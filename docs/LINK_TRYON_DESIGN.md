@@ -2,15 +2,16 @@
 
 As of 2026-10-29 · Rajesh Ramadas
 
-## Current implementation status — web 0.12
+## Current implementation status — web 0.13
 
 The v0.9 link feature and its undo/consent corrections are merged. Saved looks
 (FR-14) are implemented and enabled with account storage. Female profiles and the
 isolated browser reader are implemented as opt-in pilots; both remain disabled by
 default pending the specified live visual review and 20-product-link benchmark.
 See [female rollout](FEMALE_PROFILES.md) and [browser-reader rollout](BROWSER_LINK_READER.md).
-Final automated validation: 57 backend tests, 49 browser tests, production build,
-and the isolated container's private-network blocking checks passed. No APK built.
+Web 0.13 automated validation: 66 backend tests, 50 browser tests and the production build passed. The isolated container network checks passed in web 0.12; its isolation code is unchanged here. No APK built.
+Web 0.13 adds a fixed-set product-link benchmark and a private image-quality review/comparison tool. See [release validation](RELEASE_VALIDATION.md) and implementation tasks 13–14. These tools do not change Gemini or approve pilot rollout. Live retailer results, female quality review and any dedicated-provider choice remain outstanding.
+
 The original requirements and initial validation snapshot below document v0.9.
 
 ## Overview
@@ -216,4 +217,5 @@ Unit tests and the build pass (46 of 46, 9 new); browser tests and live Gemini q
 - [x] Save try-on looks to the store account (FR-14).
 - [x] Add female standard bodies (pilot flag off; live review pending).
 - [x] Optional headless-browser reader (off; real-site benchmark pending).
-- [ ] Evaluate a dedicated try-on model as a provider option if garment fidelity falls short.
+- [x] Add tooling to compare provider outputs on matched inputs, including failures, cost and latency.
+- [ ] Run the live quality evaluation and evaluate a dedicated try-on model if garment fidelity falls short.

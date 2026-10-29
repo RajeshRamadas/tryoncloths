@@ -56,7 +56,8 @@ export async function benchmarkLinks(manifest, {
     const passed = rows.filter(row => row[key].ok).length;
     const times = rows.map(row => row[key].elapsedMs).sort((a, b) => a - b);
     return { passed, failed: rows.length - passed, successRate: passed / rows.length,
-      medianMs: times[Math.floor(times.length / 2)], p95Ms: times[Math.ceil(times.length * .95) - 1] };
+      medianMs: (times[Math.floor((times.length - 1) / 2)] + times[Math.floor(times.length / 2)]) / 2,
+      p95Ms: times[Math.ceil(times.length * .95) - 1] };
   };
   return { version: 1, kind: 'product-link-benchmark', createdAt: new Date().toISOString(),
     manifestHash: digest(JSON.stringify(links)), mode: compare ? 'compare' : 'static',
