@@ -57,7 +57,7 @@ flowchart TB
     direction LR
     T6["Task 6<br/>LinkTryOn panel"] --> T7["Task 7<br/>stacking + wiring"] --> T8["Task 8<br/>styles, mobile"] --> T9["Task 9 · merge gate<br/>tests, docs, PR"]
   end
-  subgraph D["Future · not built"]
+  subgraph D["Implemented extensions · pilots need live review"]
     direction LR
     T10["Task 10<br/>save looks"]
     T11["Task 11<br/>female bodies"]
@@ -295,9 +295,9 @@ npm run test:e2e
 - [ ] No test makes a real network or paid call.
 - [ ] Manual check on a deployed studio: 3–4 real product links and 10+ live try-ons reviewed.
 
-## Future tasks 10–12
+## Implemented extensions: tasks 10–12
 
-These are not built yet; each is sized as one PR and depends on tasks 1–9 being merged.
+These tasks are implemented. The acceptance lists below retain the original specification; live rollout checks remain outstanding as noted under each task.
 
 ### Task 10 — save try-on looks to the store account
 
@@ -372,3 +372,27 @@ Implemented in web 0.12 on `feature/isolated-browser-link-reader`. See [setup an
 - [ ] With the flag off, behaviour is identical to tasks 1–3.
 - [ ] A page that redirects or loads a resource to a private address gets no response from it.
 - [ ] Measured success rate on a fixed list of 20 product links is recorded before enabling in production.
+
+
+## Task 13 — repeatable product-link release benchmark
+
+Implemented on `feature/release-link-benchmark`. See [commands and rollout checks](RELEASE_VALIDATION.md).
+
+**Goal.** Measure the same 20 real product URLs with the normal reader and optional
+isolated fallback, preserving network guards and making no AI calls.
+
+**Files.** `server/evaluation/link-benchmark.js`, `server/evaluation/files.js`,
+`tests/link-benchmark.test.js`, `docs/evaluation/links.example.json`.
+
+**Steps.** Validate the whole manifest before networking; reject duplicates and
+unsafe URLs; read sequentially with two-second spacing; reuse each static result
+for comparison; record sanitized errors, image counts, success rate and timing;
+write a private, non-overwriting report bound to a manifest hash.
+
+**Acceptance.**
+
+- [x] Invalid or private URLs prevent all requests.
+- [x] Every result, including failures, contributes to the denominator.
+- [x] Comparison reuses static responses; reports never retain images or raw errors.
+- [x] Fewer than 20 products cannot mark the benchmark complete.
+- [ ] Run against 20 real retailer products and review photo correctness and memory.

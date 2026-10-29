@@ -17,7 +17,8 @@
     "android:debug": "npm run android:sync && node scripts/android-build.mjs assembleDebug",
     "android:sync": "npm run build && cap sync android",
     "android:check": "npm run android:sync && node scripts/android-build.mjs assembleDebug lintDebug",
-    "android:assets": "node scripts/mobile-assets.mjs"
+    "android:assets": "node scripts/mobile-assets.mjs",
+    "benchmark:links": "node --env-file-if-exists=.env server/evaluation/link-benchmark.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
