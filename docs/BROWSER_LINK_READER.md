@@ -85,3 +85,5 @@ resolved to a private test container. The target received zero requests. Tempora
 containers and their network were removed. The first run failed closed because
 this kernel lacks IPv6 REJECT support; IPv6 DROP passed the same isolation test.
 No real-shop benchmark or live provider-generation quality check was performed.
+
+Use the [release benchmark CLI](RELEASE_VALIDATION.md) to record the required fixed 20-link comparison.
