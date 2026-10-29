@@ -4,7 +4,7 @@ import path from "node:path";
 import { randomBytes, createHash, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import sharp from "sharp";
-import { profiles, recommendProfile } from "../src/profiles.js";
+import { profiles, recommendProfile, validTemplateTone, DEFAULT_TEMPLATE_TONE } from "../src/profiles.js";
 import { GarmentStore } from "./garment-store.js";
 const scrypt = promisify(scryptCallback);
 const digest = value => createHash("sha256").update(value).digest("hex");
@@ -40,6 +40,7 @@ export class AccountStore {
       CREATE TABLE IF NOT EXISTS looks(id TEXT NOT NULL, account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, avatarId TEXT NOT NULL, name TEXT NOT NULL, garments TEXT NOT NULL, image BLOB NOT NULL, thumbnail BLOB NOT NULL, savedAt INTEGER NOT NULL, PRIMARY KEY(account,id), FOREIGN KEY(account,avatarId) REFERENCES avatars(account,id) ON DELETE CASCADE);
       CREATE INDEX IF NOT EXISTS looks_avatar ON looks(account,avatarId);`);
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
+    if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     this.garments = new GarmentStore(this);
   }
   close() { this.db.close(); }
@@ -85,6 +86,8 @@ export class AccountStore {
   }
   async save(account, input) {
     const { profileId, heightCm, weightKg } = input;
+    const templateTone = input.templateTone ?? DEFAULT_TEMPLATE_TONE;
+    if (!validTemplateTone(templateTone)) throw error('Choose an available template skin tone.');
     const name = typeof input.name === "string" ? input.name.trim() : "";
     if (!name || name.length>60 || !profiles.some(p=>p.id===profileId) || !recommendProfile(heightCm,weightKg,profiles.find(p=>p.id===profileId)?.body) || !["generated","imported"].includes(input.source)) throw error("Use a name, body profile and valid measurements.");
     const {image, thumbnail} = await savedImage(input.image);
@@ -92,11 +95,11 @@ export class AccountStore {
     const exists = this.db.prepare("SELECT id FROM avatars WHERE account=? AND id=?").get(account.id,id);
     const count = this.db.prepare("SELECT count(*) AS total FROM avatars WHERE account=?").get(account.id).total;
     if(!exists && count>=100) throw error("Your account holds up to 100 avatars. Delete one before adding another.",409);
-    this.db.prepare(`INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET name=excluded.name, profileId=excluded.profileId,heightCm=excluded.heightCm,weightKg=excluded.weightKg,source=excluded.source,savedAt=excluded.savedAt,body_type=excluded.body_type`).run(id,account.id,name,profileId,heightCm,weightKg,input.source,savedAt,image,thumbnail,profiles.find(p=>p.id===profileId).body);
+    this.db.prepare(`INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type,template_tone) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET name=excluded.name, profileId=excluded.profileId,heightCm=excluded.heightCm,weightKg=excluded.weightKg,source=excluded.source,savedAt=excluded.savedAt,body_type=excluded.body_type,template_tone=excluded.template_tone`).run(id,account.id,name,profileId,heightCm,weightKg,input.source,savedAt,image,thumbnail,profiles.find(p=>p.id===profileId).body,templateTone);
     return {id,savedAt};
   }
   list(account) {
-    return this.db.prepare("SELECT id,name,profileId,body_type AS bodyType,heightCm,weightKg,source,savedAt,thumbnail,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC").all(account.id).map(row=>({...row,thumbnail:`data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`}));
+    return this.db.prepare("SELECT id,name,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC").all(account.id).map(row=>({...row,thumbnail:`data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`}));
   }
   async saveLook(account, input) {
     const name = typeof input.name === "string" ? input.name.trim() : "";

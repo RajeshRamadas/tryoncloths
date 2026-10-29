@@ -1,6 +1,6 @@
 # Forme — Avatar Studio
 
-Level 1 of `tryoncloths`: a store-assisted customer avatar workflow. Built with React, TypeScript, Vite, Express, and Sharp. Uses four generated adult male sample profiles: slim, regular, athletic, and broad.
+Level 1 of `tryoncloths`: a store-assisted customer avatar workflow. Built with React, TypeScript, Vite, Express, and Sharp. Web 0.15 includes 48 generated adult sample templates: male and female bodies, four profiles each, and six complexion ranges. See the [avatar library and approximate matching](docs/AVATAR_LIBRARY.md).
 
 ## Install on Android
 
@@ -33,7 +33,7 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 
 - Consented face/full-body photo input, with camera capture offered on supported mobile browsers. JPEG, PNG, and WebP validation; 10 MB browser upload limit, client resizing, and removal controls.
 - Approximate standard-profile suggestion from height/weight, with staff correction. Athletic build is never inferred from weight alone.
-- Independent selection of all four standard sample profiles.
+- Male/female template selection with four body profiles and six skin tones each; saved avatars retain the chosen template tone.
 - An explicitly triggered Gemini customer-avatar adapter using both customer photos, a selected body template, and whole-body skin-tone matching instructions, with server-side credentials and consent checks.
 - Review/approval, full-body PNG download, expanded preview, and new-session photo clearing.
 - Responsive layout and keyboard-accessible controls/dialogs.
@@ -50,7 +50,7 @@ Gemini sends three labelled images in one request: customer face first, full-bod
 
 Generative output can vary and must be reviewed. There are no automatic retries or per-selection AI requests. Repeating a generation is an explicit action and may incur another charge. This development server limits attempts to 20 per hour per client IP, at least 15 seconds apart, with at most two requests in flight globally. These are development limits, not a production quota system. See [generation setup and review](docs/GENERATION_SETUP.md).
 
-With customer photos loaded, the preview displays input references and an explicit pending state until generation succeeds. It never presents the standard sample as a personalized result. Skin tone is matched automatically from the photos; there is no complexion preset.
+With customer photos loaded, the preview displays input references and an explicit pending state until generation succeeds. It never presents the standard sample as a personalized result. Personalized skin tone is matched automatically from the photos; the six template complexion choices are starting references only.
 
 Without a key, customer generation is unavailable. Sessions containing customer photos cannot approve or export a standard sample as the customer's result. Sample browsing/export remains available in sessions without photos. Provider integration is tested with a stubbed provider; real face fidelity, skin-tone matching, account/model access, cost, latency, and retention behavior must be verified with an authorized account. No claim of an actual personalized generation is made by sample mode or stubbed tests.
 

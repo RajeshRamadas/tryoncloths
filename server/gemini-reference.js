@@ -21,7 +21,7 @@ export function neckBlend(x, y) {
 async function targetFace(avatar, profileId) {
   const key = `${profileId}:${createHash("sha256").update(avatar).digest("hex")}`;
   if (!templateEyes.has(key)) {
-    if (templateEyes.size >= 8) templateEyes.clear();
+    if (templateEyes.size >= 48) templateEyes.clear();
     templateEyes.set(key, detectFaces(avatar, { landmarks: true, upper: true }).then(faces => {
       if (faces.length !== 1) throw new ProviderError("face_check");
       return faces[0];
@@ -67,7 +67,9 @@ export async function geminiBodyReference(avatar, profileId, face) {
   const aligned = await sharp({ create: { width, height, channels: 4, background: "#00000000" } })
     .composite([{ input: photo, left, top }]).png().toBuffer();
 
-  const centre = headCentres[profileId];
+  // Tone sheets preserve the pose but may vary by a few pixels. Use each
+  // template's measured eye centre rather than a different sheet's constant.
+  const centre = Math.round(midpoint(target.eyes).x);
   const patch = { left: centre - 74, top: 20, width: 148, height: 183 };
   const background = await sharp(avatar).extract({ left: 16, top: 20, width: 24, height: 183 })
     .resize(148, 183, { fit: "fill" }).png().toBuffer();

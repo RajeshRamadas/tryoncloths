@@ -3,7 +3,7 @@ import sharp from "sharp";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { profiles, recommendProfile } from "../src/profiles.js";
+import { profiles, recommendProfile, skinTones, avatarVariants, templateLibrary, validTemplateTone, DEFAULT_TEMPLATE_TONE } from "../src/profiles.js";
 import { providerErrorDetails } from "./provider-errors.js";
 import { openaiPersonalize } from "./openai.js";
 import { geminiPersonalize, GEMINI_REFERENCE_VERSION } from "./gemini.js";
@@ -53,10 +53,10 @@ export async function normalizePhoto(dataUrl, kind = "face") {
   }
 }
 
-export async function standardAvatar(profileId) {
+export async function standardAvatar(profileId, templateTone = DEFAULT_TEMPLATE_TONE) {
   const profile = profiles.find((p) => p.id === profileId);
   if (!profile) throw new Error("Choose an available body profile.");
-  const source = sharp(path.join(root, profile.body === "female" ? "public/avatar-library-female.png" : "public/avatar-library.png"));
+  const source = sharp(path.join(root, 'public', templateLibrary(profile.body, templateTone)));
   const metadata = await source.metadata();
   const panelWidth = Math.floor(metadata.width / 4);
   return source
@@ -152,6 +152,9 @@ export function createApp({
       garmentCatalogueAvailable: Boolean(accountStore),
       profileCount: femaleEnabled ? profiles.length : 4,
       supportedBodies: femaleEnabled ? ["male","female"] : ["male"],
+      templateBodies: ["male", "female"],
+      templateSkinTones: skinTones,
+      templateVariantCount: avatarVariants.length,
       tryOnAvailable: provider === "gemini" && Boolean(apiKey),
       tryOnContract: TRYON_CONTRACT,
       garmentTypes: Object.keys(garmentTypes),
@@ -187,6 +190,8 @@ export function createApp({
       return res
         .status(400)
         .json({ error: "Choose an available body profile." });
+    const templateTone = req.body.templateTone ?? DEFAULT_TEMPLATE_TONE;
+    if (!validTemplateTone(templateTone)) return res.status(400).json({ error: "Choose an available template skin tone." });
     if (!recommendProfile(req.body?.measurements?.heightCm, req.body?.measurements?.weightKg, profiles.find(p=>p.id===req.body.profileId)?.body))
       return res.status(400).json({ error: "Enter a height from 140–210 cm and weight from 35–200 kg." });
     if (!apiKey)
@@ -216,7 +221,7 @@ export function createApp({
     try {
       face = await normalizePhoto(req.body.face);
       body = await normalizePhoto(req.body.body, "full-body");
-      avatar = await standardAvatar(req.body.profileId);
+      avatar = await standardAvatar(req.body.profileId, templateTone);
     } catch (e) {
       return res.status(400).json({ error: e.message });
     }
@@ -243,7 +248,7 @@ export function createApp({
       let avatarId = null;
       if (accountStore) {
         try {
-          const saved = await accountStore.save(owner, { image, name: typeof req.body.avatarName === "string" && req.body.avatarName.trim() ? req.body.avatarName.trim().slice(0,60) : "Customer avatar", profileId: req.body.profileId, heightCm: req.body.measurements.heightCm, weightKg: req.body.measurements.weightKg, source: "generated" });
+          const saved = await accountStore.save(owner, { image, name: typeof req.body.avatarName === "string" && req.body.avatarName.trim() ? req.body.avatarName.trim().slice(0,60) : "Customer avatar", profileId: req.body.profileId, templateTone, heightCm: req.body.measurements.heightCm, weightKg: req.body.measurements.weightKg, source: "generated" });
           avatarId = saved.id;
           accountSaved = true;
         } catch {
@@ -252,7 +257,7 @@ export function createApp({
           console.error(JSON.stringify({event:"avatar_account_save_failed"}));
         }
       }
-      res.json({ image, provider, profileId: req.body.profileId, kind: "customer-avatar", needsReview: true, reviewChecks: ["face", "standard-body", "skin-tone"], ...(accountStore ? {accountSaved, avatarId, accountSaveError: accountSaved ? null : "Avatar created, but saving to your account failed. Download it now or review and save it again; do not regenerate."} : {}) });
+      res.json({ image, provider, profileId: req.body.profileId, templateTone, kind: "customer-avatar", needsReview: true, reviewChecks: ["face", "standard-body", "skin-tone"], ...(accountStore ? {accountSaved, avatarId, accountSaveError: accountSaved ? null : "Avatar created, but saving to your account failed. Download it now or review and save it again; do not regenerate."} : {}) });
     } catch (error) {
       const failure = providerErrorDetails(error, provider);
       console.error(JSON.stringify({ event: "avatar_provider_failure", provider, code: failure.code, providerStatus: failure.providerStatus }));

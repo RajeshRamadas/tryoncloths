@@ -1,8 +1,8 @@
 import { loadImage } from "./images";
-import { profiles, recommendProfile } from "./profiles";
+import { profiles, recommendProfile, validTemplateTone, DEFAULT_TEMPLATE_TONE } from "./profiles";
 
 export type OpenedLook = { image: string; name: string; garments: string[] };
-export type AvatarDetails = { avatarId?: string; look?: OpenedLook; name: string; profileId: string; heightCm: number; weightKg: number; source: "generated" | "imported" };
+export type AvatarDetails = { avatarId?: string; look?: OpenedLook; name: string; profileId: string; templateTone?:string; heightCm: number; weightKg: number; source: "generated" | "imported" };
 export type SavedAvatar = AvatarDetails & { id: string; image: Blob; thumbnail: string; savedAt: number; looksCount?: number };
 const database = "forme-saved-avatars";
 const storeName = "avatars";
@@ -20,7 +20,7 @@ function open(): Promise<IDBDatabase> {
 }
 function validDetails(details: AvatarDetails) {
   return typeof details?.name === "string" && details.name.trim().length > 0 && details.name.length <= 60 && profiles.some(p => p.id === details.profileId)
-    && recommendProfile(details.heightCm, details.weightKg, profiles.find(p=>p.id===details.profileId)?.body) && ["generated", "imported"].includes(details.source);
+    && recommendProfile(details.heightCm, details.weightKg, profiles.find(p=>p.id===details.profileId)?.body) && validTemplateTone(details.templateTone ?? DEFAULT_TEMPLATE_TONE) && ["generated", "imported"].includes(details.source);
 }
 export async function listAvatars(): Promise<SavedAvatar[]> {
   const db = await open();
@@ -43,7 +43,7 @@ export async function saveAvatar(image: string, details: AvatarDetails): Promise
   thumb.getContext("2d")!.drawImage(img,0,0,thumb.width,thumb.height);
   // Whitelist metadata; original customer photos, provider keys and tokens must
   // never enter this database. Identical PNGs update rather than duplicate.
-  const record: SavedAvatar = { id, name: details.name.trim(), profileId: details.profileId, heightCm: details.heightCm, weightKg: details.weightKg, source: details.source, image: blob, thumbnail: thumb.toDataURL("image/png"), savedAt: Date.now() };
+  const record: SavedAvatar = { id, name: details.name.trim(), profileId: details.profileId, templateTone:details.templateTone ?? DEFAULT_TEMPLATE_TONE, heightCm: details.heightCm, weightKg: details.weightKg, source: details.source, image: blob, thumbnail: thumb.toDataURL("image/png"), savedAt: Date.now() };
   const db = await open();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(storeName, "readwrite");

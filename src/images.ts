@@ -1,8 +1,8 @@
 import { isNative, shareAvatar } from "./native";
 import { preparePhoto, orientCanvas } from "./photo-orientation";
 
-import { profiles } from "./profiles";
-export function libraryForIndex(index:number) { return profiles[index]?.body === "female" ? "/avatar-library-female.png" : LIBRARY_URL; }
+import { profiles, templateLibrary, DEFAULT_TEMPLATE_TONE } from "./profiles";
+export function libraryForIndex(index:number, tone=DEFAULT_TEMPLATE_TONE) { return templateLibrary(profiles[index]?.body || 'male', tone); }
 
 export const LIBRARY_URL = "/avatar-library.png";
 
@@ -48,8 +48,8 @@ export async function readPhoto(file: File): Promise<string> {
   }
 }
 
-export async function avatarCanvas(index: number): Promise<HTMLCanvasElement> {
-  const image = await loadImage(libraryForIndex(index));
+export async function avatarCanvas(index: number, tone=DEFAULT_TEMPLATE_TONE): Promise<HTMLCanvasElement> {
+  const image = await loadImage(libraryForIndex(index, tone));
   const panelWidth = image.width / 4;
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(panelWidth);
@@ -75,6 +75,7 @@ export async function downloadAvatar(
   index: number,
   personalized: string | null,
   name: string,
+  tone=DEFAULT_TEMPLATE_TONE,
 ) {
   let canvas: HTMLCanvasElement;
   if (personalized) {
@@ -83,7 +84,7 @@ export async function downloadAvatar(
     canvas.width = image.width;
     canvas.height = image.height;
     canvas.getContext("2d")!.drawImage(image, 0, 0);
-  } else canvas = await avatarCanvas(index);
+  } else canvas = await avatarCanvas(index, tone);
   if (isNative) {
     return await shareAvatar(canvas.toDataURL("image/png"), name);
   }
