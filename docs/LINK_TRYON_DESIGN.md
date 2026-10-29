@@ -2,7 +2,7 @@
 
 As of 2026-10-29 · Rajesh Ramadas
 
-## Current implementation status — web 0.13
+## Current implementation status — web 0.14
 
 The v0.9 link feature and its undo/consent corrections are merged. Saved looks
 (FR-14) are implemented and enabled with account storage. Female profiles and the
@@ -11,6 +11,8 @@ default pending the specified live visual review and 20-product-link benchmark.
 See [female rollout](FEMALE_PROFILES.md) and [browser-reader rollout](BROWSER_LINK_READER.md).
 Web 0.13 automated validation: 66 backend tests, 50 browser tests and the production build passed. The isolated container network checks passed in web 0.12; its isolation code is unchanged here. No APK built.
 Web 0.13 adds a fixed-set product-link benchmark and a private image-quality review/comparison tool. See [release validation](RELEASE_VALIDATION.md) and implementation tasks 13–14. These tools do not change Gemini or approve pilot rollout. Live retailer results, female quality review and any dedicated-provider choice remain outstanding.
+
+Web 0.14 implements the additionally approved **store garment catalogue and adaptation reuse**. See [catalogue requirements and design](GARMENT_CATALOGUE.md) and implementation task 15. Original FR-1–14 remain supported. Validation: 75 backend tests, 52 browser tests and the production web build passed; live deployment is not verified here.
 
 The original requirements and initial validation snapshot below document v0.9.
 

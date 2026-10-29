@@ -5,6 +5,7 @@ import { randomBytes, createHash, scrypt as scryptCallback, timingSafeEqual } fr
 import { promisify } from "node:util";
 import sharp from "sharp";
 import { profiles, recommendProfile } from "../src/profiles.js";
+import { GarmentStore } from "./garment-store.js";
 const scrypt = promisify(scryptCallback);
 const digest = value => createHash("sha256").update(value).digest("hex");
 const cookieName = "forme_session";
@@ -39,6 +40,7 @@ export class AccountStore {
       CREATE TABLE IF NOT EXISTS looks(id TEXT NOT NULL, account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, avatarId TEXT NOT NULL, name TEXT NOT NULL, garments TEXT NOT NULL, image BLOB NOT NULL, thumbnail BLOB NOT NULL, savedAt INTEGER NOT NULL, PRIMARY KEY(account,id), FOREIGN KEY(account,avatarId) REFERENCES avatars(account,id) ON DELETE CASCADE);
       CREATE INDEX IF NOT EXISTS looks_avatar ON looks(account,avatarId);`);
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
+    this.garments = new GarmentStore(this);
   }
   close() { this.db.close(); }
   async register(input) {

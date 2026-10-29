@@ -1731,4 +1731,16 @@ dialog::backdrop {
 .garment-chips button[aria-pressed="true"] { background: #245a49; color: #fff; border-color: #245a49; }
 .garment-chips button:disabled, .link-tryon .link-row input:disabled { opacity: .6; cursor: not-allowed; }
 .dressed-list { margin: 8px 0 14px; padding-left: 20px; color: #254c3e; line-height: 1.7; overflow-wrap: anywhere; }
+.store-garments, .catalogue-save, .saved-adaptation { border:1px solid #dce2d8; border-radius:12px; padding:16px; margin:16px 0; background:#f8faf5; }
+.catalogue-filters { display:flex; flex-wrap:wrap; gap:12px; }
+.catalogue-filters label { flex:1 1 150px; min-width:0; }
+.catalogue-save label, .catalogue-filters label { display:block; font-size:13px; margin-bottom:10px; }
+.catalogue-save input, .catalogue-filters input, .catalogue-filters select { box-sizing:border-box; width:100%; min-width:0; display:block; border:1px solid #cfd8cb; border-radius:8px; padding:10px; margin-top:6px; font:inherit; background:white; color:#254c3e; }
+.catalogue-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin:12px 0; }
+.catalogue-item { min-width:0; border:1px solid #dce2d8; border-radius:12px; background:white; }
+.catalogue-item .garment-tile { width:100%; border:0; }
+.catalogue-item .button { width:100%; }
+.catalogue-matches h3 { font-size:14px; }
+.store-garments p, .catalogue-save p, .saved-adaptation p { font-size:13px; overflow-wrap:anywhere; }
+.store-garments select:focus-visible { outline:3px solid #8eb89e; outline-offset:3px; }
 @media (max-width: 480px) { .link-tryon .link-row { flex-direction: column; } }
