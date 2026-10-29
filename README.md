@@ -126,3 +126,10 @@ reuse the saved garment; similar photos are suggestions for staff to confirm.
 After reviewing an adaptation, save it for automatic reuse on the exact same
 avatar and starting outfit with **no new AI charge**. Different avatars/outfits
 still need a new adaptation. See [catalogue, matching and deployment](docs/GARMENT_CATALOGUE.md).
+
+## Commercial foundation
+
+Web `0.16.0-alpha.1` adds the [C1 tenancy migration](docs/TENANCY_MIGRATION.md).
+Existing accounts become organisations, stores and owner users on startup. Current
+logins and saved data remain in use; staff login and store switching are next (C2).
+Billing and the rest of R1 are not enabled by this foundation update.

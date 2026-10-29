@@ -87,9 +87,13 @@ flowchart TB
 
 **Acceptance.**
 
-- [ ] Running start-up twice creates no duplicates.
-- [ ] A database with 3 existing accounts gets 3 orgs, 3 stores, 3 users, 3 owner memberships.
-- [ ] All existing tests pass unchanged.
+- [x] Running start-up twice creates no duplicates.
+- [x] A database with 3 existing accounts gets 3 orgs, 3 stores, 3 users, 3 owner memberships.
+- [x] Existing behavior assertions pass unchanged; the look-capacity fixture uses an explicit INSERT column list for the additive schema.
+
+**Implemented:** `0.16.0-alpha.1`, branch `feature/commercial-tenancy-migration`.
+See [migration behavior and C2 handoff](../TENANCY_MIGRATION.md). C2 must reconcile
+legacy credential updates and provision new users atomically before switching auth.
 
 ### Task C2 — users, sessions and roles
 
