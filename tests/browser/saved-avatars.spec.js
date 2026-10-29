@@ -44,7 +44,7 @@ test("an explicitly saved customer avatar survives reload, reopens for clothes, 
     const all = await new Promise((resolve,reject)=>{const r=db.transaction("avatars").objectStore("avatars").getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
     db.close(); return all.map(item=>({keys:Object.keys(item).sort(),type:item.image.type,name:item.name}));
   });
-  expect(records).toEqual([{keys:["heightCm","id","image","name","profileId","savedAt","source","thumbnail","weightKg"],type:"image/png",name:"Customer A updated"}]);
+  expect(records).toEqual([{keys:["heightCm","id","image","name","profileId","savedAt","source","templateTone","thumbnail","weightKg"],type:"image/png",name:"Customer A updated"}]);
   await page.reload();
   await page.getByRole("button",{name:"Saved avatars",exact:true}).click();
   await expect(page.getByRole("button",{name:"Use Customer A updated",exact:true})).toBeVisible();
@@ -82,6 +82,7 @@ test("an existing downloaded PNG can be reused offline with selected body detail
   await page.getByLabel("Avatar body profile").selectOption("broad");
   await page.getByLabel("Saved height (cm)").fill("180");
   await page.getByLabel("Saved weight (kg)").fill("95");
+  await page.getByLabel("Saved template skin tone").selectOption("deep");
   await page.getByLabel("Open avatar PNG",{exact:true}).setInputFiles({name:"Previous customer.png",mimeType:"image/png",buffer:await standardAvatar("broad")});
   await expect(page.getByText(/Imported avatar PNG. Check/)).toBeVisible();
   await save(page,"Imported customer");
@@ -89,6 +90,7 @@ test("an existing downloaded PNG can be reused offline with selected body detail
   await page.getByRole("button",{name:"Saved avatars",exact:true}).click();
   await page.getByRole("button",{name:"Use Imported customer",exact:true}).click();
   await expect(page.getByText("180 cm / 95 kg",{exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Template tone: Deep",exact:true})).toHaveAttribute("aria-pressed","true");
   await approve(page);
   await page.getByRole("button",{name:"Select Slim profile"}).click();
   await expect(page.getByRole("button",{name:"Try clothes"})).toBeDisabled();

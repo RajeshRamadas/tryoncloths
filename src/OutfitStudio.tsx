@@ -12,9 +12,9 @@ const categoryNames = { shirt: "Shirts & tops", trousers: "Trousers", shoes: "Sh
 const layerNames = { shirt: "top", trousers: "trousers", shoes: "shoes" };
 const originalNames = { shirt: "Original top", trousers: "Original bottoms", shoes: "Bare feet" };
 
-type Props = { active: boolean; catalogueEnabled?:boolean; avatarId?:string|null; openedLook?:OpenedLook; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
+type Props = { active: boolean; templateTone?:string; catalogueEnabled?:boolean; avatarId?:string|null; openedLook?:OpenedLook; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
 type Dressed = { image: string; label: string; previousLayers: Layer[]; adaptation?:Adaptation; adaptationSaved?:boolean };
-export default function OutfitStudio({ active, catalogueEnabled=false, avatarId, openedLook, profile, personalized, tryOn, onBack, onBusy }: Props) {
+export default function OutfitStudio({ active, templateTone='medium', catalogueEnabled=false, avatarId, openedLook, profile, personalized, tryOn, onBack, onBusy }: Props) {
   const catalogue = useMemo(() => sampleCatalogue(profile.id, !!personalized), [profile.id, personalized]);
   const [imports, setImports] = useState<Garment[]>([]);
   const [layers, setLayers] = useState<Layer[]>([]);
@@ -39,9 +39,9 @@ export default function OutfitStudio({ active, catalogueEnabled=false, avatarId,
   useEffect(() => { if (active) heading.current?.focus(); }, [active]);
   useEffect(() => {
     let cancelled = false;
-    baseAvatar(profile.index, personalized).then(value => { if (!cancelled) setBase(value); }).catch(e => { if (!cancelled) { setError(e.message); setRendering(false); } });
+    baseAvatar(profile.index, personalized, templateTone).then(value => { if (!cancelled) setBase(value); }).catch(e => { if (!cancelled) { setError(e.message); setRendering(false); } });
     return () => { cancelled = true; };
-  }, [profile.index, personalized]);
+  }, [profile.index, personalized, templateTone]);
   useEffect(() => {
     if (!current) return;
     let cancelled = false;

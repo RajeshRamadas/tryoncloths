@@ -1743,4 +1743,17 @@ dialog::backdrop {
 .catalogue-matches h3 { font-size:14px; }
 .store-garments p, .catalogue-save p, .saved-adaptation p { font-size:13px; overflow-wrap:anywhere; }
 .store-garments select:focus-visible { outline:3px solid #8eb89e; outline-offset:3px; }
+.template-tones { border:0; padding:0; margin:18px 0; min-width:0; }
+.template-tones legend { font-size:14px; font-weight:600; margin-bottom:10px; }
+.tone-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.tone-options button { border:1px solid #d7ded2; border-radius:10px; background:#fbfcf8; color:#294c3d; padding:10px 4px; display:flex; flex-direction:column; align-items:center; gap:6px; font:inherit; font-size:11px; cursor:pointer; }
+.tone-options button[aria-pressed="true"] { outline:2px solid #245a49; background:#edf5ee; }
+.tone-options button:focus-visible { outline:3px solid #317bca; outline-offset:3px; }
+.tone-swatch { display:block; width:27px; height:27px; border-radius:50%; border:1px solid #0002; }
+.template-tones p, .approximation-bands { font-size:12px; line-height:1.6; color:#617163; }
+.template-tones:disabled { opacity:.6; }
 @media (max-width: 480px) { .link-tryon .link-row { flex-direction: column; } }
+
+.body-library-select { display:block; color:#5c7160; font-size:12px; margin-bottom:14px; }
+.body-library-select select { display:block; width:100%; box-sizing:border-box; margin-top:7px; padding:11px; border:1px solid #ccd7cc; border-radius:8px; background:white; color:#29493c; font:inherit; }
+.body-library-select select:focus-visible { outline:3px solid #8eb89e; outline-offset:3px; }

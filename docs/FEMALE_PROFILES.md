@@ -17,8 +17,10 @@ Lightsail `.env`, then rebuild using the shared and accounts Compose files:
 cd ~/tryoncloths && git pull --ff-only origin main && cd deploy/lightsail && sudo docker compose -f compose.shared.yaml -f compose.accounts.yaml up -d --build tryon
 ```
 
-Health reports `supportedBodies`. When enabled, **Body library** appears in customer
-details. Choose Female and a body profile, then generate/review as usual. Dress,
+Health reports `supportedBodies` for AI generation. Since web 0.15, **Body library**
+is always available for template browsing/export, with six tones per profile.
+Female generation remains disabled until the pilot is enabled. Choose Female and
+a body profile, then generate/review when enabled. Dress,
 skirt, saree, lehenga and blouse join the shared garment options. Product-photo
 try-on and transparent-layer imports work; the male sample garment catalogue is
 hidden for female profiles until suitable sample assets exist.

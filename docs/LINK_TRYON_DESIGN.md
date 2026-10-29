@@ -221,3 +221,10 @@ Unit tests and the build pass (46 of 46, 9 new); browser tests and live Gemini q
 - [x] Optional headless-browser reader (off; real-site benchmark pending).
 - [x] Add tooling to compare provider outputs on matched inputs, including failures, cost and latency.
 - [ ] Run the live quality evaluation and evaluate a dedicated try-on model if garment fidelity falls short.
+
+## Web 0.15 — approximate avatar template selection
+
+The [avatar library](AVATAR_LIBRARY.md) adds 48 body/complexion combinations,
+measurement-band guidance, explicit template-tone selection and persistent
+metadata. Both libraries can be browsed without enabling female AI generation.
+Paid personalization continues to match the customer photos automatically.

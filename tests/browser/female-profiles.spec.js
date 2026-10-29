@@ -23,7 +23,10 @@ test('female library renders, exports and sends the selected garment without sho
  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:'test-results/female-outfit-mobile.png',fullPage:true});
 });
-test('male-only studio hides female library selection by default',async({page})=>{
- await page.goto('/');await expect(page.getByLabel('Body library',{exact:true})).toHaveCount(0);
- await expect(page.getByRole('img',{name:'Regular standard male avatar'}).first()).toBeVisible();
+test('male-only studio permits female template browsing while generation stays disabled',async({page})=>{
+ await page.goto('/');await page.getByLabel('Body library',{exact:true}).selectOption('female');
+ await page.getByRole('button',{name:'Continue to match'}).click();
+ await expect(page.getByText('Female personalization is not enabled on this studio',{exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Generate customer avatar',exact:true})).toBeDisabled();
+ await expect(page.getByRole('img',{name:'Regular standard female avatar'}).first()).toBeVisible();
 });

@@ -21,7 +21,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { profiles, recommendProfile } from "./profiles";
+import { profiles, recommendProfile, skinTones, approximateSelection, DEFAULT_TEMPLATE_TONE } from "./profiles";
 import { downloadAvatar, libraryForIndex, readPhoto } from "./images";
 import { isNative, capturePhoto, clearNativeExports } from "./native";
 import { requestApi } from "./api";
@@ -39,9 +39,11 @@ type ServiceState = "checking" | "available" | "unavailable" | "unauthorized";
 function AvatarImage({
   index,
   className = "",
+  templateTone = DEFAULT_TEMPLATE_TONE,
 }: {
   index: number;
   className?: string;
+  templateTone?: string;
 }) {
   return (
     <div
@@ -50,7 +52,7 @@ function AvatarImage({
       aria-label={`${profiles[index].name} standard ${profiles[index].body} avatar`}
     >
       <img
-        src={libraryForIndex(index)}
+        src={libraryForIndex(index, templateTone)}
         alt=""
         draggable={false}
         style={{ left: `${(index % 4) * -100}%` }}
@@ -207,6 +209,7 @@ export default function App() {
   const [height, setHeight] = useState("175");
   const [weight, setWeight] = useState("72");
   const [selected, setSelected] = useState("regular");
+  const [templateTone,setTemplateTone] = useState(DEFAULT_TEMPLATE_TONE);
   const [manual, setManual] = useState(false);
   const [face, setFace] = useState<string | null>(null);
   const [body, setBody] = useState<string | null>(null);
@@ -233,6 +236,8 @@ export default function App() {
   const [dialogFocus, setDialogFocus] = useState<HTMLElement | null>(null);
   const bodyType = selected.startsWith("f-") ? "female" : "male";
   const recommendation = recommendProfile(Number(height), Number(weight), bodyType);
+  const approximation = approximateSelection(Number(height), Number(weight), bodyType);
+  const bodyGenerationAllowed = bodyType === "male" || femaleEnabled;
   const profile = profiles.find((p) => p.id === selected)!;
   const validMeasurements = recommendation !== null;
   const needsCustomerGeneration = Boolean(face || body || restoredAvatar) && !personalized;
@@ -362,6 +367,7 @@ export default function App() {
     setHeight("175");
     setWeight("72");
     setSelected("regular");
+    setTemplateTone(DEFAULT_TEMPLATE_TONE);
     setManual(false);
     setStep(1);
     invalidate();
@@ -372,7 +378,7 @@ export default function App() {
     );
   }
   async function generate() {
-    if (!face || !body || !aiConsent || !consent || !provider || service !== "available" || generating || (accountState.enabled && !accountState.account)) return;
+    if (!face || !body || !aiConsent || !consent || !provider || service !== "available" || !bodyGenerationAllowed || generating || (accountState.enabled && !accountState.account)) return;
     setGenerating(true);
     setRestoredAvatar(false);
     setAvatarSource("generated");
@@ -387,7 +393,7 @@ export default function App() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ face, body, profileId: selected, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body", consentProvider: provider, ...(accountState.enabled ? {accountStorageConsent:aiConsent,avatarName} : {}) }),
+          body: JSON.stringify({ face, body, profileId: selected, templateTone, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body", consentProvider: provider, ...(accountState.enabled ? {accountStorageConsent:aiConsent,avatarName} : {}) }),
         },
         200000,
       );
@@ -424,7 +430,7 @@ export default function App() {
     setFace(null); setBody(null); setConsent(false);
     setSession(s => s + 1);
     setAvatarId(details.avatarId || null); setOpenedLook(details.look);
-    setSelected(details.profileId); setManual(true);
+    setSelected(details.profileId); setTemplateTone(details.templateTone || DEFAULT_TEMPLATE_TONE); setManual(true);
     setHeight(String(details.heightCm)); setWeight(String(details.weightKg));
     setPersonalized(image); setRestoredAvatar(true); setAvatarSource(details.source); setAvatarName(details.name);
     setStep(3);
@@ -436,7 +442,7 @@ export default function App() {
     setExporting(true); setError("");
     try {
       const save = accountState.enabled ? saveAccountAvatar : saveAvatar;
-      const saved = await save(personalized, { name: avatarName, profileId: selected, heightCm: Number(height), weightKg: Number(weight), source: avatarSource });
+      const saved = await save(personalized, { name: avatarName, profileId: selected, templateTone, heightCm: Number(height), weightKg: Number(weight), source: avatarSource });
       if (saved?.id) setAvatarId(saved.id);
       setNotice(accountState.enabled ? "Avatar saved to your store account. Sign in to this account on another browser to reopen it." : "Avatar saved on this device. Open Saved avatars next time; no generation is needed.");
     } catch (e) { setError((e as Error).message); }
@@ -450,6 +456,7 @@ export default function App() {
         profile.index,
         personalized,
         `${profile.id}${personalized ? "-personalized" : "-sample"}`,
+        templateTone,
       );
       setNotice(
         exported
@@ -477,7 +484,7 @@ export default function App() {
       <p>Generate an avatar using your face and complexion with the selected {profile.name.toLowerCase()} body.</p>
       <div className="pending-references">
         {face && <figure><img src={face} alt="Customer identity reference" /><figcaption>Customer face</figcaption></figure>}
-        <figure><AvatarImage index={profile.index} /><figcaption>{profile.name} body template</figcaption></figure>
+        <figure><AvatarImage index={profile.index} templateTone={templateTone} /><figcaption>{profile.name} body template</figcaption></figure>
       </div>
       <p className="small-footnote">These are input references, not a generated result.</p>
       {generationFailed && error && <p className="field-error">{error}</p>}
@@ -486,7 +493,7 @@ export default function App() {
       </button>
     </div>
   ) : (
-    <AvatarImage index={profile.index} />
+    <AvatarImage index={profile.index} templateTone={templateTone} />
   );
 
   return (
@@ -632,7 +639,7 @@ export default function App() {
                     <h3>Body measurements</h3>
                     <span>Approximate is okay</span>
                   </div>
-                  {(femaleEnabled || bodyType === "female") && <label>Body library<select aria-label="Body library" value={bodyType} disabled={generating || exporting} onChange={e=>{invalidate();setManual(false);setSelected(recommendProfile(Number(height),Number(weight),e.target.value) || (e.target.value === "female" ? "f-regular" : "regular"));}}><option value="male">Male</option><option value="female">Female</option></select></label>}
+                  <label className="body-library-select">Body library<select aria-label="Body library" value={bodyType} disabled={generating || exporting} onChange={e=>{invalidate();setManual(false);setSelected(recommendProfile(Number(height),Number(weight),e.target.value) || (e.target.value === "female" ? "f-regular" : "regular"));}}><option value="male">Male</option><option value="female">Female</option></select></label>
                   <div className="measurement-grid">
                     <label>
                       Height
@@ -676,7 +683,7 @@ export default function App() {
                   <div className="library-label">
                     <span>Avatar library</span>
                     <span>
-                      Adult {bodyType} · 4 profiles <ChevronDown size={13} />
+                      Adult {bodyType} · 24 combinations <ChevronDown size={13} />
                     </span>
                   </div>
                   <div className="inline-note">
@@ -741,12 +748,14 @@ export default function App() {
                     </div>
                   </div>
                   <div
-                    className={`service-note ${service === "available" ? "available" : ""}`}
+                    className={`service-note ${service === "available" && bodyGenerationAllowed ? "available" : ""}`}
                   >
                     <span className="status-dot" />
                     <div>
                       <strong>
-                        {service === "checking"
+                        {!bodyGenerationAllowed
+                          ? "Female personalization is not enabled on this studio"
+                          : service === "checking"
                           ? "Checking avatar generation…"
                           : service === "available"
                             ? "Customer avatar generation available"
@@ -755,7 +764,9 @@ export default function App() {
                               : "Customer avatar generation unavailable"}
                       </strong>
                       <p>
-                        {service === "available"
+                        {!bodyGenerationAllowed
+                          ? "You can browse and export female templates. The studio administrator must enable the female pilot before sending customer photos."
+                          : service === "available"
                           ? "One generation, then reuse the approved avatar."
                           : service === "unauthorized"
                             ? "Open Studio connection (the cloud icon at the top) and enter your store access code. Then confirm generation consent. Your photos have not been sent."
@@ -764,7 +775,7 @@ export default function App() {
                     </div>
                   </div>
                   {accountState.enabled && <div className="save-avatar-box"><label>Customer / avatar name<input maxLength={60} value={avatarName} disabled={generating || exporting} onChange={e=>setAvatarName(e.target.value)}/></label><p>{accountState.account ? `The generated avatar and measurements will be saved to ${accountState.account.name}. Original photos are not kept.` : "Sign in to a store account above before generating. Your avatar will be saved to that account."}</p></div>}
-                  {service === "available" && (
+                  {service === "available" && bodyGenerationAllowed && (
                     <label className="consent">
                       <input
                         type="checkbox"
@@ -784,6 +795,7 @@ export default function App() {
                     className="button primary full-width"
                     disabled={
                       service !== "available" ||
+                      !bodyGenerationAllowed ||
                       !face ||
                       !body ||
                       !aiConsent ||
@@ -1029,6 +1041,15 @@ export default function App() {
                 Start with a close match.
                 <br /> Adjust it together.
               </p>
+              <fieldset className="template-tones" disabled={generating || exporting}>
+                <legend>Template skin tone</legend>
+                <div className="tone-options" role="group" aria-label="Template skin tone">
+                  {skinTones.map(tone=><button key={tone.id} type="button" aria-pressed={templateTone===tone.id} aria-label={`Template tone: ${tone.name}`} onClick={()=>{
+                    if(templateTone!==tone.id){invalidate();setTemplateTone(tone.id);}
+                  }}><span className="tone-swatch" style={{backgroundColor:tone.swatch}} aria-hidden="true"/><span>{tone.name}</span></button>)}
+                </div>
+                <p>Six sample complexion ranges for each body. Personalization matches the customer’s photos automatically, not the template colour.</p>
+              </fieldset>
               <div className="profile-grid">
                 {profiles.filter(p=>p.body===bodyType).map((p) => (
                   <button
@@ -1040,7 +1061,7 @@ export default function App() {
                     onClick={() => changeProfile(p.id)}
                   >
                     <div className="profile-thumbnail">
-                      <AvatarImage index={p.index} />
+                      <AvatarImage index={p.index} templateTone={templateTone} />
                       {selected === p.id && (
                         <span className="selection-check">
                           <Check size={12} />
@@ -1062,6 +1083,7 @@ export default function App() {
                   </button>
                 ))}
               </div>
+              {approximation&&<p className="approximation-bands" aria-label="Approximate measurement bands">Entered measurements: height {approximation.heightBand.min}–{approximation.heightBand.max} cm band · weight {approximation.weightBand.min}–{approximation.weightBand.max} kg band. The suggested frame is approximate; compare it with the customer.</p>}
               <div className="recommendation">
                 <Sparkles size={16} />
                 <p>
@@ -1232,7 +1254,7 @@ export default function App() {
       </dialog>
     </div>
     </div>
-    {approved && !needsCustomerGeneration && <OutfitStudio key={`${session}-${selected}`} active={outfitOpen} catalogueEnabled={Boolean(accountState.account)} avatarId={accountState.account ? avatarId : null} openedLook={openedLook} profile={profile} personalized={personalized} tryOn={{ available: tryOnAvailable, providerLabel }} onBack={() => { setOutfitOpen(false); requestAnimationFrame(() => titleRef.current?.focus()); }} onBusy={setExporting}/>}
+    {approved && !needsCustomerGeneration && <OutfitStudio key={`${session}-${selected}-${templateTone}`} active={outfitOpen} templateTone={templateTone} catalogueEnabled={Boolean(accountState.account)} avatarId={accountState.account ? avatarId : null} openedLook={openedLook} profile={profile} personalized={personalized} tryOn={{ available: tryOnAvailable && bodyGenerationAllowed, providerLabel }} onBack={() => { setOutfitOpen(false); requestAnimationFrame(() => titleRef.current?.focus()); }} onBusy={setExporting}/>}
     </>
   );
 }

@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { FolderOpen, X } from "lucide-react";
 import { avatarDataUrl, deleteAvatar, listAvatars, readAvatarPng, type AvatarDetails, type SavedAvatar } from "./saved-avatars";
 import { listAccountAvatars, accountAvatarImage, deleteAccountAvatar, listLooks, lookImage, deleteLook, type SavedLook } from "./account-avatars";
-import { profiles, recommendProfile } from "./profiles";
+import { profiles, recommendProfile, skinTones, DEFAULT_TEMPLATE_TONE } from "./profiles";
 
 type Props = { disabled: boolean; cloud?: boolean; onUse: (image: string, details: AvatarDetails) => void };
 export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) {
@@ -17,6 +17,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [profileId, setProfileId] = useState("regular");
+  const [templateTone,setTemplateTone] = useState(DEFAULT_TEMPLATE_TONE);
   const [height, setHeight] = useState("175");
   const [weight, setWeight] = useState("72");
   async function show() {
@@ -57,7 +58,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
     setBusy(true); setError("");
     try {
       const image = await readAvatarPng(file);
-      close(); onUse(image, { name: file.name.replace(/\.png$/i, "").slice(0,60), profileId, heightCm:Number(height), weightKg:Number(weight), source:"imported" });
+      close(); onUse(image, { name: file.name.replace(/\.png$/i, "").slice(0,60), profileId, templateTone, heightCm:Number(height), weightKg:Number(weight), source:"imported" });
     } catch(e) { setError((e as Error).message); }
     finally { setBusy(false); }
   }
@@ -85,9 +86,10 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
         </div></article>)}
       </section>}
       <details className="avatar-import"><summary>Open a downloaded avatar PNG</summary><p>Choose the body profile and approximate measurements used for this full-body avatar. Importing makes no AI request and opens it for review.</p>
-        <label>Avatar body profile<select value={profileId} disabled={busy} onChange={e => setProfileId(e.target.value)}>{profiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-        <div className="measurement-grid"><label>Saved height (cm)<input type="number" min="140" max="210" value={height} disabled={busy} onChange={e => setHeight(e.target.value)}/></label><label>Saved weight (kg)<input type="number" min="35" max="200" value={weight} disabled={busy} onChange={e => setWeight(e.target.value)}/></label></div>
-        <label>Open avatar PNG<input type="file" accept="image/png" disabled={busy || !recommendProfile(Number(height), Number(weight))} onChange={e => { void importPng(e.target.files?.[0]); e.target.value = ""; }}/></label>
+        <label>Avatar body profile<select value={profileId} disabled={busy} onChange={e => setProfileId(e.target.value)}>{profiles.map(p => <option key={p.id} value={p.id}>{p.body === 'female'?'Female':'Male'} · {p.name}</option>)}</select></label>
+        <label>Saved template skin tone<select value={templateTone} disabled={busy} onChange={e=>setTemplateTone(e.target.value)}>{skinTones.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}</select></label>
+        <div className="measurement-grid"><label>Saved height (cm)<input type="number" min="140" max={profiles.find(p=>p.id===profileId)?.body==='female'?200:210} value={height} disabled={busy} onChange={e => setHeight(e.target.value)}/></label><label>Saved weight (kg)<input type="number" min="35" max="200" value={weight} disabled={busy} onChange={e => setWeight(e.target.value)}/></label></div>
+        <label>Open avatar PNG<input type="file" accept="image/png" disabled={busy || !recommendProfile(Number(height), Number(weight),profiles.find(p=>p.id===profileId)?.body)} onChange={e => { void importPng(e.target.files?.[0]); e.target.value = ""; }}/></label>
       </details>
       {error && <p role="alert" className="error-banner">{error}</p>}
       <p className="small-footnote">{cloud && !localView ? "Original customer photos are not stored. Signing out clears the active session but keeps account avatars. Deleting here removes the saved account copy, not downloaded PNGs." : "Original customer photos are never saved here. Clearing site/app data or uninstalling removes this local library. Keep a downloaded PNG as a backup."}</p>

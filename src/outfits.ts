@@ -33,8 +33,8 @@ export function sampleCatalogue(profile: string, personalized: boolean): Garment
   ] as const).map(([category, id, name]) => ({ id, name, category, source: `/garments/${id}.webp`, placement: defaultPlacement(category, profile, personalized) }));
 }
 
-export async function baseAvatar(index: number, personalized: string | null): Promise<string> {
-  return personalized || (await avatarCanvas(index)).toDataURL("image/png");
+export async function baseAvatar(index: number, personalized: string | null, templateTone='medium'): Promise<string> {
+  return personalized || (await avatarCanvas(index, templateTone)).toDataURL("image/png");
 }
 
 export async function renderOutfit(base: string, layers: Layer[]): Promise<HTMLCanvasElement> {

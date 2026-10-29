@@ -466,3 +466,19 @@ wiring; `src/GarmentCatalogue.tsx`, `src/store-garments.ts`, `src/garment-types.
 **Release checks.** Run backend tests, browser tests and the web build. Deploy using
 the existing accounts volume, then verify the catalogue on Lightsail. Live provider
 quality remains a separate check; this task does not enable pilots or build an APK.
+
+## Task 16 — male/female complexion template library
+
+Implemented in web 0.15 on `feature/avatar-complexion-library`. See
+[selection behavior, limitations, assets and deployment](AVATAR_LIBRARY.md).
+
+- Add six template skin tones across eight stable body profiles (48 variants).
+- Preserve body proportions and full-body crops; use measured eye centres for
+  each reference sheet when aligning a customer face.
+- Suggest approximate frames from height/weight and show entered measurement bands.
+- Carry tone through sample exports, outfit bases, requests and saved avatars.
+- Migrate existing records to Medium without altering image bytes.
+- Keep female template browsing available while respecting the paid pilot flag.
+- Validate all crops/references, backend routing, storage compatibility and web flows.
+
+Live provider quality and calibrated body sizing are not established by these tests.
