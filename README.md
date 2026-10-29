@@ -117,3 +117,12 @@ remains active. Neither tool makes paid AI calls. See [instructions and examples
 
 Live rollout checks remain outstanding; female profiles and the browser worker are
 still opt-in pilots. This is a web/operator-tool update; the APK is unchanged.
+
+## Web 0.14: my store clothes
+
+Save product photos, categories, links and variants to your store account, then
+select them for any customer from **My store clothes**. Duplicate photos/links
+reuse the saved garment; similar photos are suggestions for staff to confirm.
+After reviewing an adaptation, save it for automatic reuse on the exact same
+avatar and starting outfit with **no new AI charge**. Different avatars/outfits
+still need a new adaptation. See [catalogue, matching and deployment](docs/GARMENT_CATALOGUE.md).

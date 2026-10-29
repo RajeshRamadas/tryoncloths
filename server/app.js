@@ -13,6 +13,7 @@ import { geminiTryOn, garmentTypes, normalizeAvatar, TRYON_CONTRACT } from "./ge
 import { normalizeGarmentImage, LinkError } from "./product-link.js";
 
 import { readProductLinkWithFallback } from "./browser-reader.js";
+import { installGarmentRoutes } from "./garment-routes.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const maxPhotoBytes = 5 * 1024 * 1024;
@@ -138,6 +139,7 @@ export function createApp({
   app.use("/api/account", express.json({ limit: "4kb" }));
   app.use(express.json({ limit: "15mb" }));
   installAccountRoutes(app, accountStore, { production, allowSignup });
+  installGarmentRoutes(app, accountStore, { provider, model });
   app.get("/api/health", (_req, res) =>
     res.json({
       status: "ok",
@@ -147,6 +149,7 @@ export function createApp({
       personalizationContract: "customer-avatar-v4",
       storage: accountStore ? "account" : "ephemeral",
       accountsAvailable: Boolean(accountStore),
+      garmentCatalogueAvailable: Boolean(accountStore),
       profileCount: femaleEnabled ? profiles.length : 4,
       supportedBodies: femaleEnabled ? ["male","female"] : ["male"],
       tryOnAvailable: provider === "gemini" && Boolean(apiKey),
@@ -298,9 +301,11 @@ export function createApp({
   });
 
   // Garment try-on: one paid provider call, sharing the generation limits.
+  const adapting = new Set();
   app.post("/api/tryon", async (req, res) => {
     req.body ||= {};
-    if (accountStore && !accountUser(accountStore, req)) return res.status(401).json({ error: "Sign in to the store account before trying on clothes.", code: "account_required" });
+    const owner = accountUser(accountStore, req);
+    if (accountStore && !owner) return res.status(401).json({ error: "Sign in to the store account before trying on clothes.", code: "account_required" });
     if (!sameStudio(req)) return res.status(403).json({ error: "Open this workflow from the Avatar Studio app." });
     if (req.body.consent !== true || req.body.consentScope !== "avatar-and-garment" || req.body.consentProvider !== provider)
       return res.status(400).json({ error: `Customer consent to send the avatar and garment image to ${providerLabel} is required.` });
@@ -308,6 +313,17 @@ export function createApp({
     if (!["male","female"].includes(bodyType) || (bodyType === "female" && !femaleEnabled)) return res.status(400).json({error:"Choose an enabled body library."});
     if (!Object.hasOwn(garmentTypes, req.body.garmentType) || (["dress","skirt","saree","lehenga","blouse"].includes(req.body.garmentType) && bodyType !== "female"))
       return res.status(400).json({ error: "Choose what to put on: shirt, T-shirt, trousers, jeans, shoes or another listed type." });
+    let catalogueContext;
+    if (req.body.garmentId) {
+      if (!owner) return res.status(401).json({ error: "Sign in to use your store clothes.", code: "account_required" });
+      try {
+        catalogueContext = await accountStore.garments.context(owner, req.body, { provider, model });
+        const cached = accountStore.garments.cached(owner, catalogueContext);
+        if (cached) return res.json({ image: cached.image, provider, kind: "garment-tryon", garmentType: req.body.garmentType, needsReview: true, reused: true, garmentId: catalogueContext.garmentId });
+      } catch (error) {
+        return res.status(error.status || 500).json({ error: error.status ? error.message : "The saved garment could not be loaded. No generation was attempted." });
+      }
+    }
     if (provider !== "gemini" || !apiKey)
       return res.status(503).json({ error: "Clothing try-on from product images needs the Gemini provider to be configured on the studio." });
     if (inFlight >= 2) return res.status(429).json({ error: "The studio is processing another image. Please try again shortly." });
@@ -318,25 +334,48 @@ export function createApp({
       return res.status(429).json({ error: "Please wait before generating again. This pilot allows up to 20 AI attempts per hour." });
     let avatar, garment;
     try {
-      avatar = await normalizeAvatar(req.body.avatar);
+      avatar = catalogueContext?.avatar || await normalizeAvatar(req.body.avatar);
     } catch (e) {
       return res.status(400).json({ error: e.message });
     }
     try {
-      const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(typeof req.body.garment === "string" && req.body.garment.length < maxPhotoBytes * 1.4 ? req.body.garment : "");
-      if (!match) throw new Error();
-      garment = await normalizeGarmentImage(Buffer.from(match[2], "base64"));
+      if (catalogueContext) garment = await normalizeGarmentImage(Buffer.from(catalogueContext.garment.image));
+      else {
+        const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(typeof req.body.garment === "string" && req.body.garment.length < maxPhotoBytes * 1.4 ? req.body.garment : "");
+        if (!match) throw new Error();
+        garment = await normalizeGarmentImage(Buffer.from(match[2], "base64"));
+      }
     } catch {
       return res.status(400).json({ error: "Use a JPEG, PNG or WebP garment image under 5 MB and at least 160 × 160 pixels." });
+    }
+    if (catalogueContext) {
+      try {
+        // Decoding yielded to other requests. Respect deletion or an approval
+        // saved in another tab before committing to a paid call.
+        accountStore.requireAvatar(owner, catalogueContext.avatarId);
+        accountStore.garments.row(owner, catalogueContext.garmentId);
+        const cached = accountStore.garments.cached(owner, catalogueContext);
+        if (cached) return res.json({ image: cached.image, provider, kind: "garment-tryon", garmentType: req.body.garmentType, needsReview: true, reused: true, garmentId: catalogueContext.garmentId });
+      } catch (error) {
+        return res.status(error.status || 500).json({ error: error.status ? error.message : "The saved garment could not be checked. No generation was attempted." });
+      }
     }
     const latest = attempts.get(req.ip);
     if (inFlight >= 2 || (rateLimit && latest && (Date.now() - latest.last < 15000 || latest.count >= 20)))
       return res.status(429).json({ error: "Please wait before generating again." });
+    const adaptationKey = catalogueContext ? `${owner.id}:${catalogueContext.id}` : null;
+    if (adaptationKey && adapting.has(adaptationKey)) return res.status(409).json({ error: "This garment is already being adapted to this outfit. Wait for the existing request; no second generation was started." });
+    if (adaptationKey) adapting.add(adaptationKey);
     attempts.set(req.ip, { started: latest?.started || now, last: Date.now(), count: (latest?.count || 0) + 1 });
     inFlight++;
     try {
-      const image = await tryOn({ avatar, garment, garmentType: req.body.garmentType, title: req.body.title, apiKey, model });
-      res.json({ image, provider, kind: "garment-tryon", garmentType: req.body.garmentType, needsReview: true });
+      const image = await tryOn({ avatar, garment, garmentType: req.body.garmentType, title: catalogueContext?.garment.name || req.body.title, apiKey, model });
+      // A storage/receipt failure must never discard a paid image or retry AI.
+      let reuseReceipt;
+      if (catalogueContext) { try { reuseReceipt = await accountStore.garments.receipt(owner, catalogueContext, image); } catch {} }
+      res.json({ image, provider, kind: "garment-tryon", garmentType: req.body.garmentType, needsReview: true,
+        ...(catalogueContext ? { garmentId: catalogueContext.garmentId, reuseReceipt,
+          ...(!reuseReceipt ? { reuseWarning: "The image was created but cannot be saved for automatic reuse. Save it as a look instead; do not regenerate." } : {}) } : {}) });
     } catch (error) {
       const failure = providerErrorDetails(error, provider);
       console.error(JSON.stringify({ event: "tryon_provider_failure", provider, code: failure.code, providerStatus: failure.providerStatus }));
@@ -346,6 +385,7 @@ export function createApp({
       });
     } finally {
       inFlight--;
+      if (adaptationKey) adapting.delete(adaptationKey);
     }
   });
 

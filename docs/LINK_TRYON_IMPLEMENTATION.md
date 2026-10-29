@@ -434,3 +434,35 @@ conditional dedicated-provider evaluation without changing the active provider.
 - [ ] Collect and review ten independent live female cases at each stage.
 - [ ] If Gemini fidelity is inadequate, select and compare a dedicated provider on ten paired try-ons.
 - [ ] Decide on rollout or a provider adapter from the measured evidence; no candidate is selected yet.
+
+
+## Task 15 — store garment catalogue and approved adaptation reuse
+
+Implemented in web 0.14 on `feature/store-garment-catalogue`, following the user's
+approval to save garments once and reuse matching adapted results. See
+[requirements, matching rules, API and deployment](GARMENT_CATALOGUE.md).
+
+**Goal.** Store-owned product photos can be browsed for any customer; a reviewed
+result can be reused without an AI call only for its exact input context.
+
+**Files.** `server/garment-store.js`, `server/garment-routes.js`, account/application
+wiring; `src/GarmentCatalogue.tsx`, `src/store-garments.ts`, `src/garment-types.ts`,
+`src/LinkTryOn.tsx`, `src/OutfitStudio.tsx`, `src/App.tsx`, styles and tests.
+
+**Steps.**
+
+1. Add account-owned garment/link/result tables with cascade deletion and limits.
+2. Normalize and hash product photos; canonicalize URLs without discarding variants;
+   offer conservative similar-photo suggestions without automatic merging.
+3. Add authenticated same-origin catalogue and reuse endpoints. Use stored product
+   data for generation and bind cache keys to avatar/outfit pixels and model context.
+4. Issue signed output receipts, persist only after review/storage consent, and
+   preserve paid output if receipt creation fails. Prevent identical concurrent calls.
+5. Add catalogue search/filter/save/delete, link/photo matching and explicit free
+   reuse. Save the latest eligible adaptation alongside an approved complete look.
+6. Test ownership, duplicates, variants, changed inputs, consent, receipts, limits,
+   restart persistence, deletion and the real browser save/reopen workflow.
+
+**Release checks.** Run backend tests, browser tests and the web build. Deploy using
+the existing accounts volume, then verify the catalogue on Lightsail. Live provider
+quality remains a separate check; this task does not enable pilots or build an APK.

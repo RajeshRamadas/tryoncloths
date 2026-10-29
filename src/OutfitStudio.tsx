@@ -6,14 +6,15 @@ import { isNative } from "./native";
 import LinkTryOn from "./LinkTryOn";
 import { saveLook } from "./account-avatars";
 import { type OpenedLook } from "./saved-avatars";
+import { saveAdaptation, type Adaptation } from "./store-garments";
 
 const categoryNames = { shirt: "Shirts & tops", trousers: "Trousers", shoes: "Shoes" };
 const layerNames = { shirt: "top", trousers: "trousers", shoes: "shoes" };
 const originalNames = { shirt: "Original top", trousers: "Original bottoms", shoes: "Bare feet" };
 
-type Props = { active: boolean; avatarId?:string|null; openedLook?:OpenedLook; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
-type Dressed = { image: string; label: string; previousLayers: Layer[] };
-export default function OutfitStudio({ active, avatarId, openedLook, profile, personalized, tryOn, onBack, onBusy }: Props) {
+type Props = { active: boolean; catalogueEnabled?:boolean; avatarId?:string|null; openedLook?:OpenedLook; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
+type Dressed = { image: string; label: string; previousLayers: Layer[]; adaptation?:Adaptation; adaptationSaved?:boolean };
+export default function OutfitStudio({ active, catalogueEnabled=false, avatarId, openedLook, profile, personalized, tryOn, onBack, onBusy }: Props) {
   const catalogue = useMemo(() => sampleCatalogue(profile.id, !!personalized), [profile.id, personalized]);
   const [imports, setImports] = useState<Garment[]>([]);
   const [layers, setLayers] = useState<Layer[]>([]);
@@ -33,6 +34,8 @@ export default function OutfitStudio({ active, avatarId, openedLook, profile, pe
   const input = useRef<HTMLInputElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const selected = layers.find(item => item.garment.category === category);
+  const lastAdaptation=dressed.at(-1);
+  const canSaveAdaptation=Boolean(avatarId&&lastAdaptation?.adaptation?.reuseReceipt&&lastAdaptation.adaptation.garmentId&&!layers.length&&!lastAdaptation.adaptationSaved);
   useEffect(() => { if (active) heading.current?.focus(); }, [active]);
   useEffect(() => {
     let cancelled = false;
@@ -47,11 +50,11 @@ export default function OutfitStudio({ active, avatarId, openedLook, profile, pe
       .catch(e => { if (!cancelled) { setError(e.message); setRendering(false); } });
     return () => { cancelled = true; };
   }, [current, layers]);
-  function dress(image: string, label: string) {
+  function dress(image: string, label: string, adaptation?:Adaptation) {
     // Sample layers were included in the AI input, so they are now part of the image.
-    setDressed(items => [...items, { image, label, previousLayers: layers }]);
+    setDressed(items => [...items, { image, label, previousLayers: layers, adaptation }]);
     update([]);
-    setNotice("Try-on created. Check the face, body and garment before keeping this look.");
+    setNotice(adaptation?.reuseWarning || (adaptation?.reused ? "Saved adaptation reused without an AI request. Review it before keeping this look." : "Try-on created. Check the face, body and garment before keeping this look."));
   }
   function undoDress() { const previous = dressed.at(-1); if (!previous) return; setDressed(items => items.slice(0, -1)); update(previous.previousLayers); }
   function update(next: Layer[]) { setStorageConsent(false); setLayers(next); setReviewed(false); setError(""); setNotice(""); setRendering(true); }
@@ -74,9 +77,24 @@ export default function OutfitStudio({ active, avatarId, openedLook, profile, pe
       const labels = [...(openedLook && dressed.length ? openedLook.garments : []), ...dressed.slice(openedLook ? 1 : 0).map(x=>x.label), ...layers.map(x=>x.garment.name)].map(x=>x.slice(0,120));
       await saveLook(result,avatarId,lookName,labels);
       setNotice("Look saved to your store account. Open it under this avatar in Saved avatars.");
+      if(canSaveAdaptation){
+        try{await persistAdaptation();setNotice("Look and adaptation saved. This exact starting outfit and garment can now reuse the result without AI.");}
+        catch(e){setError(`The look was saved, but automatic reuse was not: ${(e as Error).message}`);}
+      }
       setStorageConsent(false);
     } catch(e) { setError((e as Error).message); }
     finally { setBusy(false); onBusy(false); }
+  }
+  async function persistAdaptation() {
+    if(!lastAdaptation?.adaptation?.garmentId||!lastAdaptation.adaptation.reuseReceipt)return;
+    await saveAdaptation(lastAdaptation.adaptation.garmentId,lastAdaptation.image,lastAdaptation.adaptation.reuseReceipt);
+    setDressed(items=>items.map(item=>item===lastAdaptation?{...item,adaptationSaved:true}:item));
+  }
+  async function keepAdaptation() {
+    if(!canSaveAdaptation||!reviewed||!storageConsent||busy||rendering)return;
+    setBusy(true);onBusy(true);setError('');
+    try{await persistAdaptation();setStorageConsent(false);setNotice('Adaptation saved for reuse. Select this garment with the same starting avatar and outfit to reuse it without AI.');}
+    catch(e){setError((e as Error).message);}finally{setBusy(false);onBusy(false);}
   }
   async function save() {
     if (!reviewed || !result || rendering || busy) return;
@@ -94,7 +112,7 @@ export default function OutfitStudio({ active, avatarId, openedLook, profile, pe
         <p className="outfit-caption">Approximate visual styling. This preview does not predict size, fit or fabric drape.</p>
       </div>
       <div className="outfit-controls">
-        <LinkTryOn bodyType={profile.id.startsWith("f-") ? "female" : "male"} base={result} disabled={busy || rendering} available={tryOn.available} providerLabel={tryOn.providerLabel} onBusy={value => { setBusy(value); onBusy(value); }} onResult={dress}/>
+        <LinkTryOn catalogueEnabled={catalogueEnabled} avatarId={avatarId} bodyType={profile.id.startsWith("f-") ? "female" : "male"} base={result} disabled={busy || rendering} available={tryOn.available} providerLabel={tryOn.providerLabel} onBusy={value => { setBusy(value); onBusy(value); }} onResult={dress}/>
         {dressed.length > 0 && <section className="outfit-panel"><h2>Wearing from product links</h2>
           <ol className="dressed-list">{dressed.map((item, index) => <li key={index}>{item.label}</li>)}</ol>
           <button className="button secondary" disabled={busy} onClick={undoDress}><Undo2 size={16}/> Undo last garment</button>
@@ -117,6 +135,8 @@ export default function OutfitStudio({ active, avatarId, openedLook, profile, pe
           {avatarId && <div className="save-avatar-box">
             <label>Look name<input maxLength={60} value={lookName} disabled={busy} onChange={e=>setLookName(e.target.value)}/></label>
             <label className="consent"><input type="checkbox" checked={storageConsent} disabled={!reviewed || busy || rendering} onChange={e=>setStorageConsent(e.target.checked)}/><span>The customer agrees to save this outfit to the store account.</span></label>
+            {canSaveAdaptation&&<button className="button secondary full-width" disabled={!reviewed||!storageConsent||busy||rendering} onClick={()=>void keepAdaptation()}>Save adaptation for reuse</button>}
+            {lastAdaptation?.adaptationSaved&&<p role="status">Adaptation saved for reuse.</p>}
             <button className="button secondary full-width" disabled={!reviewed || !storageConsent || !result || busy || rendering || !lookName.trim()} onClick={()=>void keepLook()}>Save look to account</button>
           </div>}
           <button className="button back-button full-width" disabled={busy || (!layers.length && !dressed.length)} onClick={() => { setDressed([]); update([]); }}><RotateCcw size={16}/> Reset outfit</button>
