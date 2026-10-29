@@ -1,80 +1,16 @@
 import http from "node:http";
 import https from "node:https";
-import dns from "node:dns";
-import net from "node:net";
 import zlib from "node:zlib";
 import sharp from "sharp";
+import { LinkError } from "./link-errors.js";
+import { parseProductUrl, guardedLookup } from "./public-url.js";
+export { LinkError } from "./link-errors.js";
+export { parseProductUrl, isPublicAddress } from "./public-url.js";
 
 // Reads a public product page and returns candidate garment images.
 // Every hop (including redirects) is resolved and connected through a lookup
 // that refuses private, loopback, link-local and reserved addresses, so the
 // studio cannot be used to reach its own network or cloud metadata services.
-
-export class LinkError extends Error {
-  constructor(code) {
-    super(linkMessages[code] || linkMessages.unknown);
-    this.code = Object.hasOwn(linkMessages, code) ? code : "unknown";
-  }
-}
-
-const linkMessages = {
-  invalid_url: "Paste a full product link starting with https:// or http://.",
-  blocked_address: "This link points to a private or local address and cannot be opened.",
-  site_refused: "This website didn't allow the studio to read the page. Save the product image and upload it instead.",
-  not_found: "The product page was not found. Check the link.",
-  too_large: "The product page is too large to read.",
-  timeout: "The website took too long to respond. Try again or upload the product image.",
-  network: "The studio could not reach this website. Check the link or upload the product image.",
-  no_images: "No product images were found on this page. Save the product image and upload it instead.",
-  unknown: "The product link could not be read. Upload the product image instead.",
-};
-
-const blocked = new net.BlockList();
-for (const [address, prefix] of [
-  ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8], ["169.254.0.0", 16],
-  ["172.16.0.0", 12], ["192.0.0.0", 24], ["192.0.2.0", 24], ["192.88.99.0", 24], ["192.168.0.0", 16],
-  ["198.18.0.0", 15], ["198.51.100.0", 24], ["203.0.113.0", 24], ["224.0.0.0", 4], ["240.0.0.0", 4],
-]) blocked.addSubnet(address, prefix, "ipv4");
-for (const [address, prefix] of [
-  ["::", 128], ["::1", 128], ["64:ff9b::", 96], ["100::", 64], ["2001::", 23], ["2001:db8::", 32],
-  ["2002::", 16], ["fc00::", 7], ["fe80::", 10], ["fec0::", 10], ["ff00::", 8],
-]) blocked.addSubnet(address, prefix, "ipv6");
-
-export function isPublicAddress(address) {
-  const family = net.isIP(address);
-  if (!family) return false;
-  if (family === 6) {
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(address);
-    if (mapped) return isPublicAddress(mapped[1]);
-    if (/^::ffff:/i.test(address)) return false;
-    return !blocked.check(address, "ipv6");
-  }
-  return !blocked.check(address, "ipv4");
-}
-
-export function parseProductUrl(raw) {
-  if (typeof raw !== "string" || raw.length > 2048) throw new LinkError("invalid_url");
-  let url;
-  try { url = new URL(raw.trim()); } catch { throw new LinkError("invalid_url"); }
-  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || !url.hostname)
-    throw new LinkError("invalid_url");
-  if (url.port && !["80", "443"].includes(url.port)) throw new LinkError("blocked_address");
-  const host = url.hostname.replace(/^\[|\]$/g, "");
-  if (net.isIP(host) && !isPublicAddress(host)) throw new LinkError("blocked_address");
-  if (/^(localhost|.*\.localhost|.*\.local|.*\.internal)$/i.test(host)) throw new LinkError("blocked_address");
-  url.hash = "";
-  return url;
-}
-
-function guardedLookup(hostname, options, callback) {
-  dns.lookup(hostname, { all: true, verbatim: true }, (error, addresses) => {
-    if (error) return callback(error);
-    if (!addresses.length || addresses.some(entry => !isPublicAddress(entry.address)))
-      return callback(Object.assign(new Error("Blocked address"), { code: "EBLOCKED" }));
-    if (options?.all) return callback(null, addresses);
-    callback(null, addresses[0].address, addresses[0].family);
-  });
-}
 
 const userAgent = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36 FormeStudio/1.0";
 
@@ -83,39 +19,33 @@ function requestOnce(url, { maxBytes, accept, deadline }) {
     const client = url.protocol === "https:" ? https : http;
     const remaining = deadline - Date.now();
     if (remaining <= 0) return reject(new LinkError("timeout"));
+    let response, stream, settled=false, timer;
+    const finish=(error,result)=>{
+      if(settled)return;settled=true;clearTimeout(timer);
+      if(error || result?.redirect){response?.destroy();if(stream!==response)stream?.destroy();req.destroy();}
+      if(error)reject(error);else resolve(result);
+    };
     const req = client.request(url, {
-      method: "GET",
-      lookup: guardedLookup,
+      method: "GET", lookup: guardedLookup,
       headers: { "User-Agent": userAgent, Accept: accept, "Accept-Language": "en-IN,en;q=0.9", "Accept-Encoding": "gzip, deflate, br" },
-      timeout: remaining,
     }, res => {
-      const status = res.statusCode || 0;
-      if (status >= 300 && status < 400 && res.headers.location) {
-        res.resume();
-        return resolve({ redirect: res.headers.location });
-      }
-      if (status === 404 || status === 410) { res.resume(); return reject(new LinkError("not_found")); }
-      if (status < 200 || status >= 300) { res.resume(); return reject(new LinkError("site_refused")); }
-      const declared = Number(res.headers["content-length"]);
-      if (declared > maxBytes) { res.destroy(); return reject(new LinkError("too_large")); }
-      const encoding = String(res.headers["content-encoding"] || "").toLowerCase();
-      const stream = encoding === "gzip" ? res.pipe(zlib.createGunzip())
-        : encoding === "deflate" ? res.pipe(zlib.createInflate())
-        : encoding === "br" ? res.pipe(zlib.createBrotliDecompress()) : res;
-      const chunks = [];
-      let size = 0;
-      stream.on("data", chunk => {
-        size += chunk.length;
-        if (size > maxBytes) { res.destroy(); stream.destroy?.(); reject(new LinkError("too_large")); return; }
-        chunks.push(chunk);
-      });
-      stream.on("end", () => resolve({ body: Buffer.concat(chunks), type: String(res.headers["content-type"] || "").toLowerCase() }));
-      stream.on("error", () => reject(new LinkError("network")));
+      response=res;
+      const status=res.statusCode||0;
+      if(status>=300&&status<400&&res.headers.location)return finish(null,{redirect:res.headers.location});
+      if(status===404||status===410)return finish(new LinkError("not_found"));
+      if(status<200||status>=300)return finish(new LinkError("site_refused"));
+      if(Number(res.headers["content-length"])>maxBytes)return finish(new LinkError("too_large"));
+      res.on("error",()=>finish(new LinkError("network")));
+      const encoding=String(res.headers["content-encoding"]||"").toLowerCase();
+      stream=encoding==="gzip"?res.pipe(zlib.createGunzip()):encoding==="deflate"?res.pipe(zlib.createInflate()):encoding==="br"?res.pipe(zlib.createBrotliDecompress()):res;
+      const chunks=[];let size=0;
+      stream.on("data",chunk=>{size+=chunk.length;if(size>maxBytes)return finish(new LinkError("too_large"));chunks.push(chunk);});
+      stream.on("end",()=>finish(null,{body:Buffer.concat(chunks),type:String(res.headers["content-type"]||"").toLowerCase()}));
+      stream.on("error",()=>finish(new LinkError("network")));
     });
-    req.on("timeout", () => req.destroy(new LinkError("timeout")));
-    req.on("error", error => reject(error instanceof LinkError ? error
-      : error.code === "EBLOCKED" ? new LinkError("blocked_address")
-      : new LinkError("network")));
+    // Absolute deadline covers DNS and slow-drip bodies, not just idle sockets.
+    timer=setTimeout(()=>finish(new LinkError("timeout")),remaining);
+    req.on("error",error=>finish(error instanceof LinkError?error:new LinkError(error.code==="EBLOCKED"?"blocked_address":"network")));
     req.end();
   });
 }

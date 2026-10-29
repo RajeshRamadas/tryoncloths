@@ -10,7 +10,9 @@ import { geminiPersonalize, GEMINI_REFERENCE_VERSION } from "./gemini.js";
 import { providerConfig } from "./provider-config.js";
 import { installAccountRoutes, accountUser } from "./accounts.js";
 import { geminiTryOn, garmentTypes, normalizeAvatar, TRYON_CONTRACT } from "./gemini-tryon.js";
-import { readProductLink, normalizeGarmentImage, LinkError } from "./product-link.js";
+import { normalizeGarmentImage, LinkError } from "./product-link.js";
+
+import { readProductLinkWithFallback } from "./browser-reader.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const maxPhotoBytes = 5 * 1024 * 1024;
@@ -82,7 +84,7 @@ export function createApp({
   allowSignup = true,
   femaleEnabled = process.env.TRYON_FEMALE_PROFILES === "true",
   tryOn = geminiTryOn,
-  productLink = readProductLink,
+  productLink = readProductLinkWithFallback,
 } = {}) {
   const providerLabel = providerConfig(provider).label;
   if (!["auto", "protected", "public"].includes(accessMode))

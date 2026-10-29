@@ -101,3 +101,7 @@ Version 0.6 includes **Try clothes** after avatar approval: independent tops/tro
 **Web 0.8:** enable [store accounts](docs/STORE_ACCOUNTS.md), create a store account and sign in before generating. With customer consent, generated avatars save automatically to that account. Sign in from another browser, open **Saved avatars**, choose the customer and use **Try clothes** without another generation. Older local avatars and downloaded PNGs can be opened, reviewed and explicitly saved to the account. The deployment needs the account Compose override and persistent volume described in the guide.
 
 The existing Android APK remains 0.7.0; no APK was built for this web release. Without account storage enabled, the [local library](docs/SAVED_AVATARS.md) remains available on the same browser/app.
+
+## Web 0.12 updates
+
+Reviewed outfits can be saved under customer avatars and reopened from the store account. Undo restores previous sample layers, and failed try-on requests require fresh consent. The [female body library](docs/FEMALE_PROFILES.md) and [isolated browser reader](docs/BROWSER_LINK_READER.md) are optional pilots, disabled by default pending live validation. No Android APK was rebuilt.

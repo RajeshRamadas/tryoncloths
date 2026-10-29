@@ -2,6 +2,17 @@
 
 As of 2026-10-29 · Rajesh Ramadas
 
+## Current implementation status — web 0.12
+
+The v0.9 link feature and its undo/consent corrections are merged. Saved looks
+(FR-14) are implemented and enabled with account storage. Female profiles and the
+isolated browser reader are implemented as opt-in pilots; both remain disabled by
+default pending the specified live visual review and 20-product-link benchmark.
+See [female rollout](FEMALE_PROFILES.md) and [browser-reader rollout](BROWSER_LINK_READER.md).
+Final automated validation: 57 backend tests, 49 browser tests, production build,
+and the isolated container's private-network blocking checks passed. No APK built.
+The original requirements and initial validation snapshot below document v0.9.
+
 ## Overview
 
 Store staff can dress a customer's saved avatar in a garment from any clothing website by pasting its product link, choosing the photo and saying what to put on; one Gemini request produces the try-on. The feature ships in Forme web **0.9.0** on branch `feature/link-tryon` ([PR #1](https://github.com/RajeshRamadas/tryoncloths/pull/1)), merged into main; live provider validation remains outstanding.
@@ -203,6 +214,6 @@ Unit tests and the build pass (46 of 46, 9 new); browser tests and live Gemini q
 ### Next steps
 
 - [x] Save try-on looks to the store account (FR-14).
-- [ ] Add female standard bodies.
-- [ ] Optional headless-browser reader for script-rendered product pages.
+- [x] Add female standard bodies (pilot flag off; live review pending).
+- [x] Optional headless-browser reader (off; real-site benchmark pending).
 - [ ] Evaluate a dedicated try-on model as a provider option if garment fidelity falls short.

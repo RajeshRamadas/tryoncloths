@@ -13,3 +13,5 @@
 !deploy/
 !deploy/lightsail/
 !deploy/lightsail/Dockerfile
+!deploy/browser-reader/
+!deploy/browser-reader/**

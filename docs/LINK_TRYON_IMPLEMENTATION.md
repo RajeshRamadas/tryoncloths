@@ -4,7 +4,7 @@ As of 2026-10-29 · Rajesh Ramadas
 
 ## How to use this guide
 
-Give a coding LLM (Claude Code or similar) one task at a time, in order; each task lists the goal, files, steps and acceptance checks, and the prompt template below wraps them. Tasks 1–9 match what [PR #1](https://github.com/RajeshRamadas/tryoncloths/pull/1) built and can be used to rebuild or extend it; task 10 is now implemented; task 11 is implemented behind a pilot flag; task 12 remains optional. Requirements and design: [`LINK_TRYON_DESIGN.md`](LINK_TRYON_DESIGN.md).
+Give a coding LLM (Claude Code or similar) one task at a time, in order; each task lists the goal, files, steps and acceptance checks, and the prompt template below wraps them. Tasks 1–9 match what [PR #1](https://github.com/RajeshRamadas/tryoncloths/pull/1) built and can be used to rebuild or extend it; task 10 is now implemented; task 11 is implemented behind a pilot flag; task 12 is implemented as an optional isolated service, disabled by default. Requirements and design: [`LINK_TRYON_DESIGN.md`](LINK_TRYON_DESIGN.md).
 
 ### Repo context to give the LLM first
 
@@ -350,6 +350,8 @@ Implemented in web 0.11 on `feature/female-body-profiles`; disabled by default p
 - [ ] Live review of 10+ female avatars and try-ons before release.
 
 ### Task 12 — headless reader for script-rendered pages (optional)
+
+Implemented in web 0.12 on `feature/isolated-browser-link-reader`. See [setup and validation limits](BROWSER_LINK_READER.md). Real-shop benchmarking remains a rollout prerequisite.
 
 **Goal.** Read product pages whose images load only through JavaScript, without weakening network safety.
 
