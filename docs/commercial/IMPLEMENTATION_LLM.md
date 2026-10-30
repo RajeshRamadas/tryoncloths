@@ -136,9 +136,12 @@ See [user sessions and migration](../USER_SESSIONS.md).
 
 **Acceptance.**
 
-- [ ] Expired, reused or tampered invite tokens fail.
-- [ ] Manager cannot invite an owner or manage another store.
-- [ ] Disabling a user ends their session on the next request.
+- [x] Expired, reused or tampered invite tokens fail.
+- [x] Manager cannot invite an owner or manage another store.
+- [x] Disabling a user ends their session on the next request.
+
+**Implemented:** `0.16.0-alpha.3`, branch `feature/commercial-staff-invites`.
+See [staff invitations, SMTP setup and safeguards](../STAFF_INVITES.md).
 
 ### Task C4 — credit ledger and metering
 

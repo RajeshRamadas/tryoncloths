@@ -6,6 +6,9 @@ services:
       TRYON_DATA_DIR: /app/data
       TRYON_FEMALE_PROFILES: ${TRYON_FEMALE_PROFILES:-false}
       TRYON_TRUST_PROXY_HOPS: "1"
+      TRYON_PUBLIC_URL: ${TRYON_PUBLIC_URL:-}
+      SMTP_URL: ${SMTP_URL:-}
+      SMTP_FROM: ${SMTP_FROM:-}
       TRYON_ALLOW_SIGNUP: ${TRYON_ALLOW_SIGNUP:-true}
     volumes:
       - tryon_accounts:/app/data
