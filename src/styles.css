@@ -1757,3 +1757,14 @@ dialog::backdrop {
 .body-library-select { display:block; color:#5c7160; font-size:12px; margin-bottom:14px; }
 .body-library-select select { display:block; width:100%; box-sizing:border-box; margin-top:7px; padding:11px; border:1px solid #ccd7cc; border-radius:8px; background:white; color:#29493c; font:inherit; }
 .body-library-select select:focus-visible { outline:3px solid #8eb89e; outline-offset:3px; }
+
+.staff-management { width:100%; min-width:0; border-top:1px solid #c8d7c7; padding-top:20px; }
+.staff-management select, .store-account select { display:block; max-width:100%; padding:10px; margin-top:6px; background:white; border:1px solid #c8d7c7; border-radius:8px; }
+.staff-list { list-style:none; margin:20px 0 0; padding:0; }
+.staff-list li { display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; border-top:1px solid #d5e1d4; padding:16px 0; overflow-wrap:anywhere; }
+.staff-actions { display:flex; flex-wrap:wrap; align-items:end; gap:12px; }
+.invite-page { box-sizing:border-box; max-width:600px; margin:40px auto; padding:24px; }
+.invite-page p { line-height:1.7; }
+.invite-page form { display:grid; gap:18px; }
+.invite-page label { display:grid; gap:8px; }
+.invite-page input { box-sizing:border-box; width:100%; padding:12px; border:1px solid #c8d7c7; border-radius:8px; }

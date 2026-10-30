@@ -1,6 +1,6 @@
 {
   "name": "tryoncloths",
-  "version": "0.16.0-alpha.2",
+  "version": "0.16.0-alpha.3",
   "private": true,
   "type": "module",
   "engines": {
@@ -35,6 +35,7 @@
     "@vladmandic/face-api": "1.7.15",
     "express": "^5.1.0",
     "lucide-react": "^0.468.0",
+    "nodemailer": "^10.3.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "sharp": "^0.34.0"

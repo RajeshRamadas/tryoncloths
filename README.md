@@ -129,9 +129,11 @@ still need a new adaptation. See [catalogue, matching and deployment](docs/GARME
 
 ## Commercial foundation
 
-Web `0.16.0-alpha.2` adds [C2 user sessions and store roles](docs/USER_SESSIONS.md)
-on top of the [C1 tenancy migration](docs/TENANCY_MIGRATION.md). Existing owners
+Web `0.16.0-alpha.3` adds [C3 staff invitations and management](docs/STAFF_INVITES.md)
+with SMTP delivery, invite acceptance, role changes and immediate disabling,
+building on [C2 user sessions and store roles](docs/USER_SESSIONS.md)
+and the [C1 tenancy migration](docs/TENANCY_MIGRATION.md). Existing owners
 keep their login and saved data. Authentication now uses individual users, with
-membership-checked store switching and a staff name/role display. Staff invitations
-and management follow in C3.
+membership-checked store switching and a staff name/role display. Owners and
+managers can open **Staff**; invitation emails require server SMTP configuration.
 Billing and the rest of R1 are not enabled by this foundation update.
