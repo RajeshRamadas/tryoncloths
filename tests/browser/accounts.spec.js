@@ -74,3 +74,41 @@ test("web store accounts automatically save generated avatars and reopen them in
   expect(generations).toBe(1);
  } finally {await other.close();await new Promise(r=>server.close(r));store.close();await rm(directory,{recursive:true,force:true});}
 });
+
+test("staff can switch member stores and the previous customer's preview is cleared",async({page})=>{
+ const directory=await mkdtemp(path.join(os.tmpdir(),"forme-switch-browser-"));
+ const store=new AccountStore(directory);
+ const credentials={email:"switch@example.test",name:"Alpha store",password:"test-password-very-long"};
+ const owner=await store.register(credentials);
+ const branch=await store.register({...credentials,email:"branch@example.test",name:"Beta store"});
+ store.db.prepare("INSERT INTO memberships VALUES(?,?,'manager')").run(owner.user.id,branch.id);
+ const image=`data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;
+ await store.save(owner,{image,name:"Alpha customer",profileId:"regular",heightCm:175,weightKg:72,source:"imported"});
+ const server=createApp({accountStore:store,accessMode:"public",rateLimit:false}).listen(0,"127.0.0.1");
+ await new Promise(r=>server.once("listening",r));
+ const api=`http://127.0.0.1:${server.address().port}`;
+ try {
+  await page.route("**/api/**",async r=>{const u=new URL(r.request().url());const response=await r.fetch({url:api+u.pathname+u.search,headers:{...r.request().headers(),host:new URL(api).host,origin:api}});await r.fulfill({response});});
+  await page.goto("/");
+  await page.getByLabel("Account email").fill(credentials.email);
+  await page.getByLabel("Account password").fill(credentials.password);
+  await page.getByRole("button",{name:"Sign in",exact:true}).click();
+  await expect(page.getByLabel("Active store")).toHaveValue(owner.id);
+  await page.getByRole("button",{name:"Saved avatars",exact:true}).click();
+  await page.getByRole("button",{name:"Use Alpha customer",exact:true}).click();
+  await expect(page.getByAltText("Customer’s personalized avatar, awaiting visual review")).toBeVisible();
+  await page.getByLabel("Active store").selectOption(branch.id);
+  await expect(page.getByRole("region",{name:"Store account"})).toContainText("manager");
+  await expect(page.getByAltText("Customer’s personalized avatar, awaiting visual review")).toHaveCount(0);
+  await page.getByRole("button",{name:"Saved avatars",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Use Alpha customer",exact:true})).toHaveCount(0);
+  await page.getByRole("button",{name:"Close saved avatars"}).click();
+  await page.reload();await expect(page.getByLabel("Active store")).toHaveValue(branch.id);
+  await page.getByLabel("Active store").selectOption(owner.id);
+  await page.getByRole("button",{name:"Saved avatars",exact:true}).click();
+  await expect(page.getByRole("button",{name:"Use Alpha customer",exact:true})).toBeVisible();
+  await page.getByRole("button",{name:"Close saved avatars"}).click();
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ } finally {await new Promise(r=>server.close(r));store.close();await rm(directory,{recursive:true,force:true});}
+});

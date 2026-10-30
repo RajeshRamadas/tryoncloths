@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import sharp from "sharp";
 import { profiles, recommendProfile, validTemplateTone, DEFAULT_TEMPLATE_TONE } from "../src/profiles.js";
 import { GarmentStore } from "./garment-store.js";
-import { migrateTenancy } from "./tenancy.js";
+import { migrateTenancy, migrateUserSessions, storesForUser, storeMembership, requireRole } from "./tenancy.js";
 const scrypt = promisify(scryptCallback);
 const digest = value => createHash("sha256").update(value).digest("hex");
 const cookieName = "forme_session";
@@ -43,7 +43,7 @@ export class AccountStore {
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     this.garments = new GarmentStore(this);
-    try { migrateTenancy(this.db); }
+    try { migrateTenancy(this.db); migrateUserSessions(this.db); }
     catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
@@ -57,36 +57,85 @@ export class AccountStore {
     const salt = randomBytes(16).toString("hex");
     const password = await scrypt(input.password, salt, 64);
     const account = { id: randomBytes(16).toString("hex"), email, name };
-    try { this.db.prepare("INSERT INTO accounts VALUES(?,?,?,?,?)").run(account.id,email,name,salt,password); }
-    catch (e) { if (e.code?.includes("SQLITE_CONSTRAINT") || e.message?.includes("UNIQUE")) throw error("This email is already registered. Sign in to its store account.",409); throw e; }
-    return account;
+    try {
+      this.db.exec("BEGIN IMMEDIATE");
+      if (this.db.prepare("SELECT 1 FROM users WHERE email=?").get(email)) throw error("This email is already registered. Sign in to its store account.",409);
+      const org = randomBytes(16).toString("hex"), user = randomBytes(16).toString("hex");
+      this.db.prepare("INSERT INTO accounts VALUES(?,?,?,?,?)").run(account.id,email,name,salt,password);
+      this.db.prepare("INSERT INTO orgs(id,name,billingEmail,plan,status,createdAt) VALUES(?,?,?,'pilot','active',?)").run(org,name,email,Date.now());
+      this.db.prepare("INSERT INTO stores(id,org,name) VALUES(?,?,?)").run(account.id,org,name);
+      this.db.prepare("INSERT INTO users(id,email,name,salt,password,createdAt) VALUES(?,?,?,?,?,?)").run(user,email,name,salt,password,Date.now());
+      this.db.prepare("INSERT INTO memberships VALUES(?,?,'owner')").run(user,account.id);
+      this.db.exec("COMMIT");
+      return this.identity(user,account.id);
+    }
+    catch (e) { this.db.exec("ROLLBACK"); if (e.code?.includes("SQLITE_CONSTRAINT") || e.message?.includes("UNIQUE")) throw error("This email is already registered. Sign in to its store account.",409); throw e; }
   }
   async login(input) {
-    const row = this.db.prepare("SELECT * FROM accounts WHERE email=?").get(emailValue(input.email));
+    const row = this.db.prepare("SELECT * FROM users WHERE email=?").get(emailValue(input.email));
     const password = typeof input.password === "string" && input.password.length <= 128 ? input.password : "";
-    // Hash even unknown accounts to avoid a cheap account-existence timing test.
     const hash = await scrypt(password, row?.salt || "forme-missing-account", 64);
-    if (!row || !timingSafeEqual(hash, Buffer.from(row.password))) throw error("Email or password is incorrect.",401);
-    return { id: row.id, email: row.email, name: row.name };
+    if (!row || row.disabled || !timingSafeEqual(hash, Buffer.from(row.password))) throw error("Email or password is incorrect.",401);
+    const membership = storesForUser(this.db,row.id)[0];
+    if (!membership) throw error("No store access is available for this user.",403);
+    return this.identity(row.id,membership.id);
+  }
+  identity(userId, storeId) {
+    const membership = storeMembership(this.db,userId,storeId);
+    if (!membership) return null;
+    const user = this.db.prepare("SELECT id,name,email FROM users WHERE id=? AND disabled=0").get(userId);
+    return {id:membership.id,name:membership.name,email:user.email,
+      user:{id:user.id,name:user.name,role:membership.role},org:membership.org};
   }
   session(account) {
+    const identity = this.identity(account.user?.id,account.id);
+    if (!identity) throw error("Store access is no longer available.",403);
     const token = randomBytes(32).toString("hex");
     this.db.prepare("DELETE FROM sessions WHERE expires <= ?").run(Date.now());
-    this.db.prepare("INSERT INTO sessions VALUES(?,?,?)").run(digest(token),account.id,Date.now()+lifetime);
+    this.db.prepare("INSERT INTO sessions(token,account,expires,user,store) VALUES(?,?,?,?,?)")
+      .run(digest(token),identity.id,Date.now()+lifetime,identity.user.id,identity.id);
     return token;
   }
   user(token) {
-    return this.db.prepare("SELECT a.id,a.email,a.name FROM sessions s JOIN accounts a ON a.id=s.account WHERE s.token=? AND s.expires>?").get(digest(token),Date.now()) || null;
+    const session = this.db.prepare("SELECT * FROM sessions WHERE token=? AND expires>?").get(digest(token),Date.now());
+    if (!session) return null;
+    if (!session.user && !session.store) {
+      const owner = this.db.prepare(`SELECT u.id FROM users u JOIN accounts a ON a.email=u.email
+        JOIN memberships m ON m.user=u.id AND m.store=a.id
+        WHERE a.id=? AND m.role='owner' AND u.disabled=0`).get(session.account);
+      if (!owner) return null;
+      this.db.prepare("UPDATE sessions SET user=?,store=? WHERE token=? AND user IS NULL AND store IS NULL")
+        .run(owner.id,session.account,session.token);
+      session.user=owner.id; session.store=session.account;
+    }
+    return this.identity(session.user,session.store);
+  }
+  switchStore(token, storeId) {
+    const current = this.user(token);
+    if (!current) throw error("Sign in to your store account.",401);
+    if (typeof storeId !== "string") throw error("Choose a store.");
+    const next = this.identity(current.user.id,storeId);
+    if (!next) throw error("You do not have access to this store.",403);
+    this.db.prepare("UPDATE sessions SET store=?,account=? WHERE token=?").run(storeId,storeId,digest(token));
+    return next;
   }
   logout(token) { this.db.prepare("DELETE FROM sessions WHERE token=?").run(digest(token)); }
   async resetPassword(email, password) {
     if (typeof password !== "string" || password.length < 12 || password.length > 128) throw error("Use a password between 12 and 128 characters.");
-    const account = this.db.prepare("SELECT id FROM accounts WHERE email=?").get(emailValue(email));
-    if (!account) throw error("Account not found.",404);
+    const user = this.db.prepare("SELECT id FROM users WHERE email=?").get(emailValue(email));
+    if (!user) throw error("Account not found.",404);
     const salt = randomBytes(16).toString("hex"), hash = await scrypt(password,salt,64);
-    this.db.prepare("UPDATE accounts SET salt=?,password=? WHERE id=?").run(salt,hash,account.id);
-    this.db.prepare("DELETE FROM sessions WHERE account=?").run(account.id);
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db.prepare("UPDATE users SET salt=?,password=? WHERE id=?").run(salt,hash,user.id);
+      this.db.prepare("UPDATE accounts SET salt=?,password=? WHERE email=?").run(salt,hash,emailValue(email));
+      this.db.prepare(`DELETE FROM sessions WHERE user=? OR (user IS NULL AND account IN
+        (SELECT a.id FROM accounts a JOIN memberships m ON m.store=a.id
+          WHERE a.email=? AND m.user=? AND m.role='owner'))`).run(user.id,emailValue(email),user.id);
+      this.db.exec("COMMIT");
+    } catch (e) { this.db.exec("ROLLBACK"); throw e; }
   }
+
   async save(account, input) {
     const { profileId, heightCm, weightKg } = input;
     const templateTone = input.templateTone ?? DEFAULT_TEMPLATE_TONE;
@@ -144,7 +193,9 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
     return res.status(403).json({error:"Open account actions from this studio website."});
   };
   const requireUser = (req,res,next) => { req.account=accountUser(store,req); if(!req.account)return res.status(401).json({error:"Sign in to your store account."}); next(); };
-  app.get("/api/account",wrap((req,res)=>res.json({enabled:Boolean(store),signupAllowed:Boolean(store&&allowSignup),account:accountUser(store,req)})));
+  const response = account => ({account,user:account?.user || null,role:account?.user.role || null,
+    stores:account ? storesForUser(store.db,account.user.id) : []});
+  app.get("/api/account",wrap((req,res)=>res.json({enabled:Boolean(store),signupAllowed:Boolean(store&&allowSignup),...response(accountUser(store,req))})));
   if(!store) return;
   for(const action of ["register","login"])app.post(`/api/account/${action}`,sameOrigin,wrap(async(req,res)=>{
     const key=`${action}:${req.ip}`, now=Date.now();
@@ -157,8 +208,11 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
     try {
       const account=await store[action](req.body || {});
       store.logout(token(req)); cookie(res,store.session(account));
-      res.json({account});
+      res.json(response(account));
     } finally { hashes--; }
+  }));
+  app.post("/api/auth/switch-store",sameOrigin,requireUser,requireRole("owner","manager","staff"),wrap((req,res)=>{
+    res.json(response(store.switchStore(token(req),req.body?.storeId)));
   }));
   app.post("/api/account/logout",sameOrigin,wrap((req,res)=>{ store.logout(token(req)); cookie(res,"",0);res.json({ok:true}); }));
   app.get("/api/looks",requireUser,wrap((req,res)=>res.json({looks:store.listLooks(req.account,req.query.avatar)})));

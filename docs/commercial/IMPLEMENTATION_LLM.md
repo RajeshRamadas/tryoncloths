@@ -112,9 +112,12 @@ legacy credential updates and provision new users atomically before switching au
 
 **Acceptance.**
 
-- [ ] Pilot owner can log in with the old email/password and sees the same avatars, looks and catalogue.
-- [ ] A user without a membership on store B gets 403 on switch to B.
-- [ ] Role-matrix tests for `switch-store` pass.
+- [x] Pilot owner can log in with the old email/password and sees the same avatars, looks and catalogue.
+- [x] A user without a membership on store B gets 403 on switch to B.
+- [x] Role-matrix tests for `switch-store` pass.
+
+**Implemented:** `0.16.0-alpha.2`, branch `feature/commercial-user-sessions`.
+See [user sessions and migration](../USER_SESSIONS.md).
 
 ### Task C3 — staff invites and email
 

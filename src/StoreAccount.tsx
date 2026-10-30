@@ -1,25 +1,32 @@
 import { useEffect, useState } from "react";
 import { requestApi } from "./api";
-export type StoreUser = { id: string; name: string; email: string };
+export type StoreUser = { id: string; name: string; email: string; user?: {id:string; name:string; role:string}; org?:string };
+type StoreChoice = {id:string; name:string; role:string};
 export type AccountState = { enabled: boolean; account: StoreUser | null };
 export default function StoreAccount({disabled,available,onChange}:{disabled:boolean;available:boolean;onChange:(state:AccountState)=>void}) {
   const [state,setState]=useState<AccountState>({enabled:false,account:null});
+  const [stores,setStores]=useState<StoreChoice[]>([]);
   const [signupAllowed,setSignupAllowed]=useState(true);
   const [register,setRegister]=useState(false);
   const [email,setEmail]=useState(""); const [name,setName]=useState(""); const [password,setPassword]=useState("");
   const [busy,setBusy]=useState(false); const [error,setError]=useState("");
   function update(next:AccountState){setState(next);onChange(next);}
-  useEffect(()=>{let cancelled=false;requestApi("/api/account").then(async r=>{if(!r.ok)return;const data=await r.json();if(!cancelled){setSignupAllowed(data.signupAllowed!==false);update({enabled:data.enabled===true,account:data.account||null});}}).catch(()=>{});return()=>{cancelled=true;};},[]);
+  useEffect(()=>{let cancelled=false;requestApi("/api/account").then(async r=>{if(!r.ok)return;const data=await r.json();if(!cancelled){setSignupAllowed(data.signupAllowed!==false);setStores(data.stores || []);update({enabled:data.enabled===true,account:data.account||null});}}).catch(()=>{});return()=>{cancelled=true;};},[]);
   useEffect(()=>{const expired=()=>update({enabled:true,account:null});window.addEventListener("forme-account-expired",expired);return()=>window.removeEventListener("forme-account-expired",expired);},[]);
   async function submit(){
     setBusy(true);setError("");
-    try{const r=await requestApi(`/api/account/${register?"register":"login"}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password,name})},20000);const data=await r.json();if(!r.ok)throw new Error(data.error);setPassword("");update({enabled:true,account:data.account});}
+    try{const r=await requestApi(`/api/account/${register?"register":"login"}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password,name})},20000);const data=await r.json();if(!r.ok)throw new Error(data.error);setPassword("");setStores(data.stores || []);update({enabled:true,account:data.account});}
+    catch(e){setError((e as Error).message);}finally{setBusy(false);}
+  }
+  async function switchStore(storeId:string){
+    setBusy(true);setError("");
+    try{const r=await requestApi("/api/auth/switch-store",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({storeId})});const data=await r.json();if(!r.ok)throw new Error(data.error);setStores(data.stores || []);update({enabled:true,account:data.account});}
     catch(e){setError((e as Error).message);}finally{setBusy(false);}
   }
   async function logout(){setBusy(true);setError("");try{const r=await requestApi("/api/account/logout",{method:"POST"});if(!r.ok)throw new Error("Sign out failed. Please try again.");update({enabled:true,account:null});setPassword("");}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
   if(!state.enabled&&!available)return null;
   return <section className="store-account" aria-label="Store account">
-    {state.account?<><div><strong>{state.account.name}</strong><p>{state.account.email} · Avatars saved to this store account</p></div><button className="button secondary" disabled={disabled||busy} onClick={()=>void logout()}>Sign out</button></>:<>
+    {state.account?<><div><strong>{state.account.name}</strong><p>{state.account.user ? `${state.account.user.name} · ${state.account.user.role} · ` : ""}{state.account.email} · Avatars saved to this store account</p>{stores.length>1&&<label>Active store<select value={state.account.id} disabled={disabled||busy} onChange={e=>void switchStore(e.target.value)}>{stores.map(store=><option key={store.id} value={store.id}>{store.name} · {store.role}</option>)}</select></label>}</div><button className="button secondary" disabled={disabled||busy} onClick={()=>void logout()}>Sign out</button></>:<>
       <div><h2>{register?"Create your store account":"Sign in to your store"}</h2><p>Generate once. Reopen your customer avatars from any browser signed in to this account.</p></div>
       <form onSubmit={e=>{e.preventDefault();void submit();}}>
         {register&&<label>Store name<input autoComplete="organization" required maxLength={80} value={name} disabled={disabled||busy} onChange={e=>setName(e.target.value)}/></label>}

@@ -129,7 +129,9 @@ still need a new adaptation. See [catalogue, matching and deployment](docs/GARME
 
 ## Commercial foundation
 
-Web `0.16.0-alpha.1` adds the [C1 tenancy migration](docs/TENANCY_MIGRATION.md).
-Existing accounts become organisations, stores and owner users on startup. Current
-logins and saved data remain in use; staff login and store switching are next (C2).
+Web `0.16.0-alpha.2` adds [C2 user sessions and store roles](docs/USER_SESSIONS.md)
+on top of the [C1 tenancy migration](docs/TENANCY_MIGRATION.md). Existing owners
+keep their login and saved data. Authentication now uses individual users, with
+membership-checked store switching and a staff name/role display. Staff invitations
+and management follow in C3.
 Billing and the rest of R1 are not enabled by this foundation update.

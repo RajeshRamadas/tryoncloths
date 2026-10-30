@@ -77,3 +77,33 @@ export function storeMembership(db, userId, storeId) {
     FROM memberships m JOIN stores s ON s.id=m.store JOIN users u ON u.id=m.user
     WHERE m.user=? AND m.store=? AND u.disabled=0`).get(userId, storeId) || null;
 }
+
+// Reconcile passwords changed while C1 still used accounts, exactly once.
+// Subsequent starts must never overwrite user credentials from legacy rows.
+export function migrateUserSessions(db) {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec('CREATE TABLE IF NOT EXISTS auth_migrations (version TEXT PRIMARY KEY)');
+    const columns = new Set(db.prepare('PRAGMA table_info(sessions)').all().map(c => c.name));
+    if (!columns.has('user')) db.exec('ALTER TABLE sessions ADD COLUMN user TEXT REFERENCES users(id) ON DELETE CASCADE');
+    if (!columns.has('store')) db.exec('ALTER TABLE sessions ADD COLUMN store TEXT REFERENCES stores(id) ON DELETE CASCADE');
+    if (!db.prepare("SELECT 1 FROM auth_migrations WHERE version='c2'").get()) {
+      db.exec(`UPDATE users SET
+        salt=(SELECT a.salt FROM accounts a WHERE a.email=users.email),
+        password=(SELECT a.password FROM accounts a WHERE a.email=users.email)
+        WHERE EXISTS (SELECT 1 FROM accounts a JOIN memberships m ON m.store=a.id
+          WHERE a.email=users.email AND m.user=users.id AND m.role='owner');
+        INSERT INTO auth_migrations VALUES('c2');`);
+    }
+    db.exec('COMMIT');
+  } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+
+// Apply after authentication has set req.account. Recheck auth on each request.
+export function requireRole(...roles) {
+  return (req,res,next) => {
+    if (!req.account) return res.status(401).json({error:'Sign in to your store account.'});
+    if (!roles.includes(req.account.user?.role)) return res.status(403).json({error:'Your store role cannot perform this action.'});
+    next();
+  };
+}
