@@ -10,7 +10,12 @@ if (accountStore) {
   accountStore.billing.sweep();
   setInterval(()=>{try {accountStore.billing.sweep();} catch {console.error(JSON.stringify({event:"credit_sweep_failed"}));}},5*60*1000).unref();
 }
-createApp({ production, accountStore, allowSignup: process.env.TRYON_ALLOW_SIGNUP !== "false", trustProxy: trustProxySetting === "1" ? 1 : false }).listen(port, "0.0.0.0", (error) => {
+const app=createApp({ production, accountStore, allowSignup: process.env.TRYON_ALLOW_SIGNUP !== "false", trustProxy: trustProxySetting === "1" ? 1 : false });
+if(app.locals.payments){
+  const retry=()=>app.locals.payments.retryInvoices().catch(()=>console.error(JSON.stringify({event:"invoice_retry_failed"})));
+  void retry();setInterval(()=>void retry(),5*60*1000).unref();
+}
+app.listen(port, "0.0.0.0", (error) => {
   if (error) {
     console.error(
       `Could not start Forme on port ${port}: ${error.code || error.message}`,

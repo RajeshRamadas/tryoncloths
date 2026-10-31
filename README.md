@@ -141,3 +141,10 @@ This builds on [C3 staff invitations](docs/STAFF_INVITES.md),
 [C1 tenancy migration](docs/TENANCY_MIGRATION.md). Existing owners keep their login
 and saved data. SMTP setup is needed for staff invitation emails. Payments,
 subscriptions and invoices follow in C5; commercial R1 is not complete yet.
+
+### Commercial C5 — payments backend
+
+Web `0.16.0-alpha.5` adds [Razorpay orders, subscriptions and GST invoices](docs/PAYMENTS.md),
+verified captured-payment credit grants, idempotent webhooks and invoice email
+retry. Existing pilots work without payment credentials. The checkout UI remains
+C6; configure and validate Razorpay test mode before enabling live payments.

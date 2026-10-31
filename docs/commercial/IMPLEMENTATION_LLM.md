@@ -188,9 +188,14 @@ See [credit ledger, migration and replay handling](../CREDITS.md).
 
 **Acceptance.**
 
-- [ ] Bad signature → 400 and no state change; replayed event → no second grant.
-- [ ] Invoice numbers are gap-free and unique under concurrent payments.
-- [ ] Amounts never come from the client.
+- [x] Bad signature → 400 and no state change; replayed event → no second grant.
+- [x] Invoice numbers are gap-free and unique under concurrent payments.
+- [x] Amounts never come from the client.
+
+**Implemented:** `0.16.0-alpha.5`, branch `feature/commercial-razorpay`.
+Payment service is in `server/payments.js`, mounted through the billing routes.
+See [configuration, tests and remaining R1 work](../PAYMENTS.md). Online checkout
+UI is still C6; no live Razorpay or SMTP transaction has been run here.
 
 ### Task C6 — billing UI, usage and admin tools
 
