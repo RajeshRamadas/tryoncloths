@@ -1,3 +1,5 @@
+import {usage,usageCsv} from './commercial-admin.js';
+import {PACKS,PLANS} from './payments.js';
 import {randomBytes} from 'node:crypto';
 import sharp from 'sharp';
 import {ProviderError} from './provider-errors.js';
@@ -68,10 +70,11 @@ export class BillingStore {
     if(!validRequestId(requestId))throw new BillingError('invalid_request_id','Update the app: each generation needs a UUID v4 requestId.',400);
     if(!pools.includes(pool)||!['avatar','tryon','catalogue'].includes(action))throw new BillingError('invalid_meter','Invalid generation action.',400);
     return this.transaction(()=>{
-      const actor=this.db.prepare('SELECT m.role,u.disabled,s.org,o.status,o.pastDueSince FROM memberships m JOIN users u ON u.id=m.user JOIN stores s ON s.id=m.store JOIN orgs o ON o.id=s.org WHERE m.user=? AND m.store=?').get(user,store);
+      const actor=this.db.prepare('SELECT m.role,u.disabled,s.org,o.status,o.pastDueSince,o.trialEndsAt FROM memberships m JOIN users u ON u.id=m.user JOIN stores s ON s.id=m.store JOIN orgs o ON o.id=s.org WHERE m.user=? AND m.store=?').get(user,store);
       if(!actor||actor.disabled||actor.org!==org)throw new BillingError('account_required','Sign in to an active store account.',401);
       if(actor.status==='suspended')throw new BillingError('account_suspended','This organisation is suspended. Contact your store owner.',403);
       if(actor.status==='past_due' && Date.now() >= (actor.pastDueSince||0)+3*24*3600000)throw new BillingError('subscription_past_due','Subscription payment is overdue. Ask the store owner to open Billing.',402);
+      if(actor.status==='trial' && Date.now()>=(actor.trialEndsAt||0))throw new BillingError('trial_expired','Your trial has ended. Subscribe to continue generating.',402);
       const previous=this.db.prepare('SELECT id FROM ledger WHERE org=? AND requestId=?').get(org,requestId.toLowerCase());
       if(previous)throw new BillingError('duplicate_request','This generation request was already submitted. Check the existing result before starting a new request.');
       if(this.balance(org,pool)<1)throw new CreditsRequired();
@@ -118,10 +121,23 @@ export async function meter(req,{billing,account,pool='ai',action},fn){
     billing.commit(hold);return image;
   }catch(e){billing.refund(hold,'failed');throw e;}
 }
+export function creditStatus(store,account){
+ const org=store.db.prepare('SELECT plan,status,trialEndsAt FROM orgs WHERE id=?').get(account.org);
+ const baseline=org.plan==='trial'?30:PLANS[org.plan]?.credits||store.billing.db.prepare("SELECT amount FROM ledger WHERE org=? AND pool='ai' AND kind='grant_admin' AND ref='pilot-initial'").get(account.org)?.amount||1000;
+ const remaining=store.billing.balance(account.org);return {...org,remaining,low:remaining<=Math.ceil(baseline*0.1)};
+}
 export function installBillingRoutes(app,store,{requireUser,sameOrigin,wrap,payments}){
-  installPaymentRoutes(app,payments,{requireUser,sameOrigin,wrap});
-  app.get('/api/billing',requireUser,requireRole('owner'),wrap((req,res)=>{
-    const org=store.db.prepare('SELECT plan,status FROM orgs WHERE id=?').get(req.account.org);
-    res.json({...org,balances:{ai:store.billing.balance(req.account.org,'ai'),photo:store.billing.balance(req.account.org,'photo')}});
-  }));
+ installPaymentRoutes(app,payments,{requireUser,sameOrigin,wrap});
+ app.get('/api/credits',requireUser,wrap((req,res)=>res.json(creditStatus(store,req.account))));
+ app.get('/api/usage',requireUser,requireRole('owner','manager'),wrap((req,res)=>res.json(usage(store,req.account))));
+ app.get('/api/usage.csv',requireUser,requireRole('owner','manager'),wrap((req,res)=>res.set('Content-Disposition','attachment; filename="forme-usage.csv"').type('text/csv').send(usageCsv(usage(store,req.account)))));
+ app.get('/api/billing',requireUser,requireRole('owner'),wrap((req,res)=>{
+  const org=store.db.prepare('SELECT plan,status,trialEndsAt FROM orgs WHERE id=?').get(req.account.org);
+  const subscription=payments?.db.prepare('SELECT providerSubId,plan,period,status,currentPeriodEnd FROM subscriptions WHERE org=? ORDER BY createdAt DESC LIMIT 1').get(req.account.org)||null;
+  let paymentsAvailable=false;try{payments?.ready();paymentsAvailable=Boolean(payments);}catch{}
+  const gross=base=>base+Math.round(base*0.18);
+  res.json({...org,balances:{ai:store.billing.balance(req.account.org,'ai'),photo:store.billing.balance(req.account.org,'photo')},subscription,paymentsAvailable,
+   plans:Object.entries(PLANS).map(([id,p])=>({id,credits:p.credits,monthly:gross(p.base),annual:gross(p.base*10),monthlyAvailable:Boolean(payments?.config.planIds[id+':monthly']),annualAvailable:Boolean(payments?.config.planIds[id+':annual'])})),
+   packs:Object.entries(PACKS).map(([id,p])=>({id,credits:p.credits,amount:gross(p.base)}))});
+ }));
 }

@@ -2,7 +2,7 @@ import {test,expect} from '@playwright/test';
 import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {AccountStore} from '../../server/accounts.js';
+import {AccountStore} from '../helpers/pilot-accounts.js';
 import {createApp} from '../../server/app.js';
 
 // Mail and provider networking are replaced; auth, invites and roles use real SQLite/API routes.

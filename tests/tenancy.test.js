@@ -5,7 +5,7 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash,scryptSync} from 'node:crypto';
-import {AccountStore} from '../server/accounts.js';
+import {AccountStore} from './helpers/pilot-accounts.js';
 import {GarmentStore} from '../server/garment-store.js';
 import {migrateTenancy,storesForUser,storeMembership} from '../server/tenancy.js';
 

@@ -1,3 +1,4 @@
+import {installAdminSchema,claimTrial,trialKeys} from './commercial-admin.js';
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, chmodSync } from "node:fs";
 import path from "node:path";
@@ -31,7 +32,8 @@ async function savedImage(value) {
 }
 
 export class AccountStore {
-  constructor(directory) {
+  constructor(directory, {signupTrial=true}={}) {
+    this.signupTrial=signupTrial;
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     const filename = path.join(directory, "accounts.sqlite");
     this.db = new DatabaseSync(filename);
@@ -45,7 +47,7 @@ export class AccountStore {
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     this.garments = new GarmentStore(this);
-    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); }
+    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); }
     catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
@@ -56,6 +58,7 @@ export class AccountStore {
       throw error("Enter a store name and valid email address.");
     if (typeof input.password !== "string" || input.password.length < 12 || input.password.length > 128)
       throw error("Use a password between 12 and 128 characters.");
+    if(this.signupTrial)trialKeys({...input,email});
     const salt = randomBytes(16).toString("hex");
     const password = await scrypt(input.password, salt, 64);
     const account = { id: randomBytes(16).toString("hex"), email, name };
@@ -64,11 +67,15 @@ export class AccountStore {
       if (this.db.prepare("SELECT 1 FROM users WHERE email=?").get(email)) throw error("This email is already registered. Sign in to its store account.",409);
       const org = randomBytes(16).toString("hex"), user = randomBytes(16).toString("hex");
       this.db.prepare("INSERT INTO accounts VALUES(?,?,?,?,?)").run(account.id,email,name,salt,password);
-      this.db.prepare("INSERT INTO orgs(id,name,billingEmail,plan,status,createdAt) VALUES(?,?,?,'pilot','active',?)").run(org,name,email,Date.now());
+      this.db.prepare("INSERT INTO orgs(id,name,billingEmail,plan,status,createdAt) VALUES(?,?,?,?,?,?)").run(org,name,email,this.signupTrial?"trial":"pilot",this.signupTrial?"trial":"active",Date.now());
       this.db.prepare("INSERT INTO stores(id,org,name) VALUES(?,?,?)").run(account.id,org,name);
       this.db.prepare("INSERT INTO users(id,email,name,salt,password,createdAt) VALUES(?,?,?,?,?,?)").run(user,email,name,salt,password,Date.now());
       this.db.prepare("INSERT INTO memberships VALUES(?,?,'owner')").run(user,account.id);
-      this.billing.seedPilot(org);
+      if(this.signupTrial){
+        claimTrial(this.db,org,{...input,email});
+        this.db.prepare("UPDATE orgs SET trialEndsAt=? WHERE id=?").run(Date.now()+14*86400000,org);
+        this.billing.recordGrant(org,"ai",30,"trial","initial-trial");
+      }else this.billing.seedPilot(org);
       this.db.exec("COMMIT");
       return this.identity(user,account.id);
     }

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash,scryptSync} from 'node:crypto';
 import express from 'express';
-import {AccountStore,installAccountRoutes,accountUser} from '../server/accounts.js';
+import {AccountStore,installAccountRoutes,accountUser} from './helpers/pilot-accounts.js';
 import {requireRole} from '../server/tenancy.js';
 
 const credentials = n => ({email:`${n}@example.test`,name:n,password:'long-test-password-only'});

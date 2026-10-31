@@ -3,7 +3,7 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
-import {AccountStore} from '../../server/accounts.js';
+import {AccountStore} from '../helpers/pilot-accounts.js';
 import {createApp,standardAvatar} from '../../server/app.js';
 import {customerPhotos} from '../helpers/customer-photos.js';
 
@@ -27,7 +27,7 @@ test('zero-credit avatar shows billing help, a funded retry uses a fresh request
   await page.getByRole('button',{name:'Generate customer avatar',exact:true}).click();await expect(page.getByAltText('Customer’s personalized avatar, awaiting visual review')).toBeVisible();
   expect(calls).toBe(1);expect(ids).toHaveLength(2);expect(ids[0]).not.toBe(ids[1]);for(const id of ids)expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   await page.goto('/billing');await expect(page.getByRole('heading',{name:'1 AI credits available'})).toBeVisible();
-  await expect(page.getByText('Online checkout is not available yet.',{exact:false})).toBeVisible();
+  await expect(page.getByText('Online payments are not configured.',{exact:false})).toBeVisible();
   await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:'test-results/credit-balance-mobile.png'});
   store.db.prepare("UPDATE memberships SET role='staff' WHERE user=? AND store=?").run(owner.user.id,owner.id);

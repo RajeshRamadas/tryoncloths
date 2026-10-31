@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import sharp from 'sharp';
-import {AccountStore} from '../server/accounts.js';
+import {AccountStore} from './helpers/pilot-accounts.js';
 import {BillingStore,meter,CreditsRequired,trialWatermark} from '../server/billing.js';
 import {createApp,standardAvatar} from '../server/app.js';
 import {ProviderError} from '../server/provider-errors.js';
@@ -95,7 +95,7 @@ test('meter refunds unusable results; trial watermark is returned and saved',()=
  assert.equal(store.billing.balance(a.org),3);
  const stamp=await trialWatermark(image);assert.notEqual(stamp,image);
  assert.deepEqual(await sharp(Buffer.from(stamp.split(',')[1],'base64')).metadata().then(m=>[m.width,m.height]),await sharp(Buffer.from(image.split(',')[1],'base64')).metadata().then(m=>[m.width,m.height]));
- store.db.prepare("UPDATE orgs SET status='trial' WHERE id=?").run(a.org);
+ store.db.prepare("UPDATE orgs SET status='trial',trialEndsAt=9999999999999 WHERE id=?").run(a.org);
  const r=await request('/api/personalize',await generationInput());assert.equal(r.status,200);const result=await r.json();assert.equal(result.image,stamp);assert.equal(store.billing.balance(a.org),2);assert.equal(data(store.image(a,result.avatarId)),stamp);
  const outfit=await request('/api/tryon',tryonInput(image));assert.equal(outfit.status,200);assert.equal((await outfit.json()).image,stamp);assert.equal(store.billing.balance(a.org),1);
 }));

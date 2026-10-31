@@ -1,3 +1,4 @@
+import Usage from './Usage';
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
@@ -10,6 +11,6 @@ document.documentElement.classList.toggle("native-app", isNative);
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {window.location.pathname === "/invite" ? <InviteAcceptance /> : window.location.pathname === "/billing" ? <Billing /> : <App />}
+    {window.location.pathname === "/invite" ? <InviteAcceptance /> : window.location.pathname === "/billing" ? <Billing /> : window.location.pathname === "/usage" ? <Usage /> : <App />}
   </React.StrictMode>,
 );

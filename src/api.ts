@@ -37,12 +37,14 @@ export async function requestApi(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(`${studioUrl}${path}`, {
+    const response=await fetch(`${studioUrl}${path}`, {
       ...init,
       headers,
       signal: controller.signal,
       credentials: Capacitor.isNativePlatform() ? "omit" : "same-origin",
     });
+    if(["/api/personalize","/api/tryon","/api/billing/verify"].includes(path))window.dispatchEvent(new Event("forme-credits-changed"));
+    return response;
   } finally {
     clearTimeout(timer);
   }

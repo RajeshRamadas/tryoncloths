@@ -213,8 +213,12 @@ UI is still C6; no live Razorpay or SMTP transaction has been run here.
 
 **Acceptance.**
 
-- [ ] Staff role cannot open billing (UI hidden and API 403).
-- [ ] Browser test with mocked Checkout completes a pack purchase flow.
+- [x] Staff role cannot open billing (UI hidden and API 403).
+- [x] Browser test with mocked Checkout completes a pack purchase flow.
+
+**Implemented:** `0.16.0-alpha.6`, branch `feature/commercial-billing-ui`.
+See [billing, usage, trials and operator commands](../BILLING.md). Duplicate trial
+checks use supplied identifiers; phone/GSTIN ownership verification is not included.
 
 ### Task C7 — customer profiles
 

@@ -1,8 +1,7 @@
 # C5 — Razorpay payments and invoices
 
-Web `0.16.0-alpha.5` adds the payment backend for R1. The owner checkout UI,
-usage reports and admin plan tools remain C6. The existing Billing page continues
-to show balances and directs owners to the administrator until C6 is released.
+Web `0.16.0-alpha.5` adds the payment backend for R1. The owner checkout UI, usage reports and admin plan tools are now provided by
+[C6](BILLING.md) in web 0.16.0-alpha.6.
 No APK is rebuilt and no live payment is made by this change.
 
 ## Behaviour
@@ -85,7 +84,7 @@ into source control. `compose.accounts.yaml` passes these settings to the backen
 Configure Razorpay's webhook URL as
 `https://studio.marketingadda.com/api/billing/webhook` with the listed events and
 its separate webhook secret. Start in test mode. Test keys and test plan ids must
-belong to the same Razorpay account. Checkout JavaScript/card handling is C6;
+belong to the same Razorpay account. Checkout JavaScript is loaded by the C6 Billing screen;
 no card data is collected by this backend.
 
 Back up the existing database and retain its accounts volume, then deploy:
@@ -108,7 +107,8 @@ recover from a timeout. A failed database write after order creation may leave a
 unpaid orphan order in Razorpay; no credits are granted for unknown local orders.
 
 Upgrade/cancellation controls, refunds/credit notes, plan/pack credit expiry,
-trial lifecycle, usage views and live checkout UI are not added by C5. Credit
+trial lifecycle, usage views and checkout UI were not added by C5; the last three
+are now provided by [C6](BILLING.md). Credit
 expiry requires ledger allocation rules and is not silently implemented as a
 balance reset. Before selling plans, finish R1, validate tax/business policies,
 and run a Razorpay test-mode checkout and real SMTP delivery in staging.
