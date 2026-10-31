@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
@@ -14,7 +15,7 @@ async function fixture(run) {
  const server=createApp({accountStore:store,accessMode:"public",rateLimit:false,apiKey:"test",personalize:async()=>{calls++;return `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;}}).listen(0,"127.0.0.1");
  await new Promise(r=>server.once("listening",r));
  const base=`http://127.0.0.1:${server.address().port}`;
- const request=(url,method="GET",body,cookie="",origin=base)=>fetch(base+url,{method,headers:{"Content-Type":"application/json",Origin:origin,Cookie:cookie},...(body?{body:JSON.stringify(body)}:{})});
+ const request=(url,method="GET",body,cookie="",origin=base)=>fetch(base+url,{method,headers:{"Content-Type":"application/json",Origin:origin,Cookie:cookie},...(body?{body:JSON.stringify(url==="/api/personalize"?{requestId:randomUUID(),...body}:body)}:{})});
  try{await run({store,request,directory,base,calls:()=>calls});}finally{await new Promise(r=>server.close(r));store.close();await rm(directory,{recursive:true,force:true});}
 }
 const credentials=email=>({email,password:"long-test-password-only",name:email.split("@")[0]});

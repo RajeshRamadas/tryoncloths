@@ -8,6 +8,7 @@ import { profiles, recommendProfile, validTemplateTone, DEFAULT_TEMPLATE_TONE } 
 import { GarmentStore } from "./garment-store.js";
 import { migrateTenancy, migrateUserSessions, storesForUser, storeMembership, requireRole } from "./tenancy.js";
 import { installStaffRoutes } from "./staff.js";
+import { BillingStore, installBillingRoutes } from "./billing.js";
 const scrypt = promisify(scryptCallback);
 const digest = value => createHash("sha256").update(value).digest("hex");
 const cookieName = "forme_session";
@@ -44,7 +45,7 @@ export class AccountStore {
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     this.garments = new GarmentStore(this);
-    try { migrateTenancy(this.db); migrateUserSessions(this.db); }
+    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); }
     catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
@@ -67,6 +68,7 @@ export class AccountStore {
       this.db.prepare("INSERT INTO stores(id,org,name) VALUES(?,?,?)").run(account.id,org,name);
       this.db.prepare("INSERT INTO users(id,email,name,salt,password,createdAt) VALUES(?,?,?,?,?,?)").run(user,email,name,salt,password,Date.now());
       this.db.prepare("INSERT INTO memberships VALUES(?,?,'owner')").run(user,account.id);
+      this.billing.seedPilot(org);
       this.db.exec("COMMIT");
       return this.identity(user,account.id);
     }
@@ -198,6 +200,7 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
     stores:account ? storesForUser(store.db,account.user.id) : []});
   app.get("/api/account",wrap((req,res)=>res.json({enabled:Boolean(store),signupAllowed:Boolean(store&&allowSignup),...response(accountUser(store,req))})));
   if(!store) return;
+  installBillingRoutes(app,store,{requireUser,wrap});
   installStaffRoutes(app,store,{sameOrigin,requireUser,wrap,production,sendMail,publicUrl});
   for(const action of ["register","login"])app.post(`/api/account/${action}`,sameOrigin,wrap(async(req,res)=>{
     const key=`${action}:${req.ip}`, now=Date.now();

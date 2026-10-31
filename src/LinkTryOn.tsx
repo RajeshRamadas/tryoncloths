@@ -1,3 +1,4 @@
+import {CreditHelp} from "./Billing";
 import { useEffect, useRef, useState } from "react";
 import { Link2, Search, Sparkles, Upload } from "lucide-react";
 import { requestApi } from "./api";
@@ -52,7 +53,7 @@ export default function LinkTryOn({ catalogueEnabled=false, avatarId, bodyType =
     return()=>{cancelled=true;clearTimeout(timer);};
   },[catalogueEnabled,saved?.id,avatarId,base,garmentType,bodyType,lookupRevision]);
 
-  function begin(next: "reading" | "generating") { setState(next); onBusy(true); setError(""); setNotice(''); }
+  function begin(next: "reading" | "generating") { setState(next); onBusy(true); setError(""); setNotice(''); setCreditsRequired(false); }
   function finish() { setState("idle"); onBusy(false); }
   function accountExpired(code?: string) { if (code === "account_required") window.dispatchEvent(new Event("forme-account-expired")); }
   function applyProduct(nextTitle: string, nextImages: ProductImage[], link='') {
@@ -119,17 +120,20 @@ export default function LinkTryOn({ catalogueEnabled=false, avatarId, bodyType =
     begin('reading');try{await deleteAdaptation(saved.id,lookup.id);setLookupRevision(n=>n+1);setCatalogueRevision(n=>n+1);}catch(e){setError((e as Error).message);}finally{finish();}
   }
 
+  const [creditsRequired,setCreditsRequired]=useState(false);
   async function putOn() {
+    setCreditsRequired(false);
     if (!chosen || !garmentType || !consent || !base || busy || !available || (canLookup&&(!lookupCurrent||lookup?.error||cached))) return;
     begin("generating");
     setConsent(false);
     try {
       const response = await requestApi("/api/tryon", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatar: base, bodyType, garmentType, title, consent: true, consentScope: "avatar-and-garment", consentProvider: "gemini", ...(saved&&avatarId?{garmentId:saved.id,avatarId}:{garment:chosen}) }),
+        body: JSON.stringify({ requestId:crypto.randomUUID(), avatar: base, bodyType, garmentType, title, consent: true, consentScope: "avatar-and-garment", consentProvider: "gemini", ...(saved&&avatarId?{garmentId:saved.id,avatarId}:{garment:chosen}) }),
       }, 200000);
       const data = await response.json();
       accountExpired(data.code);
+      if (!response.ok && data.code === "credits_required") setCreditsRequired(true);
       if (!response.ok) throw new Error(data.error || "Clothing try-on failed. The avatar is unchanged.");
       if (data.kind !== "garment-tryon" || typeof data.image !== "string" || !data.image.startsWith("data:image/png;base64,"))
         throw new Error("The studio returned an unsupported result. Update the studio and try again.");
@@ -188,7 +192,7 @@ export default function LinkTryOn({ catalogueEnabled=false, avatarId, bodyType =
       <p className="small-footnote">One AI request per garment; a provider charge may apply. Add the next item after this one to build a full outfit. Results are approximate and need review.</p>
       </>}
     </>}
-    {error && <p role="alert" className="error-banner">{error}</p>}
+    {error && <p role="alert" className="error-banner">{error}{creditsRequired&&<CreditHelp/>}</p>}
     {notice&&<p role="status">{notice}</p>}
   </section>;
 }

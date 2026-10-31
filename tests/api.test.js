@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
 import sharp from "sharp";
@@ -24,7 +25,7 @@ async function post(base, body, origin = base) {
   return fetch(`${base}/api/personalize`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: origin },
-    body: JSON.stringify({ ...defaultRequest, ...body }),
+    body: JSON.stringify({ requestId:randomUUID(), ...defaultRequest, ...body }),
   });
 }
 const faceBytes = await readFile(customerPhotos[1].face);
@@ -145,7 +146,7 @@ test("mobile preflight allows only native origins, and store access codes protec
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ ...defaultRequest, consent: true, profileId: "regular", face }),
+          body: JSON.stringify({ requestId:randomUUID(), ...defaultRequest, consent: true, profileId: "regular", face }),
         });
         assert.equal(generated.status, 200);
       }
@@ -185,7 +186,7 @@ test("proxy-aware request limits separate clients only when one private reverse 
       const send = client => fetch(`${base}/api/personalize`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: base, "X-Forwarded-For": client },
-        body: JSON.stringify({ ...defaultRequest, consent: true, profileId: "regular", face }),
+        body: JSON.stringify({ requestId:randomUUID(), ...defaultRequest, consent: true, profileId: "regular", face }),
       });
       assert.equal((await send("192.0.2.10")).status, 200);
       assert.equal((await send("192.0.2.11")).status, trustProxy === 1 ? 200 : 429);

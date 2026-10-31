@@ -162,10 +162,13 @@ See [staff invitations, SMTP setup and safeguards](../STAFF_INVITES.md).
 
 **Acceptance.**
 
-- [ ] 20 parallel reserves with balance 5 → exactly 5 succeed.
-- [ ] Provider error or failed face check → balance unchanged.
-- [ ] Reuse of an approved adaptation → no ledger rows.
-- [ ] Balance 0 → 402 and no provider call.
+- [x] 20 parallel reserves with balance 5 → exactly 5 succeed.
+- [x] Provider error or failed face check → balance unchanged.
+- [x] Reuse of an approved adaptation → no ledger rows.
+- [x] Balance 0 → 402 and no provider call.
+
+**Implemented:** `0.16.0-alpha.4`, branch `feature/commercial-credit-metering`.
+See [credit ledger, migration and replay handling](../CREDITS.md).
 
 ### Task C5 — Razorpay subscriptions, packs and invoices
 
