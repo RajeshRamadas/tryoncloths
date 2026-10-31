@@ -10,7 +10,7 @@ import {standardAvatar,createApp} from '../server/app.js';
 import {detectFaces} from '../server/face-check.js';
 import {geminiBodyReference} from '../server/gemini-reference.js';
 import {customerPhotos} from './helpers/customer-photos.js';
-import {AccountStore} from '../server/accounts.js';
+import {AccountStore} from './helpers/pilot-accounts.js';
 
 test('48 unique templates retain default assets and validate selectors and measurement ranges',()=>{
  assert.equal(avatarVariants.length,48);assert.equal(new Set(avatarVariants.map(v=>v.id)).size,48);

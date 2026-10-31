@@ -1768,3 +1768,26 @@ dialog::backdrop {
 .invite-page form { display:grid; gap:18px; }
 .invite-page label { display:grid; gap:8px; }
 .invite-page input { box-sizing:border-box; width:100%; padding:12px; border:1px solid #c8d7c7; border-radius:8px; }
+
+.billing-page { max-width:1000px; margin:0 auto; padding:28px 20px 60px; color:#294b3c; }
+.billing-page h1 { margin:24px 0; font-size:34px; }
+.billing-page h2 { margin:20px 0 14px; font-size:22px; }
+.billing-page h3 { text-transform:capitalize; }
+.billing-page nav { display:flex; gap:24px; }
+.billing-page section { background:#fff; border:1px solid #dce4da; border-radius:14px; padding:22px; margin:20px 0; }
+.billing-page p { line-height:1.6; }
+.billing-page button { min-height:44px; }
+.billing-details { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.billing-details label { display:flex; flex-direction:column; gap:7px; font-size:14px; }
+.billing-details input { min-width:0; width:100%; box-sizing:border-box; padding:12px; font:inherit; border:1px solid #b7caba; border-radius:7px; }
+.billing-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:20px; }
+.billing-cards article { border:1px solid #dce4da; border-radius:12px; padding:16px; display:flex; flex-direction:column; align-items:flex-start; }
+.billing-cards article button { margin-top:auto; }
+.billing-invoices { padding:0; list-style:none; }
+.billing-invoices li { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 0; flex-wrap:wrap; }
+.billing-page table { width:100%; border-collapse:collapse; }
+.billing-page th,.billing-page td { text-align:left; padding:10px 4px; border-bottom:1px solid #e2e8df; overflow-wrap:anywhere; }
+.billing-notice { padding:14px; border-radius:8px; background:#e7f2e7; }
+.credit-badge { display:inline-block; margin:6px 10px; border-radius:14px; background:#e7f2e7; color:#28543b; padding:6px 10px; font-size:12px; }
+.credit-badge.low { background:#fff0d4; color:#76511d; }
+@media(max-width:650px){.billing-cards,.billing-details{grid-template-columns:1fr}.billing-page section{padding:17px}.billing-page{padding:20px 14px}.billing-invoices li{align-items:flex-start;flex-direction:column}}

@@ -146,5 +146,11 @@ subscriptions and invoices follow in C5; commercial R1 is not complete yet.
 
 Web `0.16.0-alpha.5` adds [Razorpay orders, subscriptions and GST invoices](docs/PAYMENTS.md),
 verified captured-payment credit grants, idempotent webhooks and invoice email
-retry. Existing pilots work without payment credentials. The checkout UI remains
-C6; configure and validate Razorpay test mode before enabling live payments.
+retry. Existing pilots work without payment credentials. The checkout UI is available in C6 below; configure and validate Razorpay test mode before enabling live payments.
+
+### Commercial C6 — owner billing and store usage
+
+Web `0.16.0-alpha.6` adds [checkout, invoice downloads, usage reports and operator billing tools](docs/BILLING.md).
+New accounts receive a 14-day, 30-credit trial; existing pilots retain their credits.
+Owners use Billing, owners/managers use Usage, and all staff see remaining credits.
+Live Razorpay and SMTP verification is still required before selling subscriptions.

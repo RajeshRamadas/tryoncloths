@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import sharp from 'sharp';
-import { AccountStore } from '../../server/accounts.js';
+import { AccountStore } from '../helpers/pilot-accounts.js';
 import { createApp, standardAvatar } from '../../server/app.js';
 
 async function fixture(page, work) {

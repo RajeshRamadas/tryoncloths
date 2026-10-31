@@ -10,7 +10,7 @@ import {geminiAvatarPrompt} from '../server/avatar-prompt.js';
 import {tryOnPrompt} from '../server/gemini-tryon.js';
 import {readFile,mkdtemp,rm} from 'node:fs/promises';
 import {customerPhotos} from './helpers/customer-photos.js';
-import {AccountStore} from '../server/accounts.js';
+import {AccountStore} from './helpers/pilot-accounts.js';
 import os from 'node:os';import path from 'node:path';
 
 test('female profiles keep stable male identifiers and validate body-specific measurements',()=>{

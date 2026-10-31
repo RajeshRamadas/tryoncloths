@@ -1,3 +1,4 @@
+import {claimTrial} from './commercial-admin.js';
 import {randomBytes,createHmac,timingSafeEqual} from 'node:crypto';
 import PDFDocument from 'pdfkit';
 import express from 'express';
@@ -55,8 +56,10 @@ export class PaymentStore {
   try{return await response.json();}catch{throw problem('payment_provider_error','Payment provider returned an invalid response.',502);}
  }
  details(org){const row=this.db.prepare('SELECT details FROM billing_profiles WHERE org=?').get(org);if(!row)throw problem('billing_details_required','Save your billing details before purchasing.');return JSON.parse(row.details);}
- saveDetails(org,input){const value=profile(input);this.db.prepare('INSERT INTO billing_profiles VALUES(?,?) ON CONFLICT(org) DO UPDATE SET details=excluded.details').run(org,JSON.stringify(value));return value;}
+ saveDetails(org,input){const value=profile(input);return this.billing.transaction(()=>{if(this.db.prepare('SELECT status FROM orgs WHERE id=?').get(org)?.status==='trial')claimTrial(this.db,org,{email:value.billingEmail,gstin:value.gstin});this.db.prepare('INSERT INTO billing_profiles VALUES(?,?) ON CONFLICT(org) DO UPDATE SET details=excluded.details').run(org,JSON.stringify(value));return value;});}
+ assertPurchasable(org){if(this.db.prepare('SELECT status FROM orgs WHERE id=?').get(org)?.status==='suspended')throw problem('account_suspended','This organisation is suspended. Contact your administrator before purchasing.',403);}
  async order(org,pack){
+  this.assertPurchasable(org);
   if(!Object.hasOwn(PACKS,String(pack)))throw problem('invalid_pack','Choose 100, 500 or 2000 credits.');
   const selected=PACKS[pack],price=tax(selected.base),details=this.details(org),key=id();
   const order=await this.api('orders',{amount:price.amount,currency:'INR',receipt:key});
@@ -65,6 +68,7 @@ export class PaymentStore {
   return {orderId:order.id,keyId:this.config.keyId,amount:price.amount,currency:'INR',credits:selected.credits};
  }
  async subscribe(org,plan,period){
+  this.assertPurchasable(org);
   if(!Object.hasOwn(PLANS,plan)||!['monthly','annual'].includes(period))throw problem('invalid_plan','Choose an available plan and billing period.');
   const details=this.details(org),planId=this.config.planIds[`${plan}:${period}`];
   if(!providerId(planId))throw problem('billing_unavailable','This subscription plan is not configured.',503);

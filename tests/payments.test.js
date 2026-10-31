@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';import path from 'node:path';
 import {createHmac,randomUUID} from 'node:crypto';
-import {AccountStore} from '../server/accounts.js';
+import {AccountStore} from './helpers/pilot-accounts.js';
 import {createApp} from '../server/app.js';
 import {PaymentStore} from '../server/payments.js';
 const config={keyId:'rzp_test_id',keySecret:'test-secret',webhookSecret:'hook-secret',supplier:{name:'Forme Test',address:'Bengaluru Karnataka',billingEmail:'billing@example.test',stateCode:'29',gstin:'29ABCDE1234F1Z5'},planIds:{'starter:monthly':'plan_starter','starter:annual':'plan_annual'}};

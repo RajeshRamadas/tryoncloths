@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { AccountStore } from "../../server/accounts.js";
+import { AccountStore } from "../helpers/pilot-accounts.js";
 import { createApp, standardAvatar } from "../../server/app.js";
 import { customerPhotos } from "../helpers/customer-photos.js";
 

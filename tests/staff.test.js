@@ -4,7 +4,7 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import express from 'express';
-import {AccountStore,installAccountRoutes} from '../server/accounts.js';
+import {AccountStore,installAccountRoutes} from './helpers/pilot-accounts.js';
 import {createMailer} from '../server/mailer.js';
 import {createHash} from 'node:crypto';
 const password='staff-test-password-long';

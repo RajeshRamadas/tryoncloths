@@ -1,0 +1,9 @@
+import {useEffect,useState} from 'react';
+import {billingJson,billingDownload} from './billing-api';
+type Report={storeName:string;from:string;to:string;total:number;days:{date:string;credits:number}[];staff:{id:string;name:string;credits:number}[];actions:{action:string;credits:number}[]};
+export default function Usage(){
+ const [report,setReport]=useState<Report|null>(null),[error,setError]=useState('');
+ useEffect(()=>{let live=true;billingJson('/api/usage').then(r=>{if(live)setReport(r);}).catch(()=>{if(live)setError('Usage is available to the owner or manager of the active store. Sign in to that store and try again.');});return()=>{live=false;};},[]);
+ const table=(title:string,rows:{label:string;credits:number}[])=><section><h2>{title}</h2><table><thead><tr><th scope="col">{title==='Daily usage'?'Date':title==='Staff usage'?'Staff member':'Action'}</th><th scope="col">Credits used</th></tr></thead><tbody>{rows.map((r,i)=><tr key={i}><td>{r.label}</td><td>{r.credits}</td></tr>)}</tbody></table>{!rows.length&&<p>No usage recorded.</p>}</section>;
+ return <main className="billing-page"><a href="/">Back to Forme</a><h1>Usage</h1>{error&&<p role="alert">{error}</p>}{!report&&!error?<p role="status">Loading usage…</p>:report&&<><h2>{report.storeName}</h2><p>{report.from} to {report.to} · India time</p><p><strong>{report.total} credits used</strong> for delivered images. Pending and refunded attempts are excluded.</p><p>Report covers the active store. Switch stores in Forme to view another store.</p><button className="button secondary" onClick={()=>void billingDownload('/api/usage.csv','forme-usage.csv').catch(e=>setError(e.message))}>Download usage CSV</button>{table('Daily usage',report.days.map(d=>({label:d.date,credits:d.credits})))}{table('Staff usage',report.staff.map(s=>({label:s.name,credits:s.credits})))}{table('Usage by action',report.actions.map(a=>({label:a.action,credits:a.credits})))}</>}</main>;
+}
