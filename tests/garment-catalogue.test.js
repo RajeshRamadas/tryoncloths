@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -20,7 +21,7 @@ async function fixture(run, options={}) {
     tryOn:async input=>{calls++;return options.generate?options.generate(input):avatar;},...options.app});
   const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
   const origin=`http://127.0.0.1:${server.address().port}`;
-  const request=(url,body,cookie='',method=body===undefined?'GET':'POST',from=origin)=>fetch(origin+url,{method,headers:{Origin:from,Cookie:cookie,'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});
+  const request=(url,body,cookie='',method=body===undefined?'GET':'POST',from=origin)=>fetch(origin+url,{method,headers:{Origin:from,Cookie:cookie,'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(url==='/api/tryon'?{requestId:randomUUID(),...body}:body)})});
   const login=async email=>{const response=await request('/api/account/register',account(email));return response.headers.get('set-cookie').split(';')[0];};
   const ca=await login('a@example.com'),cb=await login('b@example.com');
   const a=store.user(ca.split('=')[1]),b=store.user(cb.split('=')[1]);
@@ -78,7 +79,11 @@ test('only a reviewed, signed provider result is reusable; exact reuse skips pai
   const accepted=await request(endpoint+'/results',save,ca);assert.equal(accepted.status,200);
   assert.equal((await request(endpoint+'/results',save,ca)).status,200,'saving again is idempotent');
   const reuse=await (await request(endpoint+'/reuse',input,ca)).json();assert.equal(reuse.match,true);assert.ok(reuse.image);
+  const remaining=store.billing.balance(a.org);
+  store.db.prepare("INSERT INTO ledger(id,org,pool,amount,kind,ref,createdAt) VALUES(?,?,'ai',?,'expire','reuse-test-zero',?)").run(randomUUID(),a.org,-remaining,Date.now());
+  const ledgerRows=store.db.prepare('SELECT count(*) AS n FROM ledger').get().n;
   const automatic=await request('/api/tryon',input,ca);assert.equal(automatic.status,200);assert.equal((await automatic.json()).reused,true);assert.equal(calls(),1);
+  assert.equal(store.billing.balance(a.org),0);assert.equal(store.db.prepare('SELECT count(*) AS n FROM ledger').get().n,ledgerRows,'approved reuse creates no ledger entries at zero credits');
   const reopened=new AccountStore(dir);try{const context=await reopened.garments.context(a,input,{provider:'gemini',model:'gemini-2.5-flash-image'});assert.ok(reopened.garments.cached(a,context));}finally{reopened.close();}
   assert.equal((await request(`${endpoint}/results/${reuse.id}`,undefined,cb,'DELETE')).status,404);
   assert.equal((await request(`${endpoint}/results/${reuse.id}`,undefined,ca,'DELETE')).status,200);

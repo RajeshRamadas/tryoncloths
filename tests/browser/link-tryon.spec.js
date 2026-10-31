@@ -112,3 +112,14 @@ test("failed try-on requires fresh consent before a manual retry", async ({page}
   await expect(page.getByRole("button",{name:"Put on avatar"})).toBeDisabled();
   expect(calls).toBe(1);
 });
+
+test('a credit limit offers billing help and a deliberate retry uses a fresh UUID',async({page})=>{
+ const ids=[];
+ await page.route('**/api/product-link',route=>route.fulfill({json:{title:'Blue shirt',url:'https://shop.example/p/1',images:[{source:'a',image:garment}]}}));
+ await page.route('**/api/tryon',route=>{ids.push(route.request().postDataJSON().requestId);return route.fulfill({status:402,json:{error:'Buy credits or upgrade.',code:'credits_required'}});});
+ await openStudio(page);await page.getByLabel('Product link',{exact:true}).fill('https://shop.example/p/1');await page.getByRole('button',{name:'Find',exact:true}).click();
+ await page.getByLabel(/send their avatar and this product photo/).check();await page.getByRole('button',{name:'Put on avatar',exact:true}).click();
+ await expect(page.getByRole('link',{name:'Buy credits or upgrade'})).toHaveAttribute('href','/billing');expect(ids).toHaveLength(1);
+ await page.getByLabel(/send their avatar and this product photo/).check();await page.getByRole('button',{name:'Put on avatar',exact:true}).click();await expect.poll(()=>ids.length).toBe(2);
+ expect(ids[0]).not.toBe(ids[1]);for(const id of ids)expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+});

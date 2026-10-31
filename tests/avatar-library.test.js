@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
@@ -53,7 +54,7 @@ test('API selects the requested complexion and rejects unknown tones before any 
  try{
   const health=await fetch(base+'/api/health').then(r=>r.json());assert.equal(health.templateVariantCount,48);assert.deepEqual(health.templateBodies,['male','female']);
   const input={face:image,body:image,profileId:'regular',templateTone:'deep',measurements:{heightCm:175,weightKg:72},consent:true,consentScope:'face-and-body',consentProvider:'gemini'};
-  const post=body=>fetch(base+'/api/personalize',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const post=body=>fetch(base+'/api/personalize',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({requestId:randomUUID(),...body})});
   assert.equal((await post({...input,templateTone:'../../secret'})).status,400);assert.equal(calls,0);
   const response=await post(input);assert.equal(response.status,200);assert.equal((await response.json()).templateTone,'deep');assert.equal(calls,1);
  }finally{await new Promise(r=>server.close(r));}

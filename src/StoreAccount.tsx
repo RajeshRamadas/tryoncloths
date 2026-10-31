@@ -39,6 +39,7 @@ export default function StoreAccount({disabled,available,onChange}:{disabled:boo
         {signupAllowed&&<button type="button" className="button back-button" disabled={disabled||busy} onClick={()=>{setRegister(!register);setError("");}}>{register?"Use an existing account":"Create an account"}</button>}
       </form>
     </>}
+    {state.account?.user?.role==="owner"&&<a className="button secondary" href="/billing">Billing</a>}
     {state.account && ["owner","manager"].includes(state.account.user?.role || "") && <>
       <button className="button secondary" disabled={disabled||busy} aria-expanded={staffOpen} onClick={()=>setStaffOpen(!staffOpen)}>{staffOpen?"Close staff":"Staff"}</button>
       {staffOpen&&<StaffManagement key={state.account.id} account={state.account} disabled={disabled||busy} onUpdated={refresh}/>}

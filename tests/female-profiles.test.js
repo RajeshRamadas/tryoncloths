@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
@@ -42,7 +43,7 @@ test('female rollout is opt-in and female garment routes enforce the chosen libr
   try {const health=await fetch(base+'/api/health').then(r=>r.json());assert.equal(health.supportedBodies.includes('female'),enabled);
    const image='data:image/png;base64,'+(await standardAvatar('f-regular')).toString('base64');
    const input={avatar:image,garment:image,garmentType:'dress',consent:true,consentScope:'avatar-and-garment',consentProvider:'gemini'};
-   const post=body=>fetch(base+'/api/tryon',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify(body)});
+   const post=body=>fetch(base+'/api/tryon',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({requestId:randomUUID(),...body})});
    assert.equal((await post({...input,bodyType:'male'})).status,400);
    assert.equal((await post({...input,bodyType:'female'})).status,enabled?200:400);
    assert.equal(calls,enabled?1:0);

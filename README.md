@@ -129,11 +129,15 @@ still need a new adaptation. See [catalogue, matching and deployment](docs/GARME
 
 ## Commercial foundation
 
-Web `0.16.0-alpha.3` adds [C3 staff invitations and management](docs/STAFF_INVITES.md)
-with SMTP delivery, invite acceptance, role changes and immediate disabling,
-building on [C2 user sessions and store roles](docs/USER_SESSIONS.md)
-and the [C1 tenancy migration](docs/TENANCY_MIGRATION.md). Existing owners
-keep their login and saved data. Authentication now uses individual users, with
-membership-checked store switching and a staff name/role display. Owners and
-managers can open **Staff**; invitation emails require server SMTP configuration.
-Billing and the rest of R1 are not enabled by this foundation update.
+Web `0.16.0-alpha.4` adds [C4 credit metering](docs/CREDITS.md): one credit per
+successful account-backed AI generation, refunds on failure, duplicate-request
+protection, trial marks on new images and an owner credit-balance page. Approved
+reuse remains free. Existing pilot organisations receive a one-time grant of
+1000 AI credits by default. Generation requests now require a UUID v4 requestId;
+use the updated web client (the older APK has not been rebuilt).
+
+This builds on [C3 staff invitations](docs/STAFF_INVITES.md),
+[C2 user sessions and store roles](docs/USER_SESSIONS.md), and
+[C1 tenancy migration](docs/TENANCY_MIGRATION.md). Existing owners keep their login
+and saved data. SMTP setup is needed for staff invitation emails. Payments,
+subscriptions and invoices follow in C5; commercial R1 is not complete yet.

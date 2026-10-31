@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
@@ -14,7 +15,7 @@ async function withServer(options, run) {
   try { await run(base); } finally { await new Promise(resolve => server.close(resolve)); }
 }
 const post = (base, path, body, origin = base) => fetch(`${base}${path}`, {
-  method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify(body),
+  method: "POST", headers: { "Content-Type": "application/json", Origin: origin }, body: JSON.stringify(path==="/api/tryon"?{requestId:randomUUID(),...body}:body),
 });
 const avatarPng = await standardAvatar("regular");
 const avatar = `data:image/png;base64,${avatarPng.toString("base64")}`;

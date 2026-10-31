@@ -1,3 +1,4 @@
+import {CreditHelp} from "./Billing";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownToLine,
@@ -377,7 +378,9 @@ export default function App() {
       "New session started. Previous customer photos have been cleared.",
     );
   }
+  const [creditsRequired,setCreditsRequired]=useState(false);
   async function generate() {
+    setCreditsRequired(false);
     if (!face || !body || !aiConsent || !consent || !provider || service !== "available" || !bodyGenerationAllowed || generating || (accountState.enabled && !accountState.account)) return;
     setGenerating(true);
     setRestoredAvatar(false);
@@ -393,11 +396,12 @@ export default function App() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ face, body, profileId: selected, templateTone, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body", consentProvider: provider, ...(accountState.enabled ? {accountStorageConsent:aiConsent,avatarName} : {}) }),
+          body: JSON.stringify({ requestId:crypto.randomUUID(), face, body, profileId: selected, templateTone, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body", consentProvider: provider, ...(accountState.enabled ? {accountStorageConsent:aiConsent,avatarName} : {}) }),
         },
         200000,
       );
       const data = await response.json();
+      if (!response.ok && data.code === "credits_required") setCreditsRequired(true);
       if (!response.ok && data.code === "account_required") window.dispatchEvent(new Event("forme-account-expired"));
       if (!response.ok)
         throw new Error(
@@ -487,7 +491,7 @@ export default function App() {
         <figure><AvatarImage index={profile.index} templateTone={templateTone} /><figcaption>{profile.name} body template</figcaption></figure>
       </div>
       <p className="small-footnote">These are input references, not a generated result.</p>
-      {generationFailed && error && <p className="field-error">{error}</p>}
+      {generationFailed && error && <p className="field-error">{error}{creditsRequired&&<CreditHelp/>}</p>}
       <button type="button" className="button secondary" disabled={generating || exporting} onClick={() => goTo(2)}>
         Go to personalization
       </button>
@@ -939,7 +943,7 @@ export default function App() {
               )}
               {error && (
                 <div role="alert" className="error-banner">
-                  {error}
+                  {error}{creditsRequired&&<CreditHelp/>}
                 </div>
               )}
               <div className="form-navigation">

@@ -9,6 +9,7 @@ import { openaiPersonalize } from "./openai.js";
 import { geminiPersonalize, GEMINI_REFERENCE_VERSION } from "./gemini.js";
 import { providerConfig } from "./provider-config.js";
 import { installAccountRoutes, accountUser } from "./accounts.js";
+import { meter, validRequestId, BillingError, billingFailure } from "./billing.js";
 import { geminiTryOn, garmentTypes, normalizeAvatar, TRYON_CONTRACT } from "./gemini-tryon.js";
 import { normalizeGarmentImage, LinkError } from "./product-link.js";
 
@@ -163,6 +164,15 @@ export function createApp({
     }),
   );
 
+  const generationRequest = (req,res,account) => {
+    if (!validRequestId(req.body.requestId)) {
+      billingFailure(res,new BillingError("invalid_request_id","Update the app: each generation needs a UUID v4 requestId.",400));return false;
+    }
+    if (accountStore && account && accountStore.db.prepare("SELECT 1 FROM ledger WHERE org=? AND requestId=?").get(account.org,req.body.requestId.toLowerCase())) {
+      billingFailure(res,new BillingError("duplicate_request","This generation request was already submitted. Check the existing result before starting a new request."));return false;
+    }
+    return true;
+  };
   let inFlight = 0;
   const attempts = new Map();
   app.post("/api/personalize", async (req, res) => {
@@ -188,6 +198,7 @@ export function createApp({
       return res.status(400).json({
         error: `Customer consent to send both photos and measurements to ${providerLabel} is required. Refresh or update the app before generating.`,
       });
+    if (!generationRequest(req,res,owner)) return;
     if (!profiles.some((p) => p.id === req.body?.profileId))
       return res
         .status(400)
@@ -245,7 +256,7 @@ export function createApp({
     });
     inFlight++;
     try {
-      const image = await personalize({ face, body, avatar, profileId: req.body.profileId, measurements: req.body.measurements, apiKey, model, quality });
+      const image = await meter(req,{billing:accountStore?.billing,account:owner,action:"avatar"},()=>personalize({ face, body, avatar, profileId: req.body.profileId, measurements: req.body.measurements, apiKey, model, quality }));
       let accountSaved = false;
       let avatarId = null;
       if (accountStore) {
@@ -261,6 +272,7 @@ export function createApp({
       }
       res.json({ image, provider, profileId: req.body.profileId, templateTone, kind: "customer-avatar", needsReview: true, reviewChecks: ["face", "standard-body", "skin-tone"], ...(accountStore ? {accountSaved, avatarId, accountSaveError: accountSaved ? null : "Avatar created, but saving to your account failed. Download it now or review and save it again; do not regenerate."} : {}) });
     } catch (error) {
+      if (billingFailure(res,error)) return;
       const failure = providerErrorDetails(error, provider);
       console.error(JSON.stringify({ event: "avatar_provider_failure", provider, code: failure.code, providerStatus: failure.providerStatus }));
       res.status(failure.code === "face_input" ? 400 : 502).json({
@@ -316,6 +328,7 @@ export function createApp({
     if (!sameStudio(req)) return res.status(403).json({ error: "Open this workflow from the Avatar Studio app." });
     if (req.body.consent !== true || req.body.consentScope !== "avatar-and-garment" || req.body.consentProvider !== provider)
       return res.status(400).json({ error: `Customer consent to send the avatar and garment image to ${providerLabel} is required.` });
+    if (!generationRequest(req,res,owner)) return;
     const bodyType = req.body.bodyType || "male";
     if (!["male","female"].includes(bodyType) || (bodyType === "female" && !femaleEnabled)) return res.status(400).json({error:"Choose an enabled body library."});
     if (!Object.hasOwn(garmentTypes, req.body.garmentType) || (["dress","skirt","saree","lehenga","blouse"].includes(req.body.garmentType) && bodyType !== "female"))
@@ -376,7 +389,7 @@ export function createApp({
     attempts.set(req.ip, { started: latest?.started || now, last: Date.now(), count: (latest?.count || 0) + 1 });
     inFlight++;
     try {
-      const image = await tryOn({ avatar, garment, garmentType: req.body.garmentType, title: catalogueContext?.garment.name || req.body.title, apiKey, model });
+      const image = await meter(req,{billing:accountStore?.billing,account:owner,action:"tryon"},()=>tryOn({ avatar, garment, garmentType: req.body.garmentType, title: catalogueContext?.garment.name || req.body.title, apiKey, model }));
       // A storage/receipt failure must never discard a paid image or retry AI.
       let reuseReceipt;
       if (catalogueContext) { try { reuseReceipt = await accountStore.garments.receipt(owner, catalogueContext, image); } catch {} }
@@ -384,6 +397,7 @@ export function createApp({
         ...(catalogueContext ? { garmentId: catalogueContext.garmentId, reuseReceipt,
           ...(!reuseReceipt ? { reuseWarning: "The image was created but cannot be saved for automatic reuse. Save it as a look instead; do not regenerate." } : {}) } : {}) });
     } catch (error) {
+      if (billingFailure(res,error)) return;
       const failure = providerErrorDetails(error, provider);
       console.error(JSON.stringify({ event: "tryon_provider_failure", provider, code: failure.code, providerStatus: failure.providerStatus }));
       res.status(502).json({
