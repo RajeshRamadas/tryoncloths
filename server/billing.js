@@ -2,6 +2,7 @@ import {randomBytes} from 'node:crypto';
 import sharp from 'sharp';
 import {ProviderError} from './provider-errors.js';
 import {requireRole} from './tenancy.js';
+import {installPaymentRoutes} from './payments.js';
 const id=()=>randomBytes(16).toString('hex');
 const pools=['ai','photo'];
 export class BillingError extends Error {
@@ -37,6 +38,7 @@ export class BillingStore {
         CREATE UNIQUE INDEX IF NOT EXISTS ledger_grant ON ledger(org,pool,kind,ref) WHERE kind IN ('grant_plan','grant_pack','grant_admin','trial');
         CREATE TRIGGER IF NOT EXISTS ledger_immutable_update BEFORE UPDATE ON ledger BEGIN SELECT RAISE(ABORT,'Ledger entries are immutable'); END;
         CREATE TRIGGER IF NOT EXISTS ledger_immutable_delete BEFORE DELETE ON ledger BEGIN SELECT RAISE(ABORT,'Ledger entries are immutable'); END;`);
+      if(!db.prepare('PRAGMA table_info(orgs)').all().some(c=>c.name==='pastDueSince'))db.exec('ALTER TABLE orgs ADD COLUMN pastDueSince INTEGER');
       for(const org of db.prepare("SELECT id FROM orgs WHERE plan='pilot'").all())this.seedPilot(org.id);
     });
   }
@@ -52,19 +54,24 @@ export class BillingStore {
   }
   grant(org,pool,amount,kind='grant_admin',ref){
     if(!pools.includes(pool)||!Number.isSafeInteger(amount)||amount<0||amount>1_000_000||!['grant_plan','grant_pack','grant_admin','trial'].includes(kind)||typeof ref!=='string'||!ref||ref.length>200)throw new BillingError('invalid_grant','Use a valid credit grant.',400);
-    return this.transaction(()=>{
+    return this.transaction(()=>this.recordGrant(org,pool,amount,kind,ref));
+  }
+  // Payment + ledger + invoice must commit atomically in the caller transaction.
+  recordGrant(org,pool,amount,kind,ref){
+    if(!this.db.isTransaction)throw new Error('Credit grants require a transaction.');
+    if(!pools.includes(pool)||!Number.isSafeInteger(amount)||amount<0||amount>1_000_000||!['grant_plan','grant_pack','grant_admin','trial'].includes(kind)||typeof ref!=='string'||!ref||ref.length>200)throw new BillingError('invalid_grant','Use a valid credit grant.',400);
       const existing=this.db.prepare('SELECT id,amount FROM ledger WHERE org=? AND pool=? AND kind=? AND ref=?').get(org,pool,kind,ref);
       if(existing){if(existing.amount!==amount)throw new BillingError('grant_conflict','This credit grant has already been recorded.');return existing.id;}
       const key=id();this.db.prepare('INSERT INTO ledger(id,org,pool,amount,kind,ref,createdAt) VALUES(?,?,?,?,?,?,?)').run(key,org,pool,amount,kind,ref,Date.now());return key;
-    });
   }
   reserve({org,store,user,pool='ai',requestId,action=pool==='photo'?'catalogue':'avatar'}){
     if(!validRequestId(requestId))throw new BillingError('invalid_request_id','Update the app: each generation needs a UUID v4 requestId.',400);
     if(!pools.includes(pool)||!['avatar','tryon','catalogue'].includes(action))throw new BillingError('invalid_meter','Invalid generation action.',400);
     return this.transaction(()=>{
-      const actor=this.db.prepare('SELECT m.role,u.disabled,s.org,o.status FROM memberships m JOIN users u ON u.id=m.user JOIN stores s ON s.id=m.store JOIN orgs o ON o.id=s.org WHERE m.user=? AND m.store=?').get(user,store);
+      const actor=this.db.prepare('SELECT m.role,u.disabled,s.org,o.status,o.pastDueSince FROM memberships m JOIN users u ON u.id=m.user JOIN stores s ON s.id=m.store JOIN orgs o ON o.id=s.org WHERE m.user=? AND m.store=?').get(user,store);
       if(!actor||actor.disabled||actor.org!==org)throw new BillingError('account_required','Sign in to an active store account.',401);
       if(actor.status==='suspended')throw new BillingError('account_suspended','This organisation is suspended. Contact your store owner.',403);
+      if(actor.status==='past_due' && Date.now() >= (actor.pastDueSince||0)+3*24*3600000)throw new BillingError('subscription_past_due','Subscription payment is overdue. Ask the store owner to open Billing.',402);
       const previous=this.db.prepare('SELECT id FROM ledger WHERE org=? AND requestId=?').get(org,requestId.toLowerCase());
       if(previous)throw new BillingError('duplicate_request','This generation request was already submitted. Check the existing result before starting a new request.');
       if(this.balance(org,pool)<1)throw new CreditsRequired();
@@ -111,7 +118,8 @@ export async function meter(req,{billing,account,pool='ai',action},fn){
     billing.commit(hold);return image;
   }catch(e){billing.refund(hold,'failed');throw e;}
 }
-export function installBillingRoutes(app,store,{requireUser,wrap}){
+export function installBillingRoutes(app,store,{requireUser,sameOrigin,wrap,payments}){
+  installPaymentRoutes(app,payments,{requireUser,sameOrigin,wrap});
   app.get('/api/billing',requireUser,requireRole('owner'),wrap((req,res)=>{
     const org=store.db.prepare('SELECT plan,status FROM orgs WHERE id=?').get(req.account.org);
     res.json({...org,balances:{ai:store.billing.balance(req.account.org,'ai'),photo:store.billing.balance(req.account.org,'photo')}});

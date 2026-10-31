@@ -187,7 +187,7 @@ export class AccountStore {
 
 function token(req) { return (req.get("cookie") || "").split(";").map(x=>x.trim()).find(x=>x.startsWith(`${cookieName}=`))?.slice(cookieName.length+1) || ""; }
 export function accountUser(store,req) { return store?.user(token(req)) || null; }
-export function installAccountRoutes(app, store, { production=false, allowSignup=true, sendMail, publicUrl }={}) {
+export function installAccountRoutes(app, store, { production=false, allowSignup=true, sendMail, publicUrl, payments }={}) {
   const attempts = new Map(); let hashes=0;
   const cookie = (res,value,maxAge=lifetime) => res.cookie(cookieName,value,{httpOnly:true,secure:production,sameSite:"strict",path:"/",maxAge});
   const wrap = fn => async(req,res) => { try { await fn(req,res); } catch(e) { res.status(e.status || 500).json({error:e.status ? e.message : "Account storage is unavailable. Please try again; no generation request was retried."}); } };
@@ -200,7 +200,7 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
     stores:account ? storesForUser(store.db,account.user.id) : []});
   app.get("/api/account",wrap((req,res)=>res.json({enabled:Boolean(store),signupAllowed:Boolean(store&&allowSignup),...response(accountUser(store,req))})));
   if(!store) return;
-  installBillingRoutes(app,store,{requireUser,wrap});
+  installBillingRoutes(app,store,{requireUser,sameOrigin,wrap,payments});
   installStaffRoutes(app,store,{sameOrigin,requireUser,wrap,production,sendMail,publicUrl});
   for(const action of ["register","login"])app.post(`/api/account/${action}`,sameOrigin,wrap(async(req,res)=>{
     const key=`${action}:${req.ip}`, now=Date.now();

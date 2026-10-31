@@ -1,6 +1,6 @@
 {
   "name": "tryoncloths",
-  "version": "0.16.0-alpha.4",
+  "version": "0.16.0-alpha.5",
   "private": true,
   "type": "module",
   "engines": {
@@ -36,6 +36,7 @@
     "express": "^5.1.0",
     "lucide-react": "^0.468.0",
     "nodemailer": "^10.3.1",
+    "pdfkit": "^0.20.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "sharp": "^0.34.0"
