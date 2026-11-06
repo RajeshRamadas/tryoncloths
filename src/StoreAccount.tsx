@@ -44,7 +44,7 @@ export default function StoreAccount({disabled,available,onChange}:{disabled:boo
     </>}
     {state.account?.user?.role==="owner"&&<a className="button secondary" href="/billing">Billing</a>}
     {state.account && ["owner","manager"].includes(state.account.user?.role || "") && <>
-      <a className="button secondary" href="/usage">Usage</a><a className="button secondary" href="/analytics">Analytics</a><a className="button secondary" href="/size-charts">Size charts</a>
+      <a className="button secondary" href="/catalogue-photos">Catalogue photos</a><a className="button secondary" href="/usage">Usage</a><a className="button secondary" href="/analytics">Analytics</a><a className="button secondary" href="/size-charts">Size charts</a>
       <button className="button secondary" disabled={disabled||busy} aria-expanded={staffOpen} onClick={()=>setStaffOpen(!staffOpen)}>{staffOpen?"Close staff":"Staff"}</button>
       {staffOpen&&<StaffManagement key={state.account.id} account={state.account} disabled={disabled||busy} onUpdated={refresh}/>}
     </>}

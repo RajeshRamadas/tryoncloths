@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react';
 import {billingJson,billingDownload,loadCheckout,openCheckout} from './billing-api';
 export function CreditHelp(){return <> <a href="/billing">Buy credits or upgrade</a></>;}
 type Details={name:string;address:string;billingEmail:string;stateCode:string;gstin:string};
-type Summary={plan:string;status:string;trialEndsAt:number|null;balances:{ai:number;photo:number};paymentsAvailable:boolean;subscription:{status:string;currentPeriodEnd:number|null}|null;plans:{id:string;credits:number;monthly:number;annual:number;monthlyAvailable:boolean;annualAvailable:boolean}[];packs:{id:string;credits:number;amount:number}[]};
+type Summary={plan:string;status:string;trialEndsAt:number|null;balances:{ai:number;photo:number};paymentsAvailable:boolean;subscription:{status:string;currentPeriodEnd:number|null}|null;plans:{id:string;credits:number;monthly:number;annual:number;monthlyAvailable:boolean;annualAvailable:boolean}[];packs:{id:string;credits:number;amount:number}[];photoPacks:{id:string;credits:number;amount:number}[]};
 type Invoice={id:string;number:string;createdAt:number;emailedAt:number|null};
 const money=(paise:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR'}).format(paise/100);
 const date=(value:number|null)=>value?new Date(value).toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata'}):'Not scheduled';
@@ -12,10 +12,10 @@ export default function Billing(){
  async function refresh(){const next=await billingJson('/api/billing');setData(next);setInvoices((await billingJson('/api/billing/invoices')).invoices);}
  useEffect(()=>{let live=true;(async()=>{try{const [d,p,i]=await Promise.all([billingJson('/api/billing'),billingJson('/api/billing/details'),billingJson('/api/billing/invoices')]);if(live){setData(d);setInvoices(i.invoices);if(p.details){setDetails(p.details);setSaved(true);}}}catch(e){if(live)setError((e as Error).message);}})();return()=>{live=false;};},[]);
  async function save(){setBusy(true);setError('');try{await billingJson('/api/billing/details',details,'PUT');setSaved(true);setNotice('Billing details saved.');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
- async function buy(kind:'pack'|'plan',id:string){setBusy(true);setError('');setNotice('');try{
+ async function buy(kind:'pack'|'plan',id:string,pool:'ai'|'photo'='ai'){setBusy(true);setError('');setNotice('');try{
   await loadCheckout();
-  const purchase=await billingJson(kind==='pack'?'/api/billing/order':'/api/billing/subscribe',kind==='pack'?{pack:Number(id)}:{plan:id,period:annual?'annual':'monthly'});
-  const result=await openCheckout({key:purchase.keyId,name:'Forme',description:kind==='pack'?`${purchase.credits} AI credits`:`${id} subscription`,...(kind==='pack'?{order_id:purchase.orderId,amount:purchase.amount,currency:'INR'}:{subscription_id:purchase.subscriptionId}),prefill:{name:details.name,email:details.billingEmail}});
+  const purchase=await billingJson(kind==='pack'?'/api/billing/order':'/api/billing/subscribe',kind==='pack'?{pack:Number(id),pool}:{plan:id,period:annual?'annual':'monthly'});
+  const result=await openCheckout({key:purchase.keyId,name:'Forme',description:kind==='pack'?`${purchase.credits} ${pool==='photo'?'catalogue photo':'AI'} credits`:`${id} subscription`,...(kind==='pack'?{order_id:purchase.orderId,amount:purchase.amount,currency:'INR'}:{subscription_id:purchase.subscriptionId}),prefill:{name:details.name,email:details.billingEmail}});
   if(!result){setNotice('Checkout closed. No new purchase was started automatically. Refresh Billing to check payment status.');return;}
   if(kind==='pack'){
    await billingJson('/api/billing/verify',{orderId:purchase.orderId,paymentId:result.razorpay_payment_id,signature:result.razorpay_signature});setNotice('Payment verified. Credits added and invoice available.');
@@ -26,7 +26,7 @@ export default function Billing(){
  return <main className="billing-page"><nav><a href="/">Back to Forme</a> <a href="/usage">Usage</a></nav><h1>Billing</h1>
  {error&&<p role="alert" className="error-banner">{error}</p>}{notice&&<p role="status" className="billing-notice">{notice}</p>}
  {!data&&!error?<p role="status">Loading credits…</p>:data&&<>
-  <section className="billing-summary"><p>Plan: <strong>{data.plan}</strong> · {data.status}</p><h2>{data.balances.ai} AI credits available</h2><p>{data.balances.photo} catalogue photo credits</p>
+  <section className="billing-summary"><p>Plan: <strong>{data.plan}</strong> · {data.status}</p><h2>{data.plan==='photo'?'Catalogue photo account':`${data.balances.ai} AI credits available`}</h2>{data.plan==='photo'&&<p>Customer avatar and try-on generation requires a subscription. Any existing AI balance remains recorded.</p>}<p>{data.balances.photo} catalogue photo credits</p>
    {data.status==='trial'?<p>Trial ends: {date(data.trialEndsAt)}. Subscribe to continue after it ends; credit packs do not extend the trial.</p>:<p>Current paid period ends: {date(data.subscription?.currentPeriodEnd||null)}</p>}
    <p>Only delivered AI images use credits. Saved avatars and approved adaptation reuse are free.</p>
    <button className="button secondary" disabled={busy} onClick={()=>{setError('');void refresh().catch(e=>setError(e.message));}}>Refresh billing</button>
@@ -44,6 +44,7 @@ export default function Billing(){
    {data.subscription&&<p>Subscription: {data.subscription.status}. Contact your administrator to change or cancel an existing subscription.</p>}
   </section>
   <section><h2>Credit packs</h2><p>One-time purchases; prices include 18% GST.</p><div className="billing-cards">{data.packs?.map(p=><article key={p.id}><h3>{p.credits} AI credits</h3><p>{money(p.amount)}</p><button className="button secondary" disabled={busy||!saved||!data.paymentsAvailable||data.status==='suspended'} onClick={()=>void buy('pack',p.id)}>Buy {p.credits} credits</button></article>)}</div></section>
+  <section><h2>Catalogue photo credits</h2><p>Separate from try-on credits. One photo credit costs ₹99 before GST; a pack of 50 costs ₹69 per credit before GST. Prices below include 18% GST. No try-on subscription is required. A photo-only account needs a subscription before customer avatar or try-on generation.</p><div className="billing-cards">{data.photoPacks?.map(p=><article key={p.id}><h3>{p.credits} photo credits</h3><p>{money(p.amount)}</p><button className="button secondary" disabled={busy||!saved||!data.paymentsAvailable||data.status==='suspended'} onClick={()=>void buy('pack',p.id,'photo')}>Buy {p.credits} photo credits</button></article>)}</div></section>
   <section><h2>Invoices</h2>{invoices.length===0?<p>No invoices yet.</p>:<ul className="billing-invoices">{invoices.map(i=><li key={i.id}><span>{i.number} · {date(i.createdAt)} · {i.emailedAt?'Emailed':'Email pending'}</span><button className="button secondary" disabled={busy} onClick={()=>void handleDownload(i)}>Download {i.number}</button></li>)}</ul>}</section>
  </>}
  </main>;

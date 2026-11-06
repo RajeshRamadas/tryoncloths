@@ -8,6 +8,7 @@ import {sendMail as defaultMail} from './mailer.js';
 const id=()=>randomBytes(16).toString('hex');
 const problem=(code,message,status=400)=>Object.assign(new Error(message),{code,status});
 export const PACKS=Object.freeze({100:{credits:100,base:90000},500:{credits:500,base:400000},2000:{credits:2000,base:1400000}});
+export const PHOTO_PACKS=Object.freeze({1:{credits:1,base:9900},50:{credits:50,base:345000}});
 export const PLANS=Object.freeze({starter:{credits:300,base:199900},growth:{credits:1000,base:599900},chain:{credits:3000,base:1499900}});
 const tax=base=>({base,gst:Math.round(base*18/100),amount:base+Math.round(base*18/100)});
 const providerId=value=>typeof value==='string'&&/^[a-z]+_[A-Za-z0-9]{1,100}$/.test(value);
@@ -42,6 +43,7 @@ export class PaymentStore {
     CREATE TABLE IF NOT EXISTS invoices(id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES orgs(id),number TEXT UNIQUE NOT NULL,paymentId TEXT UNIQUE NOT NULL REFERENCES payments(id),pdf BLOB,snapshotJson TEXT NOT NULL,createdAt INTEGER NOT NULL,emailedAt INTEGER);
     CREATE TABLE IF NOT EXISTS invoice_sequences(year TEXT PRIMARY KEY,next INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS webhook_events(provider TEXT NOT NULL,eventId TEXT NOT NULL,receivedAt INTEGER NOT NULL,PRIMARY KEY(provider,eventId));`);
+   if(!this.db.prepare('PRAGMA table_info(billing_orders)').all().some(c=>c.name==='pool'))this.db.exec("ALTER TABLE billing_orders ADD COLUMN pool TEXT NOT NULL DEFAULT 'ai' CHECK(pool IN ('ai','photo'))");
    if(!this.db.prepare('PRAGMA table_info(orgs)').all().some(c=>c.name==='pastDueSince'))this.db.exec('ALTER TABLE orgs ADD COLUMN pastDueSince INTEGER');
   });
  }
@@ -58,14 +60,16 @@ export class PaymentStore {
  details(org){const row=this.db.prepare('SELECT details FROM billing_profiles WHERE org=?').get(org);if(!row)throw problem('billing_details_required','Save your billing details before purchasing.');return JSON.parse(row.details);}
  saveDetails(org,input){const value=profile(input);return this.billing.transaction(()=>{if(this.db.prepare('SELECT status FROM orgs WHERE id=?').get(org)?.status==='trial')claimTrial(this.db,org,{email:value.billingEmail,gstin:value.gstin});this.db.prepare('INSERT INTO billing_profiles VALUES(?,?) ON CONFLICT(org) DO UPDATE SET details=excluded.details').run(org,JSON.stringify(value));return value;});}
  assertPurchasable(org){if(this.db.prepare('SELECT status FROM orgs WHERE id=?').get(org)?.status==='suspended')throw problem('account_suspended','This organisation is suspended. Contact your administrator before purchasing.',403);}
- async order(org,pack){
+ async order(org,pack,pool='ai'){
   this.assertPurchasable(org);
-  if(!Object.hasOwn(PACKS,String(pack)))throw problem('invalid_pack','Choose 100, 500 or 2000 credits.');
-  const selected=PACKS[pack],price=tax(selected.base),details=this.details(org),key=id();
+  if(!['ai','photo'].includes(pool))throw problem('invalid_pool','Choose AI or photo credits.');
+  const packs=pool==='photo'?PHOTO_PACKS:PACKS;
+  if(!Object.hasOwn(packs,String(pack)))throw problem('invalid_pack','Choose an available credit pack.');
+  const selected=packs[pack],price=tax(selected.base),details=this.details(org),key=id();
   const order=await this.api('orders',{amount:price.amount,currency:'INR',receipt:key});
   if(!providerId(order.id)||order.amount!==price.amount||order.currency!=='INR')throw problem('payment_provider_error','Payment provider returned an invalid order.',502);
-  this.db.prepare('INSERT INTO billing_orders VALUES(?,?,?,?,?,?,?,?,?)').run(key,org,order.id,String(pack),price.amount,price.gst,selected.credits,JSON.stringify(details),this.now());
-  return {orderId:order.id,keyId:this.config.keyId,amount:price.amount,currency:'INR',credits:selected.credits};
+  this.db.prepare('INSERT INTO billing_orders(id,org,providerOrderId,pack,amountPaise,gstPaise,credits,billingJson,createdAt,pool) VALUES(?,?,?,?,?,?,?,?,?,?)').run(key,org,order.id,String(pack),price.amount,price.gst,selected.credits,JSON.stringify(details),this.now(),pool);
+  return {orderId:order.id,keyId:this.config.keyId,amount:price.amount,currency:'INR',credits:selected.credits,pool};
  }
  async subscribe(org,plan,period){
   this.assertPurchasable(org);
@@ -112,9 +116,10 @@ export class PaymentStore {
    if(previousPayment&&previousPayment.org!==record.org)throw problem('payment_conflict','Payment belongs to another organisation.',409);
    const number=`${fy}/${String(sequence).padStart(4,'0')}`,paymentKey=previousPayment?.id||id(),invoiceId=id();
    this.db.prepare('INSERT INTO payments VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(providerPaymentId) DO UPDATE SET status=excluded.status,subscriptionId=excluded.subscriptionId,providerInvoiceId=excluded.providerInvoiceId').run(paymentKey,record.org,payment.id,payment.order_id||null,kind==='subscription'?record.id:null,kind==='subscription'?payment.invoice_id:null,record.amountPaise,record.gstPaise,kind,'captured',time);
-   this.billing.recordGrant(record.org,'ai',record.credits,kind==='pack'?'grant_pack':'grant_plan',payment.id);
+   this.billing.recordGrant(record.org,kind==='pack'?(record.pool||'ai'):'ai',record.credits,kind==='pack'?'grant_pack':'grant_plan',payment.id);
    const buyer=JSON.parse(record.billingJson),supplier=profile(this.config.supplier),local=buyer.stateCode===supplier.stateCode;
-   const snapshot={number,date:new Date(time).toISOString(),supplier,buyer,paymentId:payment.id,description:kind==='pack'?`${record.credits} AI credits`:`${record.plan} ${record.period} subscription (${record.credits} AI credits)`,sac:'998314',base:record.amountPaise-record.gstPaise,total:record.amountPaise,cgst:local?Math.floor(record.gstPaise/2):0,sgst:local?record.gstPaise-Math.floor(record.gstPaise/2):0,igst:local?0:record.gstPaise};
+   if(kind==='pack'&&record.pool==='photo')this.db.prepare("UPDATE orgs SET plan='photo',status='active',trialEndsAt=NULL WHERE id=? AND plan='trial' AND status='trial' AND NOT EXISTS(SELECT 1 FROM subscriptions WHERE org=? AND status NOT IN ('cancelled','completed','expired'))").run(record.org,record.org);
+   const snapshot={number,date:new Date(time).toISOString(),supplier,buyer,paymentId:payment.id,description:kind==='pack'?`${record.credits} ${record.pool==='photo'?'catalogue photo':'AI'} credits`:`${record.plan} ${record.period} subscription (${record.credits} AI credits)`,sac:'998314',base:record.amountPaise-record.gstPaise,total:record.amountPaise,cgst:local?Math.floor(record.gstPaise/2):0,sgst:local?record.gstPaise-Math.floor(record.gstPaise/2):0,igst:local?0:record.gstPaise};
    this.db.prepare('INSERT INTO invoices(id,org,number,paymentId,snapshotJson,createdAt) VALUES(?,?,?,?,?,?)').run(invoiceId,record.org,number,paymentKey,JSON.stringify(snapshot),time);
    return this.db.prepare('SELECT * FROM invoices WHERE id=?').get(invoiceId);
   });
@@ -207,7 +212,7 @@ export function installPaymentRoutes(app,payments,{requireUser,sameOrigin,wrap})
  const owner=[requireUser,requireRole('owner')],mutation=[sameOrigin,...owner];
  app.get('/api/billing/details',...owner,wrap((req,res)=>{const row=payments.db.prepare('SELECT details FROM billing_profiles WHERE org=?').get(req.account.org);res.json({details:row?JSON.parse(row.details):null});}));
  app.put('/api/billing/details',...mutation,wrap((req,res)=>res.json(payments.saveDetails(req.account.org,req.body))));
- app.post('/api/billing/order',...mutation,wrap(async(req,res)=>res.json(await payments.order(req.account.org,req.body?.pack))));
+ app.post('/api/billing/order',...mutation,wrap(async(req,res)=>res.json(await payments.order(req.account.org,req.body?.pack,req.body?.pool||'ai'))));
  app.post('/api/billing/subscribe',...mutation,wrap(async(req,res)=>res.json(await payments.subscribe(req.account.org,req.body?.plan,req.body?.period))));
  app.post('/api/billing/verify',...mutation,wrap(async(req,res)=>res.json(await payments.verify(req.account.org,req.body))));
  app.get('/api/billing/invoices',...owner,wrap((req,res)=>res.json({invoices:payments.db.prepare('SELECT id,number,createdAt,emailedAt FROM invoices WHERE org=? ORDER BY createdAt DESC').all(req.account.org)})));

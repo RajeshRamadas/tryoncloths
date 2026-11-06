@@ -413,8 +413,13 @@ Real shop credentials and live connectivity remain to be verified after deployme
 
 **Acceptance.**
 
-- [ ] Failed items are refunded; regeneration beyond one costs a credit.
-- [ ] Job survives a server restart (pending items resumed).
+- [x] Failed items are refunded; regeneration beyond one costs a credit.
+- [x] Job survives a server restart (pending items resumed).
+
+**Implemented:** `0.18.0-alpha.2`, branch `feature/ai-catalogue-photos`.
+See [credit/approval rules, worker recovery, exports and verification](../CATALOGUE_PHOTOS.md).
+Interrupted provider requests are marked unknown rather than retried automatically;
+raw saved pixels resume local processing. Real provider/payment quality remains unverified.
 
 ### Task C15 — branding
 

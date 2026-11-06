@@ -48,6 +48,16 @@ test('server-priced credit pack verifies capture, grants once, creates GST PDF a
  assert.equal((await (await request('/api/billing/invoices')).json()).invoices.length,1);
 }));
 
+test('photo packs use server prices and the separate pool; verified purchase supports photo-only buyers without unlocking try-on',()=>fixture(async({request,hook,store,owner,captured})=>{
+ store.db.prepare("UPDATE orgs SET plan='trial',status='trial',trialEndsAt=? WHERE id=?").run(Date.now()-1,owner.org);
+ const summary=await (await request('/api/billing')).json();assert.equal(summary.photoPacks.find(p=>p.id==='50').amount,407100);assert.equal((await request('/api/billing/order',{pack:1,pool:'fake'})).status,400);
+ const order=await (await request('/api/billing/order',{pack:50,pool:'photo',amount:1,credits:99999})).json();assert.equal(order.amount,407100);assert.equal(order.pool,'photo');const payment=captured(order,'pay_photos');
+ const verified=await request('/api/billing/verify',{orderId:order.orderId,paymentId:payment.id,signature:sign(`${order.orderId}|${payment.id}`)});assert.equal(verified.status,200);assert.equal((await hook({event:'payment.captured',payload:{payment:{entity:payment}}},'photo-capture')).status,200);
+ assert.equal(store.billing.balance(owner.org,'photo'),50);assert.equal(store.billing.balance(owner.org,'ai'),1000);const org=store.db.prepare('SELECT plan,status FROM orgs WHERE id=?').get(owner.org);assert.equal(org.plan,'photo');assert.equal(org.status,'active');
+ assert.throws(()=>store.billing.reserve({org:owner.org,store:owner.id,user:owner.user.id,pool:'ai',requestId:randomUUID()}),{code:'photo_only'});const hold=store.billing.reserve({org:owner.org,store:owner.id,user:owner.user.id,pool:'photo',requestId:randomUUID()});store.billing.refund(hold);
+ const invoice=store.db.prepare('SELECT snapshotJson FROM invoices').get();assert.match(JSON.parse(invoice.snapshotJson).description,/50 catalogue photo credits/);
+}));
+
 test('bad signatures, un-captured/mismatched payments and other-store orders never grant credits',()=>fixture(async({request,responses,store,owner,other,captured})=>{
  const order=await (await request('/api/billing/order',{pack:100})).json();const before=store.billing.balance(owner.org);
  const input={orderId:order.orderId,paymentId:'pay_one',signature:sign(`${order.orderId}|pay_one`)};

@@ -2,6 +2,7 @@ import {Analytics,installAnalyticsRoutes} from './analytics.js';
 import {installTrackingSchema,validateLookTracking,attributeLook,lookAttribution} from './analytics-tracking.js';
 import {transaction,installSharedCatalogueSchema} from './catalogue-fields.js';
 import {installSyncSchema,installSyncRoutes} from './catalogue-sync.js';
+import {installPhotoSchema,installPhotoRoutes} from './photo-jobs.js';
 import {SizeStore,installSizeRoutes} from './size.js';
 import {installCatalogueRoutes} from './catalogue-import.js';
 import {installCampaignRoutes} from './whatsapp-campaigns.js';
@@ -58,7 +59,7 @@ export class AccountStore {
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     this.garments = new GarmentStore(this);
-    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); this.sizes=new SizeStore(this); installTrackingSchema(this.db); this.analytics=new Analytics(this); installSharedCatalogueSchema(this.db); installSyncSchema(this.db); }
+    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); this.sizes=new SizeStore(this); installTrackingSchema(this.db); this.analytics=new Analytics(this); installSharedCatalogueSchema(this.db); installSyncSchema(this.db); installPhotoSchema(this.db); }
     catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
@@ -213,7 +214,7 @@ export class AccountStore {
 
 function token(req) { return (req.get("cookie") || "").split(";").map(x=>x.trim()).find(x=>x.startsWith(`${cookieName}=`))?.slice(cookieName.length+1) || ""; }
 export function accountUser(store,req) { return store?.user(token(req)) || null; }
-export function installAccountRoutes(app, store, { production=false, allowSignup=true, sendMail, publicUrl, payments, whatsapp, campaignConfig, catalogueOptions, analyticsReports, catalogueSync }={}) {
+export function installAccountRoutes(app, store, { production=false, allowSignup=true, sendMail, publicUrl, payments, whatsapp, campaignConfig, catalogueOptions, analyticsReports, catalogueSync, photoJobs }={}) {
   const attempts = new Map(); let hashes=0;
   const cookie = (res,value,maxAge=lifetime) => res.cookie(cookieName,value,{httpOnly:true,secure:production,sameSite:"strict",path:"/",maxAge});
   const wrap = fn => async(req,res) => { try { await fn(req,res); } catch(e) { res.status(e.status || 500).json({error:e.status ? e.message : "Account storage is unavailable. Please try again; no generation request was retried."}); } };
@@ -228,6 +229,7 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
   if(!store) return;
   installAnalyticsRoutes(app,store,{requireUser,sameOrigin,wrap,reports:analyticsReports});
   if(catalogueSync)installSyncRoutes(app,store,catalogueSync,{requireUser,sameOrigin,wrap});
+  if(photoJobs)installPhotoRoutes(app,store,photoJobs,{requireUser,sameOrigin,wrap});
   installSizeRoutes(app,store,{requireUser,sameOrigin,wrap});
   installCatalogueRoutes(app,store,{requireUser,sameOrigin,wrap,options:catalogueOptions});
   if(whatsapp&&campaignConfig)installCampaignRoutes(app,store,whatsapp,campaignConfig,{requireUser,sameOrigin,wrap});

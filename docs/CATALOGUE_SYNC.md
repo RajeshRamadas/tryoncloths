@@ -170,4 +170,5 @@ Woo variation mapping, encrypted credentials, safe errors, failed-page/image
 rollback, inventory/capacity validation, leases, scheduling, roles/origins,
 transport DNS/redirect/body limits, read-only sharing and local cache isolation.
 Browser tests cover connections, type review, mobile layout and role controls.
-No APK was built. The next priority task is **C13 — AI catalogue photos**.
+No APK was built. [C13 — AI catalogue photos](CATALOGUE_PHOTOS.md) is implemented;
+the next priority task is **C15 — Store branding**.

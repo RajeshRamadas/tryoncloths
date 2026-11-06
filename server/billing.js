@@ -1,5 +1,5 @@
 import {usage,usageCsv} from './commercial-admin.js';
-import {PACKS,PLANS} from './payments.js';
+import {PACKS,PHOTO_PACKS,PLANS} from './payments.js';
 import {randomBytes} from 'node:crypto';
 import sharp from 'sharp';
 import {ProviderError} from './provider-errors.js';
@@ -44,7 +44,7 @@ export class BillingStore {
       for(const org of db.prepare("SELECT id FROM orgs WHERE plan='pilot'").all())this.seedPilot(org.id);
     });
   }
-  transaction(fn){this.db.exec('BEGIN IMMEDIATE');try{const result=fn();this.db.exec('COMMIT');return result;}catch(e){this.db.exec('ROLLBACK');throw e;}}
+  transaction(fn){if(this.db.isTransaction)return fn();this.db.exec('BEGIN IMMEDIATE');try{const result=fn();this.db.exec('COMMIT');return result;}catch(e){this.db.exec('ROLLBACK');throw e;}}
   seedPilot(org){
     // Called in the startup/registration transaction. The stable ref makes this
     // a one-time grant even when the configured starting amount changes later.
@@ -70,11 +70,12 @@ export class BillingStore {
     if(!validRequestId(requestId))throw new BillingError('invalid_request_id','Update the app: each generation needs a UUID v4 requestId.',400);
     if(!pools.includes(pool)||!['avatar','tryon','catalogue'].includes(action))throw new BillingError('invalid_meter','Invalid generation action.',400);
     return this.transaction(()=>{
-      const actor=this.db.prepare('SELECT m.role,u.disabled,s.org,o.status,o.pastDueSince,o.trialEndsAt FROM memberships m JOIN users u ON u.id=m.user JOIN stores s ON s.id=m.store JOIN orgs o ON o.id=s.org WHERE m.user=? AND m.store=?').get(user,store);
+      const actor=this.db.prepare('SELECT m.role,u.disabled,s.org,o.plan,o.status,o.pastDueSince,o.trialEndsAt FROM memberships m JOIN users u ON u.id=m.user JOIN stores s ON s.id=m.store JOIN orgs o ON o.id=s.org WHERE m.user=? AND m.store=?').get(user,store);
       if(!actor||actor.disabled||actor.org!==org)throw new BillingError('account_required','Sign in to an active store account.',401);
       if(actor.status==='suspended')throw new BillingError('account_suspended','This organisation is suspended. Contact your store owner.',403);
-      if(actor.status==='past_due' && Date.now() >= (actor.pastDueSince||0)+3*24*3600000)throw new BillingError('subscription_past_due','Subscription payment is overdue. Ask the store owner to open Billing.',402);
-      if(actor.status==='trial' && Date.now()>=(actor.trialEndsAt||0))throw new BillingError('trial_expired','Your trial has ended. Subscribe to continue generating.',402);
+      if(pool==='ai'&&actor.plan==='photo')throw new BillingError('photo_only','This account has catalogue photos only. Subscribe before generating customer avatars or try-ons.',402);
+      if(pool==='ai'&&actor.status==='past_due' && Date.now() >= (actor.pastDueSince||0)+3*24*3600000)throw new BillingError('subscription_past_due','Subscription payment is overdue. Ask the store owner to open Billing.',402);
+      if(pool==='ai'&&actor.status==='trial' && Date.now()>=(actor.trialEndsAt||0))throw new BillingError('trial_expired','Your trial has ended. Subscribe to continue generating.',402);
       const previous=this.db.prepare('SELECT id FROM ledger WHERE org=? AND requestId=?').get(org,requestId.toLowerCase());
       if(previous)throw new BillingError('duplicate_request','This generation request was already submitted. Check the existing result before starting a new request.');
       if(this.balance(org,pool)<1)throw new CreditsRequired();
@@ -93,7 +94,9 @@ export class BillingStore {
   commit(holdId){return this.settle(holdId,'commit','delivered');}
   refund(holdId,reason='failed'){return this.settle(holdId,'refund',reason);}
   sweep(now=Date.now()){
-    const pending=this.db.prepare("SELECT h.id FROM ledger h WHERE h.kind='hold' AND h.createdAt<? AND NOT EXISTS (SELECT 1 FROM ledger t WHERE t.ref=h.id AND t.kind IN ('commit','refund'))").all(now-10*60*1000);
+    const photos=this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='photo_attempts'").get();
+    const photoGuard=photos?` AND NOT EXISTS(SELECT 1 FROM photo_items i WHERE i.baseHold=h.id AND i.state IN ('pending','generating','processing','ready','rejected') AND i.reviewUntil>?) AND NOT EXISTS(SELECT 1 FROM photo_attempts a JOIN photo_items i ON i.id=a.item WHERE a.extraHold=h.id AND a.state IN ('pending','generating','processing') AND i.reviewUntil>?)`:'';
+    const pending=this.db.prepare("SELECT h.id FROM ledger h WHERE h.kind='hold' AND h.createdAt<? AND NOT EXISTS (SELECT 1 FROM ledger t WHERE t.ref=h.id AND t.kind IN ('commit','refund'))"+photoGuard).all(now-10*60*1000,...(photos?[now,now]:[]));
     let count=0;for(const hold of pending)if(this.refund(hold.id,'expired'))count++;return count;
   }
 }
@@ -126,7 +129,7 @@ export async function meter(req,{billing,account,pool='ai',action,beforeCommit},
 export function creditStatus(store,account){
  const org=store.db.prepare('SELECT plan,status,trialEndsAt FROM orgs WHERE id=?').get(account.org);
  const baseline=org.plan==='trial'?30:PLANS[org.plan]?.credits||store.billing.db.prepare("SELECT amount FROM ledger WHERE org=? AND pool='ai' AND kind='grant_admin' AND ref='pilot-initial'").get(account.org)?.amount||1000;
- const remaining=store.billing.balance(account.org);return {...org,remaining,low:remaining<=Math.ceil(baseline*0.1)};
+ const remaining=store.billing.balance(account.org);return {...org,remaining,...(org.plan==='photo'?{photoRemaining:store.billing.balance(account.org,'photo')} : {}),low:remaining<=Math.ceil(baseline*0.1)};
 }
 export function installBillingRoutes(app,store,{requireUser,sameOrigin,wrap,payments}){
  installPaymentRoutes(app,payments,{requireUser,sameOrigin,wrap});
@@ -140,6 +143,6 @@ export function installBillingRoutes(app,store,{requireUser,sameOrigin,wrap,paym
   const gross=base=>base+Math.round(base*0.18);
   res.json({...org,balances:{ai:store.billing.balance(req.account.org,'ai'),photo:store.billing.balance(req.account.org,'photo')},subscription,paymentsAvailable,
    plans:Object.entries(PLANS).map(([id,p])=>({id,credits:p.credits,monthly:gross(p.base),annual:gross(p.base*10),monthlyAvailable:Boolean(payments?.config.planIds[id+':monthly']),annualAvailable:Boolean(payments?.config.planIds[id+':annual'])})),
-   packs:Object.entries(PACKS).map(([id,p])=>({id,credits:p.credits,amount:gross(p.base)}))});
+   packs:Object.entries(PACKS).map(([id,p])=>({id,credits:p.credits,amount:gross(p.base)})),photoPacks:Object.entries(PHOTO_PACKS).map(([id,p])=>({id,credits:p.credits,amount:gross(p.base)}))});
  }));
 }
