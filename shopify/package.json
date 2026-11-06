@@ -1,0 +1,8 @@
+{
+  "name": "forme-shopify-extension",
+  "private": true,
+  "scripts": {
+    "deploy": "shopify app deploy",
+    "dev": "shopify app dev"
+  }
+}

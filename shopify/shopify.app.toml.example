@@ -1,0 +1,22 @@
+# Copy to shopify.app.toml and replace these public app settings before using
+# Shopify CLI. No client secret belongs in this file or in the theme extension.
+client_id = "REPLACE_WITH_SHOPIFY_CLIENT_ID"
+name = "Forme Try-On"
+application_url = "https://YOUR_STUDIO_DOMAIN/shopify-shopper"
+embedded = false
+
+[access_scopes]
+scopes = "read_products"
+
+[auth]
+redirect_urls = ["https://YOUR_STUDIO_DOMAIN/shopify/callback"]
+
+[app_proxy]
+url = "https://YOUR_STUDIO_DOMAIN/shopper/launch"
+subpath = "forme-tryon"
+prefix = "apps"
+
+[webhooks]
+api_version = "2026-10"
+# APP_UNINSTALLED, SHOP_UPDATE, PRODUCTS_UPDATE and PRODUCTS_DELETE are registered per installation by the server
+# with an installation epoch in their callback URL. Do not duplicate them here.

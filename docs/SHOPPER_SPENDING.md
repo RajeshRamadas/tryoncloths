@@ -166,7 +166,8 @@ cd ~/tryoncloths && git pull --ff-only origin main && cd deploy/lightsail && sud
 The existing account volume keeps both settings and monthly counters. No new
 API key or environment variable is required for these spending controls.
 
-Next: **C16.2 — Shopify installation, signed launches and theme extension**.
+[C16.2 Shopify installation, signed launches and theme extension](SHOPIFY_SHOPPER.md)
+are now implemented as a setup preview. Next: **C16.3 — shopper sessions and guards**.
 C16.3/C16.4 must add transient authenticated sessions, consent, abuse/safety guards,
 shared concurrency with existing image workloads, and the hosted shopper flow.
 Service selection, legal review and live deployment/provider verification remain

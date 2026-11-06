@@ -122,5 +122,6 @@ The Docker image and live deployment were not built or tested in this task.
 C15 completes the R3 implementation tasks. The release retains an alpha label
 until configured live services are verified. C16 shopper design and cost caps
 are now approved, and [C16.1 shopper spending controls](SHOPPER_SPENDING.md) are
-implemented. Shopify installation/signed launches are next; the shopper widget
-and its hosted generation flow remain pending.
+implemented. [C16.2 Shopify setup/signed launches](SHOPIFY_SHOPPER.md) are now
+implemented as well; shopper sessions and the hosted photo/generation flow remain
+pending.

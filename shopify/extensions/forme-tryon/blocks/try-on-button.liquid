@@ -1,0 +1,24 @@
+{% if product != blank and block.settings.show_button %}
+  <div class="forme-tryon" {{ block.shopify_attributes }}>
+    <a class="forme-tryon__button" data-forme-tryon href="/apps/forme-tryon?product_id={{ product.id | url_encode }}" target="_blank" rel="noopener noreferrer">
+      {{ block.settings.button_label | escape }}
+    </a>
+    <p class="forme-tryon__note">Setup preview — customer AI try-on is not available yet.</p>
+    <noscript>Enable JavaScript to open a private product launch.</noscript>
+  </div>
+{% elsif request.design_mode %}
+  <p {{ block.shopify_attributes }}>Forme: enable this block on a product page to test the store connection.</p>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Forme try-on preview",
+  "target": "section",
+  "stylesheet": "forme-tryon.css",
+  "javascript": "forme-tryon.js",
+  "settings": [
+    { "type": "checkbox", "id": "show_button", "label": "Show setup preview button", "default": false },
+    { "type": "text", "id": "button_label", "label": "Button label", "default": "Try it on me" }
+  ]
+}
+{% endschema %}

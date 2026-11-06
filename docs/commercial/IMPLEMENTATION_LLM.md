@@ -474,5 +474,9 @@ Product/design approval does not cover legal review or live service/deployment c
 
 **C16.1 implemented:** `0.19.0-alpha.1`, branch `feature/shopper-budgets`:
 [owner budgets, durable shopper metering, usage and pause controls](../SHOPPER_SPENDING.md).
-The widget is not implemented or enabled. Next: C16.2 Shopify installation and
-signed launches, followed by C16.3 guards/session storage and C16.4 hosted flow.
+
+**C16.2 implemented:** `0.19.0-alpha.2`, branch `feature/shopify-shopper-launch`:
+[Shopify installation, published-product selection, lifecycle revocation, signed
+launches and theme extension](../SHOPIFY_SHOPPER.md). The button opens a setup
+preview only; no shopper photos or AI generation are enabled. Next: C16.3
+guards/session storage, then C16.4 hosted photo/try-on flow.
