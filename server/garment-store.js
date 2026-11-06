@@ -1,4 +1,4 @@
-import {installCatalogueSchema,requireCatalogueSpace,catalogueLimit,transaction} from './catalogue-fields.js';
+import {installCatalogueSchema,requireCatalogueSpace,catalogueLimit,transaction,assertCatalogueWritable} from './catalogue-fields.js';
 import sharp from 'sharp';
 import { randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { parseProductUrl } from './public-url.js';
@@ -49,7 +49,7 @@ export async function productImage(value) {
   } catch { throw problem('Use a valid garment photo at least 160 × 160 pixels and under 5 MB.'); }
 }
 
-const metadata = row => ({ id: row.id, name: row.name, garmentType: row.garmentType, variant: row.variant,
+const metadata = row => ({readOnly:Boolean(row.readOnly),sharedFrom:row.sharedFrom||null,needsTypeReview:Boolean(row.needsTypeReview), id: row.id, name: row.name, garmentType: row.garmentType, variant: ['shopify','woo'].includes(row.source)?[row.colourLabel,...JSON.parse(row.sizesJson||'[]'),row.sku].filter(Boolean).join(' · ').slice(0,80):row.variant,
   sku:row.sku||null,brand:row.brand||'',priceInr:row.priceInr??null,mrpInr:row.mrpInr??null,sizes:JSON.parse(row.sizesJson||'[]'),stock:row.stock||'in',source:row.source||'manual',colourLabel:row.colourLabel||'',updatedAt:row.updatedAt||row.savedAt,
   sourceUrl: row.sourceUrl, savedAt: row.savedAt, adaptations: row.adaptations || 0,
   thumbnail: `data:image/jpeg;base64,${Buffer.from(row.thumbnail).toString('base64')}` });
@@ -85,12 +85,22 @@ export class GarmentStore {
     installCatalogueSchema(this.db);
   }
   row(account, id) {
-    const row = typeof id === 'string' && this.db.prepare('SELECT * FROM garments WHERE account=? AND id=?').get(account.id, id);
+    const row = typeof id === 'string' && this.db.prepare('SELECT * FROM catalogue_visible WHERE account=? AND id=?').get(account.id, id);
     if (!row) throw problem('Garment not found.', 404);
+    if(row.readOnly)this.mirror(account,row);
     return row;
   }
+  mirror(account,row){
+    transaction(this.db,()=>{
+      const previous=this.db.prepare('SELECT imageHash,garmentType,name,externalId,updatedAt,stock,needsTypeReview FROM garments WHERE account=? AND id=?').get(account.id,row.id);
+      if(previous&&previous.imageHash===row.imageHash&&previous.garmentType===row.garmentType&&previous.name===row.name&&previous.externalId===row.sharedFrom+':'+row.sharedId&&previous.updatedAt===row.updatedAt&&previous.stock===row.stock&&previous.needsTypeReview===row.needsTypeReview)return;
+      if(previous&&(previous.imageHash!==row.imageHash||previous.garmentType!==row.garmentType||previous.name!==row.name||previous.externalId!==row.sharedFrom+':'+row.sharedId))this.db.prepare('DELETE FROM garment_results WHERE account=? AND garmentId=?').run(account.id,row.id);
+      const columns=this.db.prepare('PRAGMA table_info(garments)').all().map(c=>c.name),values={...row,source:'master',variant:row.id,externalId:row.sharedFrom+':'+row.sharedId};
+      this.db.prepare(`INSERT INTO garments(${columns.join(',')}) VALUES(${columns.map(()=>'?').join(',')}) ON CONFLICT(account,id) DO UPDATE SET ${columns.filter(c=>!['account','id'].includes(c)).map(c=>c+'=excluded.'+c).join(',')}`).run(...columns.map(c=>values[c]));
+    });
+  }
   list(account) {
-    return this.db.prepare('SELECT g.id,g.name,g.garmentType,g.variant,g.sourceUrl,g.thumbnail,g.savedAt,g.sku,g.brand,g.priceInr,g.mrpInr,g.sizesJson,g.stock,g.colourLabel,g.source,g.updatedAt,(SELECT count(*) FROM garment_results r WHERE r.account=g.account AND r.garmentId=g.id) AS adaptations FROM garments g WHERE g.account=? ORDER BY g.savedAt DESC').all(account.id).map(metadata);
+    return this.db.prepare('SELECT g.id,g.name,g.garmentType,g.variant,g.sourceUrl,g.thumbnail,g.savedAt,g.sku,g.brand,g.priceInr,g.mrpInr,g.sizesJson,g.stock,g.colourLabel,g.source,g.updatedAt,g.needsTypeReview,g.sharedFrom,g.readOnly,(SELECT count(*) FROM garment_results r WHERE r.account=g.account AND r.garmentId=g.id) AS adaptations FROM catalogue_visible g WHERE g.account=? ORDER BY g.savedAt DESC').all(account.id).map(metadata);
   }
   browse(account,query={}) {
     const search=query.search??'',type=query.type??'all',stock=query.stock??'available',offset=String(query.offset??0),limit=String(query.limit??100);
@@ -99,27 +109,27 @@ export class GarmentStore {
     if(type!=='all'){where.push('g.garmentType=?');args.push(type);}
     if(stock==='available')where.push("g.stock<>'out'");else if(stock!=='all'){where.push('g.stock=?');args.push(stock);}
     if(search.trim()){where.push("(g.name LIKE ? ESCAPE '\\' OR g.variant LIKE ? ESCAPE '\\' OR g.sku LIKE ? ESCAPE '\\' OR g.brand LIKE ? ESCAPE '\\' OR g.colourLabel LIKE ? ESCAPE '\\')");const pattern='%'+search.trim().replace(/[\\%_]/g,'\\$&')+'%';args.push(pattern,pattern,pattern,pattern,pattern);}
-    const filter=where.join(' AND '),total=this.db.prepare(`SELECT count(*) AS n FROM garments g WHERE ${filter}`).get(...args).n;
-    const rows=this.db.prepare(`SELECT g.id,g.name,g.garmentType,g.variant,g.sourceUrl,g.thumbnail,g.savedAt,g.sku,g.brand,g.priceInr,g.mrpInr,g.sizesJson,g.stock,g.colourLabel,g.source,g.updatedAt,(SELECT count(*) FROM garment_results r WHERE r.account=g.account AND r.garmentId=g.id) AS adaptations FROM garments g WHERE ${filter} ORDER BY g.savedAt DESC,g.id LIMIT ? OFFSET ?`).all(...args,Number(limit),Number(offset));
-    return {garments:rows.map(metadata),total,offset:Number(offset),limit:Number(limit),capacity:catalogueLimit(this.db,account),stored:this.db.prepare('SELECT count(*) AS n FROM garments WHERE account=?').get(account.id).n};
+    const filter=where.join(' AND '),total=this.db.prepare(`SELECT count(*) AS n FROM catalogue_visible g WHERE ${filter}`).get(...args).n;
+    const rows=this.db.prepare(`SELECT g.id,g.name,g.garmentType,g.variant,g.sourceUrl,g.thumbnail,g.savedAt,g.sku,g.brand,g.priceInr,g.mrpInr,g.sizesJson,g.stock,g.colourLabel,g.source,g.updatedAt,g.needsTypeReview,g.sharedFrom,g.readOnly,(SELECT count(*) FROM garment_results r WHERE r.account=g.account AND r.garmentId=g.id) AS adaptations FROM catalogue_visible g WHERE ${filter} ORDER BY g.savedAt DESC,g.id LIMIT ? OFFSET ?`).all(...args,Number(limit),Number(offset));
+    return {garments:rows.map(metadata),total,offset:Number(offset),limit:Number(limit),capacity:catalogueLimit(this.db,account),stored:this.db.prepare('SELECT count(*) AS n FROM garments WHERE account=? AND source<>\'master\'').get(account.id).n};
   }
   get(account, id) { const row = this.row(account, id); return { ...metadata(row), image: png(row.image) }; }
   async matches(account, input) {
     if (!input.url && !input.image) throw problem('Supply a product link or photo.');
     const url = canonicalProductUrl(input.url), photo = input.image ? await productImage(input.image) : null;
     // Scan signatures without loading every product thumbnail into memory.
-    const exactIds = photo ? this.db.prepare("SELECT id FROM garments WHERE account=? AND imageHash=? AND stock<>'out' ORDER BY savedAt DESC").all(account.id,photo.imageHash).map(r=>r.id) : [];
+    const exactIds = photo ? this.db.prepare("SELECT id FROM catalogue_visible WHERE account=? AND imageHash=? AND stock<>'out' ORDER BY savedAt DESC").all(account.id,photo.imageHash).map(r=>r.id) : [];
     const exactSet=new Set(exactIds);
-    const linkedIds=url ? this.db.prepare("SELECT g.id FROM garments g JOIN garment_links l ON l.account=g.account AND l.garmentId=g.id WHERE g.account=? AND l.sourceUrl=? AND g.stock<>'out' ORDER BY g.savedAt DESC").all(account.id,url).map(r=>r.id) : [];
+    const linkedIds=url ? this.db.prepare("SELECT g.id FROM catalogue_visible g JOIN garment_links l ON l.account=COALESCE(g.sharedFrom,g.account) AND l.garmentId=COALESCE(g.sharedId,g.id) WHERE g.account=? AND l.sourceUrl=? AND g.stock<>'out' ORDER BY g.savedAt DESC").all(account.id,url).map(r=>r.id) : [];
     const linkedSet=new Set(linkedIds),similarIds=[];
-    if(photo)for(const row of this.db.prepare("SELECT id,signature,colour FROM garments WHERE account=? AND stock<>'out' ORDER BY savedAt DESC").iterate(account.id)){
+    if(photo)for(const row of this.db.prepare("SELECT id,signature,colour FROM catalogue_visible WHERE account=? AND stock<>'out' ORDER BY savedAt DESC").iterate(account.id)){
       if(exactSet.has(row.id)||linkedSet.has(row.id))continue;
       let diff=BigInt(`0x${row.signature}`)^BigInt(`0x${photo.signature}`),distance=0;while(diff){distance++;diff&=diff-1n;}
       const a=JSON.parse(row.colour),b=JSON.parse(photo.colour);
       if(distance<=6&&a.reduce((n,c,i)=>n+(c-b[i])**2,0)<=1600)similarIds.push(row.id);
       if(similarIds.length===6)break;
     }
-    const read=ids=>ids.slice(0,6).map(id=>metadata(this.db.prepare('SELECT id,name,garmentType,variant,sourceUrl,thumbnail,savedAt,sku,brand,priceInr,mrpInr,sizesJson,stock,colourLabel,source,updatedAt FROM garments WHERE account=? AND id=?').get(account.id,id)));
+    const read=ids=>ids.slice(0,6).map(id=>metadata(this.db.prepare('SELECT id,name,garmentType,variant,sourceUrl,thumbnail,savedAt,sku,brand,priceInr,mrpInr,sizesJson,stock,colourLabel,source,updatedAt,needsTypeReview,sharedFrom,readOnly FROM catalogue_visible WHERE account=? AND id=?').get(account.id,id)));
     return {exact:read(exactIds),linked:read(linkedIds.filter(id=>!exactSet.has(id))),similar:read(similarIds)};
   }
 
@@ -129,7 +139,7 @@ export class GarmentStore {
     if (!name || name.length > 100 || variant.length > 80 || !Object.hasOwn(garmentTypes, input.garmentType)) throw problem('Enter a garment name, category and optional colour/size/SKU variant.');
     const sourceUrl = canonicalProductUrl(input.sourceUrl), photo = await productImage(input.image);
     return transaction(this.db,()=>{
-    const samePhotos = this.db.prepare('SELECT id,sourceUrl FROM garments WHERE account=? AND imageHash=? AND garmentType=? AND lower(variant)=lower(?)').all(account.id, photo.imageHash, input.garmentType, variant);
+    const samePhotos = this.db.prepare("SELECT id,sourceUrl FROM garments WHERE account=? AND source<>'master' AND imageHash=? AND garmentType=? AND lower(variant)=lower(?)").all(account.id, photo.imageHash, input.garmentType, variant);
     if (!sourceUrl && samePhotos.length > 1) throw problem('This photo is used by multiple saved products. Choose the correct product in My store clothes or specify its variant.', 409);
     // Identical retailer photos may represent different SKUs/colour variants.
     // A different meaningful URL must not silently collapse those products.
@@ -138,7 +148,7 @@ export class GarmentStore {
       this.addLink(account, duplicate.id, sourceUrl);
       return { garment: metadata(this.row(account, duplicate.id)), duplicate: true };
     }
-    if (sourceUrl && this.db.prepare('SELECT g.id FROM garments g JOIN garment_links l ON l.account=g.account AND l.garmentId=g.id WHERE g.account=? AND l.sourceUrl=? AND g.garmentType=? AND lower(g.variant)=lower(?)').get(account.id, sourceUrl, input.garmentType, variant))
+    if (sourceUrl && this.db.prepare('SELECT g.id FROM catalogue_visible g JOIN garment_links l ON l.account=COALESCE(g.sharedFrom,g.account) AND l.garmentId=COALESCE(g.sharedId,g.id) WHERE g.account=? AND l.sourceUrl=? AND g.garmentType=? AND lower(g.variant)=lower(?)').get(account.id, sourceUrl, input.garmentType, variant))
       throw problem('That product and variant are already saved. Use My store clothes, or give this different photo its own colour/size/SKU variant.', 409);
     requireCatalogueSpace(this.db,account);
     const id = randomBytes(16).toString('hex'), savedAt = Date.now();
@@ -153,17 +163,19 @@ export class GarmentStore {
     this.db.prepare('INSERT OR IGNORE INTO garment_links VALUES(?,?,?)').run(account.id, id, sourceUrl);
     this.db.prepare("UPDATE garments SET sourceUrl=? WHERE account=? AND id=? AND sourceUrl=''").run(sourceUrl, account.id, id);
   }
-  remove(account, id) { return this.db.prepare('DELETE FROM garments WHERE account=? AND id=?').run(account.id, id).changes > 0; }
+  remove(account, id) { assertCatalogueWritable(this.db,account,id);return this.db.prepare('DELETE FROM garments WHERE account=? AND id=?').run(account.id, id).changes > 0; }
   async context(account, input, { provider, model }) {
     this.accounts.requireAvatar(account, input.avatarId);
     const garment = this.row(account, input.garmentId);
+    if(garment.needsTypeReview)throw problem('Ask an owner or manager to confirm this product’s clothing type in Store catalogue before using it.',409);
     if (garment.garmentType !== input.garmentType) throw problem('Use the saved garment category, or save it as a different item.');
     const bodyType = input.bodyType || 'male';
     const avatarRow = this.db.prepare('SELECT body_type FROM avatars WHERE account=? AND id=?').get(account.id, input.avatarId);
     if (bodyType !== avatarRow.body_type) throw problem('Use the saved avatar body library.');
     let avatar;
     try { avatar = await normalizeAvatar(input.avatar); } catch { throw problem('Use a valid approved avatar PNG.'); }
-    this.accounts.requireAvatar(account, input.avatarId); this.row(account, input.garmentId);
+    this.accounts.requireAvatar(account, input.avatarId); const latest=this.row(account, input.garmentId);
+    if(latest.imageHash!==garment.imageHash||latest.garmentType!==garment.garmentType||latest.name!==garment.name)throw problem('The product changed while loading. Review it again before generating.',409);
     const id = digest(JSON.stringify({ avatarId: input.avatarId, baseHash: await pixelHash(avatar),
       garmentId: garment.id, garmentHash: garment.imageHash, garmentType: garment.garmentType, bodyType,
       provider, model, revision: ADAPTATION_REVISION, title: garment.name }));

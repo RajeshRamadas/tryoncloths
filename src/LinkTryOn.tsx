@@ -65,6 +65,7 @@ export default function LinkTryOn({ catalogueEnabled=false, avatarId, sessionId,
 
   async function loadStored(item:StoreGarment) {
     const g=await getGarment(item.id);
+    if(g.needsTypeReview)throw new Error('Ask an owner or manager to confirm this product’s clothing type in Store catalogue before using it.');
     if(!g.image)throw new Error('The saved garment photo is unavailable.');
     applyProduct(g.name,[{source:'catalogue',image:g.image}],g.sourceUrl);
     setVariant(g.variant);setSaved(g);

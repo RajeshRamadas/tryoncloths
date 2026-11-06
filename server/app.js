@@ -1,4 +1,5 @@
 import {MonthlyAnalytics,installAnalyticsUnsubscribe} from './analytics-mail.js';
+import {CatalogueSync} from './catalogue-sync.js';
 import {record} from './events.js';
 import {validateSession,recordTryon} from './analytics-tracking.js';
 import {WhatsApp,installWhatsAppWebhook} from './whatsapp.js';
@@ -94,6 +95,7 @@ export function createApp({
   paymentOptions = {},
   whatsappOptions = {},
   catalogueOptions = {},
+  syncOptions = {},
   femaleEnabled = process.env.TRYON_FEMALE_PROFILES === "true",
   tryOn = geminiTryOn,
   productLink = readProductLinkWithFallback,
@@ -113,6 +115,8 @@ export function createApp({
   app.set("trust proxy", trustProxy);
   app.disable("x-powered-by");
   app.locals.accountStore=accountStore;
+  const catalogueSync=accountStore?new CatalogueSync(accountStore,syncOptions):null;
+  app.locals.catalogueSync=catalogueSync;
   app.use("/api", (_req, res, next) => {
     res.set("Cache-Control", "no-store");
     res.set("X-Content-Type-Options", "nosniff");
@@ -159,7 +163,7 @@ export function createApp({
   // Two <=5 MB photos, base64-encoded, plus small metadata. Each is checked below.
   app.use("/api/account", express.json({ limit: "4kb" }));
   app.use(express.json({ limit: "15mb" }));
-  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, analyticsReports, campaignConfig:{provider,model,apiKey,tryOn,femaleEnabled} });
+  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, analyticsReports, catalogueSync, campaignConfig:{provider,model,apiKey,tryOn,femaleEnabled} });
   installGarmentRoutes(app, accountStore, { provider, model });
   app.get("/api/health", (_req, res) =>
     res.json({

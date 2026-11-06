@@ -45,7 +45,7 @@ export default function GarmentCatalogue({disabled,refresh,onUse,onDelete,onBusy
       {!busy&&!error&&!visible.length&&<p>No saved clothes match. Read a product link or upload a photo below, then save the garment.</p>}
       <div className="catalogue-grid">{visible.map(g=><article key={g.id} className="catalogue-item">
         <button className="garment-tile" disabled={busy||disabled} onClick={()=>onUse(g)}><img src={g.thumbnail} alt=""/><strong>Use {displayName(g)}</strong><small>{garmentChoices.find(([id])=>id===g.garmentType)?.[1]} · {g.adaptations} saved adaptations</small><ProductFacts item={g}/></button>
-        <button className="button back-button" disabled={busy||disabled} aria-label={`Delete garment ${displayName(g)}`} onClick={()=>void remove(g)}>Delete</button>
+        {!g.readOnly&&<button className="button back-button" disabled={busy||disabled} aria-label={`Delete garment ${displayName(g)}`} onClick={()=>void remove(g)}>Delete</button>}
       </article>)}</div>
       <div className="customer-actions"><button className="button secondary" disabled={busy||disabled||offset===0} onClick={()=>void load(Math.max(0,offset-50))}>Previous clothes</button><button className="button secondary" disabled={busy||disabled||offset+50>=total} onClick={()=>void load(offset+50)}>Next clothes</button><span>{total} matching clothes</span></div>
       {error&&<p role="alert" className="error-banner">{error}</p>}
