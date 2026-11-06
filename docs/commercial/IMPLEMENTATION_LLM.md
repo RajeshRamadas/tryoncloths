@@ -466,3 +466,8 @@ The next outlined task, C16, requires design review and cost-cap sign-off first.
 
 - [ ] Threat model and cost cap approved.
 - [ ] Shopper data retention ≤ 24 hours unless opted in.
+
+**Design prerequisite prepared:** see [C16 shopper self-service design](SHOPPER_SELF_SERVICE_DESIGN.md)
+for the proposed flow, tenant/session boundaries, monthly credit and provider-attempt
+caps, threat model, retention, consent draft and ordered implementation/test tasks.
+The proposal is awaiting approval; the widget is not implemented or enabled.

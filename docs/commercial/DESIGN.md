@@ -4,6 +4,11 @@ As of 2026-10-30 · Baseline: `main` web **0.15.0** · Requirements: [`SALES_REQ
 
 ## 1. Design principles
 
+The R4 shopper extension is specified separately in the proposed
+[C16 design and threat model](SHOPPER_SELF_SERVICE_DESIGN.md). It requires
+design/cost approval before implementation; this staff architecture does not
+authorize anonymous access to staff generation or account storage.
+
 1. **Do not break the pilot.** Existing tables keep their `account` key; it now means *store*. Existing logins keep working after migration.
 2. **Money is a ledger.** Credits are never a mutable counter. Balance is the sum of immutable ledger rows.
 3. **Charge only for delivered images.** Reserve before a paid call, commit on success, refund on failure, in one SQLite transaction each.

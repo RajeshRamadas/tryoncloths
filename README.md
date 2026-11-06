@@ -69,6 +69,11 @@ Original customer photo inputs stay in memory and are sent to the configured pro
 
 Store accounts, durable avatar storage and clothing try-on are available. Fit prediction and automatic body measurements are not implemented.
 
+Next commercial feature: the shopper **Try it on me** Shopify widget. Its
+[design, proposed spending caps and threat model](docs/commercial/SHOPPER_SELF_SERVICE_DESIGN.md)
+are prepared for review; implementation awaits the design sign-off required by
+the commercial guide. The widget is not available in the current app.
+
 ## Validation
 
 Automated validation covers both provider adapters, provider-specific consent, whole-body skin-tone instructions, pending/error previews, customer-export blocking, and approval of a stubbed provider result. Test customer photos were generated independently of the avatar library. See [version 0.4 validation](docs/testing/avatar-v4/README.md). Live provider quality remains unverified. The Android download is version 0.7.0 with saved-avatar reuse and local clothing try-on and consent naming the configured provider.
