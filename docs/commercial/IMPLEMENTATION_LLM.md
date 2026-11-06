@@ -236,8 +236,11 @@ checks use supplied identifiers; phone/GSTIN ownership verification is not inclu
 
 **Acceptance.**
 
-- [ ] Same number in two stores = two separate customers; neither store can see the other's.
-- [ ] Erasure leaves no rows referencing the customer.
+- [x] Same number in two stores = two separate customers; neither store can see the other's.
+- [x] Erasure leaves no rows referencing the customer.
+
+**Implemented:** `0.16.0-alpha.7`, branch `feature/commercial-customers`.
+See [customer profiles, erasure boundaries and C8 handoff](../CUSTOMERS.md).
 
 ### Task C8 — share link and WhatsApp click-to-chat
 

@@ -1,3 +1,5 @@
+import CustomerPicker from "./CustomerPicker";
+import {type CustomerRef,type Customer} from "./customers";
 import {CreditHelp} from "./Billing";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -200,6 +202,7 @@ export default function App() {
   const [step, setStep] = useState(1);
   const [accountState, setAccountState] = useState<AccountState>({enabled:false,account:null});
   const accountIdentity = useRef<string | null>(null);
+  const [customer,setCustomer]=useState<CustomerRef|null>(null);
   const [avatarId, setAvatarId] = useState<string | null>(null);
   const [openedLook, setOpenedLook] = useState<OpenedLook | undefined>();
   const [outfitOpen, setOutfitOpen] = useState(false);
@@ -353,6 +356,7 @@ export default function App() {
     setTimeout(() => titleRef.current?.focus(), 0);
   }
   function reset() {
+    setCustomer(null);
     setRestoredAvatar(false);
     setAvatarSource("generated");
     setAvatarName("Customer avatar");
@@ -396,7 +400,7 @@ export default function App() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ requestId:crypto.randomUUID(), face, body, profileId: selected, templateTone, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body", consentProvider: provider, ...(accountState.enabled ? {accountStorageConsent:aiConsent,avatarName} : {}) }),
+          body: JSON.stringify({ requestId:crypto.randomUUID(), face, body, profileId: selected, templateTone, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body", consentProvider: provider, ...(accountState.enabled ? {accountStorageConsent:aiConsent,avatarName,customerId:customer?.id} : {}) }),
         },
         200000,
       );
@@ -429,7 +433,14 @@ export default function App() {
       setGenerating(false);
     }
   }
+  function selectCustomer(next:CustomerRef|null,measurements?:Customer['measurements']) {
+    if (next?.id === customer?.id) return;
+    reset(); setCustomer(next);
+    if(next)setAvatarName(next.name.slice(0,60));
+    if(measurements){setHeight(String(measurements.heightCm));setWeight(String(measurements.weightKg));}
+  }
   function useSavedAvatar(image: string, details: AvatarDetails) {
+    if(details.avatarId)setCustomer(details.customerId ? {id:details.customerId,name:details.customerName || 'Customer',phoneE164:details.customerPhone || ''} : null);
     invalidate();
     setFace(null); setBody(null); setConsent(false);
     setSession(s => s + 1);
@@ -446,7 +457,7 @@ export default function App() {
     setExporting(true); setError("");
     try {
       const save = accountState.enabled ? saveAccountAvatar : saveAvatar;
-      const saved = await save(personalized, { name: avatarName, profileId: selected, templateTone, heightCm: Number(height), weightKg: Number(weight), source: avatarSource });
+      const saved = await save(personalized, { customerId:customer?.id, name: avatarName, profileId: selected, templateTone, heightCm: Number(height), weightKg: Number(weight), source: avatarSource });
       if (saved?.id) setAvatarId(saved.id);
       setNotice(accountState.enabled ? "Avatar saved to your store account. Sign in to this account on another browser to reopen it." : "Avatar saved on this device. Open Saved avatars next time; no generation is needed.");
     } catch (e) { setError((e as Error).message); }
@@ -585,11 +596,13 @@ export default function App() {
                 </h2>
                 <span className="tiny-label">{`0${step}`}</span>
               </div>
+              {customer && step !== 1 && <p className="selected-customer-summary">Saving for {customer.name} · {customer.phoneE164}</p>}
               {step === 1 ? (
                 <>
                   <p className="section-copy">
                     A few details to find their closest starting point.
                   </p>
+                  {accountState.account && <CustomerPicker key={`${accountState.account.id}-${session}`} selected={customer} disabled={generating || exporting} onSelect={selectCustomer} onUpdate={setCustomer}/>}
                   <div className="field-label-row">
                     <h3>Customer photos</h3>
                     <span>Optional for a sample</span>
