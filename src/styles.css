@@ -1892,3 +1892,12 @@ dialog::backdrop {
 .photo-job-list { list-style:none; padding:0; }
 .photo-job-list li { padding:12px 0; border-bottom:1px solid #d7dfd2; overflow-wrap:anywhere; }
 .photo-job-list span { display:block; }
+.branding-page section { padding:20px; margin:20px 0; border:1px solid #d7dfd2; border-radius:12px; }
+.branding-page label:not(.consent) { display:flex; flex-direction:column; gap:8px; margin:12px 0; }
+.branding-page input:not([type=checkbox]) { width:100%; min-width:0; padding:10px; font:inherit; border:1px solid #d7dfd2; border-radius:8px; background:white; color:#234b3a; }
+.branding-page .consent { display:flex; align-items:start; }
+.branding-page button { margin:12px 0; white-space:normal; }
+.branding-page p,.branding-page h3,.branding-page a { overflow-wrap:anywhere; }
+.brand-card { padding:20px; border-radius:12px; }
+.brand-logo-preview { max-width:100%; width:auto; height:auto; max-height:90px; object-fit:contain; }
+.export-branding-choice p { font-size:13px; line-height:1.5; }

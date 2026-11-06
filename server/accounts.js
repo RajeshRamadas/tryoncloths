@@ -3,6 +3,7 @@ import {installTrackingSchema,validateLookTracking,attributeLook,lookAttribution
 import {transaction,installSharedCatalogueSchema} from './catalogue-fields.js';
 import {installSyncSchema,installSyncRoutes} from './catalogue-sync.js';
 import {installPhotoSchema,installPhotoRoutes} from './photo-jobs.js';
+import {BrandingStore,installBrandingRoutes} from './branding.js';
 import {SizeStore,installSizeRoutes} from './size.js';
 import {installCatalogueRoutes} from './catalogue-import.js';
 import {installCampaignRoutes} from './whatsapp-campaigns.js';
@@ -59,7 +60,7 @@ export class AccountStore {
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     this.garments = new GarmentStore(this);
-    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); this.sizes=new SizeStore(this); installTrackingSchema(this.db); this.analytics=new Analytics(this); installSharedCatalogueSchema(this.db); installSyncSchema(this.db); installPhotoSchema(this.db); }
+    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); this.sizes=new SizeStore(this); installTrackingSchema(this.db); this.analytics=new Analytics(this); installSharedCatalogueSchema(this.db); installSyncSchema(this.db); installPhotoSchema(this.db); this.branding=new BrandingStore(this); }
     catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
@@ -227,6 +228,7 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
     stores:account ? storesForUser(store.db,account.user.id) : []});
   app.get("/api/account",wrap((req,res)=>res.json({enabled:Boolean(store),signupAllowed:Boolean(store&&allowSignup),...response(accountUser(store,req))})));
   if(!store) return;
+  installBrandingRoutes(app,store,{requireUser,sameOrigin,wrap});
   installAnalyticsRoutes(app,store,{requireUser,sameOrigin,wrap,reports:analyticsReports});
   if(catalogueSync)installSyncRoutes(app,store,catalogueSync,{requireUser,sameOrigin,wrap});
   if(photoJobs)installPhotoRoutes(app,store,photoJobs,{requireUser,sameOrigin,wrap});

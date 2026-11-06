@@ -2,6 +2,7 @@ import { isNative, shareAvatar } from "./native";
 import { preparePhoto, orientCanvas } from "./photo-orientation";
 
 import { profiles, templateLibrary, DEFAULT_TEMPLATE_TONE } from "./profiles";
+import {requestApi} from './api';
 export function libraryForIndex(index:number, tone=DEFAULT_TEMPLATE_TONE) { return templateLibrary(profiles[index]?.body || 'male', tone); }
 
 export const LIBRARY_URL = "/avatar-library.png";
@@ -76,6 +77,7 @@ export async function downloadAvatar(
   personalized: string | null,
   name: string,
   tone=DEFAULT_TEMPLATE_TONE,
+  branding?:{storeFooter?:boolean},
 ) {
   let canvas: HTMLCanvasElement;
   if (personalized) {
@@ -85,6 +87,7 @@ export async function downloadAvatar(
     canvas.height = image.height;
     canvas.getContext("2d")!.drawImage(image, 0, 0);
   } else canvas = await avatarCanvas(index, tone);
+  if(branding){const response=await requestApi('/api/exports/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:canvas.toDataURL('image/png'),storeFooter:branding.storeFooter})},30000);if(!response.ok){const data=await response.json();throw new Error(data.error||'The branded export could not be prepared.');}const url=URL.createObjectURL(await response.blob());try{const image=await loadImage(url);canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;canvas.getContext('2d')!.drawImage(image,0,0);}finally{URL.revokeObjectURL(url);}}
   if (isNative) {
     return await shareAvatar(canvas.toDataURL("image/png"), name);
   }

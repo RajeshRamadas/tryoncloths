@@ -41,6 +41,7 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 - [Catalogue import](docs/CATALOGUE_IMPORT.md): CSV/Excel products, SKU updates, prices, sizes, colours, stock filters and plan limits.
 - [Shop catalogue sync](docs/CATALOGUE_SYNC.md): Shopify/WooCommerce connections, nightly sync, clothing-type review and read-only Chain master catalogues.
 - [AI catalogue photos](docs/CATALOGUE_PHOTOS.md): durable model-photo batches, approval, included regeneration, JPEG/ZIP exports and separate photo-credit purchases.
+- [Store branding](docs/STORE_BRANDING.md): owner logo/contacts, branded outfit and lookbook pages, optional export footers and server-enforced trial marks.
 - [Size guidance](docs/SIZE_RECOMMENDATIONS.md): body measurements, brand charts, confidence/explanations and purchase tracking; no additional AI calls.
 - [Store analytics](docs/ANALYTICS.md): scoped reports, daily activity, product/staff performance, committed credits, CSV export and monthly owner emails.
 - Responsive layout and keyboard-accessible controls/dialogs.

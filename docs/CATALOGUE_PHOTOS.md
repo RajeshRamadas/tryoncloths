@@ -171,5 +171,6 @@ Update the existing Lightsail web container:
 cd ~/tryoncloths && git pull --ff-only origin main && cd deploy/lightsail && sudo docker compose -f compose.shared.yaml -f compose.accounts.yaml up -d --build tryon
 ```
 
-Codex has not deployed this update or built an APK. The next priority task is
-**C15 — Store branding**.
+Codex has not deployed this update or built an APK.
+[C15 — Store branding](STORE_BRANDING.md) is now implemented. The next outlined
+task is C16 shopper self-service design review.
