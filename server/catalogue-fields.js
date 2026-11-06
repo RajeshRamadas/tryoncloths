@@ -1,0 +1,29 @@
+const fail=(message,status=400)=>Object.assign(new Error(message),{status});
+export const legacyGarmentColumns='account,id,name,garmentType,variant,sourceUrl,imageHash,signature,colour,image,thumbnail,savedAt';
+export function transaction(db,fn){if(db.isTransaction)return fn();db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}}
+export function installCatalogueSchema(db){transaction(db,()=>{
+ const columns=new Set(db.prepare('PRAGMA table_info(garments)').all().map(c=>c.name));
+ for(const [name,type] of Object.entries({sku:'TEXT',brand:"TEXT NOT NULL DEFAULT ''",priceInr:'REAL',mrpInr:'REAL',sizesJson:"TEXT NOT NULL DEFAULT '[]'",stock:"TEXT NOT NULL DEFAULT 'in' CHECK(stock IN ('in','low','out'))",externalId:'TEXT',source:"TEXT NOT NULL DEFAULT 'manual'",updatedAt:'INTEGER',colourLabel:"TEXT NOT NULL DEFAULT ''"}))if(!columns.has(name))db.exec(`ALTER TABLE garments ADD COLUMN ${name} ${type}`);
+ db.exec(`UPDATE garments SET updatedAt=savedAt WHERE updatedAt IS NULL;
+ CREATE UNIQUE INDEX IF NOT EXISTS garments_csv_sku ON garments(account,source,sku) WHERE source='csv' AND sku IS NOT NULL;
+ CREATE UNIQUE INDEX IF NOT EXISTS garments_external ON garments(account,source,externalId) WHERE externalId IS NOT NULL;
+ CREATE INDEX IF NOT EXISTS garments_stock ON garments(account,stock);`);
+});}
+export function catalogueLimit(db,account){const row=db.prepare('SELECT o.plan FROM stores s JOIN orgs o ON o.id=s.org WHERE s.id=?').get(account.id);if(!row)throw fail('Store not found.',404);return {starter:500,growth:5000,chain:50000,pilot:500,trial:500}[row.plan]||500;}
+export function requireCatalogueSpace(db,account){const limit=catalogueLimit(db,account);if(db.prepare('SELECT count(*) AS n FROM garments WHERE account=?').get(account.id).n>=limit)throw fail(`This store’s catalogue limit is ${limit.toLocaleString('en-IN')} items. Update existing SKUs, remove unused items or upgrade the plan.`,409);}
+function text(value,label,max,required=false){if(value==null)value='';if(typeof value!=='string'||value.length>max||/[\x00-\x1f]/.test(value))throw fail(`Use ${label} up to ${max} characters without line breaks.`);value=value.trim();if(required&&!value)throw fail(`${label} is required.`);return value;}
+function money(value,label){if(value==null||value==='')return null;const raw=String(value).trim();if(!/^\d+(?:\.\d{1,2})?$/.test(raw)||Number(raw)>10000000)throw fail(`${label} must be a number from 0 to 10000000 with at most two decimal places.`);return Number(raw);}
+export function catalogueFields(input,{requiredSku=false}={}){
+ const sku=text(input.sku,'SKU',64,requiredSku)||null,brand=text(input.brand,'Brand',80),colourLabel=text(input.colourLabel,'Colour',80);
+ const priceInr=money(input.priceInr,'Price'),mrpInr=money(input.mrpInr,'MRP');if(priceInr!==null&&mrpInr!==null&&mrpInr<priceInr)throw fail('MRP must be at least the selling price.');
+ let sizes=input.sizes??[];if(typeof sizes==='string')sizes=sizes.split(/[|;,]/).map(s=>s.trim()).filter(Boolean);
+ if(!Array.isArray(sizes)||sizes.length>30)throw fail('Use up to 30 sizes separated by |.');sizes=[...new Set(sizes.map(s=>text(s,'Size',30,true)))];
+ const stock=input.stock||'in';if(!['in','low','out'].includes(stock))throw fail('Stock must be in, low or out.');
+ return {sku,brand,priceInr,mrpInr,sizesJson:JSON.stringify(sizes),stock,colourLabel};
+}
+export function patchCatalogue(db,account,id,input){
+ const row=db.prepare('SELECT * FROM garments WHERE account=? AND id=?').get(account.id,id);if(!row)throw fail('Garment not found.',404);
+ const allowed=['sku','brand','priceInr','mrpInr','sizes','stock','colourLabel'];if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!allowed.includes(k)))throw fail('Use SKU, brand, price, MRP, sizes, colour or stock fields.');
+ const fields=catalogueFields({...row,sizes:JSON.parse(row.sizesJson),...input},{requiredSku:row.source==='csv'});if(row.source==='csv'&&fields.sku!==row.sku)throw fail('An imported SKU is its identity. Use the CSV import to add a different SKU.');
+ db.prepare('UPDATE garments SET sku=?,brand=?,priceInr=?,mrpInr=?,sizesJson=?,stock=?,colourLabel=?,updatedAt=? WHERE account=? AND id=?').run(fields.sku,fields.brand,fields.priceInr,fields.mrpInr,fields.sizesJson,fields.stock,fields.colourLabel,Date.now(),account.id,id);
+}

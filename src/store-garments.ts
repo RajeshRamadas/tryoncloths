@@ -1,7 +1,7 @@
 import { requestApi } from './api';
 import type { GarmentType } from './garment-types';
 
-export type StoreGarment = { id:string; name:string; garmentType:GarmentType; variant:string; sourceUrl:string; thumbnail:string; adaptations:number; savedAt:number; image?:string };
+export type StoreGarment = { id:string; name:string; garmentType:GarmentType; variant:string; sourceUrl:string; thumbnail:string; adaptations:number; savedAt:number; image?:string;sku:string|null;brand:string;priceInr:number|null;mrpInr:number|null;sizes:string[];stock:'in'|'low'|'out';source:string;colourLabel:string;updatedAt:number };
 export type GarmentMatches = { exact:StoreGarment[]; linked:StoreGarment[]; similar:StoreGarment[] };
 export type Adaptation = { garmentId?:string; reuseReceipt?:string; reused?:boolean; reuseWarning?:string };
 export async function catalogueRequest(path:string, body?:unknown, method=body === undefined ? 'GET' : 'POST') {

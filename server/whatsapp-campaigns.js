@@ -19,7 +19,7 @@ export function installCampaignRoutes(app,store,service,config,{requireUser,same
   service.access(req.account);
   const customers=store.db.prepare(`SELECT c.id,c.name,c.phoneE164,c.marketingOptIn,c.whatsappConsentAt,a.id AS avatarId,a.name AS avatarName FROM customers c JOIN avatars a ON a.account=c.store AND a.customer=c.id WHERE c.store=? ORDER BY c.name,a.savedAt DESC LIMIT 200`).all(req.account.id);
   const looks=store.db.prepare(`SELECT l.id,l.name,a.customer AS customerId,l.thumbnail FROM looks l JOIN avatars a ON a.account=l.account AND a.id=l.avatarId WHERE l.account=? AND a.customer IS NOT NULL ORDER BY l.savedAt DESC LIMIT 200`).all(req.account.id).map(({thumbnail,...r})=>({...r,thumbnail:`data:image/png;base64,${Buffer.from(thumbnail).toString('base64')}`}));
-  res.json({customers,looks,garments:store.garments.list(req.account),remaining:store.billing.balance(req.account.org),campaigns:['owner','manager'].includes(req.account.user.role)?store.db.prepare('SELECT id,createdAt FROM whatsapp_campaigns WHERE store=? ORDER BY createdAt DESC LIMIT 20').all(req.account.id):[]});
+  res.json({customers,looks,garments:store.garments.browse(req.account,{stock:'available',limit:200}).garments,remaining:store.billing.balance(req.account.org),campaigns:['owner','manager'].includes(req.account.user.role)?store.db.prepare('SELECT id,createdAt FROM whatsapp_campaigns WHERE store=? ORDER BY createdAt DESC LIMIT 20').all(req.account.id):[]});
  }));
  app.post('/api/whatsapp/campaigns/quote',sameOrigin,requireUser,manager,wrap((req,res)=>{const {items,...result}=quote(req.account,req.body||{});res.json({...result,combinations:items.length});}));
  app.post('/api/whatsapp/campaigns',sameOrigin,requireUser,manager,wrap((req,res)=>{

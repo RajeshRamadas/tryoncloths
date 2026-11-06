@@ -14,7 +14,7 @@ export function installGarmentRoutes(app, store, config) {
       await fn(req, res, owner);
     } catch (error) { res.status(error.status || 500).json({ error: error.status ? error.message : 'The store catalogue is unavailable. No AI request was made by this catalogue action.' }); }
   };
-  app.get('/api/garments', wrap((req, res, owner) => res.json({ garments: store.garments.list(owner) })));
+  app.get('/api/garments', wrap((req, res, owner) => res.json(store.garments.browse(owner,{...req.query,limit:req.query.limit??200}))));
   app.post('/api/garments/match', wrap(async (req, res, owner) => res.json(await store.garments.matches(owner, req.body || {}))));
   app.post('/api/garments', wrap(async (req, res, owner) => {
     if (req.body?.storageConsent !== true) return res.status(400).json({ error: 'Confirm saving this product photo to the store account.' });

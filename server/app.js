@@ -90,6 +90,7 @@ export function createApp({
   publicUrl = process.env.TRYON_PUBLIC_URL,
   paymentOptions = {},
   whatsappOptions = {},
+  catalogueOptions = {},
   femaleEnabled = process.env.TRYON_FEMALE_PROFILES === "true",
   tryOn = geminiTryOn,
   productLink = readProductLinkWithFallback,
@@ -151,7 +152,7 @@ export function createApp({
   // Two <=5 MB photos, base64-encoded, plus small metadata. Each is checked below.
   app.use("/api/account", express.json({ limit: "4kb" }));
   app.use(express.json({ limit: "15mb" }));
-  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, campaignConfig:{provider,model,apiKey,tryOn,femaleEnabled} });
+  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, campaignConfig:{provider,model,apiKey,tryOn,femaleEnabled} });
   installGarmentRoutes(app, accountStore, { provider, model });
   app.get("/api/health", (_req, res) =>
     res.json({
