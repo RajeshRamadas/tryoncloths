@@ -91,12 +91,28 @@ export class BillingStore {
       this.db.prepare('INSERT INTO ledger(id,org,store,user,pool,amount,kind,ref,action,createdAt) VALUES(?,?,?,?,?,?,?,?,?,?)').run(id(),hold.org,hold.store,hold.user,hold.pool,kind==='refund'?1:0,kind,holdId,reason,Date.now());return true;
     });
   }
+  // Only a pending internal shopper operation can reserve anonymous spending.
+  // This never accepts staff/user/org overrides and is not exposed as a route.
+  reserveShopper(operationId){
+    if(!this.db.isTransaction)throw new Error('Shopper reservations require the operation transaction.');
+    const op=this.db.prepare("SELECT p.*,o.plan,o.status FROM shopper_operations p JOIN stores s ON s.id=p.store AND s.org=p.org JOIN orgs o ON o.id=s.org WHERE p.id=? AND p.state='reserved' AND p.hold IS NULL").get(operationId);
+    if(!op||!['growth','chain'].includes(op.plan)||op.status!=='active')throw new BillingError('shopper_plan_required','An active Growth or Chain shopper operation is required.',403);
+    if(this.db.prepare('SELECT 1 FROM ledger WHERE org=? AND requestId=?').get(op.org,op.id))throw new BillingError('duplicate_request','This generation request id was already used.');
+    if(this.balance(op.org,'ai')<1)throw new CreditsRequired();
+    const key=id();this.db.prepare("INSERT INTO ledger(id,org,store,pool,amount,kind,ref,requestId,action,createdAt) VALUES(?,?,?,'ai',-1,'hold',?,?,?,?)")
+      .run(key,op.org,op.store,'shopper_'+op.action,op.id,'shopper_'+op.action,Date.now());
+    return key;
+  }
   commit(holdId){return this.settle(holdId,'commit','delivered');}
   refund(holdId,reason='failed'){return this.settle(holdId,'refund',reason);}
   sweep(now=Date.now()){
     const photos=this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='photo_attempts'").get();
     const photoGuard=photos?` AND NOT EXISTS(SELECT 1 FROM photo_items i WHERE i.baseHold=h.id AND i.state IN ('pending','generating','processing','ready','rejected') AND i.reviewUntil>?) AND NOT EXISTS(SELECT 1 FROM photo_attempts a JOIN photo_items i ON i.id=a.item WHERE a.extraHold=h.id AND a.state IN ('pending','generating','processing') AND i.reviewUntil>?)`:'';
-    const pending=this.db.prepare("SELECT h.id FROM ledger h WHERE h.kind='hold' AND h.createdAt<? AND NOT EXISTS (SELECT 1 FROM ledger t WHERE t.ref=h.id AND t.kind IN ('commit','refund'))"+photoGuard).all(now-10*60*1000,...(photos?[now,now]:[]));
+    const shoppers=this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='shopper_operations'").get();
+    // The shopper sweeper owns these holds and settles their cap counters in the
+    // same transaction. Generic expiry must never split ledger/cap settlement.
+    const shopperGuard=shoppers?` AND NOT EXISTS(SELECT 1 FROM shopper_operations p WHERE p.hold=h.id AND p.state IN ('reserved','dispatching'))`:'';
+    const pending=this.db.prepare("SELECT h.id FROM ledger h WHERE h.kind='hold' AND h.createdAt<? AND NOT EXISTS (SELECT 1 FROM ledger t WHERE t.ref=h.id AND t.kind IN ('commit','refund'))"+photoGuard+shopperGuard).all(now-10*60*1000,...(photos?[now,now]:[]));
     let count=0;for(const hold of pending)if(this.refund(hold.id,'expired'))count++;return count;
   }
 }

@@ -167,6 +167,7 @@ export function createApp({
   // Two <=5 MB photos, base64-encoded, plus small metadata. Each is checked below.
   app.use("/api/account", express.json({ limit: "4kb" }));
   app.use("/api/branding",express.json({limit:"750kb"}));
+  app.use("/api/shopper-settings",express.json({limit:"4kb"}));
   app.use(express.json({ limit: "15mb" }));
   installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, analyticsReports, catalogueSync, photoJobs, campaignConfig:{provider,model,apiKey,tryOn,femaleEnabled} });
   installGarmentRoutes(app, accountStore, { provider, model });

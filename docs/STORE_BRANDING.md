@@ -120,6 +120,7 @@ and AI are mocked; no real messages, paid generations or payments were sent.
 The Docker image and live deployment were not built or tested in this task.
 
 C15 completes the R3 implementation tasks. The release retains an alpha label
-until configured live services are verified. The next outlined task is **C16 —
-shopper self-service design review**, including its threat model and credit/abuse
-caps; the implementation guide requires design sign-off before building it.
+until configured live services are verified. C16 shopper design and cost caps
+are now approved, and [C16.1 shopper spending controls](SHOPPER_SPENDING.md) are
+implemented. Shopify installation/signed launches are next; the shopper widget
+and its hosted generation flow remain pending.

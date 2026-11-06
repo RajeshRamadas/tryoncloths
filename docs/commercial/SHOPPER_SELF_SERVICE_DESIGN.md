@@ -1,13 +1,16 @@
-# C16 — Shopper self-service: design for approval
+# C16 — Shopper self-service: approved staged design
 
-Status: **proposed; implementation and launch are not approved**. Prepared
-2026-11-06 against web `0.18.0-alpha.3`. No shopper endpoint, Shopify extension,
-configuration flag or owner spending control described below exists yet.
+Status: **product/design approved in this task conversation, 2026-11-06**.
+Prepared against web `0.18.0-alpha.3`; [C16.1 spending controls](../SHOPPER_SPENDING.md)
+are implemented in `0.19.0-alpha.1`. Shopify integration, shopper sessions and
+hosted generation remain pending. Service/legal review and launch verification
+are still required; design approval does not enable production shopper access.
 
 This prepares the design review for [C16](IMPLEMENTATION_LLM.md#task-c16--try-it-on-me-plugin),
 not its feature acceptance. The guide requires: “Separate design review before
 starting; legal review of shopper consent text.” Its threat-model/cost approval
-checkboxes remain open. Existing staff workflows remain the implementation baseline.
+checkboxes below record product/design approval. Existing staff workflows remain
+the implementation baseline.
 
 ## 1. Proposed first release
 
@@ -122,11 +125,12 @@ Try-on rechecks that capability and supplied-image hash, avoiding a persistent
 server image cache or arbitrary image substitution. No result is shared across
 shopper sessions, even when a product is the same.
 
-## 4. Proposed pilot spending and abuse limits
+## 4. Approved pilot spending and abuse limits
 
-These are **proposals requiring approval**, not current configuration. Limits
-are server-enforced, shared across workers/restarts, and apply to shopper work
-only; staff continue using their existing limits and the same organisation pool.
+These pilot ceilings and policies are approved. C16.1 enforces the monthly
+accounting limits; session, IP/device, provider and moderation integrations are
+implemented in later increments. Limits apply to shopper work only; staff
+continue using their existing limits and the same organisation pool.
 
 | Scope | Proposed default / ceiling |
 | --- | --- |
@@ -200,13 +204,14 @@ Add migrations transactionally/idempotently. Proposed tables:
 | `shopper_installations` | Org/store, verified Shopify shop/domain mapping, encrypted app credentials, enabled/revision, createdBy |
 | `shopper_settings` | Store/org cap policy, approved consent/privacy revision, pause state; revision-checked owner updates |
 | `shopper_launches`, `shopper_sessions` | Hashed capabilities, installation, product revision, expiry, consent version, revocation; short-lived only |
-| `shopper_operations` | Random operation UUID, org/store, action, body hash, reserved month, ledger hold, dispatch/settlement state and lease |
+| `shopper_operations` | Random operation UUID, org/store, action, reserved month, ledger hold, dispatch/settlement state and lease; request/session bindings held separately in transient storage |
 | `shopper_budgets` | Org/store/month aggregate held, committed, dispatched and moderation counts; no shopper identifiers |
 | `shopper_abuse` | Expiring keyed IP/device hashes and bounded rolling counters; no raw IP or fingerprint |
 
 Operation records required to dedupe and settle money outlive sessions but
 contain no photos, measurements, names, emails, face descriptors or device/IP
-hashes. Purge request-body hashes and session links within 24 hours. Keep only
+hashes. Keep request-body hashes and session links in transient storage, outside
+the backed-up accounting DB, and purge within 24 hours. Keep only
 nonidentifying accounting refs/aggregates under the existing financial policy.
 
 | Data | Proposed lifetime and deletion |
@@ -333,22 +338,23 @@ repository release/version rules. Do not build an APK for this web feature.
 
 ## 9. Decisions for sign-off
 
-- [ ] Approve this threat model and separate shopper authority/storage design.
-- [ ] Approve disabled-by-default pilot eligibility and the §4 **50 store / 200
+- [x] Approve this threat model and separate shopper authority/storage design.
+- [x] Approve disabled-by-default pilot eligibility and the §4 **50 store / 200
   organisation** monthly credit **and provider-attempt** ceilings, moderation
   caps and rate/concurrency limits. Adjust these figures before code if needed.
-- [ ] Approve 30-minute browser session, no account save in the first release,
+- [x] Approve 30-minute browser session, no account save in the first release,
   processing-only server image retention and ≤24-hour transient metadata policy.
 - [ ] Select CAPTCHA/moderation services and confirm tariffs, capacity, age/safety
   limits and provider processing/retention terms before enabling generation.
 - [ ] Legal review: merchant/provider roles, adult own-photo consent, privacy
   contact, deletion/complaints process and cross-border processing disclosures.
 
-Product/design approval permits C16.1 onward. Production enablement additionally
-requires the service/legal and deployment evidence above. This file records a
-proposal; neither this commit nor merging it records someone else's approval.
+Product/design approval permits C16.1 onward and was explicitly given in the
+task conversation. Production enablement additionally requires the service/legal
+and deployment evidence above. Only the first three product/design decisions
+are approved; no legal or service-provider approval is implied.
 
-## 10. Validation of this design-only change
+## 10. Validation of the original design-only change
 
 `npm test`: 210 passed, zero failures. `npm run build`: passed. Local document
 links resolve and `git diff --check` passes. These verify the existing baseline

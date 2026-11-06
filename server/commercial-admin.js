@@ -50,7 +50,8 @@ export function usage(store,account,now=Date.now()){
  const days=Array.from({length:30},(_,i)=>({date:new Date(Date.parse(start+'T00:00:00Z')+i*86400000).toISOString().slice(0,10),credits:0}));
  const staff=new Map(),actions=new Map();
  for(const row of rows){const day=new Date(row.createdAt+330*60000).toISOString().slice(0,10);days.find(d=>d.date===day).credits++;
-  const u=staff.get(row.user)||{id:row.user,name:row.name||'Former staff',credits:0};u.credits++;staff.set(row.user,u);actions.set(row.action,(actions.get(row.action)||0)+1);}
+  const shopper=!row.user&&row.action?.startsWith('shopper_'),key=shopper?'shopper-self-service':row.user;
+  const u=staff.get(key)||{id:key,name:shopper?'Shopper self-service':row.name||'Former staff',credits:0};u.credits++;staff.set(key,u);actions.set(row.action,(actions.get(row.action)||0)+1);}
  return {storeId:account.id,storeName:account.name,timezone:'Asia/Kolkata',from:start,to:end,total:rows.length,days,staff:[...staff.values()],actions:[...actions].map(([action,credits])=>({action,credits}))};
 }
 export function usageCsv(report){

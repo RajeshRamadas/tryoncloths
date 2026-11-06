@@ -65,10 +65,10 @@ export class Analytics {
    if(!ref.sessionId||!totals._sessions.has(event.store+':'+ref.sessionId))unattributedPurchases++;
    for(const id of new Set(Array.isArray(ref.garmentIds)?ref.garmentIds:[]))product(event.store,id).purchases++;
   }
-  const commits=this.db.prepare(`SELECT h.store,h.user,h.pool,t.createdAt FROM ledger t JOIN ledger h ON h.id=t.ref WHERE t.kind='commit' AND h.org=? AND h.store IN (${marks}) AND t.createdAt>=? AND t.createdAt<?`).iterate(...params);
-  for(const row of commits)for(const target of [totals,stores.get(row.store),days.get(day(row.createdAt)),staffRow(row.store,row.user)]){target.creditsUsed++;target[row.pool==='photo'?'photoCredits':'aiCredits']++;}
+  const commits=this.db.prepare(`SELECT h.store,h.user,h.action,h.pool,t.createdAt FROM ledger t JOIN ledger h ON h.id=t.ref WHERE t.kind='commit' AND h.org=? AND h.store IN (${marks}) AND t.createdAt>=? AND t.createdAt<?`).iterate(...params);
+  for(const row of commits)for(const target of [totals,stores.get(row.store),days.get(day(row.createdAt)),staffRow(row.store,row.user|| (row.action?.startsWith('shopper_')?'shopper-self-service':null))]){target.creditsUsed++;target[row.pool==='photo'?'photoCredits':'aiCredits']++;}
   const productRows=[...products.values()].map(p=>{const saved=this.db.prepare('SELECT name,sku,brand FROM garments WHERE account=? AND id=?').get(p.storeId,p.id);return {id:p.id,storeId:p.storeId,name:saved?.name||'Deleted product',sku:saved?.sku||null,brand:saved?.brand||'',tries:p.tries,generated:p.generated,reused:p.reused,purchases:p.purchases,sessions:p._sessions.size,conversion:p._sessions.size?Math.round(p.purchases/p._sessions.size*1000)/10:null};}).sort((a,b)=>b.tries-a.tries||a.storeId.localeCompare(b.storeId)||a.id.localeCompare(b.id));
-  const staffRows=[...staff.values()].map(row=>({...finished(row),name:row.id?this.db.prepare('SELECT name FROM users WHERE id=?').get(row.id)?.name||'Former staff':'Unattributed staff'})).sort((a,b)=>b.tryons-a.tryons||a.name.localeCompare(b.name));
+  const staffRows=[...staff.values()].map(row=>({...finished(row),name:row.id==='shopper-self-service'?'Shopper self-service':row.id?this.db.prepare('SELECT name FROM users WHERE id=?').get(row.id)?.name||'Former staff':'Unattributed staff'})).sort((a,b)=>b.tryons-a.tryons||a.name.localeCompare(b.name));
   return {from:range.from,to:range.to,timezone:'Asia/Kolkata',selection:scope.selection,availableStores:scope.available,
    trackingSince:this.db.prepare("SELECT value FROM analytics_meta WHERE key='tracking_started'").get().value,
    totals:{...finished(totals),untrackedProductTryons:untrackedProducts,unattributedPurchases,ignoredEvents},eventCounts,
