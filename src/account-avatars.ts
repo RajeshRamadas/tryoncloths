@@ -9,8 +9,8 @@ export async function accountAvatarImage(id:string):Promise<Blob>{const r=await 
 export async function saveAccountAvatar(image:string,details:AvatarDetails){return json("/api/avatars",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...details,image,storageConsent:true})});}
 export async function deleteAccountAvatar(id:string){await json(`/api/avatars/${encodeURIComponent(id)}`,{method:"DELETE"});}
 
-export type SavedLook = { purchasedAt?:number|null;purchasedSize?:string|null;staffUser?:string|null; id:string; avatarId:string; name:string; garments:string[]; thumbnail:string; savedAt:number };
+export type SavedLook = {sessionId?:string;garmentIds?:string[]; purchasedAt?:number|null;purchasedSize?:string|null;staffUser?:string|null; id:string; avatarId:string; name:string; garments:string[]; thumbnail:string; savedAt:number };
 export async function listLooks(avatarId:string):Promise<SavedLook[]> { return (await json(`/api/looks?avatar=${encodeURIComponent(avatarId)}`)).looks; }
-export async function saveLook(image:string,avatarId:string,name:string,garments:string[]) { return json("/api/looks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image,avatarId,name,garments,storageConsent:true})}); }
+export async function saveLook(image:string,avatarId:string,name:string,garments:string[],tracking?:{sessionId:string;garmentIds:string[]}) { return json("/api/looks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({image,avatarId,name,garments,...tracking,storageConsent:true})}); }
 export async function deleteLook(id:string) { await json(`/api/looks/${encodeURIComponent(id)}`,{method:"DELETE"}); }
 export async function lookImage(id:string):Promise<Blob> { const r=await requestApi(`/api/looks/${encodeURIComponent(id)}/image`,{},30000);if(r.status===401)window.dispatchEvent(new Event("forme-account-expired"));if(!r.ok)throw new Error("The saved look could not be opened.");return r.blob(); }

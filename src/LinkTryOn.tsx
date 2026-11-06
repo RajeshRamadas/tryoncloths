@@ -6,7 +6,7 @@ import { readPhoto } from "./images";
 
 import { garmentChoices, guessGarmentType, type GarmentType } from "./garment-types";
 import GarmentCatalogue, { MatchSuggestions } from "./GarmentCatalogue";
-import { getGarment, matchGarments, saveGarment, findAdaptation, deleteAdaptation, type StoreGarment, type GarmentMatches, type Adaptation } from "./store-garments";
+import { getGarment, matchGarments, saveGarment, findAdaptation, useAdaptation, deleteAdaptation, type StoreGarment, type GarmentMatches, type Adaptation } from "./store-garments";
 
 type ProductImage = { source: string; image: string };
 const emptyMatches = ():GarmentMatches => ({exact:[],linked:[],similar:[]});
@@ -14,6 +14,7 @@ const emptyMatches = ():GarmentMatches => ({exact:[],linked:[],similar:[]});
 type Props = {
   catalogueEnabled?: boolean;
   avatarId?: string | null;
+  sessionId?:string;
   bodyType?: "male" | "female";
   base: string;
   disabled: boolean;
@@ -23,7 +24,7 @@ type Props = {
   onResult: (image: string, label: string, adaptation?: Adaptation) => void;
 };
 
-export default function LinkTryOn({ catalogueEnabled=false, avatarId, bodyType = "male", base, disabled, available, providerLabel, onBusy, onResult }: Props) {
+export default function LinkTryOn({ catalogueEnabled=false, avatarId, sessionId, bodyType = "male", base, disabled, available, providerLabel, onBusy, onResult }: Props) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [images, setImages] = useState<ProductImage[]>([]);
@@ -120,6 +121,12 @@ export default function LinkTryOn({ catalogueEnabled=false, avatarId, bodyType =
     begin('reading');try{await deleteAdaptation(saved.id,lookup.id);setLookupRevision(n=>n+1);setCatalogueRevision(n=>n+1);}catch(e){setError((e as Error).message);}finally{finish();}
   }
 
+  async function openCached(){
+    if(!cached||!garmentType||!saved||!avatarId)return;
+    begin('reading');
+    try{const result=await useAdaptation(saved.id,{avatar:base,avatarId,garmentType,bodyType,sessionId,requestId:crypto.randomUUID()});onResult(result.image,`${garmentChoices.find(([id])=>id===garmentType)?.[1]} · ${title}`,{garmentId:saved.id,reused:true});}
+    catch(e){setError((e as Error).message);}finally{finish();}
+  }
   const [creditsRequired,setCreditsRequired]=useState(false);
   async function putOn() {
     setCreditsRequired(false);
@@ -129,7 +136,7 @@ export default function LinkTryOn({ catalogueEnabled=false, avatarId, bodyType =
     try {
       const response = await requestApi("/api/tryon", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId:crypto.randomUUID(), avatar: base, bodyType, garmentType, title, consent: true, consentScope: "avatar-and-garment", consentProvider: "gemini", ...(saved&&avatarId?{garmentId:saved.id,avatarId}:{garment:chosen}) }),
+        body: JSON.stringify({ requestId:crypto.randomUUID(),sessionId,...(avatarId?{avatarId}:{}), avatar: base, bodyType, garmentType, title, consent: true, consentScope: "avatar-and-garment", consentProvider: "gemini", ...(saved&&avatarId?{garmentId:saved.id}:{garment:chosen}) }),
       }, 200000);
       const data = await response.json();
       accountExpired(data.code);
@@ -183,7 +190,7 @@ export default function LinkTryOn({ catalogueEnabled=false, avatarId, bodyType =
       {canLookup&&!lookupCurrent&&<p role="status">Checking for a saved adaptation…</p>}
       {lookupCurrent&&lookup?.error&&<div><p role="alert" className="error-banner">{lookup.error}</p><button className="button secondary" disabled={busy} onClick={()=>setLookupRevision(n=>n+1)}>Check saved result again</button></div>}
       {cached?<div className="saved-adaptation"><p>An approved result matches this exact avatar, starting outfit and garment.</p>
-        <button className="button primary full-width" disabled={busy} onClick={()=>{if(!cached||!garmentType)return;onResult(cached,`${garmentChoices.find(([id])=>id===garmentType)?.[1]} · ${title}`,{garmentId:saved?.id,reused:true});}}>Use saved result — no AI charge</button>
+        <button className="button primary full-width" disabled={busy} onClick={()=>void openCached()}>Use saved result — no AI charge</button>
         <button className="button back-button" disabled={busy} onClick={()=>void forgetAdaptation()}>Forget saved adaptation</button></div>:<>
       <label className="consent"><input type="checkbox" checked={consent} disabled={busy || !available} onChange={e => setConsent(e.target.checked)}/>
         <span>The customer agrees to send their avatar and this product photo to {providerLabel} to create the try-on.</span></label>

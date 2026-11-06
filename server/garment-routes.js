@@ -1,3 +1,5 @@
+import {recordTryon,validateSession} from './analytics-tracking.js';
+import {validRequestId} from './billing.js';
 import { accountUser } from './accounts.js';
 
 export function installGarmentRoutes(app, store, config) {
@@ -24,6 +26,14 @@ export function installGarmentRoutes(app, store, config) {
   app.delete('/api/garments/:id', wrap((req, res, owner) => {
     if (!store.garments.remove(owner, req.params.id)) return res.status(404).json({ error: 'Garment not found.' });
     res.json({ ok: true });
+  }));
+  app.post('/api/garments/:id/reuse/use',wrap(async(req,res,owner)=>{
+    if(!validRequestId(req.body?.requestId))return res.status(400).json({error:'Use a fresh request ID to open a saved result.'});
+    validateSession(store,owner,req.body);
+    const context=await store.garments.context(owner,{...req.body,garmentId:req.params.id},config),result=store.garments.cached(owner,context);
+    if(!result)return res.status(404).json({error:'The saved adaptation is no longer available. Check before generating; no AI request was made.'});
+    recordTryon(store,owner,{...req.body,avatarId:context.avatarId,garmentId:context.garmentId},{reused:true});
+    res.json({...result,garmentId:context.garmentId,reused:true});
   }));
   app.post('/api/garments/:id/reuse', wrap(async (req, res, owner) => {
     const context = await store.garments.context(owner, { ...req.body, garmentId: req.params.id }, config);

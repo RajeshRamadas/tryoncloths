@@ -49,7 +49,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
     if(!looksFor)return;setBusy(true);setError("");
     try {
       const [avatar,image]=await Promise.all([accountAvatarImage(looksFor.id).then(avatarDataUrl),lookImage(look.id).then(avatarDataUrl)]);
-      close();onUse(avatar,{...looksFor,avatarId:looksFor.id,look:{id:look.id,image,name:look.name,garments:look.garments}});
+      close();onUse(avatar,{...looksFor,avatarId:looksFor.id,look:{id:look.id,garmentIds:look.garmentIds,image,name:look.name,garments:look.garments}});
     }catch(e){setError((e as Error).message);}finally{setBusy(false);}
   }
   async function removeLook(id:string) {

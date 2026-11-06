@@ -1,3 +1,4 @@
+import {lookAttribution} from './analytics-tracking.js';
 import {randomBytes} from 'node:crypto';
 import {parse} from 'csv-parse/sync';
 import multer from 'multer';
@@ -92,10 +93,10 @@ export class SizeStore {
   return transaction(this.db,()=>{const row=this.db.prepare('SELECT id,purchasedAt,purchasedSize,staffUser FROM looks WHERE account=? AND id=?').get(account.id,id);if(!row)throw fail('Look not found.',404);
    if(row.purchasedAt){if(row.purchasedSize!==size)throw fail('This look is already marked purchased. Undo it before changing the size.',409);return {purchasedAt:row.purchasedAt,purchasedSize:row.purchasedSize,staffUser:row.staffUser};}
    const purchasedAt=Date.now();this.db.prepare('UPDATE looks SET purchasedAt=?,purchasedSize=?,staffUser=? WHERE account=? AND id=?').run(purchasedAt,size,account.user.id,account.id,id);
-   recordEvent(this.db,{org:account.org,store:account.id,user:account.user.id},'purchase_marked',{lookId:id,size});return {purchasedAt,purchasedSize:size,staffUser:account.user.id};
+   recordEvent(this.db,{org:account.org,store:account.id,user:account.user.id},'purchase_marked',{lookId:id,size,...lookAttribution(this.store,account,id)});return {purchasedAt,purchasedSize:size,staffUser:account.user.id};
   });
  }
- undoPurchase(account,id){return transaction(this.db,()=>{const row=this.db.prepare('SELECT purchasedAt,purchasedSize FROM looks WHERE account=? AND id=?').get(account.id,id);if(!row)throw fail('Look not found.',404);if(row.purchasedAt){this.db.prepare('UPDATE looks SET purchasedAt=NULL,purchasedSize=NULL,staffUser=NULL WHERE account=? AND id=?').run(account.id,id);recordEvent(this.db,{org:account.org,store:account.id,user:account.user.id},'purchase_unmarked',{lookId:id,size:row.purchasedSize});}return {purchasedAt:null,purchasedSize:null,staffUser:null};});}
+ undoPurchase(account,id){return transaction(this.db,()=>{const row=this.db.prepare('SELECT purchasedAt,purchasedSize FROM looks WHERE account=? AND id=?').get(account.id,id);if(!row)throw fail('Look not found.',404);if(row.purchasedAt){this.db.prepare('UPDATE looks SET purchasedAt=NULL,purchasedSize=NULL,staffUser=NULL WHERE account=? AND id=?').run(account.id,id);recordEvent(this.db,{org:account.org,store:account.id,user:account.user.id},'purchase_unmarked',{lookId:id,size:row.purchasedSize,...lookAttribution(this.store,account,id)});}return {purchasedAt:null,purchasedSize:null,staffUser:null};});}
 }
 export function installSizeRoutes(app,store,{requireUser,sameOrigin,wrap}){
  const manager=requireRole('owner','manager'),staff=requireRole('owner','manager','staff'),sizes=store.sizes;

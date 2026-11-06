@@ -342,7 +342,7 @@ Next priority: C12 size recommendations.
 
 **Implemented:** `0.16.0-alpha.11`, branch `feature/size-recommendations`.
 See [measurement validation, scoring, chart workflow and purchase events](../SIZE_RECOMMENDATIONS.md).
-C14 should account for `purchase_unmarked` corrections and current purchase state.
+C14 accounts for `purchase_unmarked` corrections as of the selected report end date.
 
 ### Task C14 — events and analytics
 
@@ -360,8 +360,12 @@ C14 should account for `purchase_unmarked` corrections and current purchase stat
 
 **Acceptance.**
 
-- [ ] Manager of store A cannot query store B.
-- [ ] Aggregates match fixture event counts exactly.
+- [x] Manager of store A cannot query store B.
+- [x] Aggregates match fixture event counts exactly.
+
+**Implemented:** `0.17.0-alpha.1`, branch `feature/store-analytics`.
+See [metric definitions, scope, email setup and validation](../ANALYTICS.md).
+Live SMTP/Meta/payment rollout remains separately unverified; no APK is rebuilt.
 
 **R2 release:** bump to 0.17.0, docs for WhatsApp setup, catalogue import template, size charts.
 

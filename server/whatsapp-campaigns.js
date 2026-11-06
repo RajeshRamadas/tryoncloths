@@ -1,3 +1,4 @@
+import {recordTryon} from './analytics-tracking.js';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {requireRole} from './tenancy.js';
 import {meter,billingFailure} from './billing.js';
@@ -44,9 +45,10 @@ export function installCampaignRoutes(app,store,service,config,{requireUser,same
    const cached=store.garments.cached(account,context);
    service.consent(account,item.customer,'new_arrivals');
    const image=cached?.image || await meter({body:{requestId:item.requestId}},{billing:store.billing,account,action:'tryon',beforeCommit:()=>{service.consent(account,item.customer,'new_arrivals');store.requireAvatar(account,item.avatar);}},async()=>{const output=await config.tryOn({avatar,garment:photo,garmentType:garment.garmentType,title:garment.name,apiKey:config.apiKey,model:config.model});service.consent(account,item.customer,'new_arrivals');store.requireAvatar(account,item.avatar);return output;});
+   recordTryon(store,account,{sessionId:item.requestId,requestId:item.requestId,avatarId:item.avatar,garmentId:item.garment},{reused:Boolean(cached),source:'campaign'});
    // Erasure/opt-out during provider work must prevent new publishing or reattachment.
    service.consent(account,item.customer,'new_arrivals');store.requireAvatar(account,item.avatar);
-   const look=await store.saveLook(account,{avatarId:item.avatar,image,name:`New arrival: ${garment.name}`.slice(0,60),garments:[garment.name]});
+   const look=await store.saveLook(account,{sessionId:item.requestId,garmentIds:[item.garment],avatarId:item.avatar,image,name:`New arrival: ${garment.name}`.slice(0,60),garments:[garment.name]});
    store.db.prepare("UPDATE whatsapp_campaign_items SET state='ready',look=? WHERE id=? AND store=?").run(look.id,item.id,account.id);
    res.json({id:req.params.id,items:get(account,req.params.id)});
   }catch(e){store.db.prepare("UPDATE whatsapp_campaign_items SET state='failed' WHERE id=? AND store=?").run(item.id,account.id);if(billingFailure(res,e))return;throw fail('This item could not complete. Check saved looks and credits; generation was not retried.',e.status||502);}finally{service.generating.delete(account.org);}
