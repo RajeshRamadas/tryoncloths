@@ -1,0 +1,10 @@
+# Add after compose.shared.yaml and compose.accounts.yaml. The runtime user is
+# node (uid/gid 1000). Capability state must never use the persistent account volume.
+services:
+  tryon:
+    environment:
+      SHOPIFY_APP_CLIENT_ID: ${SHOPIFY_APP_CLIENT_ID:-}
+      SHOPIFY_APP_CLIENT_SECRET: ${SHOPIFY_APP_CLIENT_SECRET:-}
+      TRYON_SHOPPER_STATE_DIR: /run/forme-shopper
+    tmpfs:
+      - /run/forme-shopper:size=16m,mode=0700,uid=1000,gid=1000

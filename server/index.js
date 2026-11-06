@@ -13,6 +13,7 @@ if (accountStore) {
   setInterval(()=>{try {accountStore.billing.sweep();} catch {console.error(JSON.stringify({event:"credit_sweep_failed"}));}},5*60*1000).unref();
 }
 const app=createApp({ production, accountStore, allowSignup: process.env.TRYON_ALLOW_SIGNUP !== "false", trustProxy: trustProxySetting === "1" ? 1 : false });
+if(app.locals.shopifyShopper?.state)setInterval(()=>{try{app.locals.shopifyShopper.state.prune();}catch{console.error(JSON.stringify({event:'shopper_state_cleanup_failed'}));}},60000).unref();
 if(production&&app.locals.photoJobs)app.locals.photoJobs.start();
 if(app.locals.payments){
   const retry=()=>app.locals.payments.retryInvoices().catch(()=>console.error(JSON.stringify({event:"invoice_retry_failed"})));

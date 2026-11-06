@@ -1779,6 +1779,15 @@ dialog::backdrop {
 .billing-page button { min-height:44px; }
 .shopper-stage { padding:16px; background:#f1f5eb; border:1px solid #dce4da; border-radius:10px; }
 .shopper-actions { display:flex; flex-wrap:wrap; gap:12px; }
+.shopify-domain { display:flex;flex-direction:column;gap:8px; }
+.shopify-domain input { padding:12px;border:1px solid #b7caba;border-radius:7px;font:inherit;width:100%;box-sizing:border-box; }
+.shopify-settings .shopper-actions { margin:18px 0; }
+.shopify-settings form.shopper-actions { align-items:flex-end; }
+.shopify-settings form.shopper-actions label { display:flex;flex-direction:column;gap:8px;min-width:0;flex:1; }
+.shopify-settings input[type=search] { min-height:44px;width:100%;box-sizing:border-box;padding:10px;border:1px solid #b7caba;border-radius:7px;font:inherit; }
+.shopify-products { padding:0;list-style:none; }
+.shopify-products li { padding:16px 0;border-bottom:1px solid #dce4da;overflow-wrap:anywhere; }
+.shopify-settings nav,.shopper-settings nav { flex-wrap:wrap; }
 .shopper-usage { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .shopper-usage dl { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; width:100%; margin:0; }
 .shopper-usage dt,.shopper-usage dd { margin:0; overflow-wrap:anywhere; }

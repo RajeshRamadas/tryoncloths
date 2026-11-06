@@ -19,7 +19,7 @@ export default function ShopperSettings(){
     }catch(e){setError((e as Error).message);}finally{setBusy(false);}
   }
   async function refresh(){setBusy(true);setError('');setNotice('');try{apply(await catalogueApi('/api/shopper-settings'));}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
-  return <main className="billing-page shopper-settings"><nav><a href="/">Back to Forme</a><a href="/billing">Billing</a></nav>
+  return <main className="billing-page shopper-settings"><nav><a href="/">Back to Forme</a><a href="/billing">Billing</a><a href="/shopify-shopper">Shopify widget</a></nav>
     <h1>Shopper spending</h1><p>Set monthly allowances for the upcoming “Try it on me” website widget.</p>
     <p className="shopper-stage">Widget not available yet. Saving limits prepares your store; it does not start generation or publish a website button.</p>
     {error&&<p role="alert" className="error-banner">{error}</p>}{notice&&<p role="status">{notice}</p>}

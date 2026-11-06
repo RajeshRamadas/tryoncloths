@@ -5,6 +5,8 @@ import {installSyncSchema,installSyncRoutes} from './catalogue-sync.js';
 import {installPhotoSchema,installPhotoRoutes} from './photo-jobs.js';
 import {BrandingStore,installBrandingRoutes} from './branding.js';
 import {ShopperBudgets,installShopperBudgetRoutes} from './shopper-budgets.js';
+import {installShopifyShopperSchema} from './shopify-shopper.js';
+import {installShopifyShopperOwner} from './shopify-shopper-routes.js';
 import {SizeStore,installSizeRoutes} from './size.js';
 import {installCatalogueRoutes} from './catalogue-import.js';
 import {installCampaignRoutes} from './whatsapp-campaigns.js';
@@ -63,7 +65,7 @@ export class AccountStore {
     this.garments = new GarmentStore(this);
     try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); this.sizes=new SizeStore(this); installTrackingSchema(this.db); this.analytics=new Analytics(this); installSharedCatalogueSchema(this.db); installSyncSchema(this.db); installPhotoSchema(this.db); this.branding=new BrandingStore(this); }
     catch (error) { this.db.close(); throw error; }
-    try { this.shoppers=new ShopperBudgets(this); }
+    try { this.shoppers=new ShopperBudgets(this); installShopifyShopperSchema(this); }
     catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
@@ -218,7 +220,7 @@ export class AccountStore {
 
 function token(req) { return (req.get("cookie") || "").split(";").map(x=>x.trim()).find(x=>x.startsWith(`${cookieName}=`))?.slice(cookieName.length+1) || ""; }
 export function accountUser(store,req) { return store?.user(token(req)) || null; }
-export function installAccountRoutes(app, store, { production=false, allowSignup=true, sendMail, publicUrl, payments, whatsapp, campaignConfig, catalogueOptions, analyticsReports, catalogueSync, photoJobs }={}) {
+export function installAccountRoutes(app, store, { production=false, allowSignup=true, sendMail, publicUrl, payments, whatsapp, campaignConfig, catalogueOptions, analyticsReports, catalogueSync, photoJobs, shopifyShopper }={}) {
   const attempts = new Map(); let hashes=0;
   const cookie = (res,value,maxAge=lifetime) => res.cookie(cookieName,value,{httpOnly:true,secure:production,sameSite:"strict",path:"/",maxAge});
   const wrap = fn => async(req,res) => { try { await fn(req,res); } catch(e) { res.status(e.status || 500).json({error:e.status ? e.message : "Account storage is unavailable. Please try again; no generation request was retried."}); } };
@@ -232,6 +234,7 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
   app.get("/api/account",wrap((req,res)=>res.json({enabled:Boolean(store),signupAllowed:Boolean(store&&allowSignup),...response(accountUser(store,req))})));
   if(!store) return;
   installShopperBudgetRoutes(app,store,{requireUser,sameOrigin,wrap});
+  installShopifyShopperOwner(app,shopifyShopper,{requireUser,sameOrigin,wrap,production});
   installBrandingRoutes(app,store,{requireUser,sameOrigin,wrap});
   installAnalyticsRoutes(app,store,{requireUser,sameOrigin,wrap,reports:analyticsReports});
   if(catalogueSync)installSyncRoutes(app,store,catalogueSync,{requireUser,sameOrigin,wrap});

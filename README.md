@@ -40,6 +40,7 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 - [WhatsApp automation](docs/WHATSAPP.md): encrypted Business connection, consented lookbooks, metered new-arrival previews, review before sending, delivery status and STOP opt-outs.
 - [Catalogue import](docs/CATALOGUE_IMPORT.md): CSV/Excel products, SKU updates, prices, sizes, colours, stock filters and plan limits.
 - [Shop catalogue sync](docs/CATALOGUE_SYNC.md): Shopify/WooCommerce connections, nightly sync, clothing-type review and read-only Chain master catalogues.
+- [Shopify shopper setup](docs/SHOPIFY_SHOPPER.md): owner app installation, published-product selection, signed launch previews and a disabled-by-default theme button.
 - [AI catalogue photos](docs/CATALOGUE_PHOTOS.md): durable model-photo batches, approval, included regeneration, JPEG/ZIP exports and separate photo-credit purchases.
 - [Store branding](docs/STORE_BRANDING.md): owner logo/contacts, branded outfit and lookbook pages, optional export footers and server-enforced trial marks.
 - [Size guidance](docs/SIZE_RECOMMENDATIONS.md): body measurements, brand charts, confidence/explanations and purchase tracking; no additional AI calls.
@@ -73,8 +74,10 @@ The shopper **Try it on me** Shopify widget has an
 [approved staged design](docs/commercial/SHOPPER_SELF_SERVICE_DESIGN.md).
 Web `0.19.0-alpha.1` adds [shopper spending controls](docs/SHOPPER_SPENDING.md):
 owner monthly allowances, durable attempt/credit accounting, manager usage and
-immediate pause. Open **Shopper spending** after signing in. Shopify installation
-and the hosted shopper flow are next; the widget is not available yet.
+immediate pause. Web `0.19.0-alpha.2` adds [Shopify app installation and signed
+setup launches](docs/SHOPIFY_SHOPPER.md). Open **Shopper spending → Shopify widget**
+after signing in. Shopper sessions, photo capture and AI try-on remain pending;
+the theme button currently opens a branded setup preview with no photos or credits.
 
 ## Validation
 
