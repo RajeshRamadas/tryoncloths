@@ -40,6 +40,7 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 - [WhatsApp automation](docs/WHATSAPP.md): encrypted Business connection, consented lookbooks, metered new-arrival previews, review before sending, delivery status and STOP opt-outs.
 - [Catalogue import](docs/CATALOGUE_IMPORT.md): CSV/Excel products, SKU updates, prices, sizes, colours, stock filters and plan limits.
 - [Size guidance](docs/SIZE_RECOMMENDATIONS.md): body measurements, brand charts, confidence/explanations and purchase tracking; no additional AI calls.
+- [Store analytics](docs/ANALYTICS.md): scoped reports, daily activity, product/staff performance, committed credits, CSV export and monthly owner emails.
 - Responsive layout and keyboard-accessible controls/dialogs.
 - [Customer profiles](docs/CUSTOMERS.md) with store-scoped mobile lookup, customer-grouped saved avatars, optional marketing consent and linked-data erasure.
 

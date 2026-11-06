@@ -1,7 +1,7 @@
 import { loadImage } from "./images";
 import { profiles, recommendProfile, validTemplateTone, DEFAULT_TEMPLATE_TONE } from "./profiles";
 
-export type OpenedLook = { id?:string; image: string; name: string; garments: string[] };
+export type OpenedLook = {garmentIds?:string[]; id?:string; image: string; name: string; garments: string[] };
 export type AvatarDetails = { customerId?:string|null; customerName?:string; customerPhone?:string; avatarId?: string; look?: OpenedLook; name: string; profileId: string; templateTone?:string; heightCm: number; weightKg: number; source: "generated" | "imported" };
 export type SavedAvatar = AvatarDetails & { id: string; image: Blob; thumbnail: string; savedAt: number; looksCount?: number };
 const database = "forme-saved-avatars";

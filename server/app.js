@@ -1,3 +1,6 @@
+import {MonthlyAnalytics,installAnalyticsUnsubscribe} from './analytics-mail.js';
+import {record} from './events.js';
+import {validateSession,recordTryon} from './analytics-tracking.js';
 import {WhatsApp,installWhatsAppWebhook} from './whatsapp.js';
 import {PaymentStore,installPaymentWebhook} from './payments.js';
 import express from "express";
@@ -109,6 +112,7 @@ export function createApp({
     throw new Error("Only the direct connection or one trusted reverse proxy is supported.");
   app.set("trust proxy", trustProxy);
   app.disable("x-powered-by");
+  app.locals.accountStore=accountStore;
   app.use("/api", (_req, res, next) => {
     res.set("Cache-Control", "no-store");
     res.set("X-Content-Type-Options", "nosniff");
@@ -117,6 +121,9 @@ export function createApp({
   const payments = accountStore ? new PaymentStore(accountStore,{...paymentOptions, ...(sendMail ? {sendMail} : {})}) : null;
   app.locals.payments=payments;
   installPaymentWebhook(app,payments);
+  const analyticsReports=accountStore?new MonthlyAnalytics(accountStore,{sendMail,publicUrl}):null;
+  app.locals.analyticsReports=analyticsReports;
+  installAnalyticsUnsubscribe(app,analyticsReports);
   const whatsapp=accountStore?new WhatsApp(accountStore,{publicUrl,...whatsappOptions}):null;
   app.locals.whatsapp=whatsapp;
   installWhatsAppWebhook(app,whatsapp);
@@ -152,7 +159,7 @@ export function createApp({
   // Two <=5 MB photos, base64-encoded, plus small metadata. Each is checked below.
   app.use("/api/account", express.json({ limit: "4kb" }));
   app.use(express.json({ limit: "15mb" }));
-  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, campaignConfig:{provider,model,apiKey,tryOn,femaleEnabled} });
+  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, analyticsReports, campaignConfig:{provider,model,apiKey,tryOn,femaleEnabled} });
   installGarmentRoutes(app, accountStore, { provider, model });
   app.get("/api/health", (_req, res) =>
     res.json({
@@ -190,6 +197,7 @@ export function createApp({
     req.body ||= {};
     const origin = req.get("origin");
     const owner = accountUser(accountStore, req);
+    req.account=owner;
     if (accountStore && !owner) return res.status(401).json({ error: "Sign in to the store account before generating an avatar.", code: "account_required" });
     if (!femaleEnabled && profiles.find(p=>p.id===req.body.profileId)?.body === "female") return res.status(400).json({error:"Female body profiles are not enabled on this studio."});
     if (accountStore && req.body.accountStorageConsent !== true) return res.status(400).json({ error: "Confirm customer agreement to save the generated avatar in the store account." });
@@ -285,6 +293,7 @@ export function createApp({
           console.error(JSON.stringify({event:"avatar_account_save_failed"}));
         }
       }
+      record(req,'avatar_generated',{avatarId,requestId:req.body.requestId,source:'studio'});
       res.json({ image, provider, profileId: req.body.profileId, templateTone, kind: "customer-avatar", needsReview: true, reviewChecks: ["face", "standard-body", "skin-tone"], ...(accountStore ? {accountSaved, avatarId, accountSaveError: accountSaved ? null : "Avatar created, but saving to your account failed. Download it now or review and save it again; do not regenerate."} : {}) });
     } catch (error) {
       if (billingFailure(res,error)) return;
@@ -339,6 +348,7 @@ export function createApp({
   app.post("/api/tryon", async (req, res) => {
     req.body ||= {};
     const owner = accountUser(accountStore, req);
+    req.account=owner;
     if (accountStore && !owner) return res.status(401).json({ error: "Sign in to the store account before trying on clothes.", code: "account_required" });
     if (!sameStudio(req)) return res.status(403).json({ error: "Open this workflow from the Avatar Studio app." });
     if (req.body.consent !== true || req.body.consentScope !== "avatar-and-garment" || req.body.consentProvider !== provider)
@@ -348,13 +358,14 @@ export function createApp({
     if (!["male","female"].includes(bodyType) || (bodyType === "female" && !femaleEnabled)) return res.status(400).json({error:"Choose an enabled body library."});
     if (!Object.hasOwn(garmentTypes, req.body.garmentType) || (["dress","skirt","saree","lehenga","blouse"].includes(req.body.garmentType) && bodyType !== "female"))
       return res.status(400).json({ error: "Choose what to put on: shirt, T-shirt, trousers, jeans, shoes or another listed type." });
+    try { if(accountStore)validateSession(accountStore,owner,req.body); }catch(e){return res.status(e.status||500).json({error:e.status?e.message:'Fitting session could not be checked.'});}
     let catalogueContext;
     if (req.body.garmentId) {
       if (!owner) return res.status(401).json({ error: "Sign in to use your store clothes.", code: "account_required" });
       try {
         catalogueContext = await accountStore.garments.context(owner, req.body, { provider, model });
         const cached = accountStore.garments.cached(owner, catalogueContext);
-        if (cached) return res.json({ image: cached.image, provider, kind: "garment-tryon", garmentType: req.body.garmentType, needsReview: true, reused: true, garmentId: catalogueContext.garmentId });
+        if (cached) {recordTryon(accountStore,owner,{...req.body,avatarId:catalogueContext.avatarId,garmentId:catalogueContext.garmentId},{reused:true});return res.json({ image: cached.image, provider, kind: "garment-tryon", garmentType: req.body.garmentType, needsReview: true, reused: true, garmentId: catalogueContext.garmentId });}
       } catch (error) {
         return res.status(error.status || 500).json({ error: error.status ? error.message : "The saved garment could not be loaded. No generation was attempted." });
       }
@@ -390,7 +401,7 @@ export function createApp({
         accountStore.requireAvatar(owner, catalogueContext.avatarId);
         accountStore.garments.row(owner, catalogueContext.garmentId);
         const cached = accountStore.garments.cached(owner, catalogueContext);
-        if (cached) return res.json({ image: cached.image, provider, kind: "garment-tryon", garmentType: req.body.garmentType, needsReview: true, reused: true, garmentId: catalogueContext.garmentId });
+        if (cached) {recordTryon(accountStore,owner,{...req.body,avatarId:catalogueContext.avatarId,garmentId:catalogueContext.garmentId},{reused:true});return res.json({ image: cached.image, provider, kind: "garment-tryon", garmentType: req.body.garmentType, needsReview: true, reused: true, garmentId: catalogueContext.garmentId });}
       } catch (error) {
         return res.status(error.status || 500).json({ error: error.status ? error.message : "The saved garment could not be checked. No generation was attempted." });
       }
@@ -405,6 +416,7 @@ export function createApp({
     inFlight++;
     try {
       const image = await meter(req,{billing:accountStore?.billing,account:owner,action:"tryon"},()=>tryOn({ avatar, garment, garmentType: req.body.garmentType, title: catalogueContext?.garment.name || req.body.title, apiKey, model }));
+      recordTryon(accountStore,owner,{requestId:req.body.requestId,sessionId:req.body.sessionId,avatarId:catalogueContext?.avatarId||req.body.avatarId,garmentId:catalogueContext?.garmentId});
       // A storage/receipt failure must never discard a paid image or retry AI.
       let reuseReceipt;
       if (catalogueContext) { try { reuseReceipt = await accountStore.garments.receipt(owner, catalogueContext, image); } catch {} }

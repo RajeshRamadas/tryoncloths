@@ -16,15 +16,16 @@ const layerNames = { shirt: "top", trousers: "trousers", shoes: "shoes" };
 const originalNames = { shirt: "Original top", trousers: "Original bottoms", shoes: "Bare feet" };
 
 type Props = { active: boolean; templateTone?:string; catalogueEnabled?:boolean; customerId?:string|null; avatarId?:string|null; openedLook?:OpenedLook; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
-type Dressed = { image: string; label: string; previousLayers: Layer[]; adaptation?:Adaptation; adaptationSaved?:boolean };
+type Dressed = { image: string; label: string; previousLayers: Layer[]; adaptation?:Adaptation; adaptationSaved?:boolean;fromSavedLook?:boolean };
 export default function OutfitStudio({ active, templateTone='medium', catalogueEnabled=false, customerId, avatarId, openedLook, profile, personalized, tryOn, onBack, onBusy }: Props) {
   const catalogue = useMemo(() => sampleCatalogue(profile.id, !!personalized), [profile.id, personalized]);
+  const [sessionId]=useState(()=>crypto.randomUUID());
   const [imports, setImports] = useState<Garment[]>([]);
   const [layers, setLayers] = useState<Layer[]>([]);
   const [category, setCategory] = useState<Category>("shirt");
   const [base, setBase] = useState("");
   // AI try-on results stack on the avatar; each one becomes the next base.
-  const [dressed, setDressed] = useState<Dressed[]>(openedLook ? [{image:openedLook.image,label:openedLook.name,previousLayers:[]}] : []);
+  const [dressed, setDressed] = useState<Dressed[]>(openedLook ? [{image:openedLook.image,label:openedLook.name,previousLayers:[],fromSavedLook:true}] : []);
   const current = dressed.at(-1)?.image || base;
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
@@ -78,8 +79,10 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
     if (!avatarId || !result || !reviewed || !storageConsent || !lookName.trim() || busy || rendering) return;
     setBusy(true); onBusy(true); setError("");
     try {
-      const labels = [...(openedLook && dressed.length ? openedLook.garments : []), ...dressed.slice(openedLook ? 1 : 0).map(x=>x.label), ...layers.map(x=>x.garment.name)].map(x=>x.slice(0,120));
-      const saved=await saveLook(result,avatarId,lookName,labels);
+      const restored=dressed[0]?.fromSavedLook;
+      const garmentIds=[...new Set([...(restored?openedLook?.garmentIds||[]:[]),...dressed.flatMap(d=>d.adaptation?.garmentId?[d.adaptation.garmentId]:[])])];
+      const labels = [...(restored ? openedLook?.garments||[] : []), ...dressed.slice(restored ? 1 : 0).map(x=>x.label), ...layers.map(x=>x.garment.name)].map(x=>x.slice(0,120));
+      const saved=await saveLook(result,avatarId,lookName,labels,{sessionId,garmentIds});
       setSavedLook(saved.id);
       setNotice("Look saved to your store account. Open it under this avatar in Saved avatars.");
       if(canSaveAdaptation){
@@ -118,7 +121,7 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
         <p className="outfit-caption">Approximate visual styling. This preview does not predict size, fit or fabric drape.</p>
       </div>
       <div className="outfit-controls">
-        <LinkTryOn catalogueEnabled={catalogueEnabled} avatarId={avatarId} bodyType={profile.id.startsWith("f-") ? "female" : "male"} base={result} disabled={busy || rendering} available={tryOn.available} providerLabel={tryOn.providerLabel} onBusy={value => { setBusy(value); onBusy(value); }} onResult={dress}/>
+        <LinkTryOn sessionId={sessionId} catalogueEnabled={catalogueEnabled} avatarId={avatarId} bodyType={profile.id.startsWith("f-") ? "female" : "male"} base={result} disabled={busy || rendering} available={tryOn.available} providerLabel={tryOn.providerLabel} onBusy={value => { setBusy(value); onBusy(value); }} onResult={dress}/>
         {dressed.length > 0 && <section className="outfit-panel"><h2>Wearing from product links</h2>
           <ol className="dressed-list">{dressed.map((item, index) => <li key={index}>{item.label}</li>)}</ol>
           <button className="button secondary" disabled={busy} onClick={undoDress}><Undo2 size={16}/> Undo last garment</button>

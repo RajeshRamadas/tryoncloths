@@ -1,3 +1,6 @@
+import {Analytics,installAnalyticsRoutes} from './analytics.js';
+import {installTrackingSchema,validateLookTracking,attributeLook,lookAttribution} from './analytics-tracking.js';
+import {transaction} from './catalogue-fields.js';
 import {SizeStore,installSizeRoutes} from './size.js';
 import {installCatalogueRoutes} from './catalogue-import.js';
 import {installCampaignRoutes} from './whatsapp-campaigns.js';
@@ -54,7 +57,7 @@ export class AccountStore {
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     this.garments = new GarmentStore(this);
-    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); this.sizes=new SizeStore(this); }
+    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); this.sizes=new SizeStore(this); installTrackingSchema(this.db); this.analytics=new Analytics(this); }
     catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
@@ -177,14 +180,19 @@ export class AccountStore {
     const name = typeof input.name === "string" ? input.name.trim() : "";
     if (!name || name.length > 60 || !Array.isArray(input.garments) || input.garments.length > 10 || input.garments.some(x => typeof x !== "string" || !x.trim() || x.length > 120)) throw error("Use a look name and up to 10 garment labels of at most 120 characters.");
     this.requireAvatar(account, input.avatarId);
+    validateLookTracking(this,account,input);
     const {image, thumbnail} = await savedImage(input.image);
     // Recheck after decoding: the avatar may have been deleted meanwhile.
     this.requireAvatar(account, input.avatarId);
+    return transaction(this.db,()=>{
+    validateLookTracking(this,account,input);
     const id = digest(Buffer.concat([image,Buffer.from(input.avatarId)])), savedAt = Date.now();
     const exists = this.db.prepare("SELECT id FROM looks WHERE account=? AND id=?").get(account.id,id);
     if (!exists && this.db.prepare("SELECT count(*) AS total FROM looks WHERE account=?").get(account.id).total >= 200) throw error("Your account holds up to 200 looks. Delete one before adding another.",409);
     this.db.prepare(`INSERT INTO looks(id,account,avatarId,name,garments,image,thumbnail,savedAt) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET avatarId=excluded.avatarId,name=excluded.name,garments=excluded.garments,savedAt=excluded.savedAt`).run(id,account.id,input.avatarId,name,JSON.stringify(input.garments),image,thumbnail,savedAt);
+    attributeLook(this,account,id,input);
     return {id,avatarId:input.avatarId,savedAt};
+    });
   }
   requireAvatar(account,id) {
     if (typeof id !== "string" || !this.db.prepare("SELECT id FROM avatars WHERE account=? AND id=?").get(account.id,id)) throw error("Avatar not found.",404);
@@ -194,7 +202,7 @@ export class AccountStore {
     const rows = avatarId === undefined
       ? this.db.prepare("SELECT id,avatarId,name,garments,thumbnail,savedAt,purchasedAt,purchasedSize,staffUser FROM looks WHERE account=? ORDER BY savedAt DESC").all(account.id)
       : this.db.prepare("SELECT id,avatarId,name,garments,thumbnail,savedAt,purchasedAt,purchasedSize,staffUser FROM looks WHERE account=? AND avatarId=? ORDER BY savedAt DESC").all(account.id,avatarId);
-    return rows.map(row=>({...row,garments:JSON.parse(row.garments),thumbnail:`data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`}));
+    return rows.map(row=>({...row,...lookAttribution(this,account,row.id),garments:JSON.parse(row.garments),thumbnail:`data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`}));
   }
   lookImage(account,id) { const row=this.db.prepare("SELECT image FROM looks WHERE account=? AND id=?").get(account.id,id);return row?Buffer.from(row.image):null; }
   removeLook(account,id) { return this.db.prepare("DELETE FROM looks WHERE account=? AND id=?").run(account.id,id).changes>0; }
@@ -204,7 +212,7 @@ export class AccountStore {
 
 function token(req) { return (req.get("cookie") || "").split(";").map(x=>x.trim()).find(x=>x.startsWith(`${cookieName}=`))?.slice(cookieName.length+1) || ""; }
 export function accountUser(store,req) { return store?.user(token(req)) || null; }
-export function installAccountRoutes(app, store, { production=false, allowSignup=true, sendMail, publicUrl, payments, whatsapp, campaignConfig, catalogueOptions }={}) {
+export function installAccountRoutes(app, store, { production=false, allowSignup=true, sendMail, publicUrl, payments, whatsapp, campaignConfig, catalogueOptions, analyticsReports }={}) {
   const attempts = new Map(); let hashes=0;
   const cookie = (res,value,maxAge=lifetime) => res.cookie(cookieName,value,{httpOnly:true,secure:production,sameSite:"strict",path:"/",maxAge});
   const wrap = fn => async(req,res) => { try { await fn(req,res); } catch(e) { res.status(e.status || 500).json({error:e.status ? e.message : "Account storage is unavailable. Please try again; no generation request was retried."}); } };
@@ -217,6 +225,7 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
     stores:account ? storesForUser(store.db,account.user.id) : []});
   app.get("/api/account",wrap((req,res)=>res.json({enabled:Boolean(store),signupAllowed:Boolean(store&&allowSignup),...response(accountUser(store,req))})));
   if(!store) return;
+  installAnalyticsRoutes(app,store,{requireUser,sameOrigin,wrap,reports:analyticsReports});
   installSizeRoutes(app,store,{requireUser,sameOrigin,wrap});
   installCatalogueRoutes(app,store,{requireUser,sameOrigin,wrap,options:catalogueOptions});
   if(whatsapp&&campaignConfig)installCampaignRoutes(app,store,whatsapp,campaignConfig,{requireUser,sameOrigin,wrap});

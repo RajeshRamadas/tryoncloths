@@ -19,3 +19,5 @@ export const saveGarment = (input:{name:string;garmentType:GarmentType;variant:s
 export const findAdaptation = (id:string,input:{avatar:string;avatarId:string;garmentType:GarmentType;bodyType:string}):Promise<{match:boolean;id?:string;image?:string}> => catalogueRequest(`/api/garments/${encodeURIComponent(id)}/reuse`,input);
 export const saveAdaptation = (id:string,image:string,receipt:string) => catalogueRequest(`/api/garments/${encodeURIComponent(id)}/results`,{image,receipt,reviewed:true,storageConsent:true});
 export const deleteAdaptation = (id:string,result:string) => catalogueRequest(`/api/garments/${encodeURIComponent(id)}/results/${encodeURIComponent(result)}`,undefined,'DELETE');
+
+export const useAdaptation=(id:string,input:{avatar:string;avatarId:string;garmentType:GarmentType;bodyType:string;requestId:string;sessionId?:string})=>catalogueRequest(`/api/garments/${encodeURIComponent(id)}/reuse/use`,input);

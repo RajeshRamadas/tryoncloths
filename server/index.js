@@ -15,6 +15,10 @@ if(app.locals.payments){
   const retry=()=>app.locals.payments.retryInvoices().catch(()=>console.error(JSON.stringify({event:"invoice_retry_failed"})));
   void retry();setInterval(()=>void retry(),5*60*1000).unref();
 }
+if(production&&app.locals.analyticsReports){
+ const tick=()=>app.locals.analyticsReports.runDue().catch(()=>console.error(JSON.stringify({event:'analytics_scheduler_failed'})));
+ void tick();setInterval(()=>void tick(),60000).unref();
+}
 app.listen(port, "0.0.0.0", (error) => {
   if (error) {
     console.error(
