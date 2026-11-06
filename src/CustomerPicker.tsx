@@ -9,13 +9,14 @@ export default function CustomerPicker({selected,disabled,onSelect,onUpdate}:Pro
   const [searched,setSearched]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [editing,setEditing]=useState<Customer|null>(null),[form,setForm]=useState(false),[confirmErase,setConfirmErase]=useState(false);
   const [name,setName]=useState(''),[mobile,setMobile]=useState(''),[notes,setNotes]=useState(''),[marketing,setMarketing]=useState(false);
+  const [whatsapp,setWhatsapp]=useState(false);
   const [height,setHeight]=useState(''),[weight,setWeight]=useState('');
   const locked=disabled||busy;
   async function search(){setBusy(true);setError('');setMatches([]);setSearched(false);try{setMatches((await customerRequest(`/search?phone=${encodeURIComponent(phone)}`)).customers);setSearched(true);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
-  function fill(customer:Customer|null){setEditing(customer);setName(customer?.name||'');setMobile(customer?.phoneE164||phone);setNotes(customer?.notes||'');setMarketing(customer?.marketingOptIn||false);setHeight(customer?.measurements?String(customer.measurements.heightCm):'');setWeight(customer?.measurements?String(customer.measurements.weightKg):'');setForm(true);setConfirmErase(false);setError('');}
+  function fill(customer:Customer|null){setEditing(customer);setName(customer?.name||'');setMobile(customer?.phoneE164||phone);setNotes(customer?.notes||'');setMarketing(customer?.marketingOptIn||false);setWhatsapp(Boolean(customer?.whatsappConsentAt));setHeight(customer?.measurements?String(customer.measurements.heightCm):'');setWeight(customer?.measurements?String(customer.measurements.weightKg):'');setForm(true);setConfirmErase(false);setError('');}
   async function edit(){if(!selected)return;setBusy(true);setError('');try{fill((await customerRequest(`/${selected.id}`)).customer);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
   async function save(){setBusy(true);setError('');try{
-    const customer:Customer=(await customerRequest(editing?`/${editing.id}`:'',editing?'PATCH':'POST',{name,phoneE164:mobile,notes,marketingOptIn:marketing,optInSource:marketing?(editing?.marketingOptIn?editing.optInSource:'in_store'):null,measurements:height||weight?{heightCm:Number(height),weightKg:Number(weight)}:null})).customer;
+    const customer:Customer=(await customerRequest(editing?`/${editing.id}`:'',editing?'PATCH':'POST',{name,phoneE164:mobile,notes,marketingOptIn:marketing,whatsappConsent:whatsapp,optInSource:marketing?(editing?.marketingOptIn?editing.optInSource:'in_store'):null,measurements:height||weight?{heightCm:Number(height),weightKg:Number(weight)}:null})).customer;
     if(!mounted.current)return;
     if(editing)onUpdate(customer);else onSelect(customer,customer.measurements);
     setForm(false);setMatches([]);setSearched(false);
@@ -44,6 +45,7 @@ export default function CustomerPicker({selected,disabled,onSelect,onUpdate}:Pro
       <label>Customer notes<textarea value={notes} maxLength={2000} disabled={locked} onChange={e=>setNotes(e.target.value)}/></label>
       <div className="measurement-grid"><label>Profile height (cm)<input type="number" min="140" max="210" step="any" value={height} disabled={locked} onChange={e=>setHeight(e.target.value)}/></label><label>Profile weight (kg)<input type="number" min="35" max="200" step="any" value={weight} disabled={locked} onChange={e=>setWeight(e.target.value)}/></label></div>
       <p className="small-footnote">Measurements are optional. Update them here when they change; existing avatars keep their original measurements.</p>
+      <label className="consent"><input type="checkbox" checked={whatsapp} disabled={locked} onChange={e=>setWhatsapp(e.target.checked)}/><span>The customer agrees in store to receive their outfits through WhatsApp.</span></label>
       <label className="consent"><input type="checkbox" checked={marketing} disabled={locked} onChange={e=>setMarketing(e.target.checked)}/><span>The customer agrees to receive marketing messages. Optional; avatar creation does not require this.</span></label>
       <div className="customer-actions"><button className="button primary" disabled={locked}>Save customer</button><button type="button" className="button back-button" disabled={locked} onClick={()=>setForm(false)}>Cancel customer edit</button></div>
     </form>}

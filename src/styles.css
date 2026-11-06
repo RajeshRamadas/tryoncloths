@@ -1819,3 +1819,13 @@ dialog::backdrop {
 .share-links li { margin:12px 0; }
 .share-links span { display:block; }
 .created-share { min-width:0; }
+
+.whatsapp-page section { padding:20px; margin:20px 0; border:1px solid #d7dfd2; border-radius:12px; }
+.whatsapp-page label:not(.consent) { display:flex; flex-direction:column; gap:8px; margin:12px 0; }
+.whatsapp-page input:not([type=checkbox]),.whatsapp-page select { width:100%; min-width:0; padding:10px; font:inherit; border:1px solid #d7dfd2; border-radius:8px; background:white; color:#234b3a; }
+.whatsapp-page button { white-space:normal; margin:8px 8px 8px 0; }
+.whatsapp-page p,.whatsapp-page li { overflow-wrap:anywhere; }
+.wa-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; }
+.wa-options>label { padding:12px; border:1px solid #d7dfd2; border-radius:8px; }
+.wa-options img,.wa-campaign-item img { height:160px; width:auto; max-width:100%; object-fit:contain; }
+.wa-campaign-item { margin:16px 0; padding:16px; background:#f1f5ef; border-radius:10px; }

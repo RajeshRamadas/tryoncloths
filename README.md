@@ -37,6 +37,7 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 - An explicitly triggered Gemini customer-avatar adapter using both customer photos, a selected body template, and whole-body skin-tone matching instructions, with server-side credentials and consent checks.
 - Review/approval, full-body PNG download, expanded preview, and new-session photo clearing.
 - [Outfit sharing](docs/OUTFIT_SHARING.md): expiring public preview links, WhatsApp click-to-chat, and link revocation; uses saved looks with no AI credits.
+- [WhatsApp automation](docs/WHATSAPP.md): encrypted Business connection, consented lookbooks, metered new-arrival previews, review before sending, delivery status and STOP opt-outs.
 - Responsive layout and keyboard-accessible controls/dialogs.
 - [Customer profiles](docs/CUSTOMERS.md) with store-scoped mobile lookup, customer-grouped saved avatars, optional marketing consent and linked-data erasure.
 

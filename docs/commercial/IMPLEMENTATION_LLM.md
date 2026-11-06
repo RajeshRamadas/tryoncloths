@@ -290,8 +290,12 @@ C9 is next. R1 production release checks below still need operator verification.
 
 **Acceptance.**
 
-- [ ] No marketing send without opt-in; STOP works end to end in tests.
-- [ ] Access token never appears in responses or logs.
+- [x] No marketing send without opt-in; STOP works end to end in tests.
+- [x] Access token never appears in responses or logs.
+
+**Implemented:** `0.16.0-alpha.9`, branch `feature/whatsapp-lookbooks`.
+See [Meta setup, consent, campaign workflow and verification limits](../WHATSAPP.md).
+Live delivery, template approval and Meta charges require operator validation.
 
 ### Task C10 — catalogue fields and CSV import
 
