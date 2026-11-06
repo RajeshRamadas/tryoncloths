@@ -1840,3 +1840,14 @@ dialog::backdrop {
 .product-facts { font-size:13px; line-height:1.6; }
 .catalogue-item form { padding:12px; background:#f4f7f0; border-radius:8px; }
 .product-facts { display:block; margin:8px 0; }
+
+.size-guidance { padding:12px 16px; margin:12px; border:1px solid #d2ddce; border-radius:10px; background:#f2f6ed; font-size:14px; }
+.size-guidance summary { cursor:pointer; font-weight:700; color:#205c47; }
+.size-guidance p { font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
+.purchase-look { padding:16px; margin-top:16px; border:1px solid #d7dfd2; border-radius:12px; }
+.purchase-look label,.size-charts-page label { display:flex; flex-direction:column; gap:8px; margin:12px 0; }
+.purchase-look input,.size-charts-page input,.size-charts-page select { width:100%; min-width:0; padding:10px; border:1px solid #d4d9d1; border-radius:8px; font:inherit; color:#234b3a; background:white; }
+.size-charts-page section { padding:20px; margin:20px 0; border:1px solid #d7dfd2; border-radius:12px; }
+.size-charts-page button,.purchase-look button { white-space:normal; margin:8px 8px 8px 0; }
+.size-chart-row { padding:12px; margin:12px 0; background:#f1f5ed; border-radius:8px; }
+.size-chart-row h3,.size-chart-row p,.purchase-look p { overflow-wrap:anywhere; }

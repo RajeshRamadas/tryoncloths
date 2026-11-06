@@ -1,6 +1,7 @@
 import {requestApi} from './api';
 export type CustomerRef = {id:string; name:string; phoneE164:string};
-export type Customer = CustomerRef & {notes:string; whatsappConsentAt?:number|null; whatsappConsentSource?:string|null; marketingOptIn:boolean; optInAt:number|null; optInSource:'in_store'|'whatsapp'|null; measurements:{heightCm:number;weightKg:number}|null; createdAt:number};
+export type CustomerMeasurements={heightCm?:number;weightKg?:number;chestCm?:number;waistCm?:number;hipCm?:number;bodyProfileId?:string};
+export type Customer = CustomerRef & {notes:string; whatsappConsentAt?:number|null; whatsappConsentSource?:string|null; marketingOptIn:boolean; optInAt:number|null; optInSource:'in_store'|'whatsapp'|null; measurements:CustomerMeasurements|null; createdAt:number};
 export async function customerRequest(path:string,method='GET',body?:unknown) {
   const response=await requestApi(`/api/customers${path}`,{method,...(body===undefined?{}:{headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})},30000);
   const data=await response.json();

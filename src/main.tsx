@@ -1,3 +1,4 @@
+import SizeCharts from "./SizeCharts";
 import CatalogueManager from "./CatalogueManager";
 import WhatsApp from "./WhatsApp";
 import Usage from './Usage';
@@ -13,6 +14,6 @@ document.documentElement.classList.toggle("native-app", isNative);
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {window.location.pathname === "/catalogue" ? <CatalogueManager /> : window.location.pathname === "/whatsapp" ? <WhatsApp /> : window.location.pathname === "/invite" ? <InviteAcceptance /> : window.location.pathname === "/billing" ? <Billing /> : window.location.pathname === "/usage" ? <Usage /> : <App />}
+    {window.location.pathname === "/size-charts" ? <SizeCharts /> : window.location.pathname === "/catalogue" ? <CatalogueManager /> : window.location.pathname === "/whatsapp" ? <WhatsApp /> : window.location.pathname === "/invite" ? <InviteAcceptance /> : window.location.pathname === "/billing" ? <Billing /> : window.location.pathname === "/usage" ? <Usage /> : <App />}
   </React.StrictMode>,
 );

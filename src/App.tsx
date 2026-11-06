@@ -437,7 +437,7 @@ export default function App() {
     if (next?.id === customer?.id) return;
     reset(); setCustomer(next);
     if(next)setAvatarName(next.name.slice(0,60));
-    if(measurements){setHeight(String(measurements.heightCm));setWeight(String(measurements.weightKg));}
+    if(measurements){if(measurements.heightCm!=null)setHeight(String(measurements.heightCm));if(measurements.weightKg!=null)setWeight(String(measurements.weightKg));if(measurements.bodyProfileId){setSelected(measurements.bodyProfileId);setManual(true);}}
   }
   function useSavedAvatar(image: string, details: AvatarDetails) {
     if(details.avatarId)setCustomer(details.customerId ? {id:details.customerId,name:details.customerName || 'Customer',phoneE164:details.customerPhone || ''} : null);
@@ -1271,7 +1271,7 @@ export default function App() {
       </dialog>
     </div>
     </div>
-    {approved && !needsCustomerGeneration && <OutfitStudio key={`${session}-${selected}-${templateTone}`} active={outfitOpen} templateTone={templateTone} catalogueEnabled={Boolean(accountState.account)} avatarId={accountState.account ? avatarId : null} openedLook={openedLook} profile={profile} personalized={personalized} tryOn={{ available: tryOnAvailable && bodyGenerationAllowed, providerLabel }} onBack={() => { setOutfitOpen(false); requestAnimationFrame(() => titleRef.current?.focus()); }} onBusy={setExporting}/>}
+    {approved && !needsCustomerGeneration && <OutfitStudio key={`${session}-${selected}-${templateTone}`} active={outfitOpen} templateTone={templateTone} customerId={customer?.id} catalogueEnabled={Boolean(accountState.account)} avatarId={accountState.account ? avatarId : null} openedLook={openedLook} profile={profile} personalized={personalized} tryOn={{ available: tryOnAvailable && bodyGenerationAllowed, providerLabel }} onBack={() => { setOutfitOpen(false); requestAnimationFrame(() => titleRef.current?.focus()); }} onBusy={setExporting}/>}
     </>
   );
 }

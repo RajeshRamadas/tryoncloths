@@ -1,3 +1,4 @@
+import PurchaseLook from "./PurchaseLook";
 import ShareLook from "./ShareLook";
 import { useRef, useState } from "react";
 import { FolderOpen, X } from "lucide-react";
@@ -90,6 +91,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
         {looks.map(look=><article className="saved-avatar-item" key={look.id}><img src={look.thumbnail} alt={`Saved look: ${look.name}`}/><div><h3>{look.name}</h3><p>{look.garments.join(" · ")}</p>
           <button className="button primary" disabled={busy} onClick={()=>void useLook(look)}>Open look {look.name}</button>
           <button className="button secondary" disabled={busy} onClick={()=>setShareLook(shareLook===look.id?null:look.id)}>Share {look.name}</button>
+          <PurchaseLook key={`purchase-${look.id}`} lookId={look.id} disabled={busy} initialPurchase={{purchasedAt:look.purchasedAt??null,purchasedSize:look.purchasedSize??null}}/>
           {shareLook===look.id && <ShareLook key={look.id} lookId={look.id} disabled={busy}/>}
           {confirmLookDelete===look.id ? <><button className="button secondary" disabled={busy} onClick={()=>void removeLook(look.id)}>Confirm look deletion</button><button className="button back-button" disabled={busy} onClick={()=>setConfirmLookDelete(null)}>Cancel</button></> : <button className="button back-button" disabled={busy} onClick={()=>setConfirmLookDelete(look.id)}>Delete look {look.name}</button>}
         </div></article>)}

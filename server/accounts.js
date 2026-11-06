@@ -1,3 +1,4 @@
+import {SizeStore,installSizeRoutes} from './size.js';
 import {installCatalogueRoutes} from './catalogue-import.js';
 import {installCampaignRoutes} from './whatsapp-campaigns.js';
 import {installWhatsAppSchema} from './whatsapp-schema.js';
@@ -53,7 +54,7 @@ export class AccountStore {
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     this.garments = new GarmentStore(this);
-    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); }
+    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); this.sizes=new SizeStore(this); }
     catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
@@ -191,8 +192,8 @@ export class AccountStore {
   listLooks(account,avatarId) {
     if (avatarId !== undefined) this.requireAvatar(account,avatarId);
     const rows = avatarId === undefined
-      ? this.db.prepare("SELECT id,avatarId,name,garments,thumbnail,savedAt FROM looks WHERE account=? ORDER BY savedAt DESC").all(account.id)
-      : this.db.prepare("SELECT id,avatarId,name,garments,thumbnail,savedAt FROM looks WHERE account=? AND avatarId=? ORDER BY savedAt DESC").all(account.id,avatarId);
+      ? this.db.prepare("SELECT id,avatarId,name,garments,thumbnail,savedAt,purchasedAt,purchasedSize,staffUser FROM looks WHERE account=? ORDER BY savedAt DESC").all(account.id)
+      : this.db.prepare("SELECT id,avatarId,name,garments,thumbnail,savedAt,purchasedAt,purchasedSize,staffUser FROM looks WHERE account=? AND avatarId=? ORDER BY savedAt DESC").all(account.id,avatarId);
     return rows.map(row=>({...row,garments:JSON.parse(row.garments),thumbnail:`data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`}));
   }
   lookImage(account,id) { const row=this.db.prepare("SELECT image FROM looks WHERE account=? AND id=?").get(account.id,id);return row?Buffer.from(row.image):null; }
@@ -216,6 +217,7 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
     stores:account ? storesForUser(store.db,account.user.id) : []});
   app.get("/api/account",wrap((req,res)=>res.json({enabled:Boolean(store),signupAllowed:Boolean(store&&allowSignup),...response(accountUser(store,req))})));
   if(!store) return;
+  installSizeRoutes(app,store,{requireUser,sameOrigin,wrap});
   installCatalogueRoutes(app,store,{requireUser,sameOrigin,wrap,options:catalogueOptions});
   if(whatsapp&&campaignConfig)installCampaignRoutes(app,store,whatsapp,campaignConfig,{requireUser,sameOrigin,wrap});
   if(whatsapp)installWhatsAppRoutes(app,store,whatsapp,{requireUser,sameOrigin,wrap});
