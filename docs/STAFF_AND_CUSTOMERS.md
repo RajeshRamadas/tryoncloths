@@ -4,6 +4,7 @@
 - [Staff invitations](STAFF_INVITES.md): owners/managers invite staff; roles and store boundaries.
 - [Customer profiles](CUSTOMERS.md): mobile lookup, measurements, optional marketing consent and erasure.
 - [Outfit sharing](OUTFIT_SHARING.md): expiring links, WhatsApp click-to-chat and revocation.
+- [WhatsApp automation](WHATSAPP.md): Business connection, consent, metered new arrivals, delivery and opt-outs.
 - [Billing and usage](BILLING.md): trials, credits, checkout, invoices and operator commands.
 
 For a returning customer, find them by mobile number, reopen their avatar in Saved

@@ -1,3 +1,6 @@
+import {installCampaignRoutes} from './whatsapp-campaigns.js';
+import {installWhatsAppSchema} from './whatsapp-schema.js';
+import {installWhatsAppRoutes} from './whatsapp.js';
 import { ShareStore, installShareRoutes } from './sharing.js';
 import { CustomerStore, installCustomerRoutes } from './customers.js';
 import {installAdminSchema,claimTrial,trialKeys} from './commercial-admin.js';
@@ -49,7 +52,7 @@ export class AccountStore {
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     this.garments = new GarmentStore(this);
-    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); }
+    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); }
     catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
@@ -199,7 +202,7 @@ export class AccountStore {
 
 function token(req) { return (req.get("cookie") || "").split(";").map(x=>x.trim()).find(x=>x.startsWith(`${cookieName}=`))?.slice(cookieName.length+1) || ""; }
 export function accountUser(store,req) { return store?.user(token(req)) || null; }
-export function installAccountRoutes(app, store, { production=false, allowSignup=true, sendMail, publicUrl, payments }={}) {
+export function installAccountRoutes(app, store, { production=false, allowSignup=true, sendMail, publicUrl, payments, whatsapp, campaignConfig }={}) {
   const attempts = new Map(); let hashes=0;
   const cookie = (res,value,maxAge=lifetime) => res.cookie(cookieName,value,{httpOnly:true,secure:production,sameSite:"strict",path:"/",maxAge});
   const wrap = fn => async(req,res) => { try { await fn(req,res); } catch(e) { res.status(e.status || 500).json({error:e.status ? e.message : "Account storage is unavailable. Please try again; no generation request was retried."}); } };
@@ -212,6 +215,8 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
     stores:account ? storesForUser(store.db,account.user.id) : []});
   app.get("/api/account",wrap((req,res)=>res.json({enabled:Boolean(store),signupAllowed:Boolean(store&&allowSignup),...response(accountUser(store,req))})));
   if(!store) return;
+  if(whatsapp&&campaignConfig)installCampaignRoutes(app,store,whatsapp,campaignConfig,{requireUser,sameOrigin,wrap});
+  if(whatsapp)installWhatsAppRoutes(app,store,whatsapp,{requireUser,sameOrigin,wrap});
   installShareRoutes(app,store,{requireUser,sameOrigin,wrap,publicUrl});
   installCustomerRoutes(app,store,{requireUser,sameOrigin,wrap});
   installBillingRoutes(app,store,{requireUser,sameOrigin,wrap,payments});

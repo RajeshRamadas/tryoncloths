@@ -1,3 +1,4 @@
+import {WhatsApp,installWhatsAppWebhook} from './whatsapp.js';
 import {PaymentStore,installPaymentWebhook} from './payments.js';
 import express from "express";
 import sharp from "sharp";
@@ -88,6 +89,7 @@ export function createApp({
   sendMail,
   publicUrl = process.env.TRYON_PUBLIC_URL,
   paymentOptions = {},
+  whatsappOptions = {},
   femaleEnabled = process.env.TRYON_FEMALE_PROFILES === "true",
   tryOn = geminiTryOn,
   productLink = readProductLinkWithFallback,
@@ -114,6 +116,9 @@ export function createApp({
   const payments = accountStore ? new PaymentStore(accountStore,{...paymentOptions, ...(sendMail ? {sendMail} : {})}) : null;
   app.locals.payments=payments;
   installPaymentWebhook(app,payments);
+  const whatsapp=accountStore?new WhatsApp(accountStore,{publicUrl,...whatsappOptions}):null;
+  app.locals.whatsapp=whatsapp;
+  installWhatsAppWebhook(app,whatsapp);
   const nativeOrigins = new Set(["capacitor://localhost", "https://localhost"]);
   app.use("/api", (req, res, next) => {
     const origin = req.get("origin");
@@ -146,7 +151,7 @@ export function createApp({
   // Two <=5 MB photos, base64-encoded, plus small metadata. Each is checked below.
   app.use("/api/account", express.json({ limit: "4kb" }));
   app.use(express.json({ limit: "15mb" }));
-  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments });
+  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, campaignConfig:{provider,model,apiKey,tryOn,femaleEnabled} });
   installGarmentRoutes(app, accountStore, { provider, model });
   app.get("/api/health", (_req, res) =>
     res.json({

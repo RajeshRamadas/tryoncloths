@@ -99,12 +99,15 @@ export class CustomerStore {
   save(account, input, id) {
     const previous = id === undefined ? null : this.get(account,id);
     const value = fields(input,previous);
+    if(input.whatsappConsent!==undefined && typeof input.whatsappConsent!=='boolean')throw fail('Choose whether the customer agrees to receive outfits on WhatsApp.');
+    const whatsappAt=input.whatsappConsent===undefined ? previous?.whatsappConsentAt ?? null : input.whatsappConsent ? previous?.whatsappConsentAt || Date.now() : null;
+    const whatsappSource=whatsappAt?'in_store':null;
     const customerId = previous?.id || randomBytes(16).toString('hex');
     try {
-      if (previous) this.db.prepare('UPDATE customers SET name=?,phoneE164=?,notes=?,marketingOptIn=?,optInAt=?,optInSource=?,measurementsJson=? WHERE store=? AND id=?')
-        .run(value.name,value.phoneE164,value.notes,Number(value.marketingOptIn),value.optInAt,value.optInSource,JSON.stringify(value.measurements),account.id,customerId);
-      else this.db.prepare('INSERT INTO customers(id,store,name,phoneE164,notes,marketingOptIn,optInAt,optInSource,measurementsJson,createdAt) VALUES(?,?,?,?,?,?,?,?,?,?)')
-        .run(customerId,account.id,value.name,value.phoneE164,value.notes,Number(value.marketingOptIn),value.optInAt,value.optInSource,JSON.stringify(value.measurements),Date.now());
+      if (previous) this.db.prepare('UPDATE customers SET name=?,phoneE164=?,notes=?,marketingOptIn=?,optInAt=?,optInSource=?,measurementsJson=?,whatsappConsentAt=?,whatsappConsentSource=? WHERE store=? AND id=?')
+        .run(value.name,value.phoneE164,value.notes,Number(value.marketingOptIn),value.optInAt,value.optInSource,JSON.stringify(value.measurements),whatsappAt,whatsappSource,account.id,customerId);
+      else this.db.prepare('INSERT INTO customers(id,store,name,phoneE164,notes,marketingOptIn,optInAt,optInSource,measurementsJson,createdAt,whatsappConsentAt,whatsappConsentSource) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+        .run(customerId,account.id,value.name,value.phoneE164,value.notes,Number(value.marketingOptIn),value.optInAt,value.optInSource,JSON.stringify(value.measurements),Date.now(),whatsappAt,whatsappSource);
     } catch (e) {
       if (e.message?.includes('UNIQUE constraint failed: customers.store, customers.phoneE164')) throw fail('This mobile number already has a customer in this store. Find and select that customer.',409);
       throw e;
