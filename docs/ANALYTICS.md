@@ -57,8 +57,9 @@ when draft filters have changed without being applied.
 New fitting/product attribution begins with this deployment; its start date is
 displayed on the dashboard. Older sharing/purchase events and ledger entries can
 still appear, with incomplete attribution. No historical events are fabricated.
-`catalogue_photo` is reserved for C13; this feature does not generate catalogue
-photos or add paid provider calls.
+`catalogue_photo` counts C13 previews created, including included regenerations.
+Photo credits count approved base images and successful extra paid regenerations.
+Report viewing itself makes no paid provider calls.
 
 ## Monthly owner emails
 
@@ -138,4 +139,4 @@ cd ~/tryoncloths && git pull --ff-only origin main && cd deploy/lightsail && sud
 
 This is a web update, not a deployment performed by Codex. Commercial integration
 rollout remains alpha until the configured live services are validated. The next
-implementation task after C11 catalogue sync is **C13 — AI catalogue photos**.
+implementation task after C13 catalogue photos is **C15 — Store branding**.
