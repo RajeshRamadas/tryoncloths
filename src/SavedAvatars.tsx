@@ -1,3 +1,4 @@
+import ShareLook from "./ShareLook";
 import { useRef, useState } from "react";
 import { FolderOpen, X } from "lucide-react";
 import { avatarDataUrl, deleteAvatar, listAvatars, readAvatarPng, type AvatarDetails, type SavedAvatar } from "./saved-avatars";
@@ -11,6 +12,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
   const [items, setItems] = useState<SavedAvatar[]>([]);
   const [looksFor,setLooksFor]=useState<SavedAvatar|null>(null);
   const [looks,setLooks]=useState<SavedLook[]>([]);
+  const [shareLook,setShareLook]=useState<string|null>(null);
   const [confirmLookDelete,setConfirmLookDelete]=useState<string|null>(null);
   const [localView,setLocalView] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -21,7 +23,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
   const [height, setHeight] = useState("175");
   const [weight, setWeight] = useState("72");
   async function show() {
-    dialog.current?.showModal(); setLooksFor(null); setLooks([]); setLocalView(false); setItems([]); setBusy(true); setError(""); setConfirmDelete(null);
+    dialog.current?.showModal(); setLooksFor(null); setShareLook(null); setLooks([]); setLocalView(false); setItems([]); setBusy(true); setError(""); setConfirmDelete(null);
     try { setItems(await (cloud ? listAccountAvatars() : listAvatars())); } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   }
@@ -40,13 +42,13 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
   }
   async function showLooks(item:SavedAvatar) {
     setBusy(true);setError("");setConfirmLookDelete(null);
-    try {setLooks(await listLooks(item.id));setLooksFor(item);}catch(e){setError((e as Error).message);}finally{setBusy(false);}
+    try {setLooks(await listLooks(item.id));setLooksFor(item);setShareLook(null);}catch(e){setError((e as Error).message);}finally{setBusy(false);}
   }
   async function useLook(look:SavedLook) {
     if(!looksFor)return;setBusy(true);setError("");
     try {
       const [avatar,image]=await Promise.all([accountAvatarImage(looksFor.id).then(avatarDataUrl),lookImage(look.id).then(avatarDataUrl)]);
-      close();onUse(avatar,{...looksFor,avatarId:looksFor.id,look:{image,name:look.name,garments:look.garments}});
+      close();onUse(avatar,{...looksFor,avatarId:looksFor.id,look:{id:look.id,image,name:look.name,garments:look.garments}});
     }catch(e){setError((e as Error).message);}finally{setBusy(false);}
   }
   async function removeLook(id:string) {
@@ -87,6 +89,8 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
         {!looks.length && <p>No looks saved for this avatar yet.</p>}
         {looks.map(look=><article className="saved-avatar-item" key={look.id}><img src={look.thumbnail} alt={`Saved look: ${look.name}`}/><div><h3>{look.name}</h3><p>{look.garments.join(" · ")}</p>
           <button className="button primary" disabled={busy} onClick={()=>void useLook(look)}>Open look {look.name}</button>
+          <button className="button secondary" disabled={busy} onClick={()=>setShareLook(shareLook===look.id?null:look.id)}>Share {look.name}</button>
+          {shareLook===look.id && <ShareLook key={look.id} lookId={look.id} disabled={busy}/>}
           {confirmLookDelete===look.id ? <><button className="button secondary" disabled={busy} onClick={()=>void removeLook(look.id)}>Confirm look deletion</button><button className="button back-button" disabled={busy} onClick={()=>setConfirmLookDelete(null)}>Cancel</button></> : <button className="button back-button" disabled={busy} onClick={()=>setConfirmLookDelete(look.id)}>Delete look {look.name}</button>}
         </div></article>)}
       </section>}

@@ -259,9 +259,13 @@ See [customer profiles, erasure boundaries and C8 handoff](../CUSTOMERS.md).
 
 **Acceptance.**
 
-- [ ] Token not guessable (256-bit) and not stored in plain text.
-- [ ] Revoked link → 410 within one request.
-- [ ] Page passes a 390 px mobile check.
+- [x] Token not guessable (256-bit) and not stored in plain text.
+- [x] Revoked link → 410 within one request.
+- [x] Page passes a 390 px mobile check.
+
+**Implemented:** `0.16.0-alpha.8`, branch `feature/outfit-share-links`.
+See [outfit sharing and deployment](../OUTFIT_SHARING.md) and [staff/customer workflows](../STAFF_AND_CUSTOMERS.md).
+C9 is next. R1 production release checks below still need operator verification.
 
 **R1 release:** bump to 0.16.0, `docs/BILLING.md` + `docs/STAFF_AND_CUSTOMERS.md`, Lightsail env additions, Razorpay test-mode run, then live keys.
 

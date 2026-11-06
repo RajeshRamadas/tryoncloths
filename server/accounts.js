@@ -1,3 +1,4 @@
+import { ShareStore, installShareRoutes } from './sharing.js';
 import { CustomerStore, installCustomerRoutes } from './customers.js';
 import {installAdminSchema,claimTrial,trialKeys} from './commercial-admin.js';
 import { DatabaseSync } from "node:sqlite";
@@ -48,7 +49,7 @@ export class AccountStore {
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     this.garments = new GarmentStore(this);
-    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); }
+    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); }
     catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
@@ -211,6 +212,7 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
     stores:account ? storesForUser(store.db,account.user.id) : []});
   app.get("/api/account",wrap((req,res)=>res.json({enabled:Boolean(store),signupAllowed:Boolean(store&&allowSignup),...response(accountUser(store,req))})));
   if(!store) return;
+  installShareRoutes(app,store,{requireUser,sameOrigin,wrap,publicUrl});
   installCustomerRoutes(app,store,{requireUser,sameOrigin,wrap});
   installBillingRoutes(app,store,{requireUser,sameOrigin,wrap,payments});
   installStaffRoutes(app,store,{sameOrigin,requireUser,wrap,production,sendMail,publicUrl});

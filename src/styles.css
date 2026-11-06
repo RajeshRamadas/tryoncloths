@@ -1807,3 +1807,15 @@ dialog::backdrop {
 .customer-matches button { white-space:normal; text-align:left; overflow-wrap:anywhere; }
 .customer-avatar-group { min-width:0; }
 .customer-avatar-group>h3,.selected-customer-summary { overflow-wrap:anywhere; font-size:14px; color:#335b48; }
+
+.share-look { padding:16px; margin-top:16px; border:1px solid #d7dfd2; border-radius:12px; min-width:0; }
+.share-look h3 { margin:0 0 12px; }
+.share-look p,.share-look summary,.share-links { font-size:13px; line-height:1.6; }
+.share-look label:not(.consent) { display:flex; flex-direction:column; gap:8px; margin:12px 0; font-size:14px; }
+.share-look input:not([type=checkbox]),.share-look select { width:100%; min-width:0; padding:10px; border:1px solid #d4d9d1; border-radius:8px; background:white; color:#243c32; font:inherit; }
+.share-look .button { white-space:normal; }
+.share-look details { margin-top:16px; }
+.share-links { padding-left:20px; overflow-wrap:anywhere; }
+.share-links li { margin:12px 0; }
+.share-links span { display:block; }
+.created-share { min-width:0; }
