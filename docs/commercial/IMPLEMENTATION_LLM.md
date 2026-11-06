@@ -442,7 +442,7 @@ raw saved pixels resume local processing. Real provider/payment quality remains 
 **Implemented:** `0.18.0-alpha.3`, branch `feature/store-branding`.
 See [safe logo handling, role boundaries, public pages and export rules](../STORE_BRANDING.md).
 R3 implementation is complete; live service/deployment verification remains separate.
-The next outlined task, C16, requires design review and cost-cap sign-off first.
+C16 design and cost-cap sign-off are now approved; see the staged C16 status below.
 
 **R3 release:** bump to 0.18.0, docs for integrations, catalogue photos and branding.
 
@@ -464,10 +464,15 @@ The next outlined task, C16, requires design review and cost-cap sign-off first.
 
 **Acceptance (for design sign-off).**
 
-- [ ] Threat model and cost cap approved.
-- [ ] Shopper data retention ≤ 24 hours unless opted in.
+- [x] Threat model and cost cap approved (explicit task-conversation approval).
+- [x] Shopper data retention ≤ 24 hours unless opted in (policy approved; session/runtime verification in C16.3 remains pending).
 
-**Design prerequisite prepared:** see [C16 shopper self-service design](SHOPPER_SELF_SERVICE_DESIGN.md)
-for the proposed flow, tenant/session boundaries, monthly credit and provider-attempt
+**Design prerequisite approved:** see [C16 shopper self-service design](SHOPPER_SELF_SERVICE_DESIGN.md)
+for the flow, tenant/session boundaries, monthly credit and provider-attempt
 caps, threat model, retention, consent draft and ordered implementation/test tasks.
-The proposal is awaiting approval; the widget is not implemented or enabled.
+Product/design approval does not cover legal review or live service/deployment checks.
+
+**C16.1 implemented:** `0.19.0-alpha.1`, branch `feature/shopper-budgets`:
+[owner budgets, durable shopper metering, usage and pause controls](../SHOPPER_SPENDING.md).
+The widget is not implemented or enabled. Next: C16.2 Shopify installation and
+signed launches, followed by C16.3 guards/session storage and C16.4 hosted flow.

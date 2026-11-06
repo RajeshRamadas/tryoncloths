@@ -69,10 +69,12 @@ Original customer photo inputs stay in memory and are sent to the configured pro
 
 Store accounts, durable avatar storage and clothing try-on are available. Fit prediction and automatic body measurements are not implemented.
 
-Next commercial feature: the shopper **Try it on me** Shopify widget. Its
-[design, proposed spending caps and threat model](docs/commercial/SHOPPER_SELF_SERVICE_DESIGN.md)
-are prepared for review; implementation awaits the design sign-off required by
-the commercial guide. The widget is not available in the current app.
+The shopper **Try it on me** Shopify widget has an
+[approved staged design](docs/commercial/SHOPPER_SELF_SERVICE_DESIGN.md).
+Web `0.19.0-alpha.1` adds [shopper spending controls](docs/SHOPPER_SPENDING.md):
+owner monthly allowances, durable attempt/credit accounting, manager usage and
+immediate pause. Open **Shopper spending** after signing in. Shopify installation
+and the hosted shopper flow are next; the widget is not available yet.
 
 ## Validation
 

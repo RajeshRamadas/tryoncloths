@@ -4,6 +4,7 @@ import {mkdtemp,rm,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {randomUUID,createHmac} from 'node:crypto';
+import {EventEmitter,once} from 'node:events';
 import sharp from 'sharp';
 import {AccountStore} from './helpers/pilot-accounts.js';
 import {createApp,standardAvatar} from '../server/app.js';
@@ -15,11 +16,12 @@ async function fixture(run){
  const a=await store.register({email:'photos@example.test',name:'Photo store',password:'test-password-long'}),b=await store.register({email:'other@example.test',name:'Other store',password:'test-password-long'});store.db.prepare("INSERT INTO memberships VALUES(?,?,'manager')").run(b.user.id,a.id);const manager=store.identity(b.user.id,a.id);
  const image=`data:image/png;base64,${(await standardAvatar('regular')).toString('base64')}`,garmentPhoto=`data:image/jpeg;base64,${(await sharp('public/garments/blue-shirt.webp').flatten({background:'#fff'}).jpeg().toBuffer()).toString('base64')}`,product=(await store.garments.save(a,{image:garmentPhoto,name:'Blue shirt',variant:'M',garmentType:'shirt'})).garment;store.db.prepare('UPDATE garments SET sku=? WHERE account=? AND id=?').run('BLUE-001',a.id,product.id);
  const other=(await store.garments.save(b,{image:garmentPhoto,name:'Other shirt',variant:'M',garmentType:'shirt'})).garment;store.billing.grant(a.org,'photo',20,'grant_admin','test-photo-credits');store.billing.grant(b.org,'photo',20,'grant_admin','test-photo-credits');
- let calls=[],bad=false,renderBad=false,block=null;const generate=async input=>{calls.push(input);if(block)await block;if(bad)throw Object.assign(new Error('secret provider body'),{status:502});return image;};const {photoRenditions:render}=await import('../server/photo-export.js');
+ const events=new EventEmitter();let calls=[],bad=false,renderBad=false,block=null;const generate=async input=>{calls.push(input);events.emit('generation');if(block)await block;if(bad)throw Object.assign(new Error('secret provider body'),{status:502});return image;};const {photoRenditions:render}=await import('../server/photo-export.js');
+ const waitForCalls=async n=>{while(calls.length<n)await once(events,'generation',{signal:AbortSignal.timeout(10000)});};
  const app=createApp({accountStore:store,accessMode:'public',apiKey:'test',rateLimit:false,photoOptions:{generate,render:async(...args)=>{if(renderBad)throw new Error('encoder failed');return render(...args);}}}),service=app.locals.photoJobs,server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base=`http://127.0.0.1:${server.address().port}`,ca=store.session(a),cb=store.session(b),cm=store.session(manager);
  const request=(url,method='GET',body,cookie=ca,origin=base)=>fetch(base+url,{method,headers:{Cookie:cookie?`forme_session=${cookie}`:'',Origin:origin,'Content-Type':'application/json'},...(body===undefined?{}:{body:JSON.stringify(body)})});
  const selection=(extra={})=>({requestId:randomUUID(),garmentIds:[product.id],model:{profileId:'regular',tone:'medium'},poses:['front'],formats:['1:1','4:5','3:4','white'],generationConsent:true,maxCredits:1,...extra});
- try{await run({store,a,b,manager,ca,cb,cm,product,other,image,directory,app,service,request,selection,calls,generate,setBad:v=>{bad=v;},setRenderBad:v=>{renderBad=v;},setBlock:v=>{block=v;}});}finally{service.stop();await Promise.allSettled([...service.active.values()]);await new Promise(r=>server.close(r));store.close();await rm(directory,{recursive:true,force:true});}
+ try{await run({store,a,b,manager,ca,cb,cm,product,other,image,directory,app,service,request,selection,calls,generate,waitForCalls,setBad:v=>{bad=v;},setRenderBad:v=>{renderBad=v;},setBlock:v=>{block=v;}});}finally{service.stop();await Promise.allSettled([...service.active.values()]);await new Promise(r=>server.close(r));store.close();await rm(directory,{recursive:true,force:true});}
 }
 
 test('batch reservations are atomic and idempotent, use photo credits only and charge the base only on approval',async()=>fixture(async({store,a,service,selection,calls,request})=>{
@@ -54,9 +56,12 @@ test('pending jobs resume after restart, active uncertain provider requests do n
  const processing=service.create(a,selection()),next=service.claim();store.db.prepare("UPDATE photo_attempts SET state='processing',rawImage=? WHERE id=?").run(Buffer.from(image.split(',')[1],'base64'),next.id);service.recover(Date.now()+6*60000);await service.drain();assert.equal(service.get(a,processing.id).items[0].state,'ready');assert.equal(calls.length,1);assert.ok(claim.token);
 }));
 
-test('leases enforce one item per organisation and two globally; cancelling in-flight work never publishes its result',async()=>fixture(async({store,a,b,other,service,selection,generate,setBlock,calls})=>{
- const first=service.create(a,selection({poses:['front','three-quarter'],maxCredits:2})),second=service.create(b,selection({garmentIds:[other.id]}));let release;setBlock(new Promise(r=>{release=r;}));const tick=service.tick();await new Promise(r=>setTimeout(r,100));assert.equal(calls.length,2);assert.equal(store.db.prepare('SELECT count(*) n FROM photo_worker_leases').get().n,2);assert.equal(store.db.prepare('SELECT count(*) n FROM photo_worker_leases WHERE org=?').get(a.org).n,1);
- const alternate=new PhotoJobs(store,{apiKey:'test',generate,template:standardAvatar});assert.equal(alternate.claim(),null);service.cancel(a,first.id);setBlock(null);release();await tick;await service.drain();assert.equal(calls.length,2);assert.equal(service.get(a,first.id).state,'cancelled');assert.equal(service.get(b,second.id).items[0].state,'ready');assert.equal(store.db.prepare('SELECT count(*) n FROM photo_outputs WHERE attempt IN (SELECT a.id FROM photo_attempts a JOIN photo_items i ON i.id=a.item WHERE i.job=?)').get(first.id).n,0);
+test('leases enforce one item per organisation and two globally; cancelling in-flight work never publishes its result',async()=>fixture(async({store,a,b,other,service,selection,generate,setBlock,calls,waitForCalls})=>{
+ const first=service.create(a,selection({poses:['front','three-quarter'],maxCredits:2})),second=service.create(b,selection({garmentIds:[other.id]}));let release;setBlock(new Promise(r=>{release=r;}));const tick=service.tick();
+ try{await waitForCalls(2);assert.equal(calls.length,2);assert.equal(store.db.prepare('SELECT count(*) n FROM photo_worker_leases').get().n,2);assert.equal(store.db.prepare('SELECT count(*) n FROM photo_worker_leases WHERE org=?').get(a.org).n,1);
+ const alternate=new PhotoJobs(store,{apiKey:'test',generate,template:standardAvatar});assert.equal(alternate.claim(),null);service.cancel(a,first.id);
+ }finally{setBlock(null);release();await tick;}
+ await service.drain();assert.equal(calls.length,2);assert.equal(service.get(a,first.id).state,'cancelled');assert.equal(service.get(b,second.id).items[0].state,'ready');assert.equal(store.db.prepare('SELECT count(*) n FROM photo_outputs WHERE attempt IN (SELECT a.id FROM photo_attempts a JOIN photo_items i ON i.id=a.item WHERE i.job=?)').get(first.id).n,0);
 }));
 
 test('validation, enabled female models, ownership, roles and origins are enforced before any provider call',async()=>fixture(async({store,a,product,other,service,selection,request,cb,cm,calls})=>{

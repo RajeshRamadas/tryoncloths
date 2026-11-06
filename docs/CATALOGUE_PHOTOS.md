@@ -172,5 +172,6 @@ cd ~/tryoncloths && git pull --ff-only origin main && cd deploy/lightsail && sud
 ```
 
 Codex has not deployed this update or built an APK.
-[C15 — Store branding](STORE_BRANDING.md) is now implemented. The next outlined
-task is C16 shopper self-service design review.
+[C15 — Store branding](STORE_BRANDING.md) and [C16.1 shopper spending controls](SHOPPER_SPENDING.md)
+are now implemented. The approved C16 design proceeds next to Shopify
+installation/signed launches; the shopper widget is not available yet.

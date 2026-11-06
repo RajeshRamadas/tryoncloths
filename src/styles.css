@@ -1777,6 +1777,12 @@ dialog::backdrop {
 .billing-page section { background:#fff; border:1px solid #dce4da; border-radius:14px; padding:22px; margin:20px 0; }
 .billing-page p { line-height:1.6; }
 .billing-page button { min-height:44px; }
+.shopper-stage { padding:16px; background:#f1f5eb; border:1px solid #dce4da; border-radius:10px; }
+.shopper-actions { display:flex; flex-wrap:wrap; gap:12px; }
+.shopper-usage { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.shopper-usage dl { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; width:100%; margin:0; }
+.shopper-usage dt,.shopper-usage dd { margin:0; overflow-wrap:anywhere; }
+.shopper-usage dd { font-weight:600; }
 .billing-details { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
 .billing-details label { display:flex; flex-direction:column; gap:7px; font-size:14px; }
 .billing-details input { min-width:0; width:100%; box-sizing:border-box; padding:12px; font:inherit; border:1px solid #b7caba; border-radius:7px; }

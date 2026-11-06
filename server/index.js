@@ -7,6 +7,8 @@ const trustProxySetting = process.env.TRYON_TRUST_PROXY_HOPS || "0";
 if (!["0", "1"].includes(trustProxySetting)) throw new Error("TRYON_TRUST_PROXY_HOPS must be 0 or 1.");
 const accountStore = process.env.TRYON_DATA_DIR ? new AccountStore(process.env.TRYON_DATA_DIR) : null;
 if (accountStore) {
+  accountStore.shoppers.sweep();
+  setInterval(()=>{try {accountStore.shoppers.sweep();} catch {console.error(JSON.stringify({event:"shopper_sweep_failed"}));}},60000).unref();
   accountStore.billing.sweep();
   setInterval(()=>{try {accountStore.billing.sweep();} catch {console.error(JSON.stringify({event:"credit_sweep_failed"}));}},5*60*1000).unref();
 }
