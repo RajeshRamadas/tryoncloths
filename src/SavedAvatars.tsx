@@ -62,6 +62,11 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
     } catch(e) { setError((e as Error).message); }
     finally { setBusy(false); }
   }
+  const groups = items.reduce<Record<string,{name:string;items:SavedAvatar[]}>>((result,item)=>{
+    const key=cloud&&!localView ? item.customerId || 'unassigned' : 'device';
+    (result[key] ||= {name:key==='device'?'On this device':item.customerId ? `${item.customerName} · ${item.customerPhone}` : 'Unassigned avatars',items:[]}).items.push(item);
+    return result;
+  },{});
   return <>
     <button ref={trigger} className="button secondary" disabled={disabled} onClick={() => void show()}><FolderOpen size={17}/> Saved avatars</button>
     <dialog ref={dialog} className="saved-avatars-dialog" aria-labelledby="saved-avatar-heading" onCancel={e => { e.preventDefault(); if (!busy) close(); }}>
@@ -71,13 +76,13 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
       {cloud && localView && <p>These older local copies have not been uploaded. Open one, review it and choose Save avatar for reuse to copy it to your store account.</p>}
       {busy && <p role="status">Opening library…</p>}
       {!busy && !items.length && <p>No saved avatars yet. Approve an avatar and choose “Save avatar for reuse”, or open a downloaded PNG below.</p>}
-      <div className="saved-avatar-list">{items.map(item => <article className="saved-avatar-item" key={item.id}>
+      <div className="saved-avatar-list">{Object.entries(groups).map(([key,group])=><section className="customer-avatar-group" key={key}><h3>{group.name}</h3>{group.items.map(item => <article className="saved-avatar-item" key={item.id}>
         <img src={item.thumbnail} alt={`Saved avatar: ${item.name}`}/><div><h3>{item.name}</h3><p>{profiles.find(p => p.id === item.profileId)?.name} · {item.heightCm} cm · {item.weightKg} kg<br/>{new Date(item.savedAt).toLocaleDateString()}</p>
         <button className="button primary" disabled={busy} onClick={() => void use(item)}>Use {item.name}</button>
         {cloud && !localView && <button className="button secondary" disabled={busy} onClick={()=>void showLooks(item)}>View looks ({item.looksCount || 0}) for {item.name}</button>}
         {confirmDelete === item.id ? <div className="saved-delete"><p>Delete this saved copy{cloud && !localView ? " and its saved looks" : ""}?</p><button className="button secondary" disabled={busy} onClick={() => void remove(item.id)}>Confirm deletion</button><button className="button back-button" disabled={busy} onClick={() => setConfirmDelete(null)}>Cancel deletion</button></div>
           : <button className="button back-button" disabled={busy} aria-label={`Delete ${item.name}`} onClick={() => setConfirmDelete(item.id)}>Delete</button>}</div>
-      </article>)}</div>
+      </article>)}</section>)}</div>
       {cloud && !localView && looksFor && <section aria-label={`Looks for ${looksFor.name}`}><h3>Looks for {looksFor.name}</h3>
         {!looks.length && <p>No looks saved for this avatar yet.</p>}
         {looks.map(look=><article className="saved-avatar-item" key={look.id}><img src={look.thumbnail} alt={`Saved look: ${look.name}`}/><div><h3>{look.name}</h3><p>{look.garments.join(" · ")}</p>

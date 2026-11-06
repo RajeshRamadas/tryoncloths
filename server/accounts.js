@@ -1,3 +1,4 @@
+import { CustomerStore, installCustomerRoutes } from './customers.js';
 import {installAdminSchema,claimTrial,trialKeys} from './commercial-admin.js';
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, chmodSync } from "node:fs";
@@ -47,7 +48,7 @@ export class AccountStore {
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     this.garments = new GarmentStore(this);
-    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); }
+    try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); }
     catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
@@ -152,16 +153,19 @@ export class AccountStore {
     if (!validTemplateTone(templateTone)) throw error('Choose an available template skin tone.');
     const name = typeof input.name === "string" ? input.name.trim() : "";
     if (!name || name.length>60 || !profiles.some(p=>p.id===profileId) || !recommendProfile(heightCm,weightKg,profiles.find(p=>p.id===profileId)?.body) || !["generated","imported"].includes(input.source)) throw error("Use a name, body profile and valid measurements.");
+    this.customers.requireOptional(account,input.customerId);
     const {image, thumbnail} = await savedImage(input.image);
-    const id = digest(image), savedAt = Date.now();
+    this.customers.requireOptional(account,input.customerId);
+    // Scope deduplication to the customer so identical images cannot move ownership.
+    const id = input.customerId ? digest(Buffer.concat([image,Buffer.from(input.customerId)])) : digest(image), savedAt = Date.now();
     const exists = this.db.prepare("SELECT id FROM avatars WHERE account=? AND id=?").get(account.id,id);
     const count = this.db.prepare("SELECT count(*) AS total FROM avatars WHERE account=?").get(account.id).total;
     if(!exists && count>=100) throw error("Your account holds up to 100 avatars. Delete one before adding another.",409);
-    this.db.prepare(`INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type,template_tone) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET name=excluded.name, profileId=excluded.profileId,heightCm=excluded.heightCm,weightKg=excluded.weightKg,source=excluded.source,savedAt=excluded.savedAt,body_type=excluded.body_type,template_tone=excluded.template_tone`).run(id,account.id,name,profileId,heightCm,weightKg,input.source,savedAt,image,thumbnail,profiles.find(p=>p.id===profileId).body,templateTone);
+    this.db.prepare(`INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type,template_tone,customer) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET name=excluded.name, profileId=excluded.profileId,heightCm=excluded.heightCm,weightKg=excluded.weightKg,source=excluded.source,savedAt=excluded.savedAt,body_type=excluded.body_type,template_tone=excluded.template_tone`).run(id,account.id,name,profileId,heightCm,weightKg,input.source,savedAt,image,thumbnail,profiles.find(p=>p.id===profileId).body,templateTone,input.customerId ?? null);
     return {id,savedAt};
   }
   list(account) {
-    return this.db.prepare("SELECT id,name,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC").all(account.id).map(row=>({...row,thumbnail:`data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`}));
+    return this.db.prepare("SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC").all(account.id).map(row=>({...row,thumbnail:`data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`}));
   }
   async saveLook(account, input) {
     const name = typeof input.name === "string" ? input.name.trim() : "";
@@ -170,7 +174,7 @@ export class AccountStore {
     const {image, thumbnail} = await savedImage(input.image);
     // Recheck after decoding: the avatar may have been deleted meanwhile.
     this.requireAvatar(account, input.avatarId);
-    const id = digest(image), savedAt = Date.now();
+    const id = digest(Buffer.concat([image,Buffer.from(input.avatarId)])), savedAt = Date.now();
     const exists = this.db.prepare("SELECT id FROM looks WHERE account=? AND id=?").get(account.id,id);
     if (!exists && this.db.prepare("SELECT count(*) AS total FROM looks WHERE account=?").get(account.id).total >= 200) throw error("Your account holds up to 200 looks. Delete one before adding another.",409);
     this.db.prepare(`INSERT INTO looks(id,account,avatarId,name,garments,image,thumbnail,savedAt) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET avatarId=excluded.avatarId,name=excluded.name,garments=excluded.garments,savedAt=excluded.savedAt`).run(id,account.id,input.avatarId,name,JSON.stringify(input.garments),image,thumbnail,savedAt);
@@ -207,6 +211,7 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
     stores:account ? storesForUser(store.db,account.user.id) : []});
   app.get("/api/account",wrap((req,res)=>res.json({enabled:Boolean(store),signupAllowed:Boolean(store&&allowSignup),...response(accountUser(store,req))})));
   if(!store) return;
+  installCustomerRoutes(app,store,{requireUser,sameOrigin,wrap});
   installBillingRoutes(app,store,{requireUser,sameOrigin,wrap,payments});
   installStaffRoutes(app,store,{sameOrigin,requireUser,wrap,production,sendMail,publicUrl});
   for(const action of ["register","login"])app.post(`/api/account/${action}`,sameOrigin,wrap(async(req,res)=>{

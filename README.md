@@ -37,6 +37,7 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 - An explicitly triggered Gemini customer-avatar adapter using both customer photos, a selected body template, and whole-body skin-tone matching instructions, with server-side credentials and consent checks.
 - Review/approval, full-body PNG download, expanded preview, and new-session photo clearing.
 - Responsive layout and keyboard-accessible controls/dialogs.
+- [Customer profiles](docs/CUSTOMERS.md) with store-scoped mobile lookup, customer-grouped saved avatars, optional marketing consent and linked-data erasure.
 
 The full-body photo supports staff selection and, with separate consent, is sent to the provider as a visual and skin-tone reference. Automated body-shape measurements are not implemented. The current profile rule is illustrative, not calibrated to real measurements. Default height/weight inputs are sample values, not measured properties of the generated bodies.
 
@@ -58,7 +59,7 @@ Without a key, customer generation is unavailable. Sessions containing customer 
 
 Original customer photo inputs stay in memory and are sent to the configured provider only with generation consent. Web 0.8 can save generated avatar PNGs, names, profiles and measurements to a signed-in store account using a persistent server database. Account generation asks for storage consent and saves successful results automatically. Original input photos and credentials are excluded from avatar records. Without account storage enabled, the optional local library saves approved avatars on the same browser/app with explicit consent. Downloaded files remain under the recipient's control. Provider retention is governed separately by its terms. See [store accounts and retention](docs/STORE_ACCOUNTS.md), [local storage](docs/SAVED_AVATARS.md) and [Android data handling](docs/ANDROID.md#data-handling).
 
-No retailer accounts, durable avatar storage, clothing compositing, fit prediction, or automatic measurements are included yet.
+Store accounts, durable avatar storage and clothing try-on are available. Fit prediction and automatic body measurements are not implemented.
 
 ## Validation
 

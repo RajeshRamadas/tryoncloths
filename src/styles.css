@@ -1791,3 +1791,19 @@ dialog::backdrop {
 .credit-badge { display:inline-block; margin:6px 10px; border-radius:14px; background:#e7f2e7; color:#28543b; padding:6px 10px; font-size:12px; }
 .credit-badge.low { background:#fff0d4; color:#76511d; }
 @media(max-width:650px){.billing-cards,.billing-details{grid-template-columns:1fr}.billing-page section{padding:17px}.billing-page{padding:20px 14px}.billing-invoices li{align-items:flex-start;flex-direction:column}}
+
+.customer-picker { border:1px solid var(--border, #dedfd7); border-radius:12px; padding:16px; margin:20px 0; }
+.customer-picker h3,.customer-picker h4 { margin:0 0 12px; }
+.customer-picker p { font-size:13px; line-height:1.6; }
+.customer-picker label { display:flex; flex-direction:column; gap:6px; margin:12px 0; font-size:14px; }
+.customer-picker label.consent { flex-direction:row; align-items:flex-start; }
+.customer-picker input:not([type=checkbox]),.customer-picker textarea { width:100%; min-width:0; padding:10px; border:1px solid #d4d9d1; border-radius:8px; background:white; color:#243c32; font:inherit; }
+.customer-picker textarea { min-height:80px; resize:vertical; }
+.customer-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.customer-selected { background:#f0f4ed; border-radius:8px; padding:12px; overflow-wrap:anywhere; }
+.customer-selected strong,.customer-selected span { display:block; }
+.customer-matches { list-style:none; padding:0; }
+.customer-matches li { margin:8px 0; }
+.customer-matches button { white-space:normal; text-align:left; overflow-wrap:anywhere; }
+.customer-avatar-group { min-width:0; }
+.customer-avatar-group>h3,.selected-customer-summary { overflow-wrap:anywhere; font-size:14px; color:#335b48; }

@@ -203,6 +203,8 @@ export function createApp({
       return res.status(400).json({
         error: `Customer consent to send both photos and measurements to ${providerLabel} is required. Refresh or update the app before generating.`,
       });
+    try { accountStore?.customers.requireOptional(owner,req.body.customerId); }
+    catch (e) { return res.status(e.status || 500).json({error:e.message}); }
     if (!generationRequest(req,res,owner)) return;
     if (!profiles.some((p) => p.id === req.body?.profileId))
       return res
@@ -261,12 +263,14 @@ export function createApp({
     });
     inFlight++;
     try {
+      try { accountStore?.customers.requireOptional(owner,req.body.customerId); }
+      catch (e) { return res.status(e.status || 500).json({error:e.message}); }
       const image = await meter(req,{billing:accountStore?.billing,account:owner,action:"avatar"},()=>personalize({ face, body, avatar, profileId: req.body.profileId, measurements: req.body.measurements, apiKey, model, quality }));
       let accountSaved = false;
       let avatarId = null;
       if (accountStore) {
         try {
-          const saved = await accountStore.save(owner, { image, name: typeof req.body.avatarName === "string" && req.body.avatarName.trim() ? req.body.avatarName.trim().slice(0,60) : "Customer avatar", profileId: req.body.profileId, templateTone, heightCm: req.body.measurements.heightCm, weightKg: req.body.measurements.weightKg, source: "generated" });
+          const saved = await accountStore.save(owner, { image, customerId:req.body.customerId, name: typeof req.body.avatarName === "string" && req.body.avatarName.trim() ? req.body.avatarName.trim().slice(0,60) : "Customer avatar", profileId: req.body.profileId, templateTone, heightCm: req.body.measurements.heightCm, weightKg: req.body.measurements.weightKg, source: "generated" });
           avatarId = saved.id;
           accountSaved = true;
         } catch {
