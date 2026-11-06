@@ -1,3 +1,4 @@
+import ShareLook from "./ShareLook";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Download, RotateCcw, Shirt, Undo2, Upload } from "lucide-react";
 import { baseAvatar, importGarment, renderOutfit, sampleCatalogue, type Category, type Garment, type Layer, type Placement } from "./outfits";
@@ -28,6 +29,7 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
   const [busy, setBusy] = useState(false);
   const [rendering, setRendering] = useState(true);
   const [lookName,setLookName]=useState(openedLook?.name || "Customer outfit");
+  const [savedLook,setSavedLook]=useState<string|null>(openedLook?.id || null);
   const [storageConsent,setStorageConsent]=useState(false);
   const [reviewed, setReviewed] = useState(false);
   const [notice, setNotice] = useState("");
@@ -57,7 +59,7 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
     setNotice(adaptation?.reuseWarning || (adaptation?.reused ? "Saved adaptation reused without an AI request. Review it before keeping this look." : "Try-on created. Check the face, body and garment before keeping this look."));
   }
   function undoDress() { const previous = dressed.at(-1); if (!previous) return; setDressed(items => items.slice(0, -1)); update(previous.previousLayers); }
-  function update(next: Layer[]) { setStorageConsent(false); setLayers(next); setReviewed(false); setError(""); setNotice(""); setRendering(true); }
+  function update(next: Layer[]) { setSavedLook(null); setStorageConsent(false); setLayers(next); setReviewed(false); setError(""); setNotice(""); setRendering(true); }
   function select(garment: Garment) { update([...layers.filter(l => l.garment.category !== category), { garment, placement: { ...garment.placement } }]); }
   function adjust(field: keyof Placement, value: number) {
     update(layers.map(l => l.garment.category === category ? { ...l, placement: { ...l.placement, [field]: value / 100 } } : l));
@@ -75,7 +77,8 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
     setBusy(true); onBusy(true); setError("");
     try {
       const labels = [...(openedLook && dressed.length ? openedLook.garments : []), ...dressed.slice(openedLook ? 1 : 0).map(x=>x.label), ...layers.map(x=>x.garment.name)].map(x=>x.slice(0,120));
-      await saveLook(result,avatarId,lookName,labels);
+      const saved=await saveLook(result,avatarId,lookName,labels);
+      setSavedLook(saved.id);
       setNotice("Look saved to your store account. Open it under this avatar in Saved avatars.");
       if(canSaveAdaptation){
         try{await persistAdaptation();setNotice("Look and adaptation saved. This exact starting outfit and garment can now reuse the result without AI.");}
@@ -140,6 +143,7 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
             <button className="button secondary full-width" disabled={!reviewed || !storageConsent || !result || busy || rendering || !lookName.trim()} onClick={()=>void keepLook()}>Save look to account</button>
           </div>}
           <button className="button back-button full-width" disabled={busy || (!layers.length && !dressed.length)} onClick={() => { setDressed([]); update([]); }}><RotateCcw size={16}/> Reset outfit</button>
+          {savedLook && <ShareLook key={savedLook} lookId={savedLook} disabled={busy || rendering}/>}
           {error && <p role="alert" className="error-banner">{error}</p>}{notice && <p role="status">{notice}</p>}
         </section>
       </div>
