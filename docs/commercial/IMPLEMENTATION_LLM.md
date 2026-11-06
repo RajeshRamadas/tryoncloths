@@ -337,8 +337,12 @@ Next priority: C12 size recommendations.
 
 **Acceptance.**
 
-- [ ] Unit tests for each confidence branch and the height/weight fallback (always Low).
-- [ ] Recommendation never blocks generation or saving.
+- [x] Unit tests for each confidence branch and the height/weight fallback (always Low).
+- [x] Recommendation never blocks generation or saving.
+
+**Implemented:** `0.16.0-alpha.11`, branch `feature/size-recommendations`.
+See [measurement validation, scoring, chart workflow and purchase events](../SIZE_RECOMMENDATIONS.md).
+C14 should account for `purchase_unmarked` corrections and current purchase state.
 
 ### Task C14 — events and analytics
 

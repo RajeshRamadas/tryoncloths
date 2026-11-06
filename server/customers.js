@@ -1,3 +1,4 @@
+import {validateMeasurements} from './measurements.js';
 import { randomBytes } from 'node:crypto';
 import { requireRole } from './tenancy.js';
 
@@ -20,14 +21,10 @@ function searchPrefix(value) {
   if (digits.length < 3 || digits.length > 10) throw fail('Enter at least 3 digits of the mobile number.');
   return digits;
 }
-function measurements(value) {
-  if (value === null || value === undefined) return null;
-  if (typeof value !== 'object' || Array.isArray(value) || !Number.isFinite(value.heightCm) || value.heightCm < 140 || value.heightCm > 210 || !Number.isFinite(value.weightKg) || value.weightKg < 35 || value.weightKg > 200) throw fail('Use a height from 140–210 cm and weight from 35–200 kg.');
-  return {heightCm:value.heightCm, weightKg:value.weightKg};
-}
 function fields(input, previous) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw fail('Enter customer details.');
   const rawName = input.name ?? previous?.name;
+  if(input.measurements!==undefined&&input.measurements!==null&&(typeof input.measurements!=='object'||Array.isArray(input.measurements)))throw fail('Use an object of customer measurements.');
   const name = typeof rawName === 'string' ? rawName.trim() : '';
   const notes = input.notes ?? previous?.notes ?? '';
   if (!name || name.length > 80 || typeof notes !== 'string' || notes.length > 2000) throw fail('Use a customer name up to 80 characters and notes up to 2,000 characters.');
@@ -39,7 +36,7 @@ function fields(input, previous) {
   // Timestamps are server-owned. Opting out clears the consent record.
   const optInAt = marketingOptIn ? (previous?.marketingOptIn && previous.optInSource === optInSource ? previous.optInAt : Date.now()) : null;
   return {name, phoneE164, notes:notes.trim(), marketingOptIn, optInAt, optInSource,
-    measurements:measurements(input.measurements === undefined ? previous?.measurements : input.measurements)};
+    measurements:validateMeasurements(input.measurements === undefined ? previous?.measurements : input.measurements===null ? null : {...previous?.measurements,...input.measurements})};
 }
 function customer(row) {
   if (!row) return null;

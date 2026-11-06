@@ -1,3 +1,4 @@
+import {profiles} from './profiles';
 import {useEffect,useRef,useState} from 'react';
 import {customerRequest,type Customer,type CustomerRef} from './customers';
 
@@ -10,13 +11,14 @@ export default function CustomerPicker({selected,disabled,onSelect,onUpdate}:Pro
   const [editing,setEditing]=useState<Customer|null>(null),[form,setForm]=useState(false),[confirmErase,setConfirmErase]=useState(false);
   const [name,setName]=useState(''),[mobile,setMobile]=useState(''),[notes,setNotes]=useState(''),[marketing,setMarketing]=useState(false);
   const [whatsapp,setWhatsapp]=useState(false);
+  const [chest,setChest]=useState(''),[waist,setWaist]=useState(''),[hip,setHip]=useState(''),[bodyProfile,setBodyProfile]=useState('');
   const [height,setHeight]=useState(''),[weight,setWeight]=useState('');
   const locked=disabled||busy;
   async function search(){setBusy(true);setError('');setMatches([]);setSearched(false);try{setMatches((await customerRequest(`/search?phone=${encodeURIComponent(phone)}`)).customers);setSearched(true);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
-  function fill(customer:Customer|null){setEditing(customer);setName(customer?.name||'');setMobile(customer?.phoneE164||phone);setNotes(customer?.notes||'');setMarketing(customer?.marketingOptIn||false);setWhatsapp(Boolean(customer?.whatsappConsentAt));setHeight(customer?.measurements?String(customer.measurements.heightCm):'');setWeight(customer?.measurements?String(customer.measurements.weightKg):'');setForm(true);setConfirmErase(false);setError('');}
+  function fill(customer:Customer|null){setEditing(customer);setName(customer?.name||'');setMobile(customer?.phoneE164||phone);setNotes(customer?.notes||'');setMarketing(customer?.marketingOptIn||false);setWhatsapp(Boolean(customer?.whatsappConsentAt));setHeight(customer?.measurements?.heightCm==null?'':String(customer.measurements.heightCm));setWeight(customer?.measurements?.weightKg==null?'':String(customer.measurements.weightKg));setChest(customer?.measurements?.chestCm==null?'':String(customer.measurements.chestCm));setWaist(customer?.measurements?.waistCm==null?'':String(customer.measurements.waistCm));setHip(customer?.measurements?.hipCm==null?'':String(customer.measurements.hipCm));setBodyProfile(customer?.measurements?.bodyProfileId||'');setForm(true);setConfirmErase(false);setError('');}
   async function edit(){if(!selected)return;setBusy(true);setError('');try{fill((await customerRequest(`/${selected.id}`)).customer);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
   async function save(){setBusy(true);setError('');try{
-    const customer:Customer=(await customerRequest(editing?`/${editing.id}`:'',editing?'PATCH':'POST',{name,phoneE164:mobile,notes,marketingOptIn:marketing,whatsappConsent:whatsapp,optInSource:marketing?(editing?.marketingOptIn?editing.optInSource:'in_store'):null,measurements:height||weight?{heightCm:Number(height),weightKg:Number(weight)}:null})).customer;
+    const customer:Customer=(await customerRequest(editing?`/${editing.id}`:'',editing?'PATCH':'POST',{name,phoneE164:mobile,notes,marketingOptIn:marketing,whatsappConsent:whatsapp,optInSource:marketing?(editing?.marketingOptIn?editing.optInSource:'in_store'):null,measurements:{heightCm:height?Number(height):null,weightKg:weight?Number(weight):null,chestCm:chest?Number(chest):null,waistCm:waist?Number(waist):null,hipCm:hip?Number(hip):null,bodyProfileId:bodyProfile||null}})).customer;
     if(!mounted.current)return;
     if(editing)onUpdate(customer);else onSelect(customer,customer.measurements);
     setForm(false);setMatches([]);setSearched(false);
@@ -44,6 +46,9 @@ export default function CustomerPicker({selected,disabled,onSelect,onUpdate}:Pro
       <label>Saved mobile number<input type="tel" value={mobile} required maxLength={40} disabled={locked} onChange={e=>setMobile(e.target.value)}/></label><p className="small-footnote">India uses +91 by default. For other countries, include + and the country code.</p>
       <label>Customer notes<textarea value={notes} maxLength={2000} disabled={locked} onChange={e=>setNotes(e.target.value)}/></label>
       <div className="measurement-grid"><label>Profile height (cm)<input type="number" min="140" max="210" step="any" value={height} disabled={locked} onChange={e=>setHeight(e.target.value)}/></label><label>Profile weight (kg)<input type="number" min="35" max="200" step="any" value={weight} disabled={locked} onChange={e=>setWeight(e.target.value)}/></label></div>
+      <div className="measurement-grid"><label>Chest circumference (cm)<input type="number" min="60" max="200" step="any" value={chest} disabled={locked} onChange={e=>setChest(e.target.value)}/></label><label>Waist circumference (cm)<input type="number" min="40" max="220" step="any" value={waist} disabled={locked} onChange={e=>setWaist(e.target.value)}/></label><label>Hip circumference (cm)<input type="number" min="50" max="240" step="any" value={hip} disabled={locked} onChange={e=>setHip(e.target.value)}/></label></div>
+      <label>Body profile for size estimate<select value={bodyProfile} disabled={locked} onChange={e=>setBodyProfile(e.target.value)}><option value="">Use the most recent saved avatar</option>{profiles.map(p=><option key={p.id} value={p.id}>{p.body==='female'?'Female':'Male'} · {p.name}</option>)}</select></label>
+      <p className="small-footnote">Measurements are optional. Enter actual body circumferences, not flat garment widths. Size estimates from height and weight always have Low confidence.</p>
       <p className="small-footnote">Measurements are optional. Update them here when they change; existing avatars keep their original measurements.</p>
       <label className="consent"><input type="checkbox" checked={whatsapp} disabled={locked} onChange={e=>setWhatsapp(e.target.checked)}/><span>The customer agrees in store to receive their outfits through WhatsApp.</span></label>
       <label className="consent"><input type="checkbox" checked={marketing} disabled={locked} onChange={e=>setMarketing(e.target.checked)}/><span>The customer agrees to receive marketing messages. Optional; avatar creation does not require this.</span></label>

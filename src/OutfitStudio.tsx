@@ -1,3 +1,5 @@
+import SizeSuggestion from "./SizeSuggestion";
+import PurchaseLook from "./PurchaseLook";
 import ShareLook from "./ShareLook";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Download, RotateCcw, Shirt, Undo2, Upload } from "lucide-react";
@@ -13,9 +15,9 @@ const categoryNames = { shirt: "Shirts & tops", trousers: "Trousers", shoes: "Sh
 const layerNames = { shirt: "top", trousers: "trousers", shoes: "shoes" };
 const originalNames = { shirt: "Original top", trousers: "Original bottoms", shoes: "Bare feet" };
 
-type Props = { active: boolean; templateTone?:string; catalogueEnabled?:boolean; avatarId?:string|null; openedLook?:OpenedLook; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
+type Props = { active: boolean; templateTone?:string; catalogueEnabled?:boolean; customerId?:string|null; avatarId?:string|null; openedLook?:OpenedLook; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
 type Dressed = { image: string; label: string; previousLayers: Layer[]; adaptation?:Adaptation; adaptationSaved?:boolean };
-export default function OutfitStudio({ active, templateTone='medium', catalogueEnabled=false, avatarId, openedLook, profile, personalized, tryOn, onBack, onBusy }: Props) {
+export default function OutfitStudio({ active, templateTone='medium', catalogueEnabled=false, customerId, avatarId, openedLook, profile, personalized, tryOn, onBack, onBusy }: Props) {
   const catalogue = useMemo(() => sampleCatalogue(profile.id, !!personalized), [profile.id, personalized]);
   const [imports, setImports] = useState<Garment[]>([]);
   const [layers, setLayers] = useState<Layer[]>([]);
@@ -112,6 +114,7 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
     <div className="outfit-layout">
       <div className="outfit-preview-card"><div className="outfit-preview-title"><strong>{profile.name} · {personalized ? "Customer avatar" : "Sample avatar"}</strong><span>Outfit preview</span></div>
         <div className="outfit-preview" aria-busy={rendering}>{result && <img src={result} alt="Avatar wearing the selected outfit"/>}{rendering && <span className="outfit-rendering" role="status">Updating preview…</span>}</div>
+        {active && customerId && !layers.length && lastAdaptation?.adaptation?.garmentId && <SizeSuggestion key={`${customerId}-${lastAdaptation.adaptation.garmentId}`} customerId={customerId} garmentId={lastAdaptation.adaptation.garmentId}/>}
         <p className="outfit-caption">Approximate visual styling. This preview does not predict size, fit or fabric drape.</p>
       </div>
       <div className="outfit-controls">
@@ -143,6 +146,7 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
             <button className="button secondary full-width" disabled={!reviewed || !storageConsent || !result || busy || rendering || !lookName.trim()} onClick={()=>void keepLook()}>Save look to account</button>
           </div>}
           <button className="button back-button full-width" disabled={busy || (!layers.length && !dressed.length)} onClick={() => { setDressed([]); update([]); }}><RotateCcw size={16}/> Reset outfit</button>
+          {savedLook && <PurchaseLook key={`purchase-${savedLook}`} lookId={savedLook} disabled={busy || rendering}/>}
           {savedLook && <ShareLook key={savedLook} lookId={savedLook} disabled={busy || rendering}/>}
           {error && <p role="alert" className="error-banner">{error}</p>}{notice && <p role="status">{notice}</p>}
         </section>
