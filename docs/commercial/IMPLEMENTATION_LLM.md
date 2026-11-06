@@ -314,8 +314,12 @@ Live delivery, template approval and Meta charges require operator validation.
 
 **Acceptance.**
 
-- [ ] 1,000-row CSV with 20 bad rows imports 980 and reports 20 errors.
-- [ ] Private-address image URLs are rejected by the existing guard.
+- [x] 1,000-row CSV with 20 bad rows imports 980 and reports 20 errors.
+- [x] Private-address image URLs are rejected by the existing guard.
+
+**Implemented:** `0.16.0-alpha.10`, branch `feature/catalogue-bulk-import`.
+See [spreadsheet import, metadata, plan limits and deployment](../CATALOGUE_IMPORT.md).
+Next priority: C12 size recommendations.
 
 ### Task C12 — size recommendation
 

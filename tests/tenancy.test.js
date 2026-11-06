@@ -6,7 +6,6 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash,scryptSync} from 'node:crypto';
 import {AccountStore} from './helpers/pilot-accounts.js';
-import {GarmentStore} from '../server/garment-store.js';
 import {migrateTenancy,storesForUser,storeMembership} from '../server/tenancy.js';
 
 const password='legacy-pilot-password';
@@ -27,7 +26,9 @@ function legacy(filename) {
  CREATE TABLE sessions(token TEXT PRIMARY KEY,account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,expires INTEGER NOT NULL);
  CREATE TABLE avatars(id TEXT NOT NULL,account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,name TEXT NOT NULL,profileId TEXT NOT NULL,heightCm REAL NOT NULL,weightKg REAL NOT NULL,source TEXT NOT NULL,savedAt INTEGER NOT NULL,image BLOB NOT NULL,thumbnail BLOB NOT NULL,body_type TEXT NOT NULL DEFAULT 'male',template_tone TEXT NOT NULL DEFAULT 'medium',PRIMARY KEY(account,id));
  CREATE TABLE looks(id TEXT NOT NULL,account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,avatarId TEXT NOT NULL,name TEXT NOT NULL,garments TEXT NOT NULL,image BLOB NOT NULL,thumbnail BLOB NOT NULL,savedAt INTEGER NOT NULL,PRIMARY KEY(account,id),FOREIGN KEY(account,avatarId) REFERENCES avatars(account,id) ON DELETE CASCADE);`);
- new GarmentStore({db});
+ db.exec(`CREATE TABLE garments(account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,id TEXT NOT NULL,name TEXT NOT NULL,garmentType TEXT NOT NULL,variant TEXT NOT NULL,sourceUrl TEXT NOT NULL,imageHash TEXT NOT NULL,signature TEXT NOT NULL,colour TEXT NOT NULL,image BLOB NOT NULL,thumbnail BLOB NOT NULL,savedAt INTEGER NOT NULL,PRIMARY KEY(account,id),UNIQUE(account,imageHash,garmentType,variant,sourceUrl));
+ CREATE TABLE garment_links(account TEXT NOT NULL,garmentId TEXT NOT NULL,sourceUrl TEXT NOT NULL,PRIMARY KEY(account,garmentId,sourceUrl),FOREIGN KEY(account,garmentId) REFERENCES garments(account,id) ON DELETE CASCADE);
+ CREATE TABLE garment_results(account TEXT NOT NULL,id TEXT NOT NULL,avatarId TEXT NOT NULL,garmentId TEXT NOT NULL,image BLOB NOT NULL,savedAt INTEGER NOT NULL,PRIMARY KEY(account,id),FOREIGN KEY(account,avatarId) REFERENCES avatars(account,id) ON DELETE CASCADE,FOREIGN KEY(account,garmentId) REFERENCES garments(account,id) ON DELETE CASCADE);`);
  return db;
 }
 async function fixture(run) {
@@ -42,7 +43,7 @@ test('three legacy stores migrate once with unchanged credentials, cookies and s
   old.prepare('INSERT INTO sessions VALUES(?,?,?)').run(digest(`cookie-${i}`),account,Date.now()+86400000);
   old.prepare('INSERT INTO avatars VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run('avatar',account,'Customer','regular',175,72,'generated',1,bytes,bytes,'male','deep');
   old.prepare('INSERT INTO looks VALUES(?,?,?,?,?,?,?,?)').run('look',account,'avatar','Look','["Shirt"]',bytes,bytes,2);
-  old.prepare('INSERT INTO garments VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(account,'garment','Shirt','shirt','blue','https://example.test/shirt','hash','00','[0,0,0]',bytes,bytes,3);
+  old.prepare('INSERT INTO garments(account,id,name,garmentType,variant,sourceUrl,imageHash,signature,colour,image,thumbnail,savedAt) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(account,'garment','Shirt','shirt','blue','https://example.test/shirt','hash','00','[0,0,0]',bytes,bytes,3);
   old.prepare('INSERT INTO garment_links VALUES(?,?,?)').run(account,'garment','https://example.test/shirt');
   old.prepare('INSERT INTO garment_results VALUES(?,?,?,?,?,?)').run(account,'result','avatar','garment',bytes,4);
  }

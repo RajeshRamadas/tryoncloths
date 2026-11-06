@@ -1,3 +1,4 @@
+import {installCatalogueSchema,requireCatalogueSpace,catalogueLimit,transaction} from './catalogue-fields.js';
 import sharp from 'sharp';
 import { randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { parseProductUrl } from './public-url.js';
@@ -29,7 +30,7 @@ export async function pixelHash(bytes) {
   return digest(Buffer.concat([Buffer.from(`${info.width}x${info.height}:`), data]));
 }
 
-async function productImage(value) {
+export async function productImage(value) {
   const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(typeof value === 'string' && value.length < 7_000_000 ? value : '');
   if (!match) throw problem('Use a JPEG, PNG or WebP garment photo under 5 MB.');
   try {
@@ -49,6 +50,7 @@ async function productImage(value) {
 }
 
 const metadata = row => ({ id: row.id, name: row.name, garmentType: row.garmentType, variant: row.variant,
+  sku:row.sku||null,brand:row.brand||'',priceInr:row.priceInr??null,mrpInr:row.mrpInr??null,sizes:JSON.parse(row.sizesJson||'[]'),stock:row.stock||'in',source:row.source||'manual',colourLabel:row.colourLabel||'',updatedAt:row.updatedAt||row.savedAt,
   sourceUrl: row.sourceUrl, savedAt: row.savedAt, adaptations: row.adaptations || 0,
   thumbnail: `data:image/jpeg;base64,${Buffer.from(row.thumbnail).toString('base64')}` });
 
@@ -80,6 +82,7 @@ export class GarmentStore {
       CREATE INDEX IF NOT EXISTS garment_results_item ON garment_results(account,garmentId);
       CREATE INDEX IF NOT EXISTS garment_results_avatar ON garment_results(account,avatarId);
     `);
+    installCatalogueSchema(this.db);
   }
   row(account, id) {
     const row = typeof id === 'string' && this.db.prepare('SELECT * FROM garments WHERE account=? AND id=?').get(account.id, id);
@@ -87,30 +90,45 @@ export class GarmentStore {
     return row;
   }
   list(account) {
-    return this.db.prepare('SELECT g.id,g.name,g.garmentType,g.variant,g.sourceUrl,g.thumbnail,g.savedAt,(SELECT count(*) FROM garment_results r WHERE r.account=g.account AND r.garmentId=g.id) AS adaptations FROM garments g WHERE g.account=? ORDER BY g.savedAt DESC').all(account.id).map(metadata);
+    return this.db.prepare('SELECT g.id,g.name,g.garmentType,g.variant,g.sourceUrl,g.thumbnail,g.savedAt,g.sku,g.brand,g.priceInr,g.mrpInr,g.sizesJson,g.stock,g.colourLabel,g.source,g.updatedAt,(SELECT count(*) FROM garment_results r WHERE r.account=g.account AND r.garmentId=g.id) AS adaptations FROM garments g WHERE g.account=? ORDER BY g.savedAt DESC').all(account.id).map(metadata);
+  }
+  browse(account,query={}) {
+    const search=query.search??'',type=query.type??'all',stock=query.stock??'available',offset=String(query.offset??0),limit=String(query.limit??100);
+    if(typeof search!=='string'||search.length>120||typeof type!=='string'||(type!=='all'&&!Object.hasOwn(garmentTypes,type))||!['available','all','in','low','out'].includes(stock)||!/^\d+$/.test(offset)||Number(offset)>50000||!/^\d+$/.test(limit)||Number(limit)<1||Number(limit)>200)throw problem('Use valid catalogue filters and a page size from 1 to 200.');
+    const where=['g.account=?'],args=[account.id];
+    if(type!=='all'){where.push('g.garmentType=?');args.push(type);}
+    if(stock==='available')where.push("g.stock<>'out'");else if(stock!=='all'){where.push('g.stock=?');args.push(stock);}
+    if(search.trim()){where.push("(g.name LIKE ? ESCAPE '\\' OR g.variant LIKE ? ESCAPE '\\' OR g.sku LIKE ? ESCAPE '\\' OR g.brand LIKE ? ESCAPE '\\' OR g.colourLabel LIKE ? ESCAPE '\\')");const pattern='%'+search.trim().replace(/[\\%_]/g,'\\$&')+'%';args.push(pattern,pattern,pattern,pattern,pattern);}
+    const filter=where.join(' AND '),total=this.db.prepare(`SELECT count(*) AS n FROM garments g WHERE ${filter}`).get(...args).n;
+    const rows=this.db.prepare(`SELECT g.id,g.name,g.garmentType,g.variant,g.sourceUrl,g.thumbnail,g.savedAt,g.sku,g.brand,g.priceInr,g.mrpInr,g.sizesJson,g.stock,g.colourLabel,g.source,g.updatedAt,(SELECT count(*) FROM garment_results r WHERE r.account=g.account AND r.garmentId=g.id) AS adaptations FROM garments g WHERE ${filter} ORDER BY g.savedAt DESC,g.id LIMIT ? OFFSET ?`).all(...args,Number(limit),Number(offset));
+    return {garments:rows.map(metadata),total,offset:Number(offset),limit:Number(limit),capacity:catalogueLimit(this.db,account),stored:this.db.prepare('SELECT count(*) AS n FROM garments WHERE account=?').get(account.id).n};
   }
   get(account, id) { const row = this.row(account, id); return { ...metadata(row), image: png(row.image) }; }
   async matches(account, input) {
     if (!input.url && !input.image) throw problem('Supply a product link or photo.');
     const url = canonicalProductUrl(input.url), photo = input.image ? await productImage(input.image) : null;
-    const rows = this.db.prepare('SELECT id,name,garmentType,variant,sourceUrl,thumbnail,savedAt,imageHash,signature,colour FROM garments WHERE account=? ORDER BY savedAt DESC').all(account.id);
-    const exact = photo ? rows.filter(r => r.imageHash === photo.imageHash) : [];
-    const linkedIds = new Set(url ? this.db.prepare('SELECT garmentId FROM garment_links WHERE account=? AND sourceUrl=?').all(account.id, url).map(r => r.garmentId) : []);
-    const linked = rows.filter(r => linkedIds.has(r.id) && !exact.some(x => x.id === r.id));
-    const similar = photo ? rows.filter(r => {
-      if (exact.some(x => x.id === r.id) || linked.some(x => x.id === r.id)) return false;
-      let diff = BigInt(`0x${r.signature}`) ^ BigInt(`0x${photo.signature}`), distance = 0;
-      while (diff) { distance++; diff &= diff - 1n; }
-      const a = JSON.parse(r.colour), b = JSON.parse(photo.colour);
-      return distance <= 6 && a.reduce((n, c, i) => n + (c - b[i]) ** 2, 0) <= 1600;
-    }) : [];
-    return { exact: exact.slice(0, 6).map(metadata), linked: linked.slice(0, 6).map(metadata), similar: similar.slice(0, 6).map(metadata) };
+    // Scan signatures without loading every product thumbnail into memory.
+    const exactIds = photo ? this.db.prepare("SELECT id FROM garments WHERE account=? AND imageHash=? AND stock<>'out' ORDER BY savedAt DESC").all(account.id,photo.imageHash).map(r=>r.id) : [];
+    const exactSet=new Set(exactIds);
+    const linkedIds=url ? this.db.prepare("SELECT g.id FROM garments g JOIN garment_links l ON l.account=g.account AND l.garmentId=g.id WHERE g.account=? AND l.sourceUrl=? AND g.stock<>'out' ORDER BY g.savedAt DESC").all(account.id,url).map(r=>r.id) : [];
+    const linkedSet=new Set(linkedIds),similarIds=[];
+    if(photo)for(const row of this.db.prepare("SELECT id,signature,colour FROM garments WHERE account=? AND stock<>'out' ORDER BY savedAt DESC").iterate(account.id)){
+      if(exactSet.has(row.id)||linkedSet.has(row.id))continue;
+      let diff=BigInt(`0x${row.signature}`)^BigInt(`0x${photo.signature}`),distance=0;while(diff){distance++;diff&=diff-1n;}
+      const a=JSON.parse(row.colour),b=JSON.parse(photo.colour);
+      if(distance<=6&&a.reduce((n,c,i)=>n+(c-b[i])**2,0)<=1600)similarIds.push(row.id);
+      if(similarIds.length===6)break;
+    }
+    const read=ids=>ids.slice(0,6).map(id=>metadata(this.db.prepare('SELECT id,name,garmentType,variant,sourceUrl,thumbnail,savedAt,sku,brand,priceInr,mrpInr,sizesJson,stock,colourLabel,source,updatedAt FROM garments WHERE account=? AND id=?').get(account.id,id)));
+    return {exact:read(exactIds),linked:read(linkedIds.filter(id=>!exactSet.has(id))),similar:read(similarIds)};
   }
+
   async save(account, input) {
     const name = typeof input.name === 'string' ? input.name.trim() : '';
     const variant = typeof input.variant === 'string' ? input.variant.trim() : '';
     if (!name || name.length > 100 || variant.length > 80 || !Object.hasOwn(garmentTypes, input.garmentType)) throw problem('Enter a garment name, category and optional colour/size/SKU variant.');
     const sourceUrl = canonicalProductUrl(input.sourceUrl), photo = await productImage(input.image);
+    return transaction(this.db,()=>{
     const samePhotos = this.db.prepare('SELECT id,sourceUrl FROM garments WHERE account=? AND imageHash=? AND garmentType=? AND lower(variant)=lower(?)').all(account.id, photo.imageHash, input.garmentType, variant);
     if (!sourceUrl && samePhotos.length > 1) throw problem('This photo is used by multiple saved products. Choose the correct product in My store clothes or specify its variant.', 409);
     // Identical retailer photos may represent different SKUs/colour variants.
@@ -122,11 +140,12 @@ export class GarmentStore {
     }
     if (sourceUrl && this.db.prepare('SELECT g.id FROM garments g JOIN garment_links l ON l.account=g.account AND l.garmentId=g.id WHERE g.account=? AND l.sourceUrl=? AND g.garmentType=? AND lower(g.variant)=lower(?)').get(account.id, sourceUrl, input.garmentType, variant))
       throw problem('That product and variant are already saved. Use My store clothes, or give this different photo its own colour/size/SKU variant.', 409);
-    if (this.db.prepare('SELECT count(*) AS n FROM garments WHERE account=?').get(account.id).n >= 200) throw problem('Your store holds up to 200 garments. Delete an unused garment before adding another.', 409);
+    requireCatalogueSpace(this.db,account);
     const id = randomBytes(16).toString('hex'), savedAt = Date.now();
-    this.db.prepare('INSERT INTO garments VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(account.id, id, name, input.garmentType, variant, sourceUrl, photo.imageHash, photo.signature, photo.colour, photo.image, photo.thumbnail, savedAt);
+    this.db.prepare('INSERT INTO garments(account,id,name,garmentType,variant,sourceUrl,imageHash,signature,colour,image,thumbnail,savedAt,updatedAt) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').run(account.id, id, name, input.garmentType, variant, sourceUrl, photo.imageHash, photo.signature, photo.colour, photo.image, photo.thumbnail, savedAt, savedAt);
     this.addLink(account, id, sourceUrl);
     return { garment: metadata(this.row(account, id)), duplicate: false };
+    });
   }
   addLink(account, id, sourceUrl) {
     if (!sourceUrl) return;

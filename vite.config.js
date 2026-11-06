@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: { include: ['xlsx'] },
   build: { target: "chrome108" },
   server: {
     port: Number(process.env.VITE_PORT || 5173),

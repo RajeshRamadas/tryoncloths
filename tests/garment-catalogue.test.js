@@ -144,8 +144,8 @@ test('garment limits and deletion remove adaptations without deleting unrelated 
   const result=await (await request('/api/tryon',input,ca)).json();
   const save={image:result.image,receipt:result.reuseReceipt,reviewed:true,storageConsent:true};
   await store.garments.saveResult(a,garment.id,save);
-  const copy=store.db.prepare('INSERT INTO garments SELECT account,?,name,garmentType,variant,sourceUrl,?,signature,colour,image,thumbnail,savedAt FROM garments WHERE account=? AND id=?');
-  for(let i=0;i<199;i++)copy.run(`copy-${i}`,`hash-${i}`,a.id,garment.id);
+  const copy=store.db.prepare('INSERT INTO garments(account,id,name,garmentType,variant,sourceUrl,imageHash,signature,colour,image,thumbnail,savedAt) SELECT account,?,name,garmentType,variant,sourceUrl,?,signature,colour,image,thumbnail,savedAt FROM garments WHERE account=? AND id=?');
+  for(let i=0;i<499;i++)copy.run(`copy-${i}`,`hash-${i}`,a.id,garment.id);
   assert.equal((await store.garments.save(a,garmentInput)).duplicate,true);
   await assert.rejects(store.garments.save(a,{...garmentInput,variant:'another'}),{status:409});
   const copyResult=store.db.prepare('INSERT INTO garment_results SELECT account,?,avatarId,garmentId,image,savedAt FROM garment_results WHERE account=? AND id=?');
@@ -156,7 +156,7 @@ test('garment limits and deletion remove adaptations without deleting unrelated 
   const receipt=await store.garments.receipt(a,otherContext,result.image);
   await assert.rejects(store.garments.saveResult(a,garment.id,{...save,receipt}),{status:409});
   store.remove(a,input.avatarId);assert.equal(store.db.prepare('SELECT count(*) AS n FROM garment_results').get().n,0);
-  assert.equal(store.garments.list(a).length,200);
+  assert.equal(store.garments.list(a).length,500);
   store.garments.remove(a,garment.id);assert.equal(store.db.prepare('SELECT count(*) AS n FROM garment_links WHERE garmentId=?').get(garment.id).n,0);
   store.db.prepare('DELETE FROM accounts WHERE id=?').run(a.id);assert.equal(store.garments.list(a).length,0);
 }));

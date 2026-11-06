@@ -38,6 +38,7 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 - Review/approval, full-body PNG download, expanded preview, and new-session photo clearing.
 - [Outfit sharing](docs/OUTFIT_SHARING.md): expiring public preview links, WhatsApp click-to-chat, and link revocation; uses saved looks with no AI credits.
 - [WhatsApp automation](docs/WHATSAPP.md): encrypted Business connection, consented lookbooks, metered new-arrival previews, review before sending, delivery status and STOP opt-outs.
+- [Catalogue import](docs/CATALOGUE_IMPORT.md): CSV/Excel products, SKU updates, prices, sizes, colours, stock filters and plan limits.
 - Responsive layout and keyboard-accessible controls/dialogs.
 - [Customer profiles](docs/CUSTOMERS.md) with store-scoped mobile lookup, customer-grouped saved avatars, optional marketing consent and linked-data erasure.
 
