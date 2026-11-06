@@ -436,8 +436,13 @@ raw saved pixels resume local processing. Real provider/payment quality remains 
 
 **Acceptance.**
 
-- [ ] Malicious SVG (script, external refs) is neutralised.
-- [ ] Trial users cannot remove the Forme mark via API.
+- [x] Malicious SVG (script, external refs) is neutralised.
+- [x] Trial users cannot remove the Forme mark via API.
+
+**Implemented:** `0.18.0-alpha.3`, branch `feature/store-branding`.
+See [safe logo handling, role boundaries, public pages and export rules](../STORE_BRANDING.md).
+R3 implementation is complete; live service/deployment verification remains separate.
+The next outlined task, C16, requires design review and cost-cap sign-off first.
 
 **R3 release:** bump to 0.18.0, docs for integrations, catalogue photos and branding.
 

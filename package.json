@@ -1,6 +1,6 @@
 {
   "name": "tryoncloths",
-  "version": "0.18.0-alpha.2",
+  "version": "0.18.0-alpha.3",
   "private": true,
   "type": "module",
   "engines": {
@@ -41,6 +41,7 @@
     "pdfkit": "^0.20.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "saxes": "^6.0.0",
     "sharp": "^0.34.0",
     "xlsx": "npm:@e965/xlsx@0.20.3"
   },

@@ -1,3 +1,4 @@
+import {ExportBrandingChoice} from './branding';
 import SizeSuggestion from "./SizeSuggestion";
 import PurchaseLook from "./PurchaseLook";
 import ShareLook from "./ShareLook";
@@ -35,6 +36,7 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
   const [savedLook,setSavedLook]=useState<string|null>(openedLook?.id || null);
   const [storageConsent,setStorageConsent]=useState(false);
   const [reviewed, setReviewed] = useState(false);
+  const [exportFooter,setExportFooter]=useState<boolean|undefined>(undefined);
   const [notice, setNotice] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -107,7 +109,7 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
   async function save() {
     if (!reviewed || !result || rendering || busy) return;
     setBusy(true); onBusy(true); setError("");
-    try { const saved = await downloadAvatar(profile.index, result, `${profile.id}-outfit`); setNotice(saved ? "Outfit PNG prepared. Your original avatar is unchanged." : "Export cancelled."); }
+    try { const saved = await downloadAvatar(profile.index, result, `${profile.id}-outfit`,templateTone,catalogueEnabled?{storeFooter:exportFooter}:undefined); setNotice(saved ? "Outfit PNG prepared. Your original avatar is unchanged." : "Export cancelled."); }
     catch (e) { setError((e as Error).message); }
     finally { setBusy(false); onBusy(false); }
   }
@@ -140,6 +142,7 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
           {selected.garment.imported && <button className="button back-button" disabled={busy} onClick={() => { setImports(items => items.filter(g => g.id !== selected.garment.id)); update(layers.filter(l => l !== selected)); }}>Remove imported layer</button>}
         </section>}
         <section className="outfit-panel"><h2>Keep this look</h2><label className="consent"><input type="checkbox" checked={reviewed} disabled={busy || rendering || !result || (!layers.length && !dressed.length)} onChange={e => setReviewed(e.target.checked)}/><span>I have checked clothing placement and approve this outfit preview.</span></label>
+          {catalogueEnabled&&<ExportBrandingChoice onChange={setExportFooter}/>}
           <button className="button primary full-width" disabled={!reviewed || !result || rendering || busy || (!layers.length && !dressed.length)} onClick={() => void save()}><Download size={17}/>{busy ? "Preparing…" : isNative ? "Save or share outfit" : "Download outfit"}</button>
           {avatarId && <div className="save-avatar-box">
             <label>Look name<input maxLength={60} value={lookName} disabled={busy} onChange={e=>setLookName(e.target.value)}/></label>

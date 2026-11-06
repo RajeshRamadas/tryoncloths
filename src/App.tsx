@@ -1,3 +1,4 @@
+import {ExportBrandingChoice} from './branding';
 import CustomerPicker from "./CustomerPicker";
 import {type CustomerRef,type Customer} from "./customers";
 import {CreditHelp} from "./Billing";
@@ -228,6 +229,7 @@ export default function App() {
   const [generationFailed, setGenerationFailed] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [approved, setApproved] = useState(false);
+  const [exportFooter,setExportFooter]=useState<boolean|undefined>(undefined);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [help, setHelp] = useState(false);
@@ -472,6 +474,7 @@ export default function App() {
         personalized,
         `${profile.id}${personalized ? "-personalized" : "-sample"}`,
         templateTone,
+        accountState.account?{storeFooter:exportFooter}:undefined,
       );
       setNotice(
         exported
@@ -925,6 +928,7 @@ export default function App() {
                         : "I have reviewed this standard sample avatar."}
                     </span>
                   </label>
+                  {accountState.account&&<ExportBrandingChoice key={accountState.account.id} onChange={setExportFooter}/>}
                   <button
                     className="button primary full-width"
                     disabled={!approved || exporting || needsCustomerGeneration}
