@@ -19,6 +19,10 @@ if(production&&app.locals.analyticsReports){
  const tick=()=>app.locals.analyticsReports.runDue().catch(()=>console.error(JSON.stringify({event:'analytics_scheduler_failed'})));
  void tick();setInterval(()=>void tick(),60000).unref();
 }
+if(production&&app.locals.catalogueSync){
+ const tick=()=>app.locals.catalogueSync.runDue().catch(()=>console.error(JSON.stringify({event:'catalogue_scheduler_failed'})));
+ void tick();setInterval(()=>void tick(),60000).unref();
+}
 app.listen(port, "0.0.0.0", (error) => {
   if (error) {
     console.error(

@@ -37,7 +37,7 @@ export class CatalogueImporter {
   if(this.running.has(account.id))throw fail('A catalogue import is already running for this store.',409);
   this.actor(account);const input=parseCatalogue(buffer),report={created:0,updated:0,skipped:input.errors.length,errors:input.errors};
   const existing=new Set(this.db.prepare("SELECT sku FROM garments WHERE account=? AND source='csv'").all(account.id).map(r=>r.sku));
-  const limit=catalogueLimit(this.db,account),count=this.db.prepare('SELECT count(*) AS n FROM garments WHERE account=?').get(account.id).n;
+  const limit=catalogueLimit(this.db,account),count=this.db.prepare("SELECT count(*) AS n FROM garments WHERE account=? AND source<>'master'").get(account.id).n;
   if(count+input.rows.filter(r=>!existing.has(r.sku)).length>limit)return {status:409,...report,skipped:input.total,errors:[...report.errors,{row:0,message:`Import would exceed this store’s ${limit.toLocaleString('en-IN')}-item catalogue limit. No rows were saved. Split the file, update existing SKUs or upgrade.`}]};
   this.running.add(account.id);const deadline=Date.now()+this.deadlineMs;let next=0,status=200,stop=false;const photos=new Map();
   const photo=async url=>{

@@ -138,4 +138,4 @@ cd ~/tryoncloths && git pull --ff-only origin main && cd deploy/lightsail && sud
 
 This is a web update, not a deployment performed by Codex. Commercial integration
 rollout remains alpha until the configured live services are validated. The next
-implementation task in the priority guide is **C11 — Shopify/WooCommerce sync**.
+implementation task after C11 catalogue sync is **C13 — AI catalogue photos**.

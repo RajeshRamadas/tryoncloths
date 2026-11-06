@@ -7,6 +7,7 @@
 - [WhatsApp automation](WHATSAPP.md): Business connection, consent, metered new arrivals, delivery and opt-outs.
 - [Size guidance](SIZE_RECOMMENDATIONS.md): body measurements, chart management, optional suggestions and purchase marks.
 - [Store analytics](ANALYTICS.md): owner/manager reports, fitting and purchase activity, CSV exports and monthly email preferences.
+- [Shop catalogue sync](CATALOGUE_SYNC.md): owner connections, manual/nightly sync, type confirmation and read-only shared master products.
 - [Billing and usage](BILLING.md): trials, credits, checkout, invoices and operator commands.
 
 For a returning customer, find them by mobile number, reopen their avatar in Saved

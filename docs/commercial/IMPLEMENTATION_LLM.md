@@ -390,8 +390,12 @@ Live SMTP/Meta/payment rollout remains separately unverified; no APK is rebuilt.
 
 **Acceptance.**
 
-- [ ] Mocked 3-page Shopify response syncs all products; second run changes nothing.
-- [ ] Bad token → `lastError` set, no partial deletes.
+- [x] Mocked 3-page Shopify response syncs all products; second run changes nothing.
+- [x] Bad token → `lastError` set, no partial deletes.
+
+**Implemented:** `0.18.0-alpha.1`, branch `feature/catalogue-sync`.
+See [connections, snapshot rules, shared master catalogue and validation](../CATALOGUE_SYNC.md).
+Real shop credentials and live connectivity remain to be verified after deployment.
 
 ### Task C13 — AI catalogue photos
 

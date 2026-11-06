@@ -1869,3 +1869,8 @@ dialog::backdrop {
 .analytics-bars { display:block; width:100%; height:auto; }
 .analytics-page summary { cursor:pointer; }
 .analytics-page li,.analytics-page h2 { overflow-wrap:anywhere; }
+.shop-connection { padding:16px; margin:16px 0; border-radius:10px; background:#f2f5ee; min-width:0; }
+.shop-connection p { overflow-wrap:anywhere; }
+.shop-connection summary { cursor:pointer; font-weight:600; }
+.catalogue-manager .consent { flex-direction:row; align-items:start; }
+.catalogue-manager input[type=checkbox] { width:18px; flex:0 0 18px; margin-top:4px; }
