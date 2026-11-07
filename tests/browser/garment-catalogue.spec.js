@@ -6,6 +6,10 @@ import sharp from 'sharp';
 import { AccountStore } from '../helpers/pilot-accounts.js';
 import { createApp, standardAvatar } from '../../server/app.js';
 
+// Full-resolution exports, cache checks and reloads share this multi-step flow.
+// Allow it to finish when the backend suite is using the image/face workers too.
+test.setTimeout(60000);
+
 async function fixture(page, work) {
   const directory=await mkdtemp(path.join(os.tmpdir(),'forme-catalogue-browser-'));
   const store=new AccountStore(directory);

@@ -168,7 +168,8 @@ API key or environment variable is required for these spending controls.
 
 [C16.2 Shopify installation, signed launches and theme extension](SHOPIFY_SHOPPER.md)
 are now implemented as a setup preview. [C16.3 shopper sessions and guards](SHOPPER_SESSIONS.md)
-now add the optional temporary session and guarded executor. Next: **C16.4 hosted
-photo/try-on flow**, with live safety-provider selection and review still required.
+now add the optional temporary session and guarded executor. [C16.4 hosted
+photo/try-on flow](SHOPPER_WORKFLOW.md) is implemented behind its default-off flag.
+Next: **C16.5 live verification**, with safety-provider selection and review still required.
 Service selection, legal review and live deployment/provider verification remain
 launch prerequisites. No Docker image, Lightsail deployment or APK is built here.

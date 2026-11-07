@@ -3,6 +3,7 @@ import {CatalogueSync} from './catalogue-sync.js';
 import {ShopifyShopper} from './shopify-shopper.js';
 import {installShopifyShopperPublic} from './shopify-shopper-routes.js';
 import {ShopperSessions} from './shopper-sessions.js';
+import {ShopperWorkflow} from './shopper-workflow.js';
 import {installShopperSessionRoutes,installShopperJsonErrors} from './shopper-session-routes.js';
 import {PhotoJobs} from './photo-jobs.js';
 import {record} from './events.js';
@@ -103,6 +104,7 @@ export function createApp({
   syncOptions = {},
   shopifyShopperOptions = {},
   shopperSessionOptions = {},
+  shopperWorkflowOptions = {},
   photoOptions = {},
   femaleEnabled = process.env.TRYON_FEMALE_PROFILES === "true",
   tryOn = geminiTryOn,
@@ -145,6 +147,10 @@ export function createApp({
   app.locals.shopifyShopper=shopifyShopper;
   const shopperSessions=shopifyShopper?new ShopperSessions(shopifyShopper,{provider,trustProxy,...shopperSessionOptions}):null;
   app.locals.shopperSessions=shopperSessions;
+  const shopperWorkflow=shopperSessions?new ShopperWorkflow(shopperSessions,{apiKey,model,quality,personalize,tryOn,template:standardAvatar,femaleEnabled,...shopperWorkflowOptions}):null;
+  if(shopperSessions)shopperSessions.workflow=shopperWorkflow;
+  app.locals.shopperWorkflow=shopperWorkflow;
+  if(shopifyShopper)shopifyShopper.workflow=shopperWorkflow;
   installShopperSessionRoutes(app,shopperSessions,{production});
   installShopifyShopperPublic(app,shopifyShopper,{production,sessions:shopperSessions});
   installShopperJsonErrors(app);

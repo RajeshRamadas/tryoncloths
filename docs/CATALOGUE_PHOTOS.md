@@ -175,4 +175,5 @@ Codex has not deployed this update or built an APK.
 [C15 — Store branding](STORE_BRANDING.md) and [C16.1 shopper spending controls](SHOPPER_SPENDING.md)
 are now implemented. [C16.2 Shopify installation/signed launches](SHOPIFY_SHOPPER.md)
 are now available as a setup preview. [C16.3 shopper sessions and guards](SHOPPER_SESSIONS.md)
-are implemented; shopper photo/AI try-on screens remain pending in C16.4.
+are implemented. [C16.4 shopper photo/AI try-on screens](SHOPPER_WORKFLOW.md) are
+also implemented, disabled until reviewed integrations exist; C16.5 live verification remains.

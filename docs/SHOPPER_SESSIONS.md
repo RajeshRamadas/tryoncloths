@@ -5,11 +5,11 @@ interfaces, rate limits, cancellation, image validation and shared image-call
 leases. This follows the approved [shopper design](commercial/SHOPPER_SELF_SERVICE_DESIGN.md)
 and [Shopify launches](SHOPIFY_SHOPPER.md).
 
-**This is a session preview.** There are no public avatar-generation or try-on
-upload routes yet. The hosted page can show the current product, remaining session
-time and **End shopper session**. It uploads no photos and spends no AI credits.
-C16.4 supplies those screens/routes. Default session preview is off; absent
-reviewed consent and configured safety adapters block the guarded image service.
+**With the workflow flag off, this is a session preview.** The hosted page shows
+the product, remaining session time and **End shopper session**, without photos or
+AI credits. [C16.4](SHOPPER_WORKFLOW.md) now supplies guarded image routes and
+photo/review/try-on screens behind an additional default-off flag. Absent reviewed
+disclosure and configured safety adapters still block shopper photo processing.
 No live CAPTCHA, moderation or AI service was called by this task.
 
 ## Enable the optional session preview
@@ -134,8 +134,9 @@ The server factory can inject reviewed adapters through `shopperSessionOptions`:
 These are **adapter contracts**, not assertions that a chosen vendor supports
 them or that the existing face model verifies adulthood/identity. Services,
 tariffs, processing/retention terms and consent text still need launch review.
-Public metadata reports check availability; it always reports
-`shopperGenerationAvailable:false` in this increment.
+Public metadata reports check availability. `shopperGenerationAvailable` stays
+false unless the additional [C16.4 workflow](SHOPPER_WORKFLOW.md) and all of its
+reviewed dependencies are configured.
 
 Generation consent requires explicit adult/own-photo acceptance for the exact
 action, active AI provider and current wording revision. Its five-minute, single-use
@@ -172,10 +173,10 @@ and aborting HTTP cannot recall transmitted photos or prove remote cancellation.
 
 All precede the optional staff API token gate and use their own auth. Parse and
 size errors return sanitized JSON without logging/echoing request contents.
-There is **no** public `/shopper-api/avatar` or `/shopper-api/tryon` generation
-route. The internal runner is tested with mocked generation; wiring it into those
-routes and photo/consent/review/download screens is **C16.4**, the next increment.
-The prototype page must not be presented as a customer-avatar generation result.
+[C16.4](SHOPPER_WORKFLOW.md) now wires the guarded runner into public avatar and
+try-on routes and the consent/photo/review/download screens. Those routes reject
+requests before photo parsing when their opt-in/configuration, session or proof
+is missing. The setup/session preview must never be presented as a generated result.
 
 ## Validation
 

@@ -4,6 +4,7 @@ import {BillingError,validRequestId} from './billing.js';
 import {abortable} from './image-slots.js';
 import {shopperInputs,shopperPhoto} from './shopper-photos.js';
 import {requireVisibleFace} from './face-check.js';
+import {ProviderError,providerErrorDetails} from './provider-errors.js';
 
 export const SESSION_MS=30*60000;
 const HOUR=3600000,proofMs=2*60000,consentMs=5*60000;
@@ -81,9 +82,11 @@ export class ShopperSessions {
   describe(raw,session){
     const brand=this.store.branding.read(session.context.store),logo=this.store.branding.logo(session.context.store);
     let checksAvailable=true;try{this.guardReady();}catch{checksAvailable=false;}
-    return {stage:'session-guards',expiresAt:session.expiresAt,createdAt:session.createdAt,csrf:this.csrf(raw),product:session.context.product,
-      brand:{displayName:brand.displayName,primaryColor:brand.primaryColor,logo:logo?'data:image/png;base64,'+Buffer.from(logo).toString('base64'):null},
-      provider:this.provider,consentRevision:this.consentRevision||null,verificationProvider:this.captcha?.id||null,moderationProvider:this.moderation?.id||null,checksAvailable,shopperGenerationAvailable:false,attemptsRemaining:Math.max(0,3-session.attempts)};
+    const workflow=this.workflow?.metadata();
+    return {stage:workflow?'hosted-workflow':'session-guards',expiresAt:session.expiresAt,createdAt:session.createdAt,csrf:this.csrf(raw),product:session.context.product,
+      brand:{displayName:brand.displayName,primaryColor:brand.primaryColor,exportFooter:brand.exportFooter,logo:logo?'data:image/png;base64,'+Buffer.from(logo).toString('base64'):null},
+      provider:this.provider,consentRevision:this.consentRevision||null,verificationProvider:this.captcha?.id||null,moderationProvider:this.moderation?.id||null,checksAvailable,shopperGenerationAvailable:Boolean(workflow),...(workflow?{workflow}:{}),
+      avatarGenerated:session.avatars>0,avatarApproved:session.avatarApproved,tryonsRemaining:Math.max(0,2-session.tryons),processing:Boolean(session.activeAttempt),attemptsRemaining:Math.max(0,3-session.attempts)};
   }
   read(auth){const current=this.auth(auth,{mutate:false});return this.describe(current.raw,current.session);}
   revoke(key){
@@ -99,13 +102,13 @@ export class ShopperSessions {
     if(!only(input,['action','provider','revision','adult','ownPhotos','accepted'])||!['avatar','tryon'].includes(input.action)||input.provider!==this.provider||input.revision!==this.consentRevision
       ||input.adult!==true||input.ownPhotos!==true||input.accepted!==true)throw fail('shopper_consent_required','Confirm adult own-photo consent for this purpose and active provider.',400);
     if(input.action==='avatar'&&current.session.avatars>=1||input.action==='tryon'&&!current.session.avatarApproved)throw fail('shopper_review_required','Review the generated avatar before trying on this product.');
-    const id=token();this.state.transaction(()=>this.save('consent',hash(id),{session:current.key,action:input.action,provider:this.provider,revision:this.consentRevision,captcha:this.captcha.id,moderation:this.moderation.id,acceptedAt:this.now()},Math.min(current.session.expiresAt,this.now()+consentMs)));
+    const id=token();this.state.transaction(()=>this.save('consent',hash(id),{session:current.key,contextHash:hash(JSON.stringify(current.session.context)),action:input.action,provider:this.provider,revision:this.consentRevision,captcha:this.captcha.id,moderation:this.moderation.id,acceptedAt:this.now()},Math.min(current.session.expiresAt,this.now()+consentMs)));
     return {consent:id,expiresAt:Math.min(current.session.expiresAt,this.now()+consentMs)};
   }
   async challenge(auth,input,ip){
     this.guardReady();const current=this.auth(auth),address=canonicalIp(ip);
     if(!only(input,['action','consent','token'])||!['avatar','tryon'].includes(input.action)||!opaque(input.consent)||typeof input.token!=='string'||!input.token||input.token.length>4096)throw fail('shopper_challenge_invalid','Complete the verification for this image action.',400);
-    const consent=this.state.get('consent',hash(input.consent));if(!consent||consent.session!==current.key||consent.action!==input.action||consent.revision!==this.consentRevision||consent.captcha!==this.captcha.id||consent.moderation!==this.moderation.id)throw fail('shopper_consent_required','Confirm fresh generation consent first.',400);
+    const consent=this.state.get('consent',hash(input.consent));if(!consent||consent.session!==current.key||consent.contextHash!==hash(JSON.stringify(current.session.context))||consent.action!==input.action||consent.provider!==this.provider||consent.revision!==this.consentRevision||consent.captcha!==this.captcha.id||consent.moderation!==this.moderation.id)throw fail('shopper_consent_required','Confirm fresh generation consent first.',400);
     const replay=hash(input.token);
     this.state.transaction(()=>{
       if(this.state.get('captcha-replay',replay))throw fail('shopper_challenge_replayed','Complete a new verification challenge.');
@@ -130,33 +133,41 @@ export class ShopperSessions {
     let result;try{result=await abortable(()=>this.moderation.check({images,stage,policy:'adult-own-photo-v1',signal}),signal);}catch{if(signal.aborted&&signal.reason instanceof BillingError)throw signal.reason;throw fail('shopper_checks_unavailable','Image safety checks are unavailable. No new image was accepted.',503);}
     if(result?.allowed!==true||result.policy!=='adult-own-photo-v1')throw fail('shopper_image_rejected','This image did not pass the shopper safety checks.',422);
   }
-  async run(auth,{action,requestId,consent,proof,images},work,{ip,signal:externalSignal}={}){
+  proof(auth,action,consent,proof){
+    this.guardReady();const current=this.auth(auth);
+    if(!opaque(consent)||!opaque(proof))throw fail('shopper_consent_required','Fresh consent and verification are required before sending photos.',403);
+    const cons=this.state.get('consent',hash(consent)),verified=this.state.get('proof',hash(proof));
+    if(!cons||cons.session!==current.key||cons.contextHash!==hash(JSON.stringify(current.session.context))||cons.action!==action||cons.provider!==this.provider||cons.revision!==this.consentRevision||cons.captcha!==this.captcha.id||cons.moderation!==this.moderation.id||!verified||verified.session!==current.key||verified.action!==action||verified.consent!==hash(consent))throw fail('shopper_consent_required','Fresh consent and verification are required for this image request.',403);
+    return current;
+  }
+  async run(auth,{action,requestId,consent,proof,images},work,{ip,signal:externalSignal,metadata=null,uploadLease}={}){
     this.guardReady();const before=this.auth(auth),address=canonicalIp(ip);
     if(!validRequestId(requestId)||!['avatar','tryon'].includes(action)||!opaque(consent)||!opaque(proof)||typeof work!=='function')throw fail('shopper_attempt_invalid','Use a valid explicit image request.',400);
     if(this.state.get('attempt',requestId.toLowerCase()))throw fail('duplicate_request','This image request was already submitted. No automatic retry was sent.');
-    const lease=this.store.imageSlots.acquire({kind:'shopper',leaseMs:135000});if(!lease)throw fail('image_busy','The studio is processing other images. Try again shortly.',429);
+    const lease=uploadLease||this.store.imageSlots.acquire({kind:'shopper',leaseMs:135000});if(!lease)throw fail('image_busy','The studio is processing other images. Try again shortly.',429);
+    this.store.imageSlots.assert(lease);
     const controller=new AbortController(),combined=AbortSignal.any([controller.signal,AbortSignal.timeout(120000),...(externalSignal?[externalSignal]:[])]);
     const running=this.running.get(before.key)||new Set();running.add(controller);this.running.set(before.key,running);
     const watch=setInterval(()=>{try{this.auth(auth);this.store.imageSlots.assert(lease);}catch(e){controller.abort(e);}},this.pollMs);watch.unref();let operation=null;
     try{
       this.state.transaction(()=>{
-        const current=this.auth(auth),cons=this.state.get('consent',hash(consent)),verified=this.state.get('proof',hash(proof));
-        if(!cons||cons.session!==current.key||cons.action!==action||cons.provider!==this.provider||cons.revision!==this.consentRevision||cons.captcha!==this.captcha.id||cons.moderation!==this.moderation.id||!verified||verified.session!==current.key||verified.action!==action||verified.consent!==hash(consent))throw fail('shopper_consent_required','Fresh consent and verification are required for this image request.',403);
+        const current=this.proof(auth,action,consent,proof);
         this.checkAttempts(current,action,address);
         this.state.take('consent',hash(consent));this.state.take('proof',hash(proof));
         this.state.put('attempt',requestId.toLowerCase(),{session:current.key,action},current.session.expiresAt);
+        current.session.activeAttempt=requestId.toLowerCase();this.save('session',current.key,current.session,current.session.expiresAt);
       });
       let source=images;
       if(action==='tryon'){
         if(!only(images,['avatar'])||Object.keys(images).length!==1)throw fail('shopper_attempt_invalid','Use the reviewed session avatar and selected store product.',400);
-        const original=await shopperPhoto(images.avatar,{png:true}),current=this.auth(auth);
+        const original=await shopperPhoto(images.avatar,{output:true,png:true}),current=this.auth(auth);
         if(!current.session.avatarApproved||hash(original.raw)!==current.session.avatarHash)throw fail('shopper_review_required','Use the exact avatar reviewed in this shopper session.',403);
         const garment=this.store.db.prepare('SELECT image FROM garments WHERE account=? AND id=?').get(current.session.context.store,current.session.context.garmentId);
         source={avatar:images.avatar,garment:'data:image/png;base64,'+Buffer.from(garment.image).toString('base64')};
       }
       const normalized=await abortable(()=>shopperInputs(action,source,{faceCheck:this.faceCheck,visibleCheck:this.visibleCheck}),combined);
       await this.moderate(auth,Object.values(normalized),'input',combined);
-      const bodyHash=hash(JSON.stringify(Object.entries(normalized).map(([key,bytes])=>[key,hash(bytes)]))),reservation=this.store.shoppers.reserve({store:before.session.context.store,requestId,action,bodyHash,sessionHash:before.key});
+      const bodyHash=hash(JSON.stringify([Object.entries(normalized).map(([key,bytes])=>[key,hash(bytes)]),metadata,before.session.context.fingerprint])),reservation=this.store.shoppers.reserve({store:before.session.context.store,requestId,action,bodyHash,sessionHash:before.key});
       if(!reservation.fresh)throw fail('duplicate_request','This request was already reserved. No automatic retry was sent.');operation=requestId.toLowerCase();
       this.state.transaction(()=>{
         const current=this.auth(auth);this.checkAttempts(current,action,address);combined.throwIfAborted();this.store.imageSlots.assert(lease);
@@ -174,8 +185,15 @@ export class ShopperSessions {
         this.save('session',current.key,current.session,current.session.expiresAt);this.store.shoppers.commit(operation);
       });
       return {image:'data:image/png;base64,'+result.toString('base64'),needsReview:true,...(approval?{approval}:{})};
-    }catch(e){if(operation)this.store.shoppers.refund(operation);if(e instanceof BillingError)throw e;throw fail('shopper_image_failed','The image request could not complete. A provider charge may still apply; no automatic retry was sent.',502);}
-    finally{clearInterval(watch);running.delete(controller);if(!running.size)this.running.delete(before.key);this.store.imageSlots.release(lease);}
+    }catch(e){
+      if(operation)this.store.shoppers.refund(operation);if(e instanceof BillingError)throw e;
+      if(combined.aborted){if(combined.reason instanceof BillingError)throw combined.reason;throw fail('shopper_timeout','This image attempt stopped or timed out. A provider charge may still apply; no automatic retry was sent.',504);}
+      if(e instanceof ProviderError){const details=providerErrorDetails(e,this.provider);throw fail('shopper_provider_'+details.code,details.message+' No automatic retry was sent.',details.code==='quota'?429:details.code==='timeout'?504:502);}
+      throw fail('shopper_image_failed','The image request could not complete. A provider charge may still apply; no automatic retry was sent.',502);
+    }
+    finally{clearInterval(watch);running.delete(controller);if(!running.size)this.running.delete(before.key);this.store.imageSlots.release(lease);
+      this.state.transaction(()=>{const session=this.state.get('session',before.key);if(session?.activeAttempt===requestId.toLowerCase()){delete session.activeAttempt;this.save('session',before.key,session,session.expiresAt);}});
+    }
   }
   checkAttempts(current,action,ip){
     if(current.session.attempts>=3||action==='avatar'&&current.session.avatars>=1||action==='tryon'&&(!current.session.avatarApproved||current.session.tryons>=2))throw fail('shopper_attempt_limit','This session has reached its image limit. Open a fresh product session.',429);
