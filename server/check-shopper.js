@@ -39,7 +39,8 @@ export async function checkShopperConfiguration({env=process.env}={}){
   check('storage-separation',separate,'Transient capability state must be outside the persistent account/backup directory.');
   const constrained=process.constrainedMemory();
   return {schemaVersion:1,scope:'offline-server-configuration',configurationReady:checks.every(c=>c.state==='pass'),liveVerified:false,source:config.source,checks,
-    runtime:{nodeMajor:Number(process.versions.node.split('.')[0]),memoryLimitMiB:Math.floor(Math.min(os.totalmem(),constrained>0?constrained:Infinity)/1048576)},manualChecks:liveShopperChecks.map(c=>({...c,state:'unverified'}))};
+    runtime:{nodeMajor:Number(process.versions.node.split('.')[0]),memoryLimitMiB:Math.floor(Math.min(os.totalmem(),constrained>0?constrained:Infinity)/1048576)},manualChecks:liveShopperChecks.map(c=>({...c,state:'unverified'})),
+    ...(sessions.moderation?.provider==='gemini'?{safety:{provider:'gemini',model:sessions.moderation.model,revision:sessions.moderation.revision}}:{})};
 }
 if(process.argv[1]&&pathToFileURL(path.resolve(process.argv[1])).href===import.meta.url){
   try{const result=await checkShopperConfiguration();console.log(JSON.stringify(result));process.exitCode=result.configurationReady?0:1;}

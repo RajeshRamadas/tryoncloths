@@ -498,3 +498,11 @@ read-only owner/manager launch diagnostics](../SHOPPER_LAUNCH.md).
 This is tooling for C16.5, not completed live verification. Vendor activation,
 moderation policy selection, legal review, Gemini billing/quality, Shopify/theme,
 target deployment/load/retention and the supervised pilot still need evidence.
+
+**C16.5.2 implemented:** `0.19.0-alpha.6`, branch `feature/gemini-shopper-moderation`:
+[optional Gemini input/output safety review](../SHOPPER_GEMINI_SAFETY.md), trusted
+action/role labels, bounded requests, model-bound consent and deployment/preflight
+configuration. It uses the existing Gemini key or an optional separate safety key.
+The model provides fallible appearance/content assessment, not age/identity
+verification. It remains off by default; real policy accuracy/coverage, vendor/data
+terms, legal, billing and deployment/pilot evidence still require C16.5 review.

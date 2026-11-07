@@ -8,6 +8,8 @@ are implemented in `0.19.0-alpha.3`; [C16.4 hosted photo/try-on workflow](../SHO
 is implemented in `0.19.0-alpha.4`, disabled until its reviewed integrations exist.
 [C16.5.1 setup/readiness tooling](../SHOPPER_LAUNCH.md) is implemented in
 `0.19.0-alpha.5`; C16.5 live checks remain outstanding.
+[C16.5.2 optional Gemini safety review](../SHOPPER_GEMINI_SAFETY.md) is implemented
+in `0.19.0-alpha.6`, disabled until explicitly selected and reviewed.
 Service/legal review and launch verification
 are still required; design approval does not enable production shopper access.
 
@@ -329,6 +331,11 @@ C16.5.1 adds optional Turnstile, a trusted startup module, offline configuration
 preflight and owner/manager local diagnostics. It does not select/activate a
 moderation vendor, approve legal text or claim live service/deployment results.
 Configuration reports keep live checks explicitly unverified.
+
+C16.5.2 implements an optional bounded Gemini image eligibility/safety adapter,
+with trusted input/output roles and model/policy-bound consent. It does not
+establish verified age, identity or ownership, nor actual policy accuracy/coverage.
+Live service/data/legal/cost and deployment/pilot evidence remains open.
 
 No runtime version bump for this design-only change. Code increments follow the
 repository release/version rules. Do not build an APK for this web feature.

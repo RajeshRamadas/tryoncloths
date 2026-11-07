@@ -120,6 +120,9 @@ increment. An environment flag or a store access code cannot bypass that absence
 Later [C16.5.1 setup/readiness tooling](SHOPPER_LAUNCH.md) provides optional
 Turnstile and trusted startup configuration; moderation/legal/live checks remain
 unconfigured until explicitly supplied and reviewed.
+An optional [C16.5.2 Gemini safety adapter](SHOPPER_GEMINI_SAFETY.md) is now
+implemented, disabled by default, with no claim of verified age/identity or live
+policy accuracy. It validates the trusted action/role labels before sending images.
 The server factory can inject reviewed adapters through `shopperSessionOptions`:
 
 - `consentRevision`: public version id for legally reviewed photo-processing

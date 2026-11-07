@@ -2,6 +2,7 @@ import {stat} from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createTurnstile} from './turnstile.js';
+import {createGeminiModeration} from './gemini-moderation.js';
 
 // An operator-supplied module is trusted server code, never an HTTP upload. Only
 // these shopper dependencies are accepted; flags, billing and providers stay in
@@ -25,6 +26,12 @@ export async function loadShopperConfiguration({env=process.env,production=true}
       if(env.TRYON_SHOPPER_CAPTCHA!=='turnstile'||dependencies.captcha||dependencies.verificationClient)throw new Error();
       Object.assign(dependencies,createTurnstile({siteKey:env.TRYON_TURNSTILE_SITE_KEY,secretKey:env.TRYON_TURNSTILE_SECRET_KEY,production}));
     }catch{Object.assign(source,{status:'invalid',code:'verification_invalid'});}
+  }
+  if(env.TRYON_SHOPPER_MODERATION){
+    try{
+      if(env.TRYON_SHOPPER_MODERATION!=='gemini'||dependencies.moderation)throw new Error();
+      dependencies.moderation=createGeminiModeration({apiKey:env.TRYON_SHOPPER_MODERATION_API_KEY||env.TRYON_GEMINI_API_KEY,model:env.TRYON_SHOPPER_MODERATION_MODEL||undefined});
+    }catch{Object.assign(source,{status:'invalid',code:'moderation_invalid'});}
   }
   if(source.status==='invalid')return {source,shopperSessionOptions:{consentRevision:'',captcha:undefined,moderation:undefined},shopperWorkflowOptions:{disclosure:undefined,verificationClient:undefined}};
   const {disclosure,moderation,captcha,verificationClient}=dependencies;
