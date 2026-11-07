@@ -18,6 +18,11 @@ Lightsail pilot deployed by this task. Configuration presence cannot establish
 valid credentials, quota, billing, policy coverage, data terms, likeness or fit.
 The report always says `liveVerified:false`; it cannot approve a launch.
 
+[C16.5.2](SHOPPER_GEMINI_SAFETY.md) now also provides optional Gemini input/output
+safety review using the existing image key, with a separate model and bounded
+classification requests. It remains unselected by default and does not verify
+age/identity, legal approval, coverage or live accuracy.
+
 ## 1. Review the service and disclosure configuration
 
 Keep `TRYON_SHOPPER_SESSIONS=false` and `TRYON_SHOPPER_WORKFLOW=false` until the
@@ -36,6 +41,9 @@ chmod 644 /home/ubuntu/forme-shopper-services/services.mjs
 
 The example exports null dependencies and intentionally cannot enable photos.
 Replace them only with the reviewed disclosure and selected safety implementation.
+For the optional built-in Gemini safety adapter, see
+[its configuration and limitations](SHOPPER_GEMINI_SAFETY.md); leave the module's
+`moderation` null/omitted and explicitly select it through the server environment.
 The default export must be an object with only these fields:
 
 ```js
@@ -50,12 +58,14 @@ export default {disclosure, moderation};
 handling, not the test disclosure. A revision identifier is not legal approval.
 If `TRYON_SHOPPER_CONSENT_REVISION` is also set, it must match the module revision.
 
-`moderation` implements `{id, async check({images, stage, policy, signal})}` and
+Custom `moderation` implements `{id, async check({images, stage, action, roles, policy, signal})}` and
 returns `{allowed:true, policy:'adult-own-photo-v1'}` only after the selected
 service enforces the reviewed policy. Missing, unknown and error results must
 block acceptance. Local face presence is not age, ownership or identity
 verification; a generic provider safety default alone is not the required
 policy. Service selection, tariffs/limits and input/output coverage remain open.
+`action`/`roles` are additive trusted server labels; older custom adapters may
+ignore them. The built-in Gemini adapter validates them before any request.
 
 Modules are trusted code with access to the server environment. Review the entry
 module and all imports; they must make no network calls, log no credentials and

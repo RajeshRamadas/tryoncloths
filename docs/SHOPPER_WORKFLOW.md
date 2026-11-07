@@ -12,6 +12,8 @@ moderation adapter or legally reviewed disclosure is configured by default. It c
 accept shopper photos until those dependencies are supplied. This increment
 implements and tests the complete flow using mocked services; it does not launch
 public paid generation. C16.5 is the live-service, legal, cost and rollout check.
+[C16.5.2](SHOPPER_GEMINI_SAFETY.md) now provides optional Gemini safety review;
+it is not enabled or verified by adding the implementation alone.
 
 ## What the shopper can do
 
@@ -146,6 +148,10 @@ stay exclusively in its server verifier configuration.
 The complete flow currently requires Gemini. An OpenAI-only server cannot
 silently use a different provider for clothing generation. Existing staff prompts,
 contracts and provider selection remain unchanged.
+
+The optional [Gemini image-safety adapter](SHOPPER_GEMINI_SAFETY.md) can reuse that
+server key for bounded, separately metered input/output classification. Its live
+policy coverage, costs, data terms and disclosure still require review.
 
 Preserve the account volume and all shared deployment overrides when deploying
 after the independent launch review:

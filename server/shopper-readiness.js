@@ -21,7 +21,7 @@ export function shopperReadiness(shopify,account){
   check('provider','Gemini image configuration',Boolean(configuration.provider&&configuration.adapters),'A key, supported model and existing image adapters must be configured; this does not test quota or quality.');
   check('captcha','Server verification adapter',Boolean(typeof sessions?.captcha?.verify==='function'&&/^[a-z0-9-]{1,60}$/.test(sessions?.captcha?.id||'')),'Configure the verifier and matching browser widget; a site key alone cannot verify tokens.');
   check('captcha-client','Browser verification configuration',Boolean(configuration.verificationClient),'The browser adapter must match the verifier and declare bounded public HTTPS CSP origins.');
-  check('moderation','Image safety adapter',Boolean(typeof sessions?.moderation?.check==='function'&&/^[a-z0-9-]{1,60}$/.test(sessions?.moderation?.id||'')),'Supply a reviewed adapter enforcing the shopper input/output policy. Built-in face checks do not verify age or identity.');
+  check('moderation','Image safety adapter',Boolean(typeof sessions?.moderation?.check==='function'&&/^[a-z0-9-]{1,60}$/.test(sessions?.moderation?.id||'')),sessions?.moderation?.provider==='gemini'?'Gemini image-safety review is configured. Its model, policy coverage, costs and data terms still need live review; appearance assessment does not verify age, identity or ownership.':'Supply a reviewed adapter enforcing the shopper input/output policy. Built-in face checks do not verify age or identity.');
   check('disclosure','Disclosure and consent version',Boolean(configuration.disclosure),'Provide reviewed processing/purpose text, contact, HTTPS policy/terms and a matching revision.');
   check('proxy','Trusted proxy and client-IP checks',Boolean(sessions&&!sessions.proxyError&&(sessions.trustProxy===1?sessions.proxyCount>0:!shopify.production)),'Production needs one reverse proxy with explicitly trusted peer CIDRs; direct development is not a live proxy test.');
   const transient=shopify.state;let storage=false;
@@ -39,5 +39,6 @@ export function shopperReadiness(shopify,account){
   let product=false;
   if(row?.status==='installed')for(const item of shopify.products(row)){if(!item.enabled||!item.eligible)continue;try{shopify.launchContext(row,item.externalId.split('/').pop());product=true;break;}catch{}}
   check('products','An enabled product can launch',product,'Select a published, in-stock product with its clothing type confirmed in this installed shop.');
-  return {schemaVersion:1,checkedAt:new Date(shopify.now()).toISOString(),scope:'local-configuration',configurationReady:checks.every(c=>c.state==='pass'),workflowConfigured:Boolean(workflow?.metadata()),liveVerified:false,checks,manualChecks:liveShopperChecks.map(c=>({...c,state:'unverified'}))};
+  return {schemaVersion:1,checkedAt:new Date(shopify.now()).toISOString(),scope:'local-configuration',configurationReady:checks.every(c=>c.state==='pass'),workflowConfigured:Boolean(workflow?.metadata()),liveVerified:false,checks,manualChecks:liveShopperChecks.map(c=>({...c,state:'unverified'})),
+    ...(sessions?.moderation?.provider==='gemini'?{safety:{provider:'gemini',model:sessions.moderation.model,revision:sessions.moderation.revision}}:{})};
 }

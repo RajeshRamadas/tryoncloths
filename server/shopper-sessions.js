@@ -128,9 +128,10 @@ export class ShopperSessions {
       this.state.put('proof',hash(proof),{session:current.key,action:input.action,consent:hash(input.consent)},Math.min(current.session.expiresAt,this.now()+proofMs));
     });return {proof,expiresAt:Math.min(current.session.expiresAt,this.now()+proofMs)};
   }
-  async moderate(current,images,stage,signal,operationId=null){
+  async moderate(current,images,stage,signal,operationId=null,action){
     this.auth(current);this.store.shoppers.reserveModeration({store:this.auth(current).session.context.store,requestId:randomUUID(),operationId});
-    let result;try{result=await abortable(()=>this.moderation.check({images,stage,policy:'adult-own-photo-v1',signal}),signal);}catch{if(signal.aborted&&signal.reason instanceof BillingError)throw signal.reason;throw fail('shopper_checks_unavailable','Image safety checks are unavailable. No new image was accepted.',503);}
+    const roles=stage==='output'?['result']:action==='avatar'?['face','body']:['avatar','garment'];
+    let result;try{result=await abortable(()=>this.moderation.check({images,stage,action,roles,policy:'adult-own-photo-v1',signal}),signal);}catch{if(signal.aborted&&signal.reason instanceof BillingError)throw signal.reason;throw fail('shopper_checks_unavailable','Image safety checks are unavailable. No new image was accepted.',503);}
     if(result?.allowed!==true||result.policy!=='adult-own-photo-v1')throw fail('shopper_image_rejected','This image did not pass the shopper safety checks.',422);
   }
   proof(auth,action,consent,proof){
@@ -166,7 +167,7 @@ export class ShopperSessions {
         source={avatar:images.avatar,garment:'data:image/png;base64,'+Buffer.from(garment.image).toString('base64')};
       }
       const normalized=await abortable(()=>shopperInputs(action,source,{faceCheck:this.faceCheck,visibleCheck:this.visibleCheck}),combined);
-      await this.moderate(auth,Object.values(normalized),'input',combined);
+      await this.moderate(auth,Object.values(normalized),'input',combined,null,action);
       const bodyHash=hash(JSON.stringify([Object.entries(normalized).map(([key,bytes])=>[key,hash(bytes)]),metadata,before.session.context.fingerprint])),reservation=this.store.shoppers.reserve({store:before.session.context.store,requestId,action,bodyHash,sessionHash:before.key});
       if(!reservation.fresh)throw fail('duplicate_request','This request was already reserved. No automatic retry was sent.');operation=requestId.toLowerCase();
       this.state.transaction(()=>{
@@ -176,7 +177,7 @@ export class ShopperSessions {
       });
       const output=await abortable(()=>work({images:normalized,context:this.auth(auth).session.context,signal:combined}),combined);
       const result=await abortable(async()=>{const image=await shopperPhoto(output,{output:true,png:true});await this.visibleCheck(image.bytes);return image.bytes;},combined);
-      await this.moderate(auth,[result],'output',combined,operation);
+      await this.moderate(auth,[result],'output',combined,operation,action);
       const approval=action==='avatar'?token():null;
       this.state.transaction(()=>{
         const current=this.auth(auth);combined.throwIfAborted();this.store.imageSlots.assert(lease);

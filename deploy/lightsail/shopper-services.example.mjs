@@ -6,8 +6,10 @@ export default {
   // Fill the complete legally reviewed C16.4 disclosure, including actual
   // verification/moderation processing and retention, with a stable revision.
   disclosure: null,
-  // Import your selected, reviewed safety adapter implementing
+  // Select the reviewed optional TRYON_SHOPPER_MODERATION=gemini adapter,
+  // or import a reviewed custom safety adapter implementing
   // {id, async check({images,stage,policy,signal}) -> {allowed,policy}}.
+  // Keep this null when selecting the built-in adapter; do not configure both.
   // Generic face presence or a provider's default safety filter is insufficient.
   moderation: null,
   // Optional custom captcha + verificationClient can be exported here instead

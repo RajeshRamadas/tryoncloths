@@ -44,6 +44,7 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 - [Shopper sessions and guards](docs/SHOPPER_SESSIONS.md): optional expiring sessions, consent/verification interfaces, abuse limits and shared image concurrency.
 - [Hosted shopper workflow](docs/SHOPPER_WORKFLOW.md): verified photo selection, body references, avatar approval, same-store product try-on and reviewed PNG download; disabled until reviewed safety/policy integrations are configured.
 - [Shopper launch readiness](docs/SHOPPER_LAUNCH.md): optional Turnstile support, trusted startup service configuration, offline preflight and owner/manager diagnostics; live launch approval remains separate.
+- [Gemini shopper image-safety review](docs/SHOPPER_GEMINI_SAFETY.md): optional bounded input/output classification using the existing Gemini key; rejects unsafe/uncertain results and remains disabled until selected/reviewed.
 - [AI catalogue photos](docs/CATALOGUE_PHOTOS.md): durable model-photo batches, approval, included regeneration, JPEG/ZIP exports and separate photo-credit purchases.
 - [Store branding](docs/STORE_BRANDING.md): owner logo/contacts, branded outfit and lookbook pages, optional export footers and server-enforced trial marks.
 - [Size guidance](docs/SIZE_RECOMMENDATIONS.md): body measurements, brand charts, confidence/explanations and purchase tracking; no additional AI calls.
@@ -87,6 +88,8 @@ otherwise the button opens a setup/session preview without photo generation.
 Web `0.19.0-alpha.5` adds [C16.5.1 setup and readiness tooling](docs/SHOPPER_LAUNCH.md),
 including optional Turnstile and a read-only configuration mount. Live
 service/legal/cost and rollout evidence remain C16.5; no live pilot is approved.
+Web `0.19.0-alpha.6` adds [C16.5.2 optional Gemini safety review](docs/SHOPPER_GEMINI_SAFETY.md).
+This is fallible image eligibility assessment, not verified age or identity.
 
 ## Validation
 
