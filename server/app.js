@@ -105,6 +105,7 @@ export function createApp({
   shopifyShopperOptions = {},
   shopperSessionOptions = {},
   shopperWorkflowOptions = {},
+  shopperConfigurationSource = {status:'injected',code:'programmatic_configuration'},
   photoOptions = {},
   femaleEnabled = process.env.TRYON_FEMALE_PROFILES === "true",
   tryOn = geminiTryOn,
@@ -151,6 +152,7 @@ export function createApp({
   if(shopperSessions)shopperSessions.workflow=shopperWorkflow;
   app.locals.shopperWorkflow=shopperWorkflow;
   if(shopifyShopper)shopifyShopper.workflow=shopperWorkflow;
+  if(shopifyShopper){shopifyShopper.configurationSource=shopperConfigurationSource;shopifyShopper.production=production;}
   installShopperSessionRoutes(app,shopperSessions,{production});
   installShopifyShopperPublic(app,shopifyShopper,{production,sessions:shopperSessions});
   installShopperJsonErrors(app);

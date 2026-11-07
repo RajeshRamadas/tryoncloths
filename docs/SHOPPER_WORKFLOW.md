@@ -6,8 +6,9 @@ product try-on → reviewed download flow from the
 [C16.2 verified Shopify launches](SHOPIFY_SHOPPER.md) and the
 [C16.3 temporary session guards](SHOPPER_SESSIONS.md).
 
-The feature is **off by default**. The normal production bootstrap still has no
-selected CAPTCHA/moderation adapters or legally reviewed disclosure. It cannot
+The feature is **off by default**. [C16.5.1](SHOPPER_LAUNCH.md) now supplies trusted
+startup configuration loading, optional Turnstile and launch diagnostics. No
+moderation adapter or legally reviewed disclosure is configured by default. It cannot
 accept shopper photos until those dependencies are supplied. This increment
 implements and tests the complete flow using mocked services; it does not launch
 public paid generation. C16.5 is the live-service, legal, cost and rollout check.
@@ -83,8 +84,9 @@ allowances, AI balance, Gemini key and trusted proxy are also required. Staff
 mobile tokens are not shopper credentials. No secret goes into the theme block,
 browser script or disclosure.
 
-Production adapter selection and reviewed policy wiring remain C16.5 work. The
-server factory accepts these trusted configuration contracts:
+Production service selection and reviewed policy remain C16.5 work. The normal
+bootstrap can now load them from the trusted [C16.5.1 service module](SHOPPER_LAUNCH.md).
+The server factory still accepts these configuration contracts:
 
 ```js
 createApp({
@@ -218,7 +220,8 @@ expiry/resume and reload without regeneration. Mobile screenshots were inspected
 The Vite development proxy forwards shopper/Shopify routes while preserving staff
 SPA routes; syntax, default-off flags, guide links and package versions were checked.
 
-C16.5 remains: select/review/wire live safety services, approve actual disclosure
+C16.5.1 now provides [service setup and readiness tooling](SHOPPER_LAUNCH.md).
+Actual C16.5 verification remains: select/review/configure live safety services, approve actual disclosure
 and data terms, verify Gemini billing/capacity/quality, test the Shopify development
 store and theme, validate small-instance memory/expiry/proxy behavior, then run an
 owner-supervised opt-in pilot. Production generation stays unavailable until its

@@ -238,7 +238,9 @@ deployment or live Shopify schema/installation test.
 [C16.3 shopper sessions and consent/abuse/safety guards](SHOPPER_SESSIONS.md) are
 now implemented as an optional session preview. [C16.4 customer photo, avatar review
 and clothing try-on](SHOPPER_WORKFLOW.md) is also implemented, disabled until its
-reviewed dependencies are configured. Next: **C16.5 live rollout verification**. Service selection and legal
+reviewed dependencies are configured. [C16.5.1](SHOPPER_LAUNCH.md) now provides
+service setup and owner readiness diagnostics. **C16.5 live rollout verification**
+still requires evidence. Service selection and legal
 review remain prerequisites to enabling photo generation. No live Shopify call,
 paid image, external message/payment, Docker build, Lightsail deployment or APK
 was performed by this task.

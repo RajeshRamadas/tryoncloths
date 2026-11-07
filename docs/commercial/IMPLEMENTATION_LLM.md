@@ -490,4 +490,11 @@ The optional session preview is disabled by default.
 product try-on and reviewed downloads](../SHOPPER_WORKFLOW.md).
 Image routes are guarded and disabled by default. Live safety-service adapters
 and legally reviewed disclosure remain unconfigured; flags alone cannot enable
-photo processing. Next: C16.5 service/legal/cost and live rollout verification.
+photo processing.
+
+**C16.5.1 implemented:** `0.19.0-alpha.5`, branch `feature/shopper-launch-readiness`:
+[optional Turnstile, trusted bootstrap service modules, offline preflight and
+read-only owner/manager launch diagnostics](../SHOPPER_LAUNCH.md).
+This is tooling for C16.5, not completed live verification. Vendor activation,
+moderation policy selection, legal review, Gemini billing/quality, Shopify/theme,
+target deployment/load/retention and the supervised pilot still need evidence.

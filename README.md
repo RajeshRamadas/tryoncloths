@@ -43,6 +43,7 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 - [Shopify shopper setup](docs/SHOPIFY_SHOPPER.md): owner app installation, published-product selection, signed launch previews and a disabled-by-default theme button.
 - [Shopper sessions and guards](docs/SHOPPER_SESSIONS.md): optional expiring sessions, consent/verification interfaces, abuse limits and shared image concurrency.
 - [Hosted shopper workflow](docs/SHOPPER_WORKFLOW.md): verified photo selection, body references, avatar approval, same-store product try-on and reviewed PNG download; disabled until reviewed safety/policy integrations are configured.
+- [Shopper launch readiness](docs/SHOPPER_LAUNCH.md): optional Turnstile support, trusted startup service configuration, offline preflight and owner/manager diagnostics; live launch approval remains separate.
 - [AI catalogue photos](docs/CATALOGUE_PHOTOS.md): durable model-photo batches, approval, included regeneration, JPEG/ZIP exports and separate photo-credit purchases.
 - [Store branding](docs/STORE_BRANDING.md): owner logo/contacts, branded outfit and lookbook pages, optional export footers and server-enforced trial marks.
 - [Size guidance](docs/SIZE_RECOMMENDATIONS.md): body measurements, brand charts, confidence/explanations and purchase tracking; no additional AI calls.
@@ -83,7 +84,9 @@ and guards](docs/SHOPPER_SESSIONS.md). Web `0.19.0-alpha.4` adds the
 [hosted photo, review and try-on flow](docs/SHOPPER_WORKFLOW.md). It is disabled
 by default and requires configured safety adapters and reviewed disclosure;
 otherwise the button opens a setup/session preview without photo generation.
-Live service/legal/cost and rollout verification remain C16.5.
+Web `0.19.0-alpha.5` adds [C16.5.1 setup and readiness tooling](docs/SHOPPER_LAUNCH.md),
+including optional Turnstile and a read-only configuration mount. Live
+service/legal/cost and rollout evidence remain C16.5; no live pilot is approved.
 
 ## Validation
 

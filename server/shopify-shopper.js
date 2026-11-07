@@ -4,6 +4,7 @@ import {integrationFetch} from './integration-http.js';
 import {parseProductUrl} from './public-url.js';
 import {shopDomain,shopifyError as fail,verifyShopifyQuery,verifyShopifyWebhook} from './shopify-security.js';
 import {ShopperState} from './shopper-state.js';
+import {shopperReadiness} from './shopper-readiness.js';
 
 export const digest=value=>createHash('sha256').update(value).digest('hex');
 const token=()=>randomBytes(32).toString('base64url');
@@ -50,7 +51,7 @@ export class ShopifyShopper {
     if(installation?.status==='installed'&&!row.credentials)installation.status='reconnect_required';
     const generation=Boolean(this.workflow?.metadata());
     return {available,setupMessage,canEdit:actor.user.role==='owner',installation,shopperGenerationAvailable:generation,stage:generation?'hosted-workflow':'launch-preview',
-      products:row?this.products(row):[],productsTotal:row?this.productCount(row):0};
+      products:row?this.products(row):[],productsTotal:row?this.productCount(row):0,readiness:shopperReadiness(this,account)};
   }
   productCount(row){
     if(row.status!=='installed'||this.db.prepare("SELECT baseUrl FROM catalogue_source_origins WHERE store=? AND provider='shopify'").get(row.store)?.baseUrl!=='https://'+row.shop)return 0;
