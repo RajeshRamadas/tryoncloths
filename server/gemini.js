@@ -7,15 +7,17 @@ import { ProviderError, providerRequest, providerJson } from "./provider-errors.
 
 export const GEMINI_REFERENCE_VERSION = "customer-neck-v6";
 
-export async function geminiPersonalize({ face, body, avatar, profileId, measurements, apiKey, model = "gemini-2.5-flash-image", fetchImpl = fetch }) {
+export async function geminiPersonalize({ face, body, avatar, profileId, measurements, apiKey, model = "gemini-2.5-flash-image", fetchImpl = fetch, signal }) {
+  signal?.throwIfAborted();
   if (!apiKey || !/^[a-zA-Z0-9.-]+$/.test(model)) throw new ProviderError("configuration");
   if (!profiles.some(profile => profile.id === profileId) || !face || !body || !avatar || !recommendProfile(measurements?.heightCm, measurements?.weightKg, profiles.find(p=>p.id===profileId)?.body))
     throw new Error("Customer photos, measurements and a standard profile are required.");
   const bodyReference = await geminiBodyReference(avatar, profileId, face);
+  signal?.throwIfAborted();
   const response = await providerRequest(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    signal: AbortSignal.timeout(180000),
+    signal: AbortSignal.any([AbortSignal.timeout(180000),...(signal?[signal]:[])]),
     body: JSON.stringify({
       contents: [{ parts: [
         { text: geminiAvatarPrompt(profileId, measurements) },
@@ -42,5 +44,6 @@ export async function geminiPersonalize({ face, body, avatar, profileId, measure
     throw new ProviderError("invalid_image");
   }
   await requireVisibleFace(bytes);
+  signal?.throwIfAborted();
   return `data:image/png;base64,${bytes.toString("base64")}`;
 }

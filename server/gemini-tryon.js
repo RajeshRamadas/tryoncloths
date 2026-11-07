@@ -63,7 +63,8 @@ Replace ${garment.region}. Preserve unrelated clothing and footwear unless the p
 ${cataloguePoses[pose]} Use realistic anatomy, drape, folds and soft studio shadows. Keep the entire garment, head, hands and both feet inside the frame, without stretching or slimming the model.
 Use an evenly lit plain white studio background. Return one photograph on a 2:3 portrait canvas, with no collage, added text or extra people. This is a generated marketing illustration, not evidence of actual fit.`;
 }
-export async function geminiTryOn({ avatar, garment, garmentType, title, apiKey, model = "gemini-2.5-flash-image", fetchImpl = fetch, variant='tryon', pose='front' }) {
+export async function geminiTryOn({ avatar, garment, garmentType, title, apiKey, model = "gemini-2.5-flash-image", fetchImpl = fetch, variant='tryon', pose='front', signal }) {
+  signal?.throwIfAborted();
   if (!apiKey || !/^[a-zA-Z0-9.-]+$/.test(model)) throw new ProviderError("configuration");
   if (!Buffer.isBuffer(avatar) || !Buffer.isBuffer(garment) || !Object.hasOwn(garmentTypes, garmentType))
     throw new Error("An avatar, garment image and garment type are required.");
@@ -71,7 +72,7 @@ export async function geminiTryOn({ avatar, garment, garmentType, title, apiKey,
   const response = await providerRequest(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    signal: AbortSignal.timeout(180000),
+    signal: AbortSignal.any([AbortSignal.timeout(180000),...(signal?[signal]:[])]),
     body: JSON.stringify({
       contents: [{ parts: [
         { text: variant==='catalogue'?cataloguePrompt(garmentType,title,pose):tryOnPrompt(garmentType, title) },
@@ -96,5 +97,6 @@ export async function geminiTryOn({ avatar, garment, garmentType, title, apiKey,
     throw new ProviderError("invalid_image");
   }
   await requireVisibleFace(bytes);
+  signal?.throwIfAborted();
   return `data:image/png;base64,${bytes.toString("base64")}`;
 }

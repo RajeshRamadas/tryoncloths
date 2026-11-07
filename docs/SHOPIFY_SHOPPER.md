@@ -234,8 +234,9 @@ screenshots were inspected. TOML, Liquid schema JSON, declared assets, the Compo
 override and local documentation links were checked. This is not a Shopify CLI
 deployment or live Shopify schema/installation test.
 
-Next: **C16.3 — shopper sessions and consent/abuse/safety guards**, then **C16.4 —
-customer photo, avatar review and clothing try-on**. Service selection and legal
+[C16.3 shopper sessions and consent/abuse/safety guards](SHOPPER_SESSIONS.md) are
+now implemented as an optional session preview. Next: **C16.4 — customer photo,
+avatar review and clothing try-on**. Service selection and legal
 review remain prerequisites to enabling photo generation. No live Shopify call,
 paid image, external message/payment, Docker build, Lightsail deployment or APK
 was performed by this task.

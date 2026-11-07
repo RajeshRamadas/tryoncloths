@@ -2,13 +2,14 @@ import express from 'express';
 import {randomBytes} from 'node:crypto';
 import {escapeBrand} from './branding.js';
 import {requireRole} from './tenancy.js';
+import {shopperSessionPage} from './shopper-session-page.js';
 const browserCookie=production=>production?'__Host-forme_shopify_oauth':'forme_shopify_oauth';
 const cookie=(req,name)=>(req.get('cookie')||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='))?.slice(name.length+1)||'';
 const rawQuery=req=>req.originalUrl.split('?').slice(1).join('?');
 const headers=res=>res.set({'Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex, nofollow','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"});
 const page=(title,message)=>`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeBrand(title)}</title><style>body{max-width:600px;margin:10vh auto;padding:24px;font:18px/1.6 system-ui;color:#215b4a}a{color:inherit}</style><h1>${escapeBrand(title)}</h1><p>${escapeBrand(message)}</p><a href="/shopper-spending">Back to store settings</a></html>`;
 
-export function installShopifyShopperPublic(app,service,{production=false}={}){
+export function installShopifyShopperPublic(app,service,{production=false,sessions}={}){
   if(!service)return;
   app.get('/shopify/callback',async(req,res)=>{
     headers(res);
@@ -25,6 +26,7 @@ export function installShopifyShopperPublic(app,service,{production=false}={}){
   });
   app.get('/shopper',(req,res)=>{
     const nonce=randomBytes(16).toString('base64');headers(res).set('Content-Security-Policy',`default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`);
+    if(sessions?.enabled)return res.type('html').send(shopperSessionPage(nonce));
     res.type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Store try-on preview</title><style nonce="${nonce}">body{margin:0;background:#f7f8f4;color:#254b3b;font:17px/1.6 system-ui}main{max-width:600px;margin:6vh auto;padding:24px}header,section{padding:24px;border:1px solid #dce4da;border-radius:16px;background:white;margin-bottom:20px}header img{max-width:220px;max-height:80px}h1{font-size:30px;line-height:1.2}a{color:inherit;display:inline-block;padding:12px 0}p{overflow-wrap:anywhere}</style></head><body><main><header id="brand"><h1 id="name">Store try-on preview</h1></header><section><h2 id="product">Opening product…</h2><p id="message" role="status">Checking the store’s product launch.</p><a id="return" hidden>Return to product</a></section></main><script nonce="${nonce}">
     (async()=>{const p=new URLSearchParams(location.hash.slice(1)),ticket=p.get('launch');history.replaceState(null,'','/shopper');const text=document.getElementById('message');
     try{if(!ticket)throw new Error('Open the Try it on me button from a store product page.');const r=await fetch('/shopper-api/launch-preview',{method:'POST',credentials:'omit',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticket})});const d=await r.json();if(!r.ok)throw new Error(d.error||'This launch is unavailable.');document.getElementById('name').textContent=d.brand.displayName;document.getElementById('product').textContent=d.product.name;

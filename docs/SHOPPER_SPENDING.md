@@ -167,8 +167,8 @@ The existing account volume keeps both settings and monthly counters. No new
 API key or environment variable is required for these spending controls.
 
 [C16.2 Shopify installation, signed launches and theme extension](SHOPIFY_SHOPPER.md)
-are now implemented as a setup preview. Next: **C16.3 — shopper sessions and guards**.
-C16.3/C16.4 must add transient authenticated sessions, consent, abuse/safety guards,
-shared concurrency with existing image workloads, and the hosted shopper flow.
+are now implemented as a setup preview. [C16.3 shopper sessions and guards](SHOPPER_SESSIONS.md)
+now add the optional temporary session and guarded executor. Next: **C16.4 hosted
+photo/try-on flow**, with live safety-provider selection and review still required.
 Service selection, legal review and live deployment/provider verification remain
 launch prerequisites. No Docker image, Lightsail deployment or APK is built here.

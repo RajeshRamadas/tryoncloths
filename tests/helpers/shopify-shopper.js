@@ -17,7 +17,7 @@ export function signedQuery(values,{proxy=false,secret=shopifySecret}={}){
   query.set(proxy?'signature':'hmac',createHmac('sha256',secret).update(canonical).digest('hex'));return query.toString();
 }
 const json=(data,status=200)=>({status,body:Buffer.from(JSON.stringify(data))});
-export async function shopifyFixture(){
+export async function shopifyFixture({sessionOptions={},trustProxy=false}={}){
   const directory=await mkdtemp(path.join(os.tmpdir(),'forme-shopify-')),store=new AccountStore(directory);
   const a=await store.register({name:'River Clothing',email:'river@example.test',password:'test-password-long'}),b=await store.register({name:'Other shop',email:'other@example.test',password:'test-password-long'});
   store.db.prepare("UPDATE orgs SET plan='growth' WHERE id=?").run(a.org);store.db.prepare("INSERT INTO memberships VALUES(?,?,'manager')").run(b.user.id,a.id);
@@ -39,7 +39,7 @@ export async function shopifyFixture(){
     return json({data:{webhookSubscriptionCreate:{webhookSubscription:registered,userErrors:bad?[{message:'private-token-provider-body'}]:[]}}});
   };
   const options={clientId:'test-client-id-1234',clientSecret:shopifySecret,secretKey:'ab'.repeat(32),publicUrl:publicStudio,state,fetchImpl,now:()=>clock};
-  const app=createApp({accountStore:store,accessMode:'public',shopifyShopperOptions:options,personalize:async()=>{ai++;throw new Error('Unexpected AI');},tryOn:async()=>{ai++;throw new Error('Unexpected AI');}}),service=app.locals.shopifyShopper;
+  const app=createApp({accountStore:store,accessMode:'public',trustProxy,shopifyShopperOptions:options,shopperSessionOptions:{now:()=>clock,...sessionOptions},personalize:async()=>{ai++;throw new Error('Unexpected AI');},tryOn:async()=>{ai++;throw new Error('Unexpected AI');}}),service=app.locals.shopifyShopper;
   const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base=`http://127.0.0.1:${server.address().port}`;
   const request=(url,method='GET',body,session=staffToken,origin=base,extra={})=>fetch(base+url,{method,redirect:'manual',headers:{Origin:origin,Cookie:session?`forme_session=${session}`:'','Content-Type':'application/json',...extra},...(body===undefined?{}:{body:JSON.stringify(body)})});
   const timestamp=()=>String(Math.floor(clock/1000));

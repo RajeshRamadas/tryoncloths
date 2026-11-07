@@ -99,6 +99,14 @@ test('campaign validates selection, explicit credit consent, paid metering, visu
  assert.equal((await send({lookIds:[ready.look]})).status,409);assert.equal((await request(`/api/whatsapp/campaigns/${created.id}/items/${item.id}/review`,'POST',{approved:true})).status,200);assert.equal((await send({lookIds:[ready.look]})).status,200);
 }));
 
+test('campaign generation shares studio image slots and refunds a busy attempt without dispatch',async()=>fixture(async({store,a,customer,av,garment,connect,request,ai})=>{
+ await connect();const selection={customers:[{customerId:customer.id,avatarId:av.id}],garmentIds:[garment.id]};
+ const created=await (await request('/api/whatsapp/campaigns','POST',{...selection,generationConsent:true,maxCredits:1})).json(),item=created.items[0],balance=store.billing.balance(a.org);
+ const staff=store.imageSlots.acquire({kind:'staff'}),shopper=store.imageSlots.acquire({kind:'shopper'});assert.ok(staff&&shopper);
+ try{const result=await request(`/api/whatsapp/campaigns/${created.id}/items/${item.id}/generate`,'POST',{generationConsent:true});assert.equal(result.status,429);assert.equal(ai(),0);assert.equal(store.billing.balance(a.org),balance);assert.equal((await (await request(`/api/whatsapp/campaigns/${created.id}`)).json()).items[0].state,'failed');}
+ finally{store.imageSlots.release(staff);store.imageSlots.release(shopper);}
+}));
+
 test('failed campaign generation refunds its credit and cannot be retried automatically; opt-out blocks quotes',async()=>fixture(async({store,a,customer,av,garment,connect,request,setAiFailure,ai})=>{
  await connect();const selection={customers:[{customerId:customer.id,avatarId:av.id}],garmentIds:[garment.id]};const created=await (await request('/api/whatsapp/campaigns','POST',{...selection,generationConsent:true,maxCredits:1})).json();const item=created.items[0],balance=store.billing.balance(a.org);setAiFailure(true);
  assert.equal((await request(`/api/whatsapp/campaigns/${created.id}/items/${item.id}/generate`,'POST',{generationConsent:true})).status,502);assert.equal(store.billing.balance(a.org),balance);assert.equal(ai(),1);assert.equal((await (await request(`/api/whatsapp/campaigns/${created.id}`)).json()).items[0].state,'failed');

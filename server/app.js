@@ -2,6 +2,8 @@ import {MonthlyAnalytics,installAnalyticsUnsubscribe} from './analytics-mail.js'
 import {CatalogueSync} from './catalogue-sync.js';
 import {ShopifyShopper} from './shopify-shopper.js';
 import {installShopifyShopperPublic} from './shopify-shopper-routes.js';
+import {ShopperSessions} from './shopper-sessions.js';
+import {installShopperSessionRoutes,installShopperJsonErrors} from './shopper-session-routes.js';
 import {PhotoJobs} from './photo-jobs.js';
 import {record} from './events.js';
 import {validateSession,recordTryon} from './analytics-tracking.js';
@@ -100,6 +102,7 @@ export function createApp({
   catalogueOptions = {},
   syncOptions = {},
   shopifyShopperOptions = {},
+  shopperSessionOptions = {},
   photoOptions = {},
   femaleEnabled = process.env.TRYON_FEMALE_PROFILES === "true",
   tryOn = geminiTryOn,
@@ -140,7 +143,11 @@ export function createApp({
   installWhatsAppWebhook(app,whatsapp);
   const shopifyShopper=accountStore?new ShopifyShopper(accountStore,{publicUrl,...shopifyShopperOptions}):null;
   app.locals.shopifyShopper=shopifyShopper;
-  installShopifyShopperPublic(app,shopifyShopper,{production});
+  const shopperSessions=shopifyShopper?new ShopperSessions(shopifyShopper,{provider,trustProxy,...shopperSessionOptions}):null;
+  app.locals.shopperSessions=shopperSessions;
+  installShopperSessionRoutes(app,shopperSessions,{production});
+  installShopifyShopperPublic(app,shopifyShopper,{production,sessions:shopperSessions});
+  installShopperJsonErrors(app);
   const nativeOrigins = new Set(["capacitor://localhost", "https://localhost"]);
   app.use("/api", (req, res, next) => {
     const origin = req.get("origin");
@@ -176,7 +183,8 @@ export function createApp({
   app.use("/api/shopper-settings",express.json({limit:"4kb"}));
   app.use("/api/shopify-shopper",express.json({limit:"4kb"}));
   app.use(express.json({ limit: "15mb" }));
-  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, analyticsReports, catalogueSync, photoJobs, shopifyShopper, campaignConfig:{provider,model,apiKey,tryOn,femaleEnabled} });
+  const staffGenerate=(fn,input)=>accountStore?.imageSlots?accountStore.imageSlots.run({kind:'staff'},signal=>fn({...input,signal})):fn(input);
+  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, analyticsReports, catalogueSync, photoJobs, shopifyShopper, campaignConfig:{provider,model,apiKey,tryOn:input=>staffGenerate(tryOn,input),femaleEnabled} });
   installGarmentRoutes(app, accountStore, { provider, model });
   app.get("/api/health", (_req, res) =>
     res.json({
@@ -296,7 +304,7 @@ export function createApp({
     try {
       try { accountStore?.customers.requireOptional(owner,req.body.customerId); }
       catch (e) { return res.status(e.status || 500).json({error:e.message}); }
-      const image = await meter(req,{billing:accountStore?.billing,account:owner,action:"avatar"},()=>personalize({ face, body, avatar, profileId: req.body.profileId, measurements: req.body.measurements, apiKey, model, quality }));
+      const image = await meter(req,{billing:accountStore?.billing,account:owner,action:"avatar"},()=>staffGenerate(personalize,{ face, body, avatar, profileId: req.body.profileId, measurements: req.body.measurements, apiKey, model, quality }));
       let accountSaved = false;
       let avatarId = null;
       if (accountStore) {
@@ -432,7 +440,7 @@ export function createApp({
     attempts.set(req.ip, { started: latest?.started || now, last: Date.now(), count: (latest?.count || 0) + 1 });
     inFlight++;
     try {
-      const image = await meter(req,{billing:accountStore?.billing,account:owner,action:"tryon"},()=>tryOn({ avatar, garment, garmentType: req.body.garmentType, title: catalogueContext?.garment.name || req.body.title, apiKey, model }));
+      const image = await meter(req,{billing:accountStore?.billing,account:owner,action:"tryon"},()=>staffGenerate(tryOn,{ avatar, garment, garmentType: req.body.garmentType, title: catalogueContext?.garment.name || req.body.title, apiKey, model }));
       recordTryon(accountStore,owner,{requestId:req.body.requestId,sessionId:req.body.sessionId,avatarId:catalogueContext?.avatarId||req.body.avatarId,garmentId:catalogueContext?.garmentId});
       // A storage/receipt failure must never discard a paid image or retry AI.
       let reuseReceipt;
