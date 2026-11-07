@@ -8,7 +8,8 @@ The R4 shopper extension is specified separately in the approved
 [C16 design and threat model](SHOPPER_SELF_SERVICE_DESIGN.md). C16.1 implements
 [spending controls](../SHOPPER_SPENDING.md); C16.2 adds
 [Shopify installation and signed setup launches](../SHOPIFY_SHOPPER.md).
-Shopper sessions and photo generation remain pending.
+Shopper sessions and guards are implemented in [C16.3](../SHOPPER_SESSIONS.md).
+Shopper photo generation and review screens remain pending in C16.4.
 This staff architecture does not authorize anonymous access to staff generation
 or account storage. Production shopper access requires the outstanding legal,
 service and deployment checks in the staged design.

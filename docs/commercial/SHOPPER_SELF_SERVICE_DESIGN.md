@@ -3,8 +3,9 @@
 Status: **product/design approved in this task conversation, 2026-11-06**.
 Prepared against web `0.18.0-alpha.3`; [C16.1 spending controls](../SHOPPER_SPENDING.md)
 are implemented in `0.19.0-alpha.1`; [C16.2 Shopify setup and signed launches](../SHOPIFY_SHOPPER.md)
-are implemented in `0.19.0-alpha.2`. Shopper sessions and hosted generation remain
-pending. Service/legal review and launch verification
+are implemented in `0.19.0-alpha.2`; [C16.3 sessions and guards](../SHOPPER_SESSIONS.md)
+are implemented in `0.19.0-alpha.3`. Hosted photo generation remains pending.
+Service/legal review and launch verification
 are still required; design approval does not enable production shopper access.
 
 This prepares the design review for [C16](IMPLEMENTATION_LLM.md#task-c16--try-it-on-me-plugin),
@@ -129,8 +130,8 @@ shopper sessions, even when a product is the same.
 ## 4. Approved pilot spending and abuse limits
 
 These pilot ceilings and policies are approved. C16.1 enforces the monthly
-accounting limits; session, IP/device, provider and moderation integrations are
-implemented in later increments. Limits apply to shopper work only; staff
+accounting limits; C16.3 supplies session/IP/device limits and safety interfaces.
+Live safety-provider adapters and public photo routes remain pending. Limits apply to shopper work only; staff
 continue using their existing limits and the same organisation pool.
 
 | Scope | Proposed default / ceiling |
@@ -311,13 +312,13 @@ Each increment gets a branch, mocked tests, build and merge before the next.
    walkthrough, separate provider/legal/cost verification, Shopify development
    store installation, memory/load/expiry checks and owner-supervised pilot.
 
-Implementation status: C16.1 and C16.2 are complete in code. C16.2 also supplies
-the shared tmpfs `ShopperState` store for short-lived OAuth/tickets/replay markers;
-C16.3 should extend that module for shopper sessions rather than putting transient
-bindings into account backups. The hosted C16.2 page redeems setup tickets only;
-C16.3/C16.4 must replace this setup exchange with the guarded session flow before
-adding photo inputs or metered generation. Theme and live Shopify deployment
-still require operator verification.
+Implementation status: C16.1–C16.3 are complete in code. The shared tmpfs
+`ShopperState` store now holds session/consent/rate metadata as well as short-lived
+OAuth/tickets/replay markers, outside account backups. C16.3 adds an opt-in hosted
+session preview and guarded internal executor; no public photo/generation route
+or live safety adapter is enabled. Next: C16.4 photo/review/try-on UI and routes.
+Theme, Shopify, safety services, legal and live deployment still require the
+C16.5 verification/launch evidence.
 
 No runtime version bump for this design-only change. Code increments follow the
 repository release/version rules. Do not build an APK for this web feature.

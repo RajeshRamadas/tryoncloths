@@ -6,8 +6,9 @@ import { ProviderError, providerRequest, providerJson } from "./provider-errors.
 
 export async function openaiPersonalize({
   face, body, avatar, profileId, measurements, apiKey,
-  model = "gpt-image-1.5", quality = "low", fetchImpl = fetch,
+  model = "gpt-image-1.5", quality = "low", fetchImpl = fetch, signal,
 }) {
+  signal?.throwIfAborted();
   if (!apiKey || !/^(gpt-image-[a-zA-Z0-9.-]+|chatgpt-image-latest)$/.test(model) || !["low", "medium", "high"].includes(quality))
     throw new ProviderError("configuration");
   if (!profiles.some(profile => profile.id === profileId) || !face || !body || !avatar ||
@@ -31,7 +32,7 @@ export async function openaiPersonalize({
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
     body: form,
-    signal: AbortSignal.timeout(180000),
+    signal: AbortSignal.any([AbortSignal.timeout(180000),...(signal?[signal]:[])]),
   }, fetchImpl);
   const result = await providerJson(response);
   const output = result?.data?.[0]?.b64_json;
@@ -44,5 +45,6 @@ export async function openaiPersonalize({
     throw new ProviderError("invalid_image");
   }
   await requireVisibleFace(bytes);
+  signal?.throwIfAborted();
   return `data:image/png;base64,${bytes.toString("base64")}`;
 }

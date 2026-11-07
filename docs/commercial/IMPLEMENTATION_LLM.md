@@ -465,7 +465,7 @@ C16 design and cost-cap sign-off are now approved; see the staged C16 status bel
 **Acceptance (for design sign-off).**
 
 - [x] Threat model and cost cap approved (explicit task-conversation approval).
-- [x] Shopper data retention ≤ 24 hours unless opted in (policy approved; session/runtime verification in C16.3 remains pending).
+- [x] Shopper data retention ≤ 24 hours unless opted in (policy approved; C16.3 session expiry/cleanup tested, live retention/provider verification remains C16.5).
 
 **Design prerequisite approved:** see [C16 shopper self-service design](SHOPPER_SELF_SERVICE_DESIGN.md)
 for the flow, tenant/session boundaries, monthly credit and provider-attempt
@@ -478,5 +478,11 @@ Product/design approval does not cover legal review or live service/deployment c
 **C16.2 implemented:** `0.19.0-alpha.2`, branch `feature/shopify-shopper-launch`:
 [Shopify installation, published-product selection, lifecycle revocation, signed
 launches and theme extension](../SHOPIFY_SHOPPER.md). The button opens a setup
-preview only; no shopper photos or AI generation are enabled. Next: C16.3
-guards/session storage, then C16.4 hosted photo/try-on flow.
+preview only; no shopper photos or AI generation are enabled.
+
+**C16.3 implemented:** `0.19.0-alpha.3`, branch `feature/shopper-session-guards`:
+[temporary sessions, consent/CAPTCHA/moderation interfaces, abuse limits,
+provider cancellation and shared image leases](../SHOPPER_SESSIONS.md).
+The optional session preview is disabled by default. Live safety services and
+legal review remain unconfigured; no public shopper generation route exists.
+Next: C16.4 hosted photo/try-on flow, then C16.5 live rollout verification.

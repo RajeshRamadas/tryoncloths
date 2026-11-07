@@ -20,6 +20,7 @@ export class ShopperState {
   }
   transaction(fn){if(this.db.isTransaction)return fn();this.db.exec('BEGIN IMMEDIATE');try{const result=fn();this.db.exec('COMMIT');return result;}catch(e){this.db.exec('ROLLBACK');throw e;}}
   prune(){this.db.prepare('DELETE FROM shopper_state WHERE expiresAt<=?').run(this.now());}
+  cleanup(){this.prune();if(!this.db.isTransaction)this.db.prepare('PRAGMA wal_checkpoint(TRUNCATE)').get();}
   get(kind,key){const row=this.db.prepare('SELECT value FROM shopper_state WHERE kind=? AND key=? AND expiresAt>?').get(kind,key,this.now());return row?JSON.parse(row.value):null;}
   put(kind,key,value,expiresAt){
     this.prune();if(this.db.prepare('SELECT count(*) n FROM shopper_state').get().n>=10000)throw Object.assign(new Error('Shopper setup is busy. Try again shortly.'),{status:503});

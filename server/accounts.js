@@ -5,6 +5,7 @@ import {installSyncSchema,installSyncRoutes} from './catalogue-sync.js';
 import {installPhotoSchema,installPhotoRoutes} from './photo-jobs.js';
 import {BrandingStore,installBrandingRoutes} from './branding.js';
 import {ShopperBudgets,installShopperBudgetRoutes} from './shopper-budgets.js';
+import {ImageSlots} from './image-slots.js';
 import {installShopifyShopperSchema} from './shopify-shopper.js';
 import {installShopifyShopperOwner} from './shopify-shopper-routes.js';
 import {SizeStore,installSizeRoutes} from './size.js';
@@ -65,7 +66,7 @@ export class AccountStore {
     this.garments = new GarmentStore(this);
     try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); this.sizes=new SizeStore(this); installTrackingSchema(this.db); this.analytics=new Analytics(this); installSharedCatalogueSchema(this.db); installSyncSchema(this.db); installPhotoSchema(this.db); this.branding=new BrandingStore(this); }
     catch (error) { this.db.close(); throw error; }
-    try { this.shoppers=new ShopperBudgets(this); installShopifyShopperSchema(this); }
+    try { this.imageSlots=new ImageSlots(this.billing); this.shoppers=new ShopperBudgets(this); installShopifyShopperSchema(this); }
     catch (error) { this.db.close(); throw error; }
   }
   close() { this.db.close(); }
