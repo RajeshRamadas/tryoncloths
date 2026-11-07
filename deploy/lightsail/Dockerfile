@@ -24,6 +24,7 @@ RUN --mount=type=secret,id=proxy_ca \
 COPY --from=build /app/dist ./dist
 COPY server ./server
 COPY src/profiles.js ./src/profiles.js
+COPY src/jewellery-definitions.js ./src/jewellery-definitions.js
 COPY public/avatar-library*.png ./public/
 COPY public/avatar-tones ./public/avatar-tones
 # Source checkouts may use restrictive permissions; the runtime user must read

@@ -2,6 +2,11 @@
 
 As of 2026-10-30 · Baseline: `main` web **0.15.0** · Stage: later, after commercial R1 · Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md) · Design: [`DESIGN.md`](DESIGN.md)
 
+Implementation update (2026-11-07): **J1 implemented in web `0.20.0-alpha.1`**.
+See [catalogue setup, scope and validation](../JEWELLERY_CATALOGUE.md).
+J2 is the next code task; J2–J12 remain pending. The separate commercial C16.5
+live service/legal/cost and pilot evidence remains outstanding.
+
 ## How to use this guide
 
 Give a coding LLM **one task per session**, in order. Paste the repo context, the rules and one task. Each task has files to read, steps and acceptance checks.
@@ -23,7 +28,7 @@ Give a coding LLM **one task per session**, in order. Paste the repo context, th
 
 1. Read the named files first; extend existing modules and patterns instead of duplicating them.
 2. Never change the clothing try-on prompt, contract (`garment-tryon-v1`) or existing test expectations.
-3. All new behaviour behind feature flag `TRYON_JEWELLERY=1` (server) and `jewelleryAvailable` in health (client).
+3. All new behaviour behind feature flag `TRYON_JEWELLERY=1` (server). J1 inventory uses `jewelleryCatalogueAvailable` in health; `jewelleryAvailable` remains false until actual try-on is implemented.
 4. Paid calls: explicit consent, one request, no automatic retries, refunded on failed checks when metering exists.
 5. Never store, log or return face descriptors or customer face photos.
 6. Tests never call Gemini or the network; inject `fetchImpl` and use Sharp-made or repo fixture images.
@@ -93,9 +98,9 @@ flowchart TB
 
 **Acceptance.**
 
-- [ ] Existing catalogue tests pass; clothing lists contain no jewellery.
-- [ ] `chooseView("necklace", {lengthCm: 45})` → `portrait`; 60 → `full`.
-- [ ] Invalid metal, out-of-range lengths and unknown fields are rejected or dropped.
+- [x] Existing catalogue tests pass; clothing lists contain no jewellery.
+- [x] `chooseView("necklace", {lengthCm: 45})` → `portrait`; 60 → `full`.
+- [x] Invalid metal, out-of-range lengths and unknown fields are rejected or dropped.
 
 ### Task J2 — identity check
 

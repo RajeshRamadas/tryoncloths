@@ -1,6 +1,7 @@
 import {recordTryon,validateSession} from './analytics-tracking.js';
 import {validRequestId} from './billing.js';
 import { accountUser } from './accounts.js';
+import {catalogueCategory,jewelleryTypes,jewelleryMetals,bangleSizes,chooseView} from './jewellery-types.js';
 
 export function installGarmentRoutes(app, store, config) {
   if (!store) return;
@@ -13,18 +14,23 @@ export function installGarmentRoutes(app, store, config) {
         try { const origin = new URL(req.get('origin')); allowed = origin.host === req.get('host') && origin.protocol === `${req.protocol}:`; } catch {}
         if (!allowed) return res.status(403).json({ error: 'Open catalogue actions from this studio website.' });
       }
+      const category=catalogueCategory(req.query.category??req.body?.category,{jewelleryEnabled:config.jewelleryEnabled});
+      if(req.query.category&&req.body?.category&&req.query.category!==req.body.category)return res.status(400).json({error:'Use one consistent catalogue category.'});
+      if(category==='jewellery'&&req.method!=='GET'&&!req.path.endsWith('/match')&&!['owner','manager'].includes(owner.user.role))return res.status(403).json({error:'Only owners and managers can change the jewellery catalogue.'});
+      req.catalogueOptions={category,jewelleryEnabled:config.jewelleryEnabled};
       await fn(req, res, owner);
     } catch (error) { res.status(error.status || 500).json({ error: error.status ? error.message : 'The store catalogue is unavailable. No AI request was made by this catalogue action.' }); }
   };
-  app.get('/api/garments', wrap((req, res, owner) => res.json(store.garments.browse(owner,{...req.query,limit:req.query.limit??200}))));
-  app.post('/api/garments/match', wrap(async (req, res, owner) => res.json(await store.garments.matches(owner, req.body || {}))));
+  app.get('/api/jewellery/types',wrap((req,res)=>{catalogueCategory('jewellery',{jewelleryEnabled:config.jewelleryEnabled});res.json({types:jewelleryTypes,metals:jewelleryMetals,bangleSizes,tryOnAvailable:false});}));
+  app.get('/api/garments', wrap((req, res, owner) => res.json(store.garments.browse(owner,{...req.query,limit:req.query.limit??200},req.catalogueOptions))));
+  app.post('/api/garments/match', wrap(async (req, res, owner) => res.json(await store.garments.matches(owner, {...req.body,category:req.catalogueOptions.category},req.catalogueOptions))));
   app.post('/api/garments', wrap(async (req, res, owner) => {
     if (req.body?.storageConsent !== true) return res.status(400).json({ error: 'Confirm saving this product photo to the store account.' });
-    res.json(await store.garments.save(owner, req.body));
+    res.json(await store.garments.save(owner,{...req.body,category:req.catalogueOptions.category},req.catalogueOptions));
   }));
-  app.get('/api/garments/:id', wrap((req, res, owner) => res.json({ garment: store.garments.get(owner, req.params.id) })));
+  app.get('/api/garments/:id', wrap((req, res, owner) => {const garment=store.garments.get(owner,req.params.id,req.catalogueOptions);res.json({garment,...(garment.category==='jewellery'?{suggestedView:chooseView(garment.garmentType,garment.attributes)}:{})});}));
   app.delete('/api/garments/:id', wrap((req, res, owner) => {
-    if (!store.garments.remove(owner, req.params.id)) return res.status(404).json({ error: 'Garment not found.' });
+    if (!store.garments.remove(owner, req.params.id,req.catalogueOptions)) return res.status(404).json({ error: 'Garment not found.' });
     res.json({ ok: true });
   }));
   app.post('/api/garments/:id/reuse/use',wrap(async(req,res,owner)=>{

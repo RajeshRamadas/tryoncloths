@@ -55,7 +55,7 @@ export class ShopifyShopper {
   }
   productCount(row){
     if(row.status!=='installed'||this.db.prepare("SELECT baseUrl FROM catalogue_source_origins WHERE store=? AND provider='shopify'").get(row.store)?.baseUrl!=='https://'+row.shop)return 0;
-    return this.db.prepare("SELECT count(*) n FROM garments WHERE account=? AND source='shopify' AND externalId LIKE 'gid://shopify/Product/%'").get(row.store).n;
+    return this.db.prepare("SELECT count(*) n FROM garments WHERE account=? AND category='garment' AND source='shopify' AND externalId LIKE 'gid://shopify/Product/%'").get(row.store).n;
   }
   products(row,{garmentId,externalId,search='',offset=0}={}){
     if(row.status!=='installed')return [];
@@ -63,7 +63,7 @@ export class ShopifyShopper {
     if(source?.baseUrl!=='https://'+row.shop)return [];
     const extra=garmentId?' AND g.id=?':externalId?' AND g.externalId=?':' AND g.name LIKE ?',value=garmentId||externalId||'%'+search+'%';
     return this.db.prepare(`SELECT g.id,g.name,g.externalId,g.sourceUrl,g.stock,g.needsTypeReview,g.garmentType,coalesce(p.enabled,0) enabled FROM garments g
-      LEFT JOIN shopper_shopify_products p ON p.installation=? AND p.garment=g.id WHERE g.account=? AND g.source='shopify'${extra} ORDER BY g.name,g.id LIMIT 50 OFFSET ?`)
+      LEFT JOIN shopper_shopify_products p ON p.installation=? AND p.garment=g.id WHERE g.account=? AND g.category='garment' AND g.source='shopify'${extra} ORDER BY g.name,g.id LIMIT 50 OFFSET ?`)
       .all(row.id,row.store,value,offset).filter(g=>/^gid:\/\/shopify\/Product\/[1-9]\d{0,19}$/.test(g.externalId||''))
       .map(g=>({...g,enabled:Boolean(g.enabled),eligible:g.stock!=='out'&&!g.needsTypeReview}));
   }
@@ -261,7 +261,7 @@ export class ShopifyShopper {
       this.db.prepare('INSERT OR IGNORE INTO shopper_shopify_webhooks VALUES(?,?,?,?,?)').run(id,epoch,topic,bodyHash,this.now());
       if(topic==='app/uninstalled')this.db.prepare("UPDATE shopper_shopify_installations SET status='uninstalled',enabled=0,credentials=NULL,revision=? WHERE id=?").run(randomUUID(),id);
       else if(topic.startsWith('products/')){
-        this.db.prepare("UPDATE shopper_shopify_products SET enabled=0 WHERE installation=? AND garment IN (SELECT id FROM garments WHERE account=? AND source='shopify' AND externalId=?)").run(id,row.store,'gid://shopify/Product/'+body.id);
+        this.db.prepare("UPDATE shopper_shopify_products SET enabled=0 WHERE installation=? AND garment IN (SELECT id FROM garments WHERE account=? AND category='garment' AND source='shopify' AND externalId=?)").run(id,row.store,'gid://shopify/Product/'+body.id);
         this.db.prepare('UPDATE shopper_shopify_installations SET revision=? WHERE id=?').run(randomUUID(),id);
       }
       else this.db.prepare('UPDATE shopper_shopify_installations SET primaryHost=?,enabled=0,revision=? WHERE id=?').run(info.primaryHost,randomUUID(),id);

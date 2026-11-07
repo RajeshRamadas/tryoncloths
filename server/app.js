@@ -106,6 +106,7 @@ export function createApp({
   shopperSessionOptions = {},
   shopperWorkflowOptions = {},
   shopperConfigurationSource = {status:'injected',code:'programmatic_configuration'},
+  jewelleryEnabled = process.env.TRYON_JEWELLERY === '1',
   photoOptions = {},
   femaleEnabled = process.env.TRYON_FEMALE_PROFILES === "true",
   tryOn = geminiTryOn,
@@ -192,11 +193,13 @@ export function createApp({
   app.use("/api/shopify-shopper",express.json({limit:"4kb"}));
   app.use(express.json({ limit: "15mb" }));
   const staffGenerate=(fn,input)=>accountStore?.imageSlots?accountStore.imageSlots.run({kind:'staff'},signal=>fn({...input,signal})):fn(input);
-  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, analyticsReports, catalogueSync, photoJobs, shopifyShopper, campaignConfig:{provider,model,apiKey,tryOn:input=>staffGenerate(tryOn,input),femaleEnabled} });
-  installGarmentRoutes(app, accountStore, { provider, model });
+  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, analyticsReports, catalogueSync, photoJobs, shopifyShopper,jewelleryEnabled, campaignConfig:{provider,model,apiKey,tryOn:input=>staffGenerate(tryOn,input),femaleEnabled} });
+  installGarmentRoutes(app, accountStore, { provider, model,jewelleryEnabled });
   app.get("/api/health", (_req, res) =>
     res.json({
       status: "ok",
+      jewelleryAvailable:false,
+      jewelleryCatalogueAvailable:Boolean(jewelleryEnabled&&accountStore),
       personalizationAvailable: Boolean(apiKey),
       provider,
       generationRevision: provider === "gemini" ? GEMINI_REFERENCE_VERSION : "template-first-v1",

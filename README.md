@@ -91,6 +91,11 @@ service/legal/cost and rollout evidence remain C16.5; no live pilot is approved.
 Web `0.19.0-alpha.6` adds [C16.5.2 optional Gemini safety review](docs/SHOPPER_GEMINI_SAFETY.md).
 This is fallible image eligibility assessment, not verified age or identity.
 
+Web `0.20.0-alpha.1` adds the optional [J1 jewellery catalogue](docs/JEWELLERY_CATALOGUE.md):
+18 jewellery types, product photos, metals, dimensions and reusable store inventory.
+Enable `TRYON_JEWELLERY=1` with account storage, then open **Catalogue → Jewellery catalogue**.
+Jewellery try-on and portrait/hands views remain later work; catalogue actions use no AI credits.
+
 ## Validation
 
 Automated validation covers both provider adapters, provider-specific consent, whole-body skin-tone instructions, pending/error previews, customer-export blocking, and approval of a stubbed provider result. Test customer photos were generated independently of the avatar library. See [version 0.4 validation](docs/testing/avatar-v4/README.md). Live provider quality remains unverified. The Android download is version 0.7.0 with saved-avatar reuse and local clothing try-on and consent naming the configured provider.
