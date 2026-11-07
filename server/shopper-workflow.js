@@ -18,18 +18,26 @@ export class ShopperWorkflow {
   constructor(sessions,{enabled=process.env.TRYON_SHOPPER_WORKFLOW==='true',apiKey,model,quality,personalize,tryOn,template,femaleEnabled=false,disclosure,verificationClient}={}){
     Object.assign(this,{sessions,enabled,apiKey,model,quality,personalize,tryOn,template,femaleEnabled,disclosure,verificationClient});this.previews=new Map();
   }
-  ready(){
-    this.sessions.guardReady();const d=this.disclosure,v=this.verificationClient;
+  configuration(){
+    const d=this.disclosure,v=this.verificationClient;
+    const checks={provider:this.sessions.provider==='gemini'&&typeof this.apiKey==='string'&&Boolean(this.apiKey.trim())&&text(this.model,100)&&/^[a-zA-Z0-9.-]+$/.test(this.model),adapters:typeof this.personalize==='function'&&typeof this.tryOn==='function'&&typeof this.template==='function',disclosure:false,verificationClient:false};
     try{
-      if(!this.enabled||this.sessions.provider!=='gemini'||typeof this.apiKey!=='string'||!this.apiKey.trim()||!text(this.model,100)||!/^[a-zA-Z0-9.-]+$/.test(this.model)||typeof this.personalize!=='function'||typeof this.tryOn!=='function'||typeof this.template!=='function')throw new Error();
       if(!d||d.revision!==this.sessions.consentRevision||!['privacyContact','processingText','avatarText','tryonText'].every(key=>text(d[key],key==='privacyContact'?200:4000)))throw new Error();
-      publicLink(d.privacyUrl);publicLink(d.providerTermsUrl);
+      publicLink(d.privacyUrl);publicLink(d.providerTermsUrl);checks.disclosure=true;
+    }catch{}
+    try{
       if(!v||v.id!==this.sessions.captcha.id||typeof v.script!=='string'||!v.script.trim()||Buffer.byteLength(v.script)>128*1024)throw new Error();
       for(const key of ['scriptOrigins','connectOrigins','frameOrigins']){
         if(v[key]!==undefined&&(!Array.isArray(v[key])||v[key].length>6))throw new Error();
         for(const origin of v[key]||[])if(new URL(publicLink(origin)).origin!==origin)throw new Error();
       }
-    }catch{throw fail('Shopper photo generation is not enabled for this store. No photos have been sent.',503,'shopper_workflow_unavailable');}
+      checks.verificationClient=true;
+    }catch{}
+    return checks;
+  }
+  ready(){
+    this.sessions.guardReady();
+    if(!this.enabled||!Object.values(this.configuration()).every(Boolean))throw fail('Shopper photo generation is not enabled for this store. No photos have been sent.',503,'shopper_workflow_unavailable');
   }
   metadata(){
     try{this.ready();}catch{return null;}

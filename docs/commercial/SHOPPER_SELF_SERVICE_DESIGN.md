@@ -6,6 +6,8 @@ are implemented in `0.19.0-alpha.1`; [C16.2 Shopify setup and signed launches](.
 are implemented in `0.19.0-alpha.2`; [C16.3 sessions and guards](../SHOPPER_SESSIONS.md)
 are implemented in `0.19.0-alpha.3`; [C16.4 hosted photo/try-on workflow](../SHOPPER_WORKFLOW.md)
 is implemented in `0.19.0-alpha.4`, disabled until its reviewed integrations exist.
+[C16.5.1 setup/readiness tooling](../SHOPPER_LAUNCH.md) is implemented in
+`0.19.0-alpha.5`; C16.5 live checks remain outstanding.
 Service/legal review and launch verification
 are still required; design approval does not enable production shopper access.
 
@@ -322,6 +324,11 @@ they remain disabled by default, with no live safety adapter or reviewed policy
 configured. Flags alone cannot enable shopper photo processing.
 Theme, Shopify, safety services, legal and live deployment still require the
 C16.5 verification/launch evidence.
+
+C16.5.1 adds optional Turnstile, a trusted startup module, offline configuration
+preflight and owner/manager local diagnostics. It does not select/activate a
+moderation vendor, approve legal text or claim live service/deployment results.
+Configuration reports keep live checks explicitly unverified.
 
 No runtime version bump for this design-only change. Code increments follow the
 repository release/version rules. Do not build an APK for this web feature.

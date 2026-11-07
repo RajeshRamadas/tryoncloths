@@ -11,6 +11,8 @@ The R4 shopper extension is specified separately in the approved
 Shopper sessions and guards are implemented in [C16.3](../SHOPPER_SESSIONS.md).
 The hosted photo, avatar review and product try-on flow is implemented in
 [C16.4](../SHOPPER_WORKFLOW.md), disabled until its reviewed integrations exist.
+[C16.5.1](../SHOPPER_LAUNCH.md) supplies setup/readiness tooling, with actual live
+verification and rollout still outstanding.
 This staff architecture does not authorize anonymous access to staff generation
 or account storage. Production shopper access requires the outstanding legal,
 service and deployment checks in the staged design.

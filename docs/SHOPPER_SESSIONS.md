@@ -117,6 +117,9 @@ leases expire. Staff/provider prompts, model selection and contracts are unchang
 
 Production CAPTCHA/moderation adapters are **not selected or configured** in this
 increment. An environment flag or a store access code cannot bypass that absence.
+Later [C16.5.1 setup/readiness tooling](SHOPPER_LAUNCH.md) provides optional
+Turnstile and trusted startup configuration; moderation/legal/live checks remain
+unconfigured until explicitly supplied and reviewed.
 The server factory can inject reviewed adapters through `shopperSessionOptions`:
 
 - `consentRevision`: public version id for legally reviewed photo-processing

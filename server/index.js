@@ -1,6 +1,7 @@
 import { createApp } from "./app.js";
 import { providerConfig } from "./provider-config.js";
 import { AccountStore } from "./accounts.js";
+import {loadShopperConfiguration} from './shopper-config.js';
 const port = Number(process.env.PORT || 3001);
 const production = process.argv.includes("--production");
 const trustProxySetting = process.env.TRYON_TRUST_PROXY_HOPS || "0";
@@ -12,7 +13,8 @@ if (accountStore) {
   accountStore.billing.sweep();
   setInterval(()=>{try {accountStore.billing.sweep();} catch {console.error(JSON.stringify({event:"credit_sweep_failed"}));}},5*60*1000).unref();
 }
-const app=createApp({ production, accountStore, allowSignup: process.env.TRYON_ALLOW_SIGNUP !== "false", trustProxy: trustProxySetting === "1" ? 1 : false });
+const shopperConfiguration=await loadShopperConfiguration({production});
+const app=createApp({ production, accountStore, allowSignup: process.env.TRYON_ALLOW_SIGNUP !== "false", trustProxy: trustProxySetting === "1" ? 1 : false,shopperSessionOptions:shopperConfiguration.shopperSessionOptions,shopperWorkflowOptions:shopperConfiguration.shopperWorkflowOptions,shopperConfigurationSource:shopperConfiguration.source });
 if(app.locals.shopifyShopper?.state){app.locals.shopifyShopper.state.cleanup();setInterval(()=>{try{app.locals.shopifyShopper.state.cleanup();}catch{console.error(JSON.stringify({event:'shopper_state_cleanup_failed'}));}},60000).unref();}
 if(production&&app.locals.photoJobs)app.locals.photoJobs.start();
 if(app.locals.payments){
