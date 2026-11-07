@@ -18,7 +18,7 @@ export async function shopperPhoto(value,{output=false,png=false}={}){
 export async function shopperInputs(action,images,{faceCheck=customerFace,visibleCheck=requireVisibleFace}={}){
   const keys=action==='avatar'?['face','body']:['avatar','garment'];
   if(!images||Object.keys(images).length!==2||Object.keys(images).some(k=>!keys.includes(k)))throw invalid();
-  const result={};for(const key of keys)result[key]=(await shopperPhoto(images[key],{png:key==='avatar'})).bytes;
+  const result={};for(const key of keys)result[key]=(await shopperPhoto(images[key],{png:key==='avatar',output:key==='avatar'})).bytes;
   try{if(action==='avatar'){await faceCheck(result.face);await visibleCheck(result.body);}else await visibleCheck(result.avatar);}
   catch{throw invalid();}return result;
 }

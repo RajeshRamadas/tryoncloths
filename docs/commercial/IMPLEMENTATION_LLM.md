@@ -483,6 +483,11 @@ preview only; no shopper photos or AI generation are enabled.
 **C16.3 implemented:** `0.19.0-alpha.3`, branch `feature/shopper-session-guards`:
 [temporary sessions, consent/CAPTCHA/moderation interfaces, abuse limits,
 provider cancellation and shared image leases](../SHOPPER_SESSIONS.md).
-The optional session preview is disabled by default. Live safety services and
-legal review remain unconfigured; no public shopper generation route exists.
-Next: C16.4 hosted photo/try-on flow, then C16.5 live rollout verification.
+The optional session preview is disabled by default.
+
+**C16.4 implemented:** `0.19.0-alpha.4`, branch `feature/shopper-photo-flow`:
+[hosted consent/verification, photo/body selection, avatar approval, scoped
+product try-on and reviewed downloads](../SHOPPER_WORKFLOW.md).
+Image routes are guarded and disabled by default. Live safety-service adapters
+and legally reviewed disclosure remain unconfigured; flags alone cannot enable
+photo processing. Next: C16.5 service/legal/cost and live rollout verification.

@@ -3,6 +3,7 @@ import {randomBytes} from 'node:crypto';
 import {escapeBrand} from './branding.js';
 import {requireRole} from './tenancy.js';
 import {shopperSessionPage} from './shopper-session-page.js';
+import {shopperWorkflowPage} from './shopper-workflow-page.js';
 const browserCookie=production=>production?'__Host-forme_shopify_oauth':'forme_shopify_oauth';
 const cookie=(req,name)=>(req.get('cookie')||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='))?.slice(name.length+1)||'';
 const rawQuery=req=>req.originalUrl.split('?').slice(1).join('?');
@@ -25,7 +26,9 @@ export function installShopifyShopperPublic(app,service,{production=false,sessio
     catch(e){res.status(e.status||503).type('html').send(page('Try-on preview unavailable',e.status&&e.status<500?e.message:'This store preview is temporarily unavailable. Return to the product page and try again later.'));}
   });
   app.get('/shopper',(req,res)=>{
-    const nonce=randomBytes(16).toString('base64');headers(res).set('Content-Security-Policy',`default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; connect-src 'self'; img-src data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`);
+    const nonce=randomBytes(16).toString('base64'),verification=sessions?.workflow?.metadata()?sessions.workflow.verificationClient:{};
+    headers(res).set('Content-Security-Policy',`default-src 'none'; script-src 'nonce-${nonce}' ${(verification.scriptOrigins||[]).join(' ')}; style-src 'nonce-${nonce}'; connect-src 'self' ${(verification.connectOrigins||[]).join(' ')}; img-src 'self' data: blob:; frame-src ${(verification.frameOrigins?.length?verification.frameOrigins:["'none'"]).join(' ')}; frame-ancestors 'none'; base-uri 'none'; form-action 'none'`);
+    if(sessions?.enabled&&sessions.workflow?.enabled)return res.type('html').send(shopperWorkflowPage(nonce));
     if(sessions?.enabled)return res.type('html').send(shopperSessionPage(nonce));
     res.type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Store try-on preview</title><style nonce="${nonce}">body{margin:0;background:#f7f8f4;color:#254b3b;font:17px/1.6 system-ui}main{max-width:600px;margin:6vh auto;padding:24px}header,section{padding:24px;border:1px solid #dce4da;border-radius:16px;background:white;margin-bottom:20px}header img{max-width:220px;max-height:80px}h1{font-size:30px;line-height:1.2}a{color:inherit;display:inline-block;padding:12px 0}p{overflow-wrap:anywhere}</style></head><body><main><header id="brand"><h1 id="name">Store try-on preview</h1></header><section><h2 id="product">Opening product…</h2><p id="message" role="status">Checking the store’s product launch.</p><a id="return" hidden>Return to product</a></section></main><script nonce="${nonce}">
     (async()=>{const p=new URLSearchParams(location.hash.slice(1)),ticket=p.get('launch');history.replaceState(null,'','/shopper');const text=document.getElementById('message');

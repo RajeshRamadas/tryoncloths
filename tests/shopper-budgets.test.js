@@ -54,8 +54,8 @@ test('owner/manager/staff/other-store/anonymous API matrix, origin and stale rev
     assert.equal((await (await request('GET',managerCookie)).json()).canEdit,false);
     store.db.prepare("UPDATE memberships SET role='staff' WHERE user=? AND store=?").run(b.user.id,a.id);
     assert.equal((await request('GET',managerCookie)).status,403);assert.equal((await request('PUT',managerCookie,{action:'pause'})).status,403);
-    // No anonymous shopper generation/meter API was introduced.
-    assert.equal((await fetch(base+'/shopper-api/avatar',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,404);
+    // C16.4 has a separate route, but disabled/unconfigured sessions cannot use it.
+    assert.equal((await fetch(base+'/shopper-api/avatar',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,503);
   }finally{await new Promise(r=>server.close(r));}
 }));
 

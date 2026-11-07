@@ -136,7 +136,7 @@ test('ending a session cancels an in-flight CAPTCHA verification without issuing
   try{await ready;f.sessions.end(auth);await rejected;assert.equal(signal.aborted,true);assert.equal(f.state.db.prepare("SELECT count(*) n FROM shopper_state WHERE kind='proof'").get().n,0);}finally{release();}
 }));
 
-test('HTTP shopper cookies are isolated from staff auth, Origin/CSRF gates apply, end is idempotent, and no photo generation endpoint exists',fixture(async f=>{
+test('HTTP shopper cookies are isolated from staff auth, Origin/CSRF gates apply, end is idempotent, and generation routes reject missing sessions',fixture(async f=>{
   const location=new URL(f.service.launch(f.proxy({launch_nonce:randomBytes(16).toString('hex')}))),ticket=location.hash.slice(8);
   const request=(url,method='GET',body,cookies='',csrf='',origin=publicStudio)=>fetch(f.base+url,{method,headers:{Origin:origin,Cookie:cookies,'X-Shopper-CSRF':csrf,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
   assert.equal((await request('/shopper-api/session','POST',{ticket},'', '', 'https://attacker.test')).status,403);
@@ -145,7 +145,7 @@ test('HTTP shopper cookies are isolated from staff auth, Origin/CSRF gates apply
   assert.equal((await request('/shopper-api/session','GET',undefined,'forme_session='+f.staffToken)).status,401);
   assert.equal((await request('/shopper-api/session','DELETE',undefined,cookies,'wrong')).status,403);assert.equal((await request('/shopper-api/session','GET',undefined,cookies)).status,200);
   assert.equal((await request('/shopper-api/session','DELETE',undefined,cookies,data.csrf)).status,204);assert.equal((await request('/shopper-api/session','DELETE',undefined,cookies,data.csrf)).status,204);
-  assert.equal((await request('/shopper-api/avatar','POST',{})).status,404);assert.equal(f.ai(),0);
+  assert.equal((await request('/shopper-api/avatar','POST',{})).status,401);assert.equal(f.ai(),0);
   const bad=await fetch(f.base+'/shopper-api/session',{method:'POST',headers:{Origin:publicStudio,'Content-Type':'application/json'},body:'{"private-photo-data":'});assert.equal(bad.status,400);assert.ok(!(await bad.text()).includes('private-photo-data'));
 }));
 

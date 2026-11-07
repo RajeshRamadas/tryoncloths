@@ -7,8 +7,9 @@ the connection and product list; staff and anonymous visitors cannot manage it.
 
 **This increment is a setup preview.** The button opens a branded page for the
 verified product and a return link. It collects no photos, creates no shopper
-avatar/session and makes no AI request or credit reservation. Shopper safety
-guards, sessions and the photo/try-on workflow remain C16.3/C16.4. Both the Forme
+avatar/session and makes no AI request or credit reservation. Later
+[C16.3 sessions](SHOPPER_SESSIONS.md) and [C16.4 photo/try-on flow](SHOPPER_WORKFLOW.md)
+are implemented behind additional default-off flags and reviewed dependencies. Both the Forme
 setup preview and theme button are disabled by default. No APK was built.
 
 ## 1. Configure the Shopify app
@@ -157,7 +158,7 @@ theme. The browser opens the hosted setup page in a new tab.
 The public app manifest is a configuration template; the Shopify CLI/live-theme
 validation has not been run here. The code tests do not prove Shopify has accepted
 the app registration, scopes, webhook registrations or extension schema in a live
-development store. Keep the setup-preview label until C16.3/C16.4 are complete.
+development store. Keep the setup-preview label until C16.5 live launch checks are complete.
 
 ## 5. Launch and lifecycle guarantees
 
@@ -235,8 +236,9 @@ override and local documentation links were checked. This is not a Shopify CLI
 deployment or live Shopify schema/installation test.
 
 [C16.3 shopper sessions and consent/abuse/safety guards](SHOPPER_SESSIONS.md) are
-now implemented as an optional session preview. Next: **C16.4 — customer photo,
-avatar review and clothing try-on**. Service selection and legal
+now implemented as an optional session preview. [C16.4 customer photo, avatar review
+and clothing try-on](SHOPPER_WORKFLOW.md) is also implemented, disabled until its
+reviewed dependencies are configured. Next: **C16.5 live rollout verification**. Service selection and legal
 review remain prerequisites to enabling photo generation. No live Shopify call,
 paid image, external message/payment, Docker build, Lightsail deployment or APK
 was performed by this task.

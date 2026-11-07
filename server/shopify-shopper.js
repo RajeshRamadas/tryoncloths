@@ -48,7 +48,8 @@ export class ShopifyShopper {
     const actor=this.actor(account);let available=true,setupMessage='';try{this.ready();}catch(e){available=false;setupMessage=e.message;}
     const row=this.row(account.id),installation=row?Object.fromEntries(fields.map(k=>[k,k==='enabled'?Boolean(row[k]):row[k]])):null;
     if(installation?.status==='installed'&&!row.credentials)installation.status='reconnect_required';
-    return {available,setupMessage,canEdit:actor.user.role==='owner',installation,shopperGenerationAvailable:false,stage:'launch-preview',
+    const generation=Boolean(this.workflow?.metadata());
+    return {available,setupMessage,canEdit:actor.user.role==='owner',installation,shopperGenerationAvailable:generation,stage:generation?'hosted-workflow':'launch-preview',
       products:row?this.products(row):[],productsTotal:row?this.productCount(row):0};
   }
   productCount(row){

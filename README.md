@@ -41,7 +41,8 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 - [Catalogue import](docs/CATALOGUE_IMPORT.md): CSV/Excel products, SKU updates, prices, sizes, colours, stock filters and plan limits.
 - [Shop catalogue sync](docs/CATALOGUE_SYNC.md): Shopify/WooCommerce connections, nightly sync, clothing-type review and read-only Chain master catalogues.
 - [Shopify shopper setup](docs/SHOPIFY_SHOPPER.md): owner app installation, published-product selection, signed launch previews and a disabled-by-default theme button.
-- [Shopper sessions and guards](docs/SHOPPER_SESSIONS.md): optional expiring sessions, consent/verification interfaces, abuse limits and shared image concurrency; customer photo screens remain pending.
+- [Shopper sessions and guards](docs/SHOPPER_SESSIONS.md): optional expiring sessions, consent/verification interfaces, abuse limits and shared image concurrency.
+- [Hosted shopper workflow](docs/SHOPPER_WORKFLOW.md): verified photo selection, body references, avatar approval, same-store product try-on and reviewed PNG download; disabled until reviewed safety/policy integrations are configured.
 - [AI catalogue photos](docs/CATALOGUE_PHOTOS.md): durable model-photo batches, approval, included regeneration, JPEG/ZIP exports and separate photo-credit purchases.
 - [Store branding](docs/STORE_BRANDING.md): owner logo/contacts, branded outfit and lookbook pages, optional export footers and server-enforced trial marks.
 - [Size guidance](docs/SIZE_RECOMMENDATIONS.md): body measurements, brand charts, confidence/explanations and purchase tracking; no additional AI calls.
@@ -78,8 +79,11 @@ owner monthly allowances, durable attempt/credit accounting, manager usage and
 immediate pause. Web `0.19.0-alpha.2` adds [Shopify app installation and signed
 setup launches](docs/SHOPIFY_SHOPPER.md). Open **Shopper spending → Shopify widget**
 after signing in. Web `0.19.0-alpha.3` adds [optional temporary shopper sessions
-and guards](docs/SHOPPER_SESSIONS.md). Photo capture and AI try-on screens remain
-pending; the button opens a setup/session preview with no photos or credits.
+and guards](docs/SHOPPER_SESSIONS.md). Web `0.19.0-alpha.4` adds the
+[hosted photo, review and try-on flow](docs/SHOPPER_WORKFLOW.md). It is disabled
+by default and requires configured safety adapters and reviewed disclosure;
+otherwise the button opens a setup/session preview without photo generation.
+Live service/legal/cost and rollout verification remain C16.5.
 
 ## Validation
 
