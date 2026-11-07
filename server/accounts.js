@@ -221,7 +221,7 @@ export class AccountStore {
 
 function token(req) { return (req.get("cookie") || "").split(";").map(x=>x.trim()).find(x=>x.startsWith(`${cookieName}=`))?.slice(cookieName.length+1) || ""; }
 export function accountUser(store,req) { return store?.user(token(req)) || null; }
-export function installAccountRoutes(app, store, { production=false, allowSignup=true, sendMail, publicUrl, payments, whatsapp, campaignConfig, catalogueOptions, analyticsReports, catalogueSync, photoJobs, shopifyShopper }={}) {
+export function installAccountRoutes(app, store, { production=false, allowSignup=true, sendMail, publicUrl, payments, whatsapp, campaignConfig, catalogueOptions, analyticsReports, catalogueSync, photoJobs, shopifyShopper,jewelleryEnabled=false }={}) {
   const attempts = new Map(); let hashes=0;
   const cookie = (res,value,maxAge=lifetime) => res.cookie(cookieName,value,{httpOnly:true,secure:production,sameSite:"strict",path:"/",maxAge});
   const wrap = fn => async(req,res) => { try { await fn(req,res); } catch(e) { res.status(e.status || 500).json({error:e.status ? e.message : "Account storage is unavailable. Please try again; no generation request was retried."}); } };
@@ -241,7 +241,7 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
   if(catalogueSync)installSyncRoutes(app,store,catalogueSync,{requireUser,sameOrigin,wrap});
   if(photoJobs)installPhotoRoutes(app,store,photoJobs,{requireUser,sameOrigin,wrap});
   installSizeRoutes(app,store,{requireUser,sameOrigin,wrap});
-  installCatalogueRoutes(app,store,{requireUser,sameOrigin,wrap,options:catalogueOptions});
+  installCatalogueRoutes(app,store,{requireUser,sameOrigin,wrap,options:catalogueOptions,jewelleryEnabled});
   if(whatsapp&&campaignConfig)installCampaignRoutes(app,store,whatsapp,campaignConfig,{requireUser,sameOrigin,wrap});
   if(whatsapp)installWhatsAppRoutes(app,store,whatsapp,{requireUser,sameOrigin,wrap});
   installShareRoutes(app,store,{requireUser,sameOrigin,wrap,publicUrl});

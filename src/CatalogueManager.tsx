@@ -20,16 +20,17 @@ export default function CatalogueManager(){
  const [applied,setApplied]=useState({search:'',type:'all',stock:'available'});
  const [importing,setImporting]=useState(false);
  const [reviewTypes,setReviewTypes]=useState<Record<string,string>>({});
+ const [jewelleryEnabled,setJewelleryEnabled]=useState(false);
  const manager=role==='owner'||role==='manager';
  async function load(offset=0,filters={search,type,stock}){setBusy(true);setError('');try{setData(await browseCatalogue({...filters,offset,limit:50}));setApplied(filters);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
- useEffect(()=>{let alive=true;void catalogueApi('/api/account').then(r=>{if(alive)setRole(r.account?.user?.role||'');}).catch(()=>{});void load();return()=>{alive=false;};},[]);
+ useEffect(()=>{let alive=true;void catalogueApi('/api/account').then(r=>{if(alive)setRole(r.account?.user?.role||'');}).catch(()=>{});void catalogueApi('/api/health').then(r=>{if(alive)setJewelleryEnabled(r.jewelleryCatalogueAvailable===true);}).catch(()=>{});void load();return()=>{alive=false;};},[]);
  async function upload(){if(!file||busy)return;setBusy(true);setImporting(true);setError('');setNotice('');setReport(null);try{
   const csv=await spreadsheetCsv(file),form=new FormData();form.append('file',csv);
   const response=await requestApi('/api/catalogue/import',{method:'POST',body:form},330000),result=await response.json();
   if(typeof result.created==='number'){setReport(result);if(!response.ok)setError('The import could not save every row. Review the counts and error report.');setData(await browseCatalogue({search,type,stock,offset:0,limit:50}));}
   else throw new Error(result.error||'Import failed.');
  }catch(e){setError(e instanceof Error&&(e.name==='AbortError'||e.name==='TimeoutError')?'The import response was interrupted. Some products may have been saved. Refresh the catalogue before reimporting the same SKUs.':(e as Error).message);}finally{setBusy(false);setImporting(false);}}
- return <main className="billing-page catalogue-manager"><a href="/">Back to Forme</a><h1>Store catalogue</h1>{manager&&<a href="/catalogue-photos">Create AI catalogue photos</a>}<p>Products for your active store. Importing and editing product details uses no AI credits.</p>
+ return <main className="billing-page catalogue-manager"><a href="/">Back to Forme</a><h1>Store catalogue</h1>{jewelleryEnabled&&<p><a href="/jewellery-catalogue">Jewellery catalogue</a></p>}{manager&&<a href="/catalogue-photos">Create AI catalogue photos</a>}<p>Products for your active store. Importing and editing product details uses no AI credits.</p>
   {error&&<p role="alert" className="error-banner">{error}</p>}{notice&&<p role="status">{notice}</p>}
   {manager&&<ShopConnections owner={role==='owner'} onBusy={setBusy} onChanged={()=>load(data?.offset||0,applied)}/>}
   {manager&&<section><h2>Import products</h2><p>CSV, XLSX or XLS, up to 5 MB. Excel uses the first worksheet and converts to CSV in your browser. Up to 10,000 rows per file; photos download three at a time. Repeat a SKU to update its product. Missing products are never deleted.</p><button className="button secondary" disabled={busy} onClick={async()=>{try{const r=await requestApi('/api/catalogue/template.csv');if(!r.ok)throw new Error('Template could not be downloaded.');downloadText('catalogue-template.csv',await r.text());}catch(e){setError((e as Error).message);}}}>Download import template</button><label>Product spreadsheet<input type="file" accept=".csv,.xlsx,.xls" disabled={busy} onChange={e=>{setFile(e.target.files?.[0]||null);setReport(null);}}/></label><button className="button primary" disabled={busy||!file} onClick={()=>void upload()}>Import selected spreadsheet</button>{importing&&<p role="status">Importing products… This may take several minutes. Keep this page open.</p>}
