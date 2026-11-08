@@ -1,6 +1,7 @@
 import PurchaseLook from "./PurchaseLook";
 import ShareLook from "./ShareLook";
-import { useRef, useState } from "react";
+import { useRef, useState,useEffect } from "react";
+import {catalogueApi} from './catalogue';
 import { FolderOpen, X } from "lucide-react";
 import { avatarDataUrl, deleteAvatar, listAvatars, readAvatarPng, type AvatarDetails, type SavedAvatar } from "./saved-avatars";
 import { listAccountAvatars, accountAvatarImage, deleteAccountAvatar, listLooks, lookImage, deleteLook, type SavedLook } from "./account-avatars";
@@ -11,6 +12,8 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const [items, setItems] = useState<SavedAvatar[]>([]);
+  const [viewsAvailable,setViewsAvailable]=useState(false);
+  useEffect(()=>{let alive=true;if(cloud)void catalogueApi('/api/health').then(h=>{if(alive)setViewsAvailable(h.avatarViewsAvailable===true);}).catch(()=>{});return()=>{alive=false;};},[cloud]);
   const [looksFor,setLooksFor]=useState<SavedAvatar|null>(null);
   const [looks,setLooks]=useState<SavedLook[]>([]);
   const [shareLook,setShareLook]=useState<string|null>(null);
@@ -83,7 +86,8 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
         <img src={item.thumbnail} alt={`Saved avatar: ${item.name}`}/><div><h3>{item.name}</h3><p>{profiles.find(p => p.id === item.profileId)?.name} · {item.heightCm} cm · {item.weightKg} kg<br/>{new Date(item.savedAt).toLocaleDateString()}</p>
         <button className="button primary" disabled={busy} onClick={() => void use(item)}>Use {item.name}</button>
         {cloud && !localView && <button className="button secondary" disabled={busy} onClick={()=>void showLooks(item)}>View looks ({item.looksCount || 0}) for {item.name}</button>}
-        {confirmDelete === item.id ? <div className="saved-delete"><p>Delete this saved copy{cloud && !localView ? " and its saved looks" : ""}?</p><button className="button secondary" disabled={busy} onClick={() => void remove(item.id)}>Confirm deletion</button><button className="button back-button" disabled={busy} onClick={() => setConfirmDelete(null)}>Cancel deletion</button></div>
+        {cloud&&!localView&&viewsAvailable&&!busy&&<a className="button secondary" href={'/avatar-views?avatar='+encodeURIComponent(item.id)}>Manage views for {item.name}</a>}
+        {confirmDelete === item.id ? <div className="saved-delete"><p>Delete this saved copy{cloud && !localView ? viewsAvailable?" and its saved looks and views":" and its saved looks" : ""}?</p><button className="button secondary" disabled={busy} onClick={() => void remove(item.id)}>Confirm deletion</button><button className="button back-button" disabled={busy} onClick={() => setConfirmDelete(null)}>Cancel deletion</button></div>
           : <button className="button back-button" disabled={busy} aria-label={`Delete ${item.name}`} onClick={() => setConfirmDelete(item.id)}>Delete</button>}</div>
       </article>)}</section>)}</div>
       {cloud && !localView && looksFor && <section aria-label={`Looks for ${looksFor.name}`}><h3>Looks for {looksFor.name}</h3>

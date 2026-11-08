@@ -104,6 +104,10 @@ views. Selecting these assets uses no AI credits; the interactive hands flow is 
 Web `0.20.0-alpha.4` adds the internal [J4 portrait-generation adapter](docs/JEWELLERY_PORTRAITS.md)
 with face, framing and identity checks. Account routes, approval and storage follow in J5;
 no new generation screen or live paid request is added by this update.
+Web `0.20.0-alpha.5` adds [J5 saved avatar views](docs/AVATAR_VIEWS.md).
+With account storage and `TRYON_JEWELLERY=1`, open **Saved avatars → Manage views**
+to create a one-credit Gemini portrait or free sample hands, review and save it,
+then reuse it from the same store account. Jewellery try-on remains pending.
 
 ## Validation
 

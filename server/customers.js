@@ -113,6 +113,7 @@ export class CustomerStore {
   }
   remove(account,id) {
     this.get(account,id);
+    this.onRemove?.(account,id);
     // One SQLite statement includes the avatar trigger and all FK cascades.
     this.db.prepare('DELETE FROM customers WHERE store=? AND id=?').run(account.id,id);
   }

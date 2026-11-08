@@ -117,5 +117,7 @@ Release validation for `0.20.0-alpha.4`: **326 backend tests, 112 browser tests
 and the production web build passed**. The provider transport was mocked; no
 live paid portrait request or production deployment was made.
 
-J5 views storage and authenticated API routes are next. No APK or production
-deployment is included.
+[J5 view storage, authenticated routes and the web review page](AVATAR_VIEWS.md)
+are implemented in `0.20.0-alpha.5`. They enforce consent, ownership, credits and
+signed approval before saving a view. J6 jewellery adaptation is next; live
+provider quality and pilot threshold calibration are still unverified.

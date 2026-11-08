@@ -1,4 +1,5 @@
 import {MonthlyAnalytics,installAnalyticsUnsubscribe} from './analytics-mail.js';
+import {installAvatarViewRoutes} from './avatar-view-routes.js';
 import {CatalogueSync} from './catalogue-sync.js';
 import {ShopifyShopper} from './shopify-shopper.js';
 import {installShopifyShopperPublic} from './shopify-shopper-routes.js';
@@ -107,6 +108,7 @@ export function createApp({
   shopperWorkflowOptions = {},
   shopperConfigurationSource = {status:'injected',code:'programmatic_configuration'},
   jewelleryEnabled = process.env.TRYON_JEWELLERY === '1',
+  avatarViewOptions = {},
   photoOptions = {},
   femaleEnabled = process.env.TRYON_FEMALE_PROFILES === "true",
   tryOn = geminiTryOn,
@@ -195,11 +197,14 @@ export function createApp({
   const staffGenerate=(fn,input)=>accountStore?.imageSlots?accountStore.imageSlots.run({kind:'staff'},signal=>fn({...input,signal})):fn(input);
   installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, analyticsReports, catalogueSync, photoJobs, shopifyShopper,jewelleryEnabled, campaignConfig:{provider,model,apiKey,tryOn:input=>staffGenerate(tryOn,input),femaleEnabled} });
   installGarmentRoutes(app, accountStore, { provider, model,jewelleryEnabled });
+  installAvatarViewRoutes(app,accountStore,{enabled:jewelleryEnabled,provider,apiKey,model,femaleEnabled,rateLimit,...avatarViewOptions});
   app.get("/api/health", (_req, res) =>
     res.json({
       status: "ok",
       jewelleryAvailable:false,
       jewelleryCatalogueAvailable:Boolean(jewelleryEnabled&&accountStore),
+      avatarViewsAvailable:Boolean(jewelleryEnabled&&accountStore),
+      portraitGenerationAvailable:Boolean(jewelleryEnabled&&accountStore&&provider==='gemini'&&apiKey),
       personalizationAvailable: Boolean(apiKey),
       provider,
       generationRevision: provider === "gemini" ? GEMINI_REFERENCE_VERSION : "template-first-v1",

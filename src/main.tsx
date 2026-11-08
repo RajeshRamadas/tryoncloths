@@ -1,4 +1,5 @@
 import Branding from "./branding";
+import AvatarViews from './AvatarViews';
 import JewelleryCatalogue from './JewelleryCatalogue';
 import ShopperSettings from "./ShopperSettings";
 import ShopifyShopper from "./ShopifyShopper";
@@ -20,6 +21,6 @@ document.documentElement.classList.toggle("native-app", isNative);
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    {window.location.pathname === '/jewellery-catalogue' ? <JewelleryCatalogue/> : window.location.pathname === "/shopify-shopper" ? <ShopifyShopper /> : window.location.pathname === "/shopper-spending" ? <ShopperSettings /> : window.location.pathname === "/branding" ? <Branding /> : window.location.pathname === "/catalogue-photos" ? <CataloguePhotos /> : window.location.pathname === "/analytics" ? <Analytics /> : window.location.pathname === "/size-charts" ? <SizeCharts /> : window.location.pathname === "/catalogue" ? <CatalogueManager /> : window.location.pathname === "/whatsapp" ? <WhatsApp /> : window.location.pathname === "/invite" ? <InviteAcceptance /> : window.location.pathname === "/billing" ? <Billing /> : window.location.pathname === "/usage" ? <Usage /> : <App />}
+    {window.location.pathname === '/avatar-views' ? <AvatarViews/> : window.location.pathname === '/jewellery-catalogue' ? <JewelleryCatalogue/> : window.location.pathname === "/shopify-shopper" ? <ShopifyShopper /> : window.location.pathname === "/shopper-spending" ? <ShopperSettings /> : window.location.pathname === "/branding" ? <Branding /> : window.location.pathname === "/catalogue-photos" ? <CataloguePhotos /> : window.location.pathname === "/analytics" ? <Analytics /> : window.location.pathname === "/size-charts" ? <SizeCharts /> : window.location.pathname === "/catalogue" ? <CatalogueManager /> : window.location.pathname === "/whatsapp" ? <WhatsApp /> : window.location.pathname === "/invite" ? <InviteAcceptance /> : window.location.pathname === "/billing" ? <Billing /> : window.location.pathname === "/usage" ? <Usage /> : <App />}
   </React.StrictMode>,
 );
