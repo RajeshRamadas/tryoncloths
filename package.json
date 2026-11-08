@@ -1,6 +1,6 @@
 {
   "name": "tryoncloths",
-  "version": "0.20.0-alpha.11",
+  "version": "0.21.0-rc.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -20,7 +20,8 @@
     "android:check": "npm run android:sync && node scripts/android-build.mjs assembleDebug lintDebug",
     "android:assets": "node scripts/mobile-assets.mjs",
     "benchmark:links": "node --env-file-if-exists=.env server/evaluation/link-benchmark.js",
-    "evaluate:quality": "node server/evaluation/quality-cli.js"
+    "evaluate:quality": "node server/evaluation/quality-cli.js",
+    "evaluate:jewellery": "node server/evaluation/jewellery-cli.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

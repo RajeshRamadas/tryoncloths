@@ -1,4 +1,4 @@
-# J6 — internal jewellery adaptation adapter
+# Jewellery try-on — staff workflow and adapter reference
 
 Web `0.20.0-alpha.6` implements Task J6 from
 [the implementation guide](jewellery/IMPLEMENTATION_LLM.md), following
@@ -10,6 +10,45 @@ the [J7 API](JEWELLERY_API.md), enforcing `TRYON_JEWELLERY=1`, account/store
 ownership, approved base views, item ownership, same origin, explicit consent,
 request IDs, concurrency, credit reservation/refund and review before reusable
 storage. The interactive [J8 studio](JEWELLERY_STUDIO.md) is now implemented.
+
+## Staff setup and workflow (J1–J12)
+
+Web `0.21.0-rc.1` adds [private quality evaluation and pilot reporting](JEWELLERY_EVALUATION.md).
+The pilot flag remains off by default. Enable persistent account storage and
+`TRYON_JEWELLERY=1` only on a pilot deployment. Configure Gemini credentials
+**on the server**, never in a customer browser; see [API setup](JEWELLERY_API.md).
+The flag covers the entire deployment, so isolate pilot stores from general
+stores. Current generation/provider and female pilot restrictions still apply.
+
+1. Sign in, select the customer's saved avatar and open **Jewellery**. Approve
+   a portrait once and reuse it; hands templates are available without AI.
+2. For portrait capture, show the entire head, face forward, both ears and
+   neck/collarbones, with even lighting. Remove obstructing accessories only
+   with agreement. Moving hair behind ears also requires customer agreement.
+   Use a clear product photo with the whole piece on a simple background.
+3. Choose an inventory item, upload or product link; confirm type, metal,
+   side/pair and optional dimensions. Owner/manager roles can save inventory;
+   staff can read, fit and approve looks without inventory-write access.
+4. Select **AI** for one consented paid request or **Overlay** for a free,
+   adjustable transparent cut-out. New AI results use one app credit; failed
+   checks refund the app credit but provider billing may still apply. Approved
+   exact reuse is free. No automatic retry or provider fallback is performed.
+5. Review face, complexion, placement and design against the source. Undo or
+   remove a piece freely, stack approved pieces, compare two variants with
+   an explicit cost quote, or make a complete-look board with approved clothes.
+   Sizing guides are approximate, optional, and never a physical fit guarantee.
+6. Approve storage only with customer agreement. Save to the same account,
+   reopen later, and use the studio's labelled download/share controls. AI
+   previews may differ in fine details from the actual product.
+
+Detailed controls: [studio](JEWELLERY_STUDIO.md), [free overlays](JEWELLERY_OVERLAY.md),
+[comparisons and complete looks](JEWELLERY_COMPARE_COMPLETE.md), [sizing](JEWELLERY_SIZING.md).
+For a missing face, identity drift, changed framing/hands, quota or timeout,
+read the displayed error and correct the cause before a separately consented
+retry. Never approve an unreviewed image because an automatic check passed.
+Provider quality, threshold calibration and live store pilot targets remain
+pending; the new [evaluation workflow](JEWELLERY_EVALUATION.md) measures those
+before general release.
 
 ## Module contract
 

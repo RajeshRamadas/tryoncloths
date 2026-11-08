@@ -3,9 +3,9 @@ import { createHash } from 'node:crypto';
 
 export const digest = value => createHash('sha256').update(value).digest('hex');
 
-export async function readJson(file) {
+export async function readJson(file, {maxBytes=1024*1024}={}) {
   const bytes = await readFile(file);
-  if (bytes.length > 1024 * 1024) throw new Error('Manifest or report exceeds 1 MB.');
+  if (bytes.length > maxBytes) throw new Error('Evaluation JSON exceeds its size limit.');
   return JSON.parse(bytes.toString('utf8'));
 }
 

@@ -12,7 +12,8 @@ Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 **J8 implemented in web `0.20.0-alpha.8`**;
 **J9 implemented in web `0.20.0-alpha.9`**;
 **J10 implemented in web `0.20.0-alpha.10`**;
-**J11 implemented in web `0.20.0-alpha.11`**. See
+**J11 implemented in web `0.20.0-alpha.11`**;
+**J12 tooling and release preparation implemented in web `0.21.0-rc.1`**. See
 [catalogue setup](../JEWELLERY_CATALOGUE.md) and
 [local identity-check scope and validation](../JEWELLERY_IDENTITY.md), plus
 [hands assets and placement coordinates](../JEWELLERY_HANDS.md), and the
@@ -24,7 +25,8 @@ Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 [free cut-out placement, save/share and validation](../JEWELLERY_OVERLAY.md), and
 [costed variant comparisons and complete-look boards](../JEWELLERY_COMPARE_COMPLETE.md), and
 [optional sizing profiles, conversions and necklace guides](../JEWELLERY_SIZING.md).
-J12 evaluation/release is the next task and remains pending. J8 exposes view preparation,
+J12 code, private review tooling and staff documentation are implemented;
+[live pilot measurement and general-release approval](../JEWELLERY_EVALUATION.md) remain pending. J8 exposes view preparation,
 item selection, stacking/review, saved looks, labelled downloads and sharing.
 Pilot threshold calibration and live provider quality/cost checks remain outstanding.
 The separate commercial C16.5
@@ -351,5 +353,11 @@ J11 implementation: [reference charts, optional measurements and anchor-based gu
 
 **Acceptance.**
 
-- [ ] `npm test`, `npm run build`, `npm run test:e2e` green.
+- [x] `npm test`, `npm run build`, `npm run test:e2e` green (423 backend, 135 browser tests; private review rerun after final statistics changes).
 - [ ] Pilot targets from REQUIREMENTS §8 measured before general release.
+
+J12 tooling: [private 30 × 10 review, identity-distance analysis and pilot counters](../JEWELLERY_EVALUATION.md).
+[Release verification](../JEWELLERY_RELEASE.md) records automated checks separately
+from outstanding live evidence. No deployment or pilot flag activation is part
+of this change. The remaining task is operational: collect consented real pilot
+results and independent identity calibration evidence before general release.
