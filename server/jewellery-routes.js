@@ -1,3 +1,5 @@
+import {prepareComplete,completePreview,saveComplete} from './jewellery-complete.js';
+import {variantChoices,comparisonVariants,comparisonQuote,verifyComparisonQuote} from './jewellery-variants.js';
 import {accountUser} from './accounts.js';
 import {meter,validRequestId,BillingError,billingFailure} from './billing.js';
 import {validateSession,recordTryon} from './analytics-tracking.js';
@@ -32,6 +34,15 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
       else res.status(error.status||500).json({error:error.status?error.message:'Jewellery try-on could not be completed. No request was automatically retried.'});
     }
   };
+  app.get('/api/jewellery/variants/:id',wrap((req,res,account)=>res.json({variants:variantChoices(store,account,req.params.id)})));
+  for(const path of ['/api/jewellery/complete/prepare','/api/jewellery/complete'])app.post(path,wrap(async(req,res,account)=>{
+    const input=req.body||{};fields(input,['avatarId','outfitLookId','portraitLookId','sourceHash','name','reviewed','storageConsent']);
+    if(preflights>=2)throw new BillingError('image_busy','The studio is composing other previews. Try again shortly.',429);
+    preflights++;let context;
+    const guard=()=>{if(req.aborted||res.destroyed)throw fail('Composition stopped.',409);session(req,account);};
+    try{if(path.endsWith('/prepare')){context=await prepareComplete(store,account,input,guard);return res.json(completePreview(context));}res.json(await saveComplete(store,account,input,guard));}
+    finally{preflights--;context?.outfitImage.fill(0);context?.portraitImage.fill(0);}
+  }));
   app.get('/api/jewellery/looks/:id',wrap((req,res,account)=>{const row=jewelleryLook(store,account,req.params.id);res.json({id:row.id,avatarId:row.avatarId,view:row.view,previewMode:row.previewMode,name:row.name,itemsJson:JSON.parse(row.itemsJson),image:'data:image/png;base64,'+Buffer.from(row.image).toString('base64')});}));
   for(const path of ['/api/jewellery/overlay/prepare','/api/jewellery/overlay'])app.post(path,wrap(async(req,res,account)=>{
     const body=req.body||{};
@@ -57,8 +68,35 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
     if(!/^[a-f0-9]{64}$/.test(req.params.id))throw fail('Use a valid jewellery result ID.');
     const result=await jewellery.approve(account,req.params.id,req.body,{guard:()=>session(req,account)});res.json(result);
   }));
-  app.post('/api/jewellery/tryon',wrap(async(req,res,account)=>{
-    const body=req.body||{};
+  app.post('/api/jewellery/compare',wrap(async(req,res,account)=>{
+    const body=req.body||{};fields(body,['action','avatarId','view','itemIds','base','baseReceipt','baseResultId','baseLookId','baseReviewed','side','hand','finger','wrist','count','replaceExisting','quote','consent','consentScope','consentProvider','requestIds']);
+    if(!['quote','run'].includes(body.action))throw fail('Check the comparison cost before running it.');
+    if(preflights>=2)throw new BillingError('image_busy','The studio is checking other images. Try again shortly.',429);
+    const contexts=[];let held=true;preflights++;
+    let family;const {action,itemIds,quote,requestIds,consent,consentScope,consentProvider,...base}=body;
+    const guard=()=>{if(req.aborted||res.destroyed)throw fail('Comparison stopped.',409);session(req,account);const current=comparisonVariants(store,account,itemIds,{metadata:false});if(current.root!==family.root)throw fail('The variant family changed. Check the cost again.',409);};
+    try{
+      family=comparisonVariants(store,account,body.itemIds);
+      for(const itemId of itemIds)contexts.push(await jewellery.context(account,{...base,itemId},{provider,model,guard}));guard();
+      const costs=contexts.map(c=>jewellery.cached(account,c)?0:1),credits=costs.reduce((a,b)=>a+b,0),runnable=!credits||provider==='gemini'&&Boolean(apiKey)&&contexts.every(c=>c.bodyType!=='female'||femaleEnabled);
+      if(action==='quote')return res.json({credits,variants:family.items.map((item,i)=>({item,credits:costs[i],reused:!costs[i]})),quote:comparisonQuote(jewellery,account,contexts,credits,family.root),runnable});
+      if(consent!==true||consentScope!=='compare-two-variants'||consentProvider!=='gemini')throw fail('Confirm customer consent for both avatar-and-product requests and their displayed cost.');
+      verifyComparisonQuote(jewellery,account,quote,contexts,credits,family.root);
+      if(!Array.isArray(requestIds)||requestIds.length!==2||requestIds.some(id=>!validRequestId(id))||requestIds[0].toLowerCase()===requestIds[1].toLowerCase())throw fail('Use two fresh request IDs for this comparison.');
+      if(requestIds.some(id=>store.db.prepare('SELECT 1 FROM ledger WHERE org=? AND requestId=?').get(account.org,id.toLowerCase())))throw new BillingError('duplicate_request','This comparison was already submitted. Check its results before starting another.');
+      if(!runnable)throw fail('New comparison images require the configured Gemini service and supported body library.',503);
+      if(credits&&store.billing.balance(account.org)<credits)throw new BillingError('insufficient_credits','This comparison needs '+credits+' AI credits. Add credits before running it.',402);
+      if(rateLimit&&credits){const usage=store.db.prepare("SELECT count(*) n,max(createdAt) last FROM ledger WHERE org=? AND store=? AND user=? AND pool='ai' AND kind='hold' AND action='tryon' AND createdAt>?").get(account.org,account.id,account.user.id,Date.now()-3600000);if(usage.n+credits>20||usage.last&&Date.now()-usage.last<15000)throw new BillingError('jewellery_rate_limit','Wait before comparing. The pilot allows 20 attempts per hour and 15 seconds between fitting operations.',429);}
+      held=false;preflights--;
+      const results=[];
+      for(let i=0;i<2;i++){
+        try{guard();const result=await execute(req,res,account,{...base,itemId:itemIds[i],consent:true,consentScope:'view-and-item',consentProvider:'gemini',requestId:requestIds[i]},{prepared:contexts[i],previousRequestId:i===1?requestIds[0].toLowerCase():'',extraGuard:guard});results.push({item:family.items[i],result});}
+        catch(error){if(req.aborted||res.destroyed)throw error;session(req,account);if(!results.length)throw error;jewellery.current(account,contexts[0]);const message=error instanceof ProviderError?providerErrorDetails(error,'gemini').message:error.status?error.message:'The second variant could not be completed.';return res.json({results,partial:true,error:message+' The completed result is kept; nothing was retried.',creditsUsed:results.reduce((n,r)=>n+r.result.creditsUsed,0)});}
+      }
+      res.json({results,partial:false,creditsUsed:results.reduce((n,r)=>n+r.result.creditsUsed,0)});
+    }finally{if(held)preflights--;for(const c of contexts){c.base.fill(0);c.product.fill(0);c.secondAngle?.fill(0);}}
+  }));
+  async function execute(req,res,account,body,{prepared,previousRequestId='',extraGuard=()=>{}}={}){
     fields(body,['avatarId','view','base','baseReceipt','baseReviewed','baseResultId','baseLookId','itemId','image','type','attributes','title','secondAngle','side','finger','hand','wrist','count','replaceExisting','consent','consentScope','consentProvider','requestId','sessionId']);
     if(body.consent!==true||body.consentScope!=='view-and-item'||body.consentProvider!=='gemini')throw fail('Customer consent to send this avatar view and jewellery product image to Gemini is required.');
     if(!validRequestId(body.requestId))throw new BillingError('invalid_request_id','Each jewellery request needs a fresh UUID v4 requestId.',400);
@@ -72,11 +110,11 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
     let context,job,timer,receipt;const cancelled=new AbortController();
     const stop=()=>{if(!res.writableEnded)cancelled.abort(fail('Jewellery generation stopped. No automatic retry was sent; the provider may still charge.',409));};
     req.on('aborted',stop);res.on('close',stop);
-    const active=()=>{if(cancelled.signal.aborted)throw cancelled.signal.reason;session(req,account);};
+    const active=()=>{if(cancelled.signal.aborted)throw cancelled.signal.reason;session(req,account);extraGuard();};
     try{
-      preflights++;try{context=await jewellery.context(account,body,{provider,model,guard:active});}finally{preflights--;}
+      if(prepared){context=prepared;active();}else{preflights++;try{context=await jewellery.context(account,body,{provider,model,guard:active});}finally{preflights--;}}
       const guard=()=>{active();jewellery.current(account,context);};guard();
-      const respond=(image,reused)=>res.json({image,provider:'gemini',kind:'jewellery-tryon',view:context.view,type:context.selection.type,reused,
+      const respond=(image,reused)=>({image,provider:'gemini',kind:'jewellery-tryon',view:context.view,type:context.selection.type,reused,
         previewMode:combinedMode(context.baseMode,'ai'),resultId:context.id,itemId:context.itemId,needsReview:true,creditsUsed:reused?0:1,reuseAvailable:Boolean(context.itemId),
         ...(receipt?{receipt}:{}),...(!receipt&&!reused?{receiptUnavailable:true,note:'Keep or download this preview. Do not regenerate just to obtain a save receipt.'}: {})});
       const recordResult=reused=>recordTryon(store,account,{requestId:body.requestId,sessionId:body.sessionId,avatarId:context.avatarId,garmentId:context.itemId||undefined},{source:'jewellery',reused});
@@ -87,9 +125,9 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
       job=jewellery.acquire(account,context);
       const live=()=>{guard();jewellery.job(account,context,job);};
       timer=setInterval(()=>{try{live();}catch(error){cancelled.abort(error);}},150);timer.unref();
-      const image=await meter(req,{billing:store.billing,account,action:'tryon',beforeReserve:()=>{
+      const image=await meter({body},{billing:store.billing,account,action:'tryon',beforeReserve:()=>{
         live();
-        if(rateLimit){const usage=store.db.prepare("SELECT count(*) n,max(createdAt) last FROM ledger WHERE org=? AND store=? AND user=? AND pool='ai' AND kind='hold' AND action='tryon' AND createdAt>?").get(account.org,account.id,account.user.id,Date.now()-3600000);if(usage.n>=20||usage.last&&Date.now()-usage.last<15000)throw new BillingError('jewellery_rate_limit','Wait before generating again. The pilot allows 20 try-on attempts per hour and 15 seconds between attempts.',429);}
+        if(rateLimit){const usage=store.db.prepare("SELECT count(*) n,max(CASE WHEN requestId<>? THEN createdAt END) last FROM ledger WHERE org=? AND store=? AND user=? AND pool='ai' AND kind='hold' AND action='tryon' AND createdAt>?").get(previousRequestId,account.org,account.id,account.user.id,Date.now()-3600000);if(usage.n>=20||usage.last&&Date.now()-usage.last<15000)throw new BillingError('jewellery_rate_limit','Wait before generating again. The pilot allows 20 try-on attempts per hour and 15 seconds between attempts.',429);}
       },beforeCommit:output=>{
         live();
         // Receipt failures cannot throw away a paid, validated image or cause a
@@ -106,5 +144,6 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
       clearInterval(timer);req.off('aborted',stop);res.off('close',stop);if(job)jewellery.release(job);
       context?.base.fill(0);context?.product.fill(0);context?.secondAngle?.fill(0);
     }
-  }));
+  }
+  app.post('/api/jewellery/tryon',wrap(async(req,res,account)=>res.json(await execute(req,res,account,req.body||{}))));
 }

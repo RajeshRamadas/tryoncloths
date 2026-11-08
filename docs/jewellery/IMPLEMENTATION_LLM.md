@@ -10,7 +10,8 @@ Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 **J6 implemented in web `0.20.0-alpha.6`**;
 **J7 implemented in web `0.20.0-alpha.7`**;
 **J8 implemented in web `0.20.0-alpha.8`**;
-**J9 implemented in web `0.20.0-alpha.9`**. See
+**J9 implemented in web `0.20.0-alpha.9`**;
+**J10 implemented in web `0.20.0-alpha.10`**. See
 [catalogue setup](../JEWELLERY_CATALOGUE.md) and
 [local identity-check scope and validation](../JEWELLERY_IDENTITY.md), plus
 [hands assets and placement coordinates](../JEWELLERY_HANDS.md), and the
@@ -19,8 +20,9 @@ Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 [jewellery prompt, scale and result checks](../JEWELLERY_TRYON.md), plus the
 [guarded try-on API, approval and free reuse](../JEWELLERY_API.md), and
 [the jewellery studio, saved looks and sharing](../JEWELLERY_STUDIO.md), and
-[free cut-out placement, save/share and validation](../JEWELLERY_OVERLAY.md).
-J10 is the next code task; J10–J12 remain pending. J8 exposes view preparation,
+[free cut-out placement, save/share and validation](../JEWELLERY_OVERLAY.md), and
+[costed variant comparisons and complete-look boards](../JEWELLERY_COMPARE_COMPLETE.md).
+J11 is the next code task; J11–J12 remain pending. J8 exposes view preparation,
 item selection, stacking/review, saved looks, labelled downloads and sharing.
 Pilot threshold calibration and live provider quality/cost checks remain outstanding.
 The separate commercial C16.5
@@ -312,8 +314,10 @@ J9 implementation: [cut-out preparation, placement editor and verification](../J
 
 **Acceptance.**
 
-- [ ] Compare shows the cost before running and reuses approved variants for free.
-- [ ] Complete look export is legible on a phone.
+- [x] Compare shows the cost before running and reuses approved variants for free.
+- [x] Complete look export is legible on a phone.
+
+J10 implementation: [variant groups, guarded comparison and complete-look workflow](../JEWELLERY_COMPARE_COMPLETE.md).
 
 ### Task J11 — sizing help
 

@@ -189,7 +189,7 @@ export class AccountStore {
   }
   async saveLook(account, input, {view='full',itemsJson=[],previewMode='ai',guard}={}) {
     const name = typeof input.name === "string" ? input.name.trim() : "";
-    if (!name || name.length > 60 || !Array.isArray(input.garments) || input.garments.length > 10 || input.garments.some(x => typeof x !== "string" || !x.trim() || x.length > 120)) throw error("Use a look name and up to 10 garment labels of at most 120 characters.");
+    if (!name || name.length > 60 || !Array.isArray(input.garments) || input.garments.length > (view==='complete'?20:10) || input.garments.some(x => typeof x !== "string" || !x.trim() || x.length > 120)) throw error("Use a look name and up to 10 garment labels of at most 120 characters.");
     this.requireAvatar(account, input.avatarId);
     validateLookTracking(this,account,input);
     const {image, thumbnail} = await savedImage(input.image,view);

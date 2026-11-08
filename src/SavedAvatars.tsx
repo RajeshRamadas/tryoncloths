@@ -94,10 +94,10 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
       {cloud && !localView && looksFor && <section aria-label={`Looks for ${looksFor.name}`}><h3>Looks for {looksFor.name}</h3>
         {!looks.length && <p>No looks saved for this avatar yet.</p>}
         {looks.map(look=><article className="saved-avatar-item" key={look.id}><img src={look.thumbnail} alt={`Saved look: ${look.name}`}/><div><h3>{look.name}</h3><p>{look.garments.join(" · ")}</p>
-          <>{look.itemsJson?.length?<a className="button primary" href={'/jewellery?avatar='+encodeURIComponent(look.avatarId)+'&look='+encodeURIComponent(look.id)}>Open jewellery look {look.name}</a>:<button className="button primary" disabled={busy} onClick={()=>void useLook(look)}>Open look {look.name}</button>}</>
+          <>{look.view==='complete'?<a className="button primary" href={'/complete-look?avatar='+encodeURIComponent(look.avatarId)+'&look='+encodeURIComponent(look.id)}>Open complete look {look.name}</a>:look.itemsJson?.length?<a className="button primary" href={'/jewellery?avatar='+encodeURIComponent(look.avatarId)+'&look='+encodeURIComponent(look.id)}>Open jewellery look {look.name}</a>:<button className="button primary" disabled={busy} onClick={()=>void useLook(look)}>Open look {look.name}</button>}</>
           <button className="button secondary" disabled={busy} onClick={()=>setShareLook(shareLook===look.id?null:look.id)}>Share {look.name}</button>
           <PurchaseLook key={`purchase-${look.id}`} lookId={look.id} disabled={busy} initialPurchase={{purchasedAt:look.purchasedAt??null,purchasedSize:look.purchasedSize??null}}/>
-          {shareLook===look.id && <ShareLook key={look.id} lookId={look.id} disabled={busy} kind={look.itemsJson?.length?'jewellery':'outfit'}/>}
+          {shareLook===look.id && <ShareLook key={look.id} lookId={look.id} disabled={busy} kind={look.view==='complete'?'complete':look.itemsJson?.length?'jewellery':'outfit'}/>}
           {confirmLookDelete===look.id ? <><button className="button secondary" disabled={busy} onClick={()=>void removeLook(look.id)}>Confirm look deletion</button><button className="button back-button" disabled={busy} onClick={()=>setConfirmLookDelete(null)}>Cancel</button></> : <button className="button back-button" disabled={busy} onClick={()=>setConfirmLookDelete(look.id)}>Delete look {look.name}</button>}
         </div></article>)}
       </section>}

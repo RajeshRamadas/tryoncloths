@@ -104,7 +104,8 @@ Release validation: **377 backend tests, 123 browser tests and the production
 web build passed**. The browser suite includes expiry during a pending export,
 which cancels the download before it writes a customer image.
 
-J9's free transparent-image overlay is next. Compare/complete looks, sizing,
+J9 adds [free overlays](JEWELLERY_OVERLAY.md), and J10 adds
+[variant comparisons and complete looks](JEWELLERY_COMPARE_COMPLETE.md). Sizing,
 customer hand photos and live jewellery evaluation remain later work. Real
 Gemini detail fidelity, placement, costs, identity/hand thresholds and Lightsail
 performance still require pilot evidence.

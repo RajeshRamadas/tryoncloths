@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import {cleanTitle} from './gemini-tryon.js';
-import {jewelleryTypes,jewelleryMetals,validateAttributes,chooseView} from './jewellery-types.js';
+import {jewelleryTypes,jewelleryMetals,validateAttributes,chooseView,visualAttributes} from './jewellery-types.js';
 import {validateHandAnchors} from './hands-templates.js';
 import {requirePortraitFraming} from './avatar-views.js';
 import {detectFaces,requireVisibleFace} from './face-check.js';
@@ -17,7 +17,7 @@ const referenceText = value => cleanTitle(value).replace(/\b(?:bindi|sindoor)\b/
 
 function selection({type,attributes,view,side,hand,finger,wrist,replaceExisting=false}={}) {
   let a;
-  try {a=validateAttributes(type,attributes);}catch{fail();}
+  try {a=visualAttributes(validateAttributes(type,attributes));}catch{fail();}
   const item=jewelleryTypes[type],selectedView=view??chooseView(type,a);
   if(!Object.hasOwn(views,selectedView)||!(necklaces.includes(type)?['portrait','full'].includes(selectedView):selectedView===item.view))fail();
   if(a.pair&&!item.pair)fail();
@@ -56,7 +56,7 @@ function pxPerMm(anchors,type) {
 
 /** Missing catalogue dimensions are never guessed. Anchors are server-owned. */
 export function scaleSentence(type,attributes,anchors) {
-  let a;try{a=validateAttributes(type,attributes);}catch{fail();}
+  let a;try{a=visualAttributes(validateAttributes(type,attributes));}catch{fail();}
   const result=[],scale=pxPerMm(anchors,type);
   const measured=(mm,label)=>`${label} about ${mm} mm${scale?` (approximately ${Math.round(mm*scale)} px at this view's illustrative scale)`:''}.`;
   if(['drop_earrings','jhumka'].includes(type)&&a.dropMm!==undefined){

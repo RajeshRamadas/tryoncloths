@@ -1,5 +1,6 @@
 import {installCatalogueSchema,requireCatalogueSpace,catalogueLimit,transaction,assertCatalogueWritable,catalogueFields} from './catalogue-fields.js';
-import {catalogueCategory,jewelleryTypes,jewelleryMetals,validateAttributes} from './jewellery-types.js';
+import {catalogueCategory,jewelleryTypes,jewelleryMetals,validateAttributes,visualAttributes} from './jewellery-types.js';
+import {validateVariantLink,variantParent} from './jewellery-variants.js';
 import sharp from 'sharp';
 import {overlayAsset} from './jewellery-overlay.js';
 import { randomBytes, createHash, createHmac, timingSafeEqual } from 'node:crypto';
@@ -51,7 +52,7 @@ export async function productImage(value) {
   } catch { throw problem('Use a valid garment photo at least 160 × 160 pixels and under 5 MB.'); }
 }
 
-const metadata = row => ({hasOverlay:Boolean(row.hasOverlay??row.overlayPng),overlayAnchor:row.overlayAnchor||null,category:row.category||'garment',attributes:row.category==='jewellery'?JSON.parse(row.attributesJson||'{}'):{},readOnly:Boolean(row.readOnly),sharedFrom:row.sharedFrom||null,needsTypeReview:Boolean(row.needsTypeReview), id: row.id, name: row.name, garmentType: row.garmentType, variant: ['shopify','woo'].includes(row.source)?[row.colourLabel,...JSON.parse(row.sizesJson||'[]'),row.sku].filter(Boolean).join(' · ').slice(0,80):row.variant,
+const metadata = row => ({hasOverlay:Boolean(row.hasOverlay??row.overlayPng),overlayAnchor:row.overlayAnchor||null,category:row.category||'garment',attributes:row.category==='jewellery'?{...JSON.parse(row.attributesJson||'{}'),...(variantParent(row)?{variantOf:variantParent(row)}:{})}:{},readOnly:Boolean(row.readOnly),sharedFrom:row.sharedFrom||null,needsTypeReview:Boolean(row.needsTypeReview), id: row.id, name: row.name, garmentType: row.garmentType, variant: ['shopify','woo'].includes(row.source)?[row.colourLabel,...JSON.parse(row.sizesJson||'[]'),row.sku].filter(Boolean).join(' · ').slice(0,80):row.variant,
   sku:row.sku||null,brand:row.brand||'',priceInr:row.priceInr??null,mrpInr:row.mrpInr??null,sizes:JSON.parse(row.sizesJson||'[]'),stock:row.stock||'in',source:row.source||'manual',colourLabel:row.colourLabel||'',updatedAt:row.updatedAt||row.savedAt,
   sourceUrl: row.sourceUrl, savedAt: row.savedAt, adaptations: row.adaptations || 0,
   thumbnail: `data:image/jpeg;base64,${Buffer.from(row.thumbnail).toString('base64')}` });
@@ -102,11 +103,12 @@ export class GarmentStore {
     transaction(this.db,()=>{
       const previous=this.db.prepare('SELECT imageHash,garmentType,name,externalId,updatedAt,stock,needsTypeReview,category,attributesJson,overlayPng,overlayAnchor FROM garments WHERE account=? AND id=?').get(account.id,row.id);
       if(previous&&previous.imageHash===row.imageHash&&previous.garmentType===row.garmentType&&previous.name===row.name&&previous.externalId===row.sharedFrom+':'+row.sharedId&&previous.updatedAt===row.updatedAt&&previous.stock===row.stock&&previous.needsTypeReview===row.needsTypeReview&&previous.category===row.category&&previous.attributesJson===row.attributesJson&&previous.overlayAnchor===row.overlayAnchor&&Buffer.from(previous.overlayPng||[]).equals(Buffer.from(row.overlayPng||[])))return;
-      if(previous&&(previous.imageHash!==row.imageHash||previous.garmentType!==row.garmentType||previous.name!==row.name||previous.externalId!==row.sharedFrom+':'+row.sharedId||previous.category!==row.category||previous.attributesJson!==row.attributesJson))this.db.prepare('DELETE FROM garment_results WHERE account=? AND garmentId=?').run(account.id,row.id);
+      if(previous&&(previous.imageHash!==row.imageHash||previous.garmentType!==row.garmentType||previous.name!==row.name||previous.externalId!==row.sharedFrom+':'+row.sharedId||previous.category!==row.category||JSON.stringify(visualAttributes(JSON.parse(previous.attributesJson)))!==JSON.stringify(visualAttributes(JSON.parse(row.attributesJson)))))this.db.prepare('DELETE FROM garment_results WHERE account=? AND garmentId=?').run(account.id,row.id);
       const columns=this.db.prepare('PRAGMA table_info(garments)').all().map(c=>c.name),values={...row,source:'master',variant:row.id,externalId:row.sharedFrom+':'+row.sharedId};
       this.db.prepare(`INSERT INTO garments(${columns.join(',')}) VALUES(${columns.map(()=>'?').join(',')}) ON CONFLICT(account,id) DO UPDATE SET ${columns.filter(c=>!['account','id'].includes(c)).map(c=>c+'=excluded.'+c).join(',')}`).run(...columns.map(c=>values[c]));
     });
   }
+  describe(row){return metadata(row);}
   list(account,options={}) {
     const category=catalogueCategory(options.category,options);
     return this.db.prepare('SELECT g.id,g.name,g.garmentType,g.variant,g.sourceUrl,g.thumbnail,g.savedAt,g.sku,g.brand,g.priceInr,g.mrpInr,g.sizesJson,g.stock,g.colourLabel,g.source,g.updatedAt,g.needsTypeReview,g.category,g.attributesJson,g.overlayAnchor,(g.overlayPng IS NOT NULL) AS hasOverlay,g.sharedFrom,g.readOnly,(SELECT count(*) FROM garment_results r WHERE r.account=g.account AND r.garmentId=g.id) AS adaptations FROM catalogue_visible g WHERE g.account=? AND g.category=? ORDER BY g.savedAt DESC').all(account.id,category).map(metadata);
@@ -159,6 +161,7 @@ export class GarmentStore {
     return transaction(this.db,()=>{
     if(category==='jewellery'){
       options.guard?.();
+      validateVariantLink(this.db,account,null,input.garmentType,attributes);
       const actor=account.user&&this.accounts.identity(account.user.id,account.id);
       if(!actor||actor.org!==account.org||!['owner','manager'].includes(actor.user.role))throw problem('Only owners and managers can change the jewellery catalogue.',403);
     }

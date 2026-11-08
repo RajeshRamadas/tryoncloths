@@ -8,8 +8,8 @@ async function api(path:string,method='GET',body?:unknown){
   const data=await response.json();if(response.status===401)window.dispatchEvent(new Event('forme-account-expired'));
   if(!response.ok)throw new Error(data.error||'The share link could not be updated.');return data;
 }
-export default function ShareLook({lookId,disabled=false,kind='outfit'}:{lookId:string;disabled?:boolean;kind?:'outfit'|'jewellery'}){
-  const subject=kind==='jewellery'?'jewellery look':'outfit';
+export default function ShareLook({lookId,disabled=false,kind='outfit'}:{lookId:string;disabled?:boolean;kind?:'outfit'|'jewellery'|'complete'}){
+  const subject=kind==='complete'?'complete look':kind==='jewellery'?'jewellery look':'outfit';
   const [links,setLinks]=useState<LinkRecord[]>([]),[created,setCreated]=useState<Created|null>(null);
   const [days,setDays]=useState('30'),[consent,setConsent]=useState(false),[busy,setBusy]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState('');
   const alive=useRef(true);
@@ -26,7 +26,7 @@ export default function ShareLook({lookId,disabled=false,kind='outfit'}:{lookId:
     <label>Link expires after<select value={days} disabled={disabled||busy} onChange={e=>setDays(e.target.value)}><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option></select></label>
     <label className="consent"><input type="checkbox" checked={consent} disabled={disabled||busy} onChange={e=>setConsent(e.target.checked)}/><span>The customer agrees to make this {subject} available through a share link.</span></label>
     <button className="button secondary" disabled={disabled||busy||!consent} onClick={()=>void create()}>Create {subject} link</button>
-    {created&&<div className="created-share"><label>{kind==='jewellery'?'Jewellery share link':'Outfit share link'}<input readOnly value={created.url} onFocus={e=>e.target.select()}/></label><p>Expires {new Date(created.expiresAt).toLocaleDateString()}.</p><div className="customer-actions">
+    {created&&<div className="created-share"><label>{kind==='complete'?'Complete look share link':kind==='jewellery'?'Jewellery share link':'Outfit share link'}<input readOnly value={created.url} onFocus={e=>e.target.select()}/></label><p>Expires {new Date(created.expiresAt).toLocaleDateString()}.</p><div className="customer-actions">
       {created.customerPhone&&<a className="button primary" target="_blank" rel="noopener noreferrer" href={`https://wa.me/${created.customerPhone.replace(/\D/g,'')}?text=${encodeURIComponent(message)}`}>Share on WhatsApp</a>}
       <button className="button secondary" disabled={busy||disabled} onClick={async()=>{try{await navigator.clipboard.writeText(created.url);setNotice('Link copied.');}catch{setNotice('Select and copy the link above.');}}}>Copy link</button>
       {typeof navigator.share==='function'&&<button className="button secondary" disabled={busy||disabled} onClick={async()=>{try{await navigator.share({title:'Your '+subject+' preview',text:'Here is your '+subject+' preview.',url:created.url});}catch(e){if((e as Error).name!=='AbortError')setError('Sharing was unavailable. Copy the link instead.');}}}>Share using another app</button>}

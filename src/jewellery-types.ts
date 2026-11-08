@@ -1,7 +1,7 @@
 import {jewelleryTypes} from './jewellery-definitions.js';
 export {jewelleryMetals,bangleSizes,jewelleryView,jewelleryTypes} from './jewellery-definitions.js';
 export type JewelleryType=keyof typeof jewelleryTypes;
-export type JewelleryAttributes={metal:string;purity?:string;stones?:string;weightG?:number;lengthCm?:number;dropMm?:number;pendantMm?:number;ringSizeIn?:number;bangleSize?:string;count?:number;pair?:boolean;huid?:string};
+export type JewelleryAttributes={metal:string;variantOf?:string;purity?:string;stones?:string;weightG?:number;lengthCm?:number;dropMm?:number;pendantMm?:number;ringSizeIn?:number;bangleSize?:string;count?:number;pair?:boolean;huid?:string};
 export const jewelleryChoices=Object.entries(jewelleryTypes).map(([id,item])=>[id,item.label]) as [JewelleryType,string][];
 /** A title hint only; staff explicitly choose the saved type and metal. */
 export function guessJewelleryType(title:string):JewelleryType|null{
