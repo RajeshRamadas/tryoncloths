@@ -119,5 +119,5 @@ flags and session cleanup at 390 px.
 Tests use local customer fixtures and injected generation, never live Gemini.
 They verify product behavior and accounting, not live-provider jewellery fidelity
 or anchor accuracy. [Browser captures](testing/jewellery-compare-complete/README.md)
-show the tested screens. J11 sizing help is the next task; pilot quality/cost and
-commercial release evidence remain outstanding.
+show the tested screens. J11 now adds [optional sizing help](JEWELLERY_SIZING.md);
+pilot quality/cost and commercial release evidence remain outstanding.

@@ -607,7 +607,7 @@ export default function App() {
                   <p className="section-copy">
                     A few details to find their closest starting point.
                   </p>
-                  {accountState.account && <CustomerPicker key={`${accountState.account.id}-${session}`} selected={customer} disabled={generating || exporting} onSelect={selectCustomer} onUpdate={setCustomer}/>}
+                  {accountState.account && <CustomerPicker key={`${accountState.account.id}-${session}`} jewelleryEnabled={jewelleryAvailable} selected={customer} disabled={generating || exporting} onSelect={selectCustomer} onUpdate={setCustomer}/>}
                   <div className="field-label-row">
                     <h3>Customer photos</h3>
                     <span>Optional for a sample</span>

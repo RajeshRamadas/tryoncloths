@@ -1,3 +1,4 @@
+import {customerSizing,saveCustomerSizing,necklaceGuide} from './jewellery-sizing.js';
 import {prepareComplete,completePreview,saveComplete} from './jewellery-complete.js';
 import {variantChoices,comparisonVariants,comparisonQuote,verifyComparisonQuote} from './jewellery-variants.js';
 import {accountUser} from './accounts.js';
@@ -12,7 +13,7 @@ import {combinedMode} from '../src/jewellery-overlay.js';
 
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 function fields(body,allowed){if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!allowed.includes(k)))throw fail('Use only the supported jewellery action fields.');}
-export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,rateLimit=true,femaleEnabled=false,generate=jewelleryTryOn}={}){
+export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,rateLimit=true,femaleEnabled=false,generate=jewelleryTryOn,computeFullGuide}={}){
   const jewellery=store?new JewelleryStore(store):null;app.locals.jewellery=jewellery;let preflights=0;
   const session=(req,account)=>{
     const current=accountUser(store,req);
@@ -34,6 +35,13 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
       else res.status(error.status||500).json({error:error.status?error.message:'Jewellery try-on could not be completed. No request was automatically retried.'});
     }
   };
+  app.get('/api/jewellery/size',wrap((req,res,account)=>{if(Object.keys(req.query).some(k=>k!=='avatarId'))throw fail('Choose a saved avatar for sizing help.');res.json(customerSizing(store,account,req.query.avatarId));}));
+  app.post('/api/jewellery/size',wrap((req,res,account)=>{fields(req.body,['avatarId','customerId','measurements','storageConsent']);res.json(saveCustomerSizing(store,account,req.body,()=>session(req,account)));}));
+  app.get('/api/jewellery/necklace-guide',wrap(async(req,res,account)=>{
+    if(Object.keys(req.query).some(k=>!['avatarId','view'].includes(k)))throw fail('Choose a saved view for the necklace guide.');
+    if(preflights>=2)throw new BillingError('image_busy','Other views are being checked. Continue without the guide, or try it later.',429);preflights++;
+    try{res.json(await necklaceGuide(store,account,req.query.avatarId,req.query.view,{guard:()=>{if(req.aborted||res.destroyed)throw fail('Guide request stopped.',409);session(req,account);},...(computeFullGuide?{computeFull:computeFullGuide}:{})}));}finally{preflights--;}
+  }));
   app.get('/api/jewellery/variants/:id',wrap((req,res,account)=>res.json({variants:variantChoices(store,account,req.params.id)})));
   for(const path of ['/api/jewellery/complete/prepare','/api/jewellery/complete'])app.post(path,wrap(async(req,res,account)=>{
     const input=req.body||{};fields(input,['avatarId','outfitLookId','portraitLookId','sourceHash','name','reviewed','storageConsent']);

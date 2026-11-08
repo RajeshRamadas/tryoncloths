@@ -119,6 +119,12 @@ failed checks and free reuse of reviewed, saved results for the exact same
 starting view, item and placement. Enable `TRYON_JEWELLERY=1` with account
 storage and Gemini configuration to expose the API; the interactive jewellery
 studio screen is the next task, J8.
+Web `0.20.0-alpha.11` adds [J11 optional jewellery sizing](docs/JEWELLERY_SIZING.md).
+Store finger/hand measurements and known ring/bangle sizes on customer profiles.
+The Jewellery studio shows confidence-labelled size suggestions beside rings
+and bangles, plus free portrait/full-body necklace length guides. Guidance never
+changes the product size or blocks try-on, and uses no AI credits.
+
 Web `0.20.0-alpha.10` adds [J10 jewellery comparisons and complete looks](docs/JEWELLERY_COMPARE_COMPLETE.md).
 Link metal/colour variants in the catalogue, check the comparison cost, then
 compare two designs on the same saved view. Approved exact variants reuse free.

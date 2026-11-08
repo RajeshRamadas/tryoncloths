@@ -1958,3 +1958,13 @@ dialog::backdrop {
 .complete-layout label { display:block; margin:14px 0; }
 .complete-preview { display:block; width:100%; height:auto; border-radius:12px; }
 @media (max-width:760px) { .complete-layout { grid-template-columns:minmax(0,1fr); } .jewellery-compare-grid article { padding:7px; } }
+
+.jewellery-size-help { border:1px solid #dce2db; border-radius:12px; padding:16px; margin:18px 0; background:#f5f7f0; }
+.jewellery-size-help .size-help-result { font-weight:700; color:#245c49; }
+.jewellery-size-help .measurement-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.jewellery-necklace-guide { margin:18px 0; }
+.necklace-guide-picture { overflow:hidden; display:block; width:100%; height:auto; background:#e4e2dd; border-radius:12px; margin:14px 0; }
+.necklace-guide-legend { border:1px solid #dce2db; border-radius:12px; padding:12px; }
+.necklace-guide-legend label { display:flex; align-items:flex-start; gap:8px; font-size:14px; margin:10px 0; }
+.necklace-guide-legend input { width:auto!important; flex:none; }
+@media(max-width:480px) { .jewellery-size-help .measurement-grid { grid-template-columns:minmax(0,1fr); } }
