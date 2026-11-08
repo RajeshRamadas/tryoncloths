@@ -6,14 +6,16 @@ Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 **J2 implemented in web `0.20.0-alpha.2`**;
 **J3 implemented in web `0.20.0-alpha.3`**;
 **J4 implemented in web `0.20.0-alpha.4`**;
-**J5 implemented in web `0.20.0-alpha.5`**. See
+**J5 implemented in web `0.20.0-alpha.5`**;
+**J6 implemented in web `0.20.0-alpha.6`**. See
 [catalogue setup](../JEWELLERY_CATALOGUE.md) and
 [local identity-check scope and validation](../JEWELLERY_IDENTITY.md), plus
 [hands assets and placement coordinates](../JEWELLERY_HANDS.md), and the
 [portrait adapter and its checks](../JEWELLERY_PORTRAITS.md), plus
-[authenticated view creation, approval and storage](../AVATAR_VIEWS.md).
-J6 is the next code task; J6–J12 remain pending. J5 exposes guarded portrait and
-hands views. Pilot threshold calibration and live provider quality/cost checks
+[authenticated view creation, approval and storage](../AVATAR_VIEWS.md), and
+[jewellery prompt, scale and result checks](../JEWELLERY_TRYON.md).
+J7 is the next code task; J7–J12 remain pending. J5 exposes guarded portrait and
+hands views; J6 is an internal adapter with no route or UI. Pilot threshold calibration and live provider quality/cost checks
 remain outstanding; jewellery try-on is not yet available.
 The separate commercial C16.5
 live service/legal/cost and pilot evidence remains outstanding.
@@ -217,9 +219,13 @@ receipt; arbitrary images cannot be approved just by supplying a PNG.
 
 **Acceptance.**
 
-- [ ] Snapshot tests for prompts of earrings (pair), nose pin (left), ring (right ring finger), bangles (count 4), necklace 45 cm.
-- [ ] The prompt never contains "sindoor" or "bindi" except in the "never add" sentence.
-- [ ] Each failing check maps to its error code.
+- [x] Snapshot tests for prompts of earrings (pair), nose pin (left), ring (right ring finger), bangles (count 4), necklace 45 cm.
+- [x] The prompt never contains "sindoor" or "bindi" except in the "never add" sentence.
+- [x] Each failing check maps to its error code.
+
+J6 implementation: [adapter contract and validation](../JEWELLERY_TRYON.md).
+Clothing prompts are unchanged. No public route, credits or reuse wiring is
+added in this stage; `jewelleryAvailable` remains false until J7.
 
 ### Task J7 — `POST /api/jewellery/tryon` and reuse
 

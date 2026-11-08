@@ -23,7 +23,7 @@ export const garmentTypes = {
   outfit: { label: "complete outfit", region: "all visible clothing; footwear only if footwear is shown in Image 2", keep: "footwear unless Image 2 shows footwear" },
 };
 
-const cleanTitle = title => typeof title === "string"
+export const cleanTitle = title => typeof title === "string"
   ? title.replace(/[^\p{L}\p{N}\s.,'&()\-/%]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 100) : "";
 
 export function tryOnPrompt(garmentType, title = "") {

@@ -184,5 +184,6 @@ on 50+ pilot portraits, and real likeness, complexion, hair, framing, provider
 quota/cost/retention and Lightsail performance remain unverified. Keep the pilot
 flag off until those operator checks are complete. No APK or deployment was made.
 
-J6 jewellery adaptation prompts/checks are next; product placement and jewellery
-try-on remain pending.
+J6's internal [jewellery adaptation adapter](JEWELLERY_TRYON.md) is implemented
+in `0.20.0-alpha.6`. J7's public route, credit/refund integration and adaptation
+reuse are next; the jewellery studio UI follows in J8.
