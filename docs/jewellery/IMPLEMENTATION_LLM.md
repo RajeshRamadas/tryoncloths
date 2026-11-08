@@ -2,9 +2,13 @@
 
 As of 2026-10-30 · Baseline: `main` web **0.15.0** · Stage: later, after commercial R1 · Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md) · Design: [`DESIGN.md`](DESIGN.md)
 
-Implementation update (2026-11-07): **J1 implemented in web `0.20.0-alpha.1`**.
-See [catalogue setup, scope and validation](../JEWELLERY_CATALOGUE.md).
-J2 is the next code task; J2–J12 remain pending. The separate commercial C16.5
+Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
+**J2 implemented in web `0.20.0-alpha.2`**. See
+[catalogue setup](../JEWELLERY_CATALOGUE.md) and
+[local identity-check scope and validation](../JEWELLERY_IDENTITY.md).
+J3 is the next code task; J3–J12 remain pending. J2 is an internal helper;
+pilot threshold calibration and integration into generation remain outstanding.
+The separate commercial C16.5
 live service/legal/cost and pilot evidence remains outstanding.
 
 ## How to use this guide
@@ -118,8 +122,8 @@ flowchart TB
 
 **Acceptance.**
 
-- [ ] Same template image vs itself (slightly resized) passes; two different template faces fail.
-- [ ] A grep test confirms no descriptor arrays are logged.
+- [x] Same template image vs itself (slightly resized) passes; two different template faces fail.
+- [x] A grep test confirms no descriptor arrays are logged.
 
 ### Task J3 — hands templates and anchors
 
