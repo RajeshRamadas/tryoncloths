@@ -1,5 +1,9 @@
 # J8 — jewellery studio
 
+J9 adds [free transparent cut-out overlays](JEWELLERY_OVERLAY.md) alongside this
+AI workflow. Overlay placement uses no Gemini key or AI credit.
+
+
 Web `0.20.0-alpha.8` adds Task J8's staff screen using the
 [saved views](AVATAR_VIEWS.md) and [J7 API](JEWELLERY_API.md).
 It loads separately from the main app bundle. No APK, production deployment,

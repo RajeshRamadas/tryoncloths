@@ -64,7 +64,7 @@ export class AccountStore {
       CREATE INDEX IF NOT EXISTS looks_avatar ON looks(account,avatarId);`);
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="body_type")) this.db.exec("ALTER TABLE avatars ADD COLUMN body_type TEXT NOT NULL DEFAULT 'male'");
     if (!this.db.prepare("PRAGMA table_info(avatars)").all().some(c=>c.name==="template_tone")) this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
-    transaction(this.db,()=>{const columns=this.db.prepare('PRAGMA table_info(looks)').all().map(c=>c.name);if(!columns.includes('view'))this.db.exec("ALTER TABLE looks ADD COLUMN view TEXT NOT NULL DEFAULT 'full'");if(!columns.includes('itemsJson'))this.db.exec("ALTER TABLE looks ADD COLUMN itemsJson TEXT NOT NULL DEFAULT '[]'");});
+    transaction(this.db,()=>{const columns=this.db.prepare('PRAGMA table_info(looks)').all().map(c=>c.name);if(!columns.includes('view'))this.db.exec("ALTER TABLE looks ADD COLUMN view TEXT NOT NULL DEFAULT 'full'");if(!columns.includes('itemsJson'))this.db.exec("ALTER TABLE looks ADD COLUMN itemsJson TEXT NOT NULL DEFAULT '[]'");if(!columns.includes('previewMode'))this.db.exec("ALTER TABLE looks ADD COLUMN previewMode TEXT NOT NULL DEFAULT 'ai'");});
     this.garments = new GarmentStore(this);
     try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); this.sizes=new SizeStore(this); installTrackingSchema(this.db); this.analytics=new Analytics(this); installSharedCatalogueSchema(this.db); installSyncSchema(this.db); installPhotoSchema(this.db); this.branding=new BrandingStore(this); }
     catch (error) { this.db.close(); throw error; }
@@ -187,7 +187,7 @@ export class AccountStore {
   list(account) {
     return this.db.prepare("SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC").all(account.id).map(row=>({...row,thumbnail:`data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`}));
   }
-  async saveLook(account, input, {view='full',itemsJson=[],guard}={}) {
+  async saveLook(account, input, {view='full',itemsJson=[],previewMode='ai',guard}={}) {
     const name = typeof input.name === "string" ? input.name.trim() : "";
     if (!name || name.length > 60 || !Array.isArray(input.garments) || input.garments.length > 10 || input.garments.some(x => typeof x !== "string" || !x.trim() || x.length > 120)) throw error("Use a look name and up to 10 garment labels of at most 120 characters.");
     this.requireAvatar(account, input.avatarId);
@@ -201,7 +201,7 @@ export class AccountStore {
     const id = digest(Buffer.concat([image,Buffer.from(input.avatarId)])), savedAt = Date.now();
     const exists = this.db.prepare("SELECT id FROM looks WHERE account=? AND id=?").get(account.id,id);
     if (!exists && this.db.prepare("SELECT count(*) AS total FROM looks WHERE account=?").get(account.id).total >= 200) throw error("Your account holds up to 200 looks. Delete one before adding another.",409);
-    this.db.prepare(`INSERT INTO looks(id,account,avatarId,name,garments,image,thumbnail,savedAt,view,itemsJson) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET avatarId=excluded.avatarId,name=excluded.name,garments=excluded.garments,savedAt=excluded.savedAt,view=excluded.view,itemsJson=excluded.itemsJson`).run(id,account.id,input.avatarId,name,JSON.stringify(input.garments),image,thumbnail,savedAt,view,JSON.stringify(itemsJson));
+    this.db.prepare(`INSERT INTO looks(id,account,avatarId,name,garments,image,thumbnail,savedAt,view,itemsJson,previewMode) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET avatarId=excluded.avatarId,name=excluded.name,garments=excluded.garments,savedAt=excluded.savedAt,view=excluded.view,itemsJson=excluded.itemsJson,previewMode=excluded.previewMode`).run(id,account.id,input.avatarId,name,JSON.stringify(input.garments),image,thumbnail,savedAt,view,JSON.stringify(itemsJson),previewMode);
     attributeLook(this,account,id,input);
     return {id,avatarId:input.avatarId,savedAt};
     });
@@ -212,8 +212,8 @@ export class AccountStore {
   listLooks(account,avatarId) {
     if (avatarId !== undefined) this.requireAvatar(account,avatarId);
     const rows = avatarId === undefined
-      ? this.db.prepare("SELECT id,avatarId,name,garments,thumbnail,savedAt,purchasedAt,purchasedSize,staffUser,view,itemsJson FROM looks WHERE account=? ORDER BY savedAt DESC").all(account.id)
-      : this.db.prepare("SELECT id,avatarId,name,garments,thumbnail,savedAt,purchasedAt,purchasedSize,staffUser,view,itemsJson FROM looks WHERE account=? AND avatarId=? ORDER BY savedAt DESC").all(account.id,avatarId);
+      ? this.db.prepare("SELECT id,avatarId,name,garments,thumbnail,savedAt,purchasedAt,purchasedSize,staffUser,view,itemsJson,previewMode FROM looks WHERE account=? ORDER BY savedAt DESC").all(account.id)
+      : this.db.prepare("SELECT id,avatarId,name,garments,thumbnail,savedAt,purchasedAt,purchasedSize,staffUser,view,itemsJson,previewMode FROM looks WHERE account=? AND avatarId=? ORDER BY savedAt DESC").all(account.id,avatarId);
     return rows.map(row=>({...row,...lookAttribution(this,account,row.id),itemsJson:JSON.parse(row.itemsJson),garments:JSON.parse(row.garments),thumbnail:`data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`}));
   }
   lookImage(account,id) { const row=this.db.prepare("SELECT image FROM looks WHERE account=? AND id=?").get(account.id,id);return row?Buffer.from(row.image):null; }

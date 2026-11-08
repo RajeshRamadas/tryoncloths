@@ -5,6 +5,8 @@ import {JewelleryStore,jewelleryPng} from './jewellery-store.js';
 import {jewelleryTryOn} from './jewellery-tryon.js';
 import {ProviderError,providerErrorDetails} from './provider-errors.js';
 import {saveJewelleryLook,jewelleryLook} from './jewellery-looks.js';
+import {prepareOverlay,applyOverlay} from './jewellery-overlay.js';
+import {combinedMode} from '../src/jewellery-overlay.js';
 
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 function fields(body,allowed){if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!allowed.includes(k)))throw fail('Use only the supported jewellery action fields.');}
@@ -30,7 +32,22 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
       else res.status(error.status||500).json({error:error.status?error.message:'Jewellery try-on could not be completed. No request was automatically retried.'});
     }
   };
-  app.get('/api/jewellery/looks/:id',wrap((req,res,account)=>{const row=jewelleryLook(store,account,req.params.id);res.json({id:row.id,avatarId:row.avatarId,view:row.view,name:row.name,itemsJson:JSON.parse(row.itemsJson),image:'data:image/png;base64,'+Buffer.from(row.image).toString('base64')});}));
+  app.get('/api/jewellery/looks/:id',wrap((req,res,account)=>{const row=jewelleryLook(store,account,req.params.id);res.json({id:row.id,avatarId:row.avatarId,view:row.view,previewMode:row.previewMode,name:row.name,itemsJson:JSON.parse(row.itemsJson),image:'data:image/png;base64,'+Buffer.from(row.image).toString('base64')});}));
+  for(const path of ['/api/jewellery/overlay/prepare','/api/jewellery/overlay'])app.post(path,wrap(async(req,res,account)=>{
+    const body=req.body||{};
+    fields(body,['avatarId','itemId','view','base','baseReceipt','baseResultId','baseLookId','baseReviewed','side','hand','finger','wrist','count','replaceExisting','placements','assetHash']);
+    if(preflights>=2)throw new BillingError('image_busy','The studio is checking other images. Try again shortly.',429);
+    let prepared;preflights++;
+    try{
+      const guard=()=>{if(req.aborted||res.destroyed)throw fail('Overlay preparation stopped.',409);session(req,account);};
+      prepared=await prepareOverlay(store,jewellery,account,body,guard);guard();
+      if(path.endsWith('/prepare'))return res.json({base:'data:image/png;base64,'+prepared.context.base.toString('base64'),asset:'data:image/png;base64,'+prepared.asset.toString('base64'),assetHash:prepared.context.overlayHash,placements:prepared.defaults,width:prepared.width,height:prepared.height,warning:prepared.warning,creditsUsed:0});
+      if(body.assetHash!==prepared.context.overlayHash)throw fail('The cut-out changed. Reload the placement editor before applying it.',409);
+      const result=await applyOverlay(prepared,body.placements);guard();jewellery.current(account,prepared.context);
+      prepared.context.mode='overlay';const receipt=jewellery.receipt(account,prepared.context,result.image);
+      res.json({...result,receipt,kind:'jewellery-overlay',view:prepared.context.view,resultId:prepared.context.id,creditsUsed:0,reused:false,needsReview:true});
+    }finally{preflights--;prepared?.context.base.fill(0);prepared?.context.product.fill(0);prepared?.asset.fill(0);}
+  }));
   app.post('/api/jewellery/looks',wrap(async(req,res,account)=>{
     fields(req.body,['avatarId','view','image','name','itemsJson','receipt','resultId','baseLookId','reviewed','storageConsent','sessionId']);
     res.json(await saveJewelleryLook(store,jewellery,account,req.body,()=>session(req,account)));
@@ -60,7 +77,7 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
       preflights++;try{context=await jewellery.context(account,body,{provider,model,guard:active});}finally{preflights--;}
       const guard=()=>{active();jewellery.current(account,context);};guard();
       const respond=(image,reused)=>res.json({image,provider:'gemini',kind:'jewellery-tryon',view:context.view,type:context.selection.type,reused,
-        resultId:context.id,itemId:context.itemId,needsReview:true,creditsUsed:reused?0:1,reuseAvailable:Boolean(context.itemId),
+        previewMode:combinedMode(context.baseMode,'ai'),resultId:context.id,itemId:context.itemId,needsReview:true,creditsUsed:reused?0:1,reuseAvailable:Boolean(context.itemId),
         ...(receipt?{receipt}:{}),...(!receipt&&!reused?{receiptUnavailable:true,note:'Keep or download this preview. Do not regenerate just to obtain a save receipt.'}: {})});
       const recordResult=reused=>recordTryon(store,account,{requestId:body.requestId,sessionId:body.sessionId,avatarId:context.avatarId,garmentId:context.itemId||undefined},{source:'jewellery',reused});
       const cached=jewellery.cached(account,context);if(cached){try{receipt=jewellery.receipt(account,context,cached.image);}catch{}recordResult(true);return respond(cached.image,true);}

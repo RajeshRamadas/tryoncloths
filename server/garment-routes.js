@@ -1,3 +1,4 @@
+import {saveOverlayAsset} from './jewellery-overlay.js';
 import {recordTryon,validateSession} from './analytics-tracking.js';
 import {validRequestId} from './billing.js';
 import { accountUser } from './accounts.js';
@@ -26,12 +27,19 @@ export function installGarmentRoutes(app, store, config) {
   app.post('/api/garments/match', wrap(async (req, res, owner) => res.json(await store.garments.matches(owner, {...req.body,category:req.catalogueOptions.category},req.catalogueOptions))));
   app.post('/api/garments', wrap(async (req, res, owner) => {
     if (req.body?.storageConsent !== true) return res.status(400).json({ error: 'Confirm saving this product photo to the store account.' });
-    res.json(await store.garments.save(owner,{...req.body,category:req.catalogueOptions.category},req.catalogueOptions));
+    const options={...req.catalogueOptions,...(req.catalogueOptions.category==='jewellery'?{guard:()=>{const current=accountUser(store,req);if(!current||current.id!==owner.id||current.user.id!==owner.user.id)throw Object.assign(new Error('The store session changed.'),{status:401});}}:{})};
+    res.json(await store.garments.save(owner,{...req.body,category:req.catalogueOptions.category},options));
   }));
   app.get('/api/garments/:id', wrap((req, res, owner) => {const garment=store.garments.get(owner,req.params.id,req.catalogueOptions);res.json({garment,...(garment.category==='jewellery'?{suggestedView:chooseView(garment.garmentType,garment.attributes)}:{})});}));
   app.delete('/api/garments/:id', wrap((req, res, owner) => {
     if (!store.garments.remove(owner, req.params.id,req.catalogueOptions)) return res.status(404).json({ error: 'Garment not found.' });
     res.json({ ok: true });
+  }));
+  app.post('/api/garments/:id/overlay',wrap(async(req,res,owner)=>{
+    if(req.catalogueOptions.category!=='jewellery')return res.status(400).json({error:'Choose the jewellery catalogue.'});
+    if(!req.body||Object.keys(req.body).some(k=>!['overlayPng','overlayAnchor','storageConsent'].includes(k)))return res.status(400).json({error:'Use a transparent PNG and its anchor type only.'});
+    if(req.body.storageConsent!==true)return res.status(400).json({error:'Confirm saving this cut-out to the catalogue.'});
+    res.json(await saveOverlayAsset(store,owner,req.params.id,req.body,{guard:()=>{const latest=accountUser(store,req);if(!latest||latest.id!==owner.id||latest.user.id!==owner.user.id)throw Object.assign(new Error('The store session changed.'),{status:401});}}));
   }));
   app.post('/api/garments/:id/reuse/use',wrap(async(req,res,owner)=>{
     if(!validRequestId(req.body?.requestId))return res.status(400).json({error:'Use a fresh request ID to open a saved result.'});
