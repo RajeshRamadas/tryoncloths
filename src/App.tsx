@@ -1277,7 +1277,7 @@ export default function App() {
       </dialog>
     </div>
     </div>
-    {approved && !needsCustomerGeneration && <OutfitStudio key={`${session}-${selected}-${templateTone}`} active={outfitOpen} templateTone={templateTone} customerId={customer?.id} catalogueEnabled={Boolean(accountState.account)} avatarId={accountState.account ? avatarId : null} openedLook={openedLook} profile={profile} personalized={personalized} tryOn={{ available: tryOnAvailable && bodyGenerationAllowed, providerLabel }} onBack={() => { setOutfitOpen(false); requestAnimationFrame(() => titleRef.current?.focus()); }} onBusy={setExporting}/>}
+    {approved && !needsCustomerGeneration && <OutfitStudio key={`${session}-${selected}-${templateTone}`} active={outfitOpen} jewelleryEnabled={jewelleryAvailable} templateTone={templateTone} customerId={customer?.id} catalogueEnabled={Boolean(accountState.account)} avatarId={accountState.account ? avatarId : null} openedLook={openedLook} profile={profile} personalized={personalized} tryOn={{ available: tryOnAvailable && bodyGenerationAllowed, providerLabel }} onBack={() => { setOutfitOpen(false); requestAnimationFrame(() => titleRef.current?.focus()); }} onBusy={setExporting}/>}
     </>
   );
 }

@@ -1,5 +1,6 @@
 import {createHash,createHmac,timingSafeEqual,randomBytes} from 'node:crypto';
 import sharp from 'sharp';
+import {visualAttributes} from './jewellery-types.js';
 import {combinedMode} from '../src/jewellery-overlay.js';
 import {transaction} from './catalogue-fields.js';
 import {productImage} from './garment-store.js';
@@ -11,7 +12,7 @@ const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const dataUrl=bytes=>'data:image/png;base64,'+Buffer.from(bytes).toString('base64');
 const catalogue={category:'jewellery',jewelleryEnabled:true};
-const itemVersion=item=>hash(JSON.stringify([item.imageHash,item.garmentType,item.attributesJson,item.name]));
+const itemVersion=item=>hash(JSON.stringify([item.imageHash,item.garmentType,JSON.stringify(visualAttributes(JSON.parse(item.attributesJson))),item.name]));
 
 export async function jewelleryPng(value,view,{legacyFull=false}={}){
   if(view!=='full')return viewPng(value,view);

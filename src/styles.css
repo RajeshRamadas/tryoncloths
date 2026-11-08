@@ -1945,3 +1945,16 @@ dialog::backdrop {
 .jewellery-overlay fieldset label { display:block; margin:12px 0; }
 .jewellery-cutout { margin-top:16px; padding:12px; border:1px solid #dce2db; border-radius:12px; }
 .cutout-checker { background:repeating-conic-gradient(#ddd 0% 25%,#fff 0% 50%) 50% / 20px 20px; }
+
+.jewellery-compare { border-top:1px solid #dce2db; padding-top:20px; margin-top:24px; }
+.jewellery-compare-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:20px 0; }
+.jewellery-compare-grid article { min-width:0; padding:10px; border:1px solid #dce2db; border-radius:12px; }
+.jewellery-compare-grid img { width:100%; height:auto; display:block; }
+.jewellery-compare-grid h4, .jewellery-compare-grid p { overflow-wrap:anywhere; }
+.jewellery-compare-grid .button { width:100%; margin-top:8px; white-space:normal; }
+.comparison-cost { padding:14px; border-radius:12px; background:#eef5ed; margin:16px 0; }
+.complete-layout { display:grid; grid-template-columns:minmax(280px,.8fr) minmax(0,1.2fr); gap:24px; margin-top:24px; }
+.complete-layout section { min-width:0; background:white; border:1px solid #dce2db; border-radius:16px; padding:20px; }
+.complete-layout label { display:block; margin:14px 0; }
+.complete-preview { display:block; width:100%; height:auto; border-radius:12px; }
+@media (max-width:760px) { .complete-layout { grid-template-columns:minmax(0,1fr); } .jewellery-compare-grid article { padding:7px; } }

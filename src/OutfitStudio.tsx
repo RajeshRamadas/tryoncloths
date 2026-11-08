@@ -16,9 +16,9 @@ const categoryNames = { shirt: "Shirts & tops", trousers: "Trousers", shoes: "Sh
 const layerNames = { shirt: "top", trousers: "trousers", shoes: "shoes" };
 const originalNames = { shirt: "Original top", trousers: "Original bottoms", shoes: "Bare feet" };
 
-type Props = { active: boolean; templateTone?:string; catalogueEnabled?:boolean; customerId?:string|null; avatarId?:string|null; openedLook?:OpenedLook; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
+type Props = { active: boolean; templateTone?:string; catalogueEnabled?:boolean;jewelleryEnabled?:boolean; customerId?:string|null; avatarId?:string|null; openedLook?:OpenedLook; profile: { id: string; name: string; index: number }; personalized: string | null; tryOn: { available: boolean; providerLabel: string }; onBack: () => void; onBusy: (busy: boolean) => void };
 type Dressed = { image: string; label: string; previousLayers: Layer[]; adaptation?:Adaptation; adaptationSaved?:boolean;fromSavedLook?:boolean };
-export default function OutfitStudio({ active, templateTone='medium', catalogueEnabled=false, customerId, avatarId, openedLook, profile, personalized, tryOn, onBack, onBusy }: Props) {
+export default function OutfitStudio({ active, templateTone='medium', catalogueEnabled=false, jewelleryEnabled=false, customerId, avatarId, openedLook, profile, personalized, tryOn, onBack, onBusy }: Props) {
   const catalogue = useMemo(() => sampleCatalogue(profile.id, !!personalized), [profile.id, personalized]);
   const [sessionId]=useState(()=>crypto.randomUUID());
   const [imports, setImports] = useState<Garment[]>([]);
@@ -152,7 +152,7 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
             <button className="button secondary full-width" disabled={!reviewed || !storageConsent || !result || busy || rendering || !lookName.trim()} onClick={()=>void keepLook()}>Save look to account</button>
           </div>}
           <button className="button back-button full-width" disabled={busy || (!layers.length && !dressed.length)} onClick={() => { setDressed([]); update([]); }}><RotateCcw size={16}/> Reset outfit</button>
-          {savedLook && <PurchaseLook key={`purchase-${savedLook}`} lookId={savedLook} disabled={busy || rendering}/>}
+          {jewelleryEnabled&&savedLook&&avatarId&&<a className="button secondary" href={'/complete-look?avatar='+encodeURIComponent(avatarId)}>Combine with jewellery portrait</a>}{savedLook && <PurchaseLook key={`purchase-${savedLook}`} lookId={savedLook} disabled={busy || rendering}/>}
           {savedLook && <ShareLook key={savedLook} lookId={savedLook} disabled={busy || rendering}/>}
           {error && <p role="alert" className="error-banner">{error}</p>}{notice && <p role="status">{notice}</p>}
         </section>

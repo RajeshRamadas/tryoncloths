@@ -1,4 +1,5 @@
-import {catalogueCategory,validateAttributes} from './jewellery-types.js';
+import {validateVariantLink} from './jewellery-variants.js';
+import {catalogueCategory,validateAttributes,visualAttributes} from './jewellery-types.js';
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 export const legacyGarmentColumns='account,id,name,garmentType,variant,sourceUrl,imageHash,signature,colour,image,thumbnail,savedAt';
 export function transaction(db,fn){if(db.isTransaction)return fn();db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}}
@@ -32,7 +33,7 @@ export function patchCatalogue(db,account,id,input,options={}){
  const allowed=['sku','brand','priceInr','mrpInr','sizes','stock','colourLabel',...(category==='jewellery'?['attributes']:[])];if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).some(k=>!allowed.includes(k)))throw fail('Use supported catalogue fields and, for jewellery, validated attributes.');
  const fields=catalogueFields({...row,sizes:JSON.parse(row.sizesJson),...input},{requiredSku:row.source==='csv'});if(row.source==='csv'&&fields.sku!==row.sku)throw fail('An imported SKU is its identity. Use the CSV import to add a different SKU.');
  const attributesJson=input.attributes===undefined?row.attributesJson:JSON.stringify(validateAttributes(row.garmentType,input.attributes));
- transaction(db,()=>{db.prepare('UPDATE garments SET sku=?,brand=?,priceInr=?,mrpInr=?,sizesJson=?,stock=?,colourLabel=?,attributesJson=?,updatedAt=? WHERE account=? AND id=?').run(fields.sku,fields.brand,fields.priceInr,fields.mrpInr,fields.sizesJson,fields.stock,fields.colourLabel,attributesJson,Date.now(),account.id,id);if(category==='jewellery'&&attributesJson!==row.attributesJson)db.prepare('DELETE FROM garment_results WHERE account=? AND garmentId=?').run(account.id,id);});
+ transaction(db,()=>{if(category==='jewellery')validateVariantLink(db,account,id,row.garmentType,JSON.parse(attributesJson));db.prepare('UPDATE garments SET sku=?,brand=?,priceInr=?,mrpInr=?,sizesJson=?,stock=?,colourLabel=?,attributesJson=?,updatedAt=? WHERE account=? AND id=?').run(fields.sku,fields.brand,fields.priceInr,fields.mrpInr,fields.sizesJson,fields.stock,fields.colourLabel,attributesJson,Date.now(),account.id,id);if(category==='jewellery'&&JSON.stringify(visualAttributes(JSON.parse(attributesJson)))!==JSON.stringify(visualAttributes(JSON.parse(row.attributesJson))))db.prepare('DELETE FROM garment_results WHERE account=? AND garmentId=?').run(account.id,id);});
 }
 export function installSharedCatalogueSchema(db){transaction(db,()=>{
  db.exec(`CREATE TABLE IF NOT EXISTS catalogue_master(org TEXT PRIMARY KEY REFERENCES orgs(id) ON DELETE CASCADE,store TEXT NOT NULL,FOREIGN KEY(store,org) REFERENCES stores(id,org) ON DELETE CASCADE);`);

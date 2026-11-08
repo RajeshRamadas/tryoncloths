@@ -119,6 +119,12 @@ failed checks and free reuse of reviewed, saved results for the exact same
 starting view, item and placement. Enable `TRYON_JEWELLERY=1` with account
 storage and Gemini configuration to expose the API; the interactive jewellery
 studio screen is the next task, J8.
+Web `0.20.0-alpha.10` adds [J10 jewellery comparisons and complete looks](docs/JEWELLERY_COMPARE_COMPLETE.md).
+Link metal/colour variants in the catalogue, check the comparison cost, then
+compare two designs on the same saved view. Approved exact variants reuse free.
+Combine a saved outfit and jewellery portrait in **Complete look**, then save,
+reopen, export and share the board without another AI request.
+
 Web `0.20.0-alpha.9` adds [J9 free jewellery overlays](docs/JEWELLERY_OVERLAY.md).
 Owners/managers attach transparent PNG cut-outs in **Jewellery catalogue**.
 Staff choose **Overlay · free** in the Jewellery studio to drag, pinch, scale,
