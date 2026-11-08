@@ -3,8 +3,10 @@
 Web `0.20.0-alpha.1` implements the first task in the
 [jewellery implementation guide](jewellery/IMPLEMENTATION_LLM.md). Signed-in
 stores can save jewellery product photos and structured details for reuse.
-Catalogue actions do not call AI or use credits. Jewellery generation, portrait
-and hands views, sizing and overlays remain later tasks J2–J12.
+Catalogue actions do not call AI or use credits. J2 adds the internal
+[local face comparison helper](JEWELLERY_IDENTITY.md) in `0.20.0-alpha.2`.
+Jewellery generation, portrait and hands views, sizing and overlays remain
+later tasks J3–J12.
 
 ## Enable and use
 

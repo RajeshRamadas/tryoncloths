@@ -5,10 +5,12 @@ import { ProviderError } from "./provider-errors.js";
 
 const require = createRequire(import.meta.url);
 let ready;
+let recognitionReady;
 let queue = Promise.resolve();
 
-// Models and WASM ship in pinned npm packages. No runtime model downloads,
-// face recognition, identity scoring, or additional provider calls are used.
+// Models and WASM ship in pinned npm packages. Ordinary presence checks load
+// only the tiny detector/landmarks. Jewellery identity checks opt into the full
+// landmarks and recognition nets; there are no runtime downloads or paid calls.
 async function detector() {
   if (!ready) ready = (async () => {
     const { default: faceapi } = await import("@vladmandic/face-api/dist/face-api.node-wasm.js");
@@ -31,14 +33,30 @@ function exclusive(work) {
   return result;
 }
 
+// One queue owns the shared TensorFlow/WASM backend, including model loading.
+// Keep identity model weights cached, never customer tensors or descriptors.
+export function withFaceApi(work, { recognition = false } = {}) {
+  return exclusive(async () => {
+    const api = await detector();
+    if (recognition) {
+      if (!recognitionReady) recognitionReady = (async () => {
+        const models = path.join(path.dirname(require.resolve('@vladmandic/face-api/package.json')), 'model');
+        if (!api.nets.faceLandmark68Net.isLoaded) await api.nets.faceLandmark68Net.loadFromDisk(models);
+        if (!api.nets.faceRecognitionNet.isLoaded) await api.nets.faceRecognitionNet.loadFromDisk(models);
+      })().catch(() => { recognitionReady = undefined; throw new ProviderError('face_check'); });
+      await recognitionReady;
+    }
+    return work(api);
+  });
+}
+
 const average = points => ({
   x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
   y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
 });
 
 export async function detectFaces(bytes, { landmarks = false, upper = false } = {}) {
-  return exclusive(async () => {
-    const api = await detector();
+  return withFaceApi(async api => {
     const { width, height } = await sharp(bytes).metadata();
     const cropHeight = upper ? Math.max(1, Math.round(height * 0.55)) : height;
     const { data, info } = await sharp(bytes, { limitInputPixels: 25_000_000 })

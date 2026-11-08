@@ -95,6 +95,9 @@ Web `0.20.0-alpha.1` adds the optional [J1 jewellery catalogue](docs/JEWELLERY_C
 18 jewellery types, product photos, metals, dimensions and reusable store inventory.
 Enable `TRYON_JEWELLERY=1` with account storage, then open **Catalogue → Jewellery catalogue**.
 Jewellery try-on and portrait/hands views remain later work; catalogue actions use no AI credits.
+Web `0.20.0-alpha.2` adds the internal [J2 local face comparison helper](docs/JEWELLERY_IDENTITY.md)
+for future jewellery checks. Descriptors stay in memory; pilot threshold calibration
+and generation integration are still pending.
 
 ## Validation
 
