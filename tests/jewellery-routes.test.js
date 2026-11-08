@@ -101,8 +101,8 @@ test('flag, account storage and provider configuration gate generation and expos
 });
 
 test('identity, face, framing, hands and provider failures refund exactly once with safe codes and no retries',async()=>{
-  for(const failure of ['identity_mismatch','missing_face','framing_changed','hands_changed','quota'])await fixture(async({store,a,create,calls})=>{
-    const before=store.billing.balance(a.org),response=await create();assert.equal(response.status,502);const error=await response.json();assert.equal(error.code,failure);assert.doesNotMatch(JSON.stringify(error),/test-key-only|PRIVATE/);
+  for(const failure of ['identity_mismatch','missing_face','framing_changed','hands_changed','face_check','quota','timeout','network','blocked','no_image','invalid_image','credentials','model','unavailable','request','response','unknown'])await fixture(async({store,a,create,calls})=>{
+    const before=store.billing.balance(a.org),response=await create();assert.equal(response.status,502);const error=await response.json();assert.equal(error.code,failure);assert.equal(error.image,undefined);assert.equal(error.receipt,undefined);assert.doesNotMatch(JSON.stringify(error),/test-key-only|PRIVATE/);
     assert.equal(calls(),1);assert.equal(store.billing.balance(a.org),before);assert.equal(store.db.prepare("SELECT count(*) n FROM ledger WHERE kind='refund'").get().n,1);assert.equal(store.db.prepare('SELECT count(*) n FROM garment_results').get().n,0);
   },{generate:async()=>{throw new ProviderError(failure);}});
   await fixture(async({store,a,create,calls})=>{const before=store.billing.balance(a.org),response=await create();assert.equal(response.status,502);assert.equal((await response.json()).code,'invalid_image');assert.equal(store.billing.balance(a.org),before);assert.equal(calls(),1);},{generate:async()=>url(portrait)});

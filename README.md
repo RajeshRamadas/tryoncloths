@@ -119,6 +119,15 @@ failed checks and free reuse of reviewed, saved results for the exact same
 starting view, item and placement. Enable `TRYON_JEWELLERY=1` with account
 storage and Gemini configuration to expose the API; the interactive jewellery
 studio screen is the next task, J8.
+
+Web `0.21.0-rc.1` adds [J12 private jewellery evaluation](docs/JEWELLERY_EVALUATION.md):
+a 30-item × 10-portrait review matrix, local staff scoring, identity-distance
+analysis and store-pilot reporting. Start with `npm run evaluate:jewellery -- template --out path/to/manifest.json`.
+The [staff workflow](docs/JEWELLERY_TRYON.md) covers capture, setup and limits;
+[release checks](docs/JEWELLERY_RELEASE.md) separate automated verification from
+pending live pilot evidence. No paid calls, deployment, flag activation or APK
+build is performed by these offline tools. General rollout remains pending.
+
 Web `0.20.0-alpha.11` adds [J11 optional jewellery sizing](docs/JEWELLERY_SIZING.md).
 Store finger/hand measurements and known ring/bangle sizes on customer profiles.
 The Jewellery studio shows confidence-labelled size suggestions beside rings

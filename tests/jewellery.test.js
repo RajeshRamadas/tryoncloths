@@ -137,3 +137,23 @@ test('clothing and jewellery share catalogue capacity and Shopify shopper produc
  const copy=store.db.prepare('INSERT INTO garments(account,id,name,garmentType,variant,sourceUrl,imageHash,signature,colour,image,thumbnail,savedAt) SELECT account,?,name,garmentType,variant,sourceUrl,?,signature,colour,image,thumbnail,savedAt FROM garments WHERE account=? AND id=?');for(let i=0;i<498;i++)copy.run('copy-'+i,'hash-'+i,a.id,clothes.id);
  assert.equal(store.garments.browse(a,{category:'jewellery'},enabled).stored,500);await assert.rejects(store.garments.save(a,{...input,variant:'Another'},enabled),{status:409});
 }));
+
+test('release role matrix permits jewellery reads for all store roles and inventory writes only for owner/manager',async()=>fixture(async({store,a,request,input,calls})=>{
+ const balance=store.billing.balance(a.org),item=(await(await request('/api/garments','POST',input)).json()).garment;
+ for(const role of ['owner','manager','staff']){
+  store.db.prepare('UPDATE memberships SET role=? WHERE user=? AND store=?').run(role,a.user.id,a.id);
+  for(const endpoint of ['/api/jewellery/types','/api/catalogue?category=jewellery','/api/garments?category=jewellery','/api/garments/'+item.id+'?category=jewellery'])assert.equal((await request(endpoint)).status,200,role+' '+endpoint);
+  assert.equal((await request('/api/garments/match','POST',{category:'jewellery',image:input.image})).status,200);
+  const saved=await request('/api/garments','POST',{...input,variant:role+' review piece'});
+  assert.equal(saved.status,role==='staff'?403:200);
+  if(role!=='staff'){
+   const id=(await saved.json()).garment.id;
+   assert.equal((await request('/api/catalogue/'+id+'?category=jewellery','PATCH',{stock:'low'})).status,200);
+   assert.equal((await request('/api/garments/'+id+'?category=jewellery','DELETE')).status,200);
+  }else{
+   assert.equal((await request('/api/catalogue/'+item.id+'?category=jewellery','PATCH',{stock:'low'})).status,403);
+   assert.equal((await request('/api/garments/'+item.id+'?category=jewellery','DELETE')).status,403);
+  }
+ }
+ assert.equal(store.billing.balance(a.org),balance);assert.equal(calls(),0);
+}));

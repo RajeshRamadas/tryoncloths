@@ -1,0 +1,416 @@
+{
+  "version": 1,
+  "kind": "jewellery-evaluation",
+  "identityThreshold": 0.45,
+  "collection": "accepted-only",
+  "providers": [
+    {
+      "id": "gemini",
+      "label": "Gemini pilot",
+      "model": "gemini-2.5-flash-image",
+      "mode": "ai",
+      "evidence": "fixture"
+    }
+  ],
+  "items": [
+    {
+      "id": "item-01",
+      "name": "Stud earrings 1",
+      "type": "stud_earrings",
+      "attributes": {
+        "metal": "yellow_gold",
+        "pair": true
+      },
+      "side": "both",
+      "image": "inputs/item-01.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-02",
+      "name": "Drop / chandbali earrings 2",
+      "type": "drop_earrings",
+      "attributes": {
+        "metal": "silver",
+        "pair": true,
+        "dropMm": 38
+      },
+      "side": "both",
+      "image": "inputs/item-02.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-03",
+      "name": "Jhumka earrings 3",
+      "type": "jhumka",
+      "attributes": {
+        "metal": "rose_gold",
+        "pair": true,
+        "dropMm": 38
+      },
+      "side": "both",
+      "image": "inputs/item-03.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-04",
+      "name": "Nose pin 4",
+      "type": "nose_pin",
+      "attributes": {
+        "metal": "yellow_gold"
+      },
+      "side": "left",
+      "image": "inputs/item-04.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-05",
+      "name": "Nose ring / nath 5",
+      "type": "nose_ring",
+      "attributes": {
+        "metal": "silver"
+      },
+      "side": "left",
+      "image": "inputs/item-05.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-06",
+      "name": "Maang tikka 6",
+      "type": "maang_tikka",
+      "attributes": {
+        "metal": "rose_gold"
+      },
+      "image": "inputs/item-06.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-07",
+      "name": "Matha patti 7",
+      "type": "matha_patti",
+      "attributes": {
+        "metal": "yellow_gold"
+      },
+      "image": "inputs/item-07.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-08",
+      "name": "Choker 8",
+      "type": "choker",
+      "attributes": {
+        "metal": "silver"
+      },
+      "image": "inputs/item-08.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-09",
+      "name": "Necklace / chain 9",
+      "type": "necklace",
+      "attributes": {
+        "metal": "rose_gold",
+        "lengthCm": 45
+      },
+      "image": "inputs/item-09.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-10",
+      "name": "Pendant 10",
+      "type": "pendant",
+      "attributes": {
+        "metal": "yellow_gold",
+        "lengthCm": 45
+      },
+      "image": "inputs/item-10.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-11",
+      "name": "Mangalsutra 11",
+      "type": "mangalsutra",
+      "attributes": {
+        "metal": "silver",
+        "lengthCm": 45
+      },
+      "image": "inputs/item-11.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-12",
+      "name": "Stud earrings 12",
+      "type": "stud_earrings",
+      "attributes": {
+        "metal": "rose_gold",
+        "pair": true
+      },
+      "side": "both",
+      "image": "inputs/item-12.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-13",
+      "name": "Drop / chandbali earrings 13",
+      "type": "drop_earrings",
+      "attributes": {
+        "metal": "yellow_gold",
+        "pair": true,
+        "dropMm": 38
+      },
+      "side": "both",
+      "image": "inputs/item-13.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-14",
+      "name": "Jhumka earrings 14",
+      "type": "jhumka",
+      "attributes": {
+        "metal": "silver",
+        "pair": true,
+        "dropMm": 38
+      },
+      "side": "both",
+      "image": "inputs/item-14.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-15",
+      "name": "Nose pin 15",
+      "type": "nose_pin",
+      "attributes": {
+        "metal": "rose_gold"
+      },
+      "side": "left",
+      "image": "inputs/item-15.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-16",
+      "name": "Nose ring / nath 16",
+      "type": "nose_ring",
+      "attributes": {
+        "metal": "yellow_gold"
+      },
+      "side": "left",
+      "image": "inputs/item-16.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-17",
+      "name": "Maang tikka 17",
+      "type": "maang_tikka",
+      "attributes": {
+        "metal": "silver"
+      },
+      "image": "inputs/item-17.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-18",
+      "name": "Matha patti 18",
+      "type": "matha_patti",
+      "attributes": {
+        "metal": "rose_gold"
+      },
+      "image": "inputs/item-18.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-19",
+      "name": "Choker 19",
+      "type": "choker",
+      "attributes": {
+        "metal": "yellow_gold"
+      },
+      "image": "inputs/item-19.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-20",
+      "name": "Necklace / chain 20",
+      "type": "necklace",
+      "attributes": {
+        "metal": "silver",
+        "lengthCm": 45
+      },
+      "image": "inputs/item-20.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-21",
+      "name": "Pendant 21",
+      "type": "pendant",
+      "attributes": {
+        "metal": "rose_gold",
+        "lengthCm": 45
+      },
+      "image": "inputs/item-21.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-22",
+      "name": "Mangalsutra 22",
+      "type": "mangalsutra",
+      "attributes": {
+        "metal": "yellow_gold",
+        "lengthCm": 45
+      },
+      "image": "inputs/item-22.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-23",
+      "name": "Stud earrings 23",
+      "type": "stud_earrings",
+      "attributes": {
+        "metal": "silver",
+        "pair": true
+      },
+      "side": "both",
+      "image": "inputs/item-23.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-24",
+      "name": "Drop / chandbali earrings 24",
+      "type": "drop_earrings",
+      "attributes": {
+        "metal": "rose_gold",
+        "pair": true,
+        "dropMm": 38
+      },
+      "side": "both",
+      "image": "inputs/item-24.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-25",
+      "name": "Jhumka earrings 25",
+      "type": "jhumka",
+      "attributes": {
+        "metal": "yellow_gold",
+        "pair": true,
+        "dropMm": 38
+      },
+      "side": "both",
+      "image": "inputs/item-25.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-26",
+      "name": "Nose pin 26",
+      "type": "nose_pin",
+      "attributes": {
+        "metal": "silver"
+      },
+      "side": "left",
+      "image": "inputs/item-26.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-27",
+      "name": "Nose ring / nath 27",
+      "type": "nose_ring",
+      "attributes": {
+        "metal": "rose_gold"
+      },
+      "side": "left",
+      "image": "inputs/item-27.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-28",
+      "name": "Maang tikka 28",
+      "type": "maang_tikka",
+      "attributes": {
+        "metal": "yellow_gold"
+      },
+      "image": "inputs/item-28.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-29",
+      "name": "Matha patti 29",
+      "type": "matha_patti",
+      "attributes": {
+        "metal": "silver"
+      },
+      "image": "inputs/item-29.png",
+      "storageConsent": false
+    },
+    {
+      "id": "item-30",
+      "name": "Choker 30",
+      "type": "choker",
+      "attributes": {
+        "metal": "rose_gold"
+      },
+      "image": "inputs/item-30.png",
+      "storageConsent": false
+    }
+  ],
+  "portraits": [
+    {
+      "id": "portrait-01",
+      "profileId": "regular",
+      "image": "inputs/portrait-01.png",
+      "storageConsent": false
+    },
+    {
+      "id": "portrait-02",
+      "profileId": "regular",
+      "image": "inputs/portrait-02.png",
+      "storageConsent": false
+    },
+    {
+      "id": "portrait-03",
+      "profileId": "regular",
+      "image": "inputs/portrait-03.png",
+      "storageConsent": false
+    },
+    {
+      "id": "portrait-04",
+      "profileId": "regular",
+      "image": "inputs/portrait-04.png",
+      "storageConsent": false
+    },
+    {
+      "id": "portrait-05",
+      "profileId": "regular",
+      "image": "inputs/portrait-05.png",
+      "storageConsent": false
+    },
+    {
+      "id": "portrait-06",
+      "profileId": "f-regular",
+      "image": "inputs/portrait-06.png",
+      "storageConsent": false
+    },
+    {
+      "id": "portrait-07",
+      "profileId": "f-regular",
+      "image": "inputs/portrait-07.png",
+      "storageConsent": false
+    },
+    {
+      "id": "portrait-08",
+      "profileId": "f-regular",
+      "image": "inputs/portrait-08.png",
+      "storageConsent": false
+    },
+    {
+      "id": "portrait-09",
+      "profileId": "f-regular",
+      "image": "inputs/portrait-09.png",
+      "storageConsent": false
+    },
+    {
+      "id": "portrait-10",
+      "profileId": "f-regular",
+      "image": "inputs/portrait-10.png",
+      "storageConsent": false
+    }
+  ],
+  "results": []
+}

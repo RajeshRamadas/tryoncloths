@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Forme — Private jewellery evaluation</title>
+  <link rel="stylesheet" href="review.css">
+  <script src="data.js" defer></script>
+  <script type="module" src="review.js"></script>
+</head>
+<body>
+<header>
+  <p class="eyebrow">FORME · PRIVATE STAFF REVIEW</p>
+  <h1>Review jewellery quality</h1>
+  <p>Compare the requested piece and customer portrait with each output. Scores stay in this tab until you download them. No photos or scores are uploaded.</p>
+  <p id="collection" class="notice"></p>
+  <p class="notice">Pilot evaluation only. This page never approves rollout or changes the server identity threshold. Fixture results cannot count as live pilot evidence.</p>
+</header>
+<main>
+  <section aria-label="Review controls" class="panel">
+    <label>Reviewer ID <input id="reviewer" maxlength="60" placeholder="staff-01" autocomplete="off"></label>
+    <p class="help">Use an anonymized ID with letters, numbers, underscores or hyphens. Do not enter customer names.</p>
+    <div class="filters">
+      <label>Provider <select id="provider" aria-label="Provider"><option value="">All providers</option></select></label>
+      <label>Item <select id="item" aria-label="Item"><option value="">All items</option></select></label>
+      <label>Portrait <select id="portrait" aria-label="Portrait"><option value="">All portraits</option></select></label>
+      <label>Review filter <select id="pending" aria-label="Review filter"><option value="all">All outcomes</option><option value="pending">Needs review</option><option value="reviewed">Reviewed</option></select></label>
+    </div>
+    <div class="actions"><button id="previous" type="button">Previous output</button><span id="position"></span><button id="next" type="button">Next output</button></div>
+    <p id="status" role="status" aria-live="polite"></p>
+    <div class="actions"><button id="export" type="button">Download review scores</button><label class="file">Load previous review <input id="import" type="file" accept="application/json,.json"></label></div>
+    <p id="error" role="alert"></p>
+  </section>
+  <section id="case" aria-label="Current output" class="panel"></section>
+  <section class="panel" aria-label="Identity analysis">
+    <h2>Identity distance analysis</h2>
+    <p>Label likeness from the photos before interpreting the automatic distance. Lower distance is closer. Flagged outputs remain reviewable so false rejects can be measured.</p>
+    <label>Analysis threshold <input id="threshold" type="range" min="0.05" max="1" step="0.01"><output id="threshold-value"></output></label>
+    <p id="identity-summary"></p>
+    <p class="help">This analysis uses the selected provider filter and completed reviews. At least 50 human-same image pairs are needed for a measured false-reject rate. The 10-person matrix alone cannot establish a population-wide threshold; collect additional independent pilot portraits. A missing different-person sample means false accepts are unknown.</p>
+  </section>
+</main>
+<footer>Close this tab to clear unsaved ratings. Keep downloaded scores, reports and customer images in private storage; delete them according to the consented retention period.</footer>
+</body>
+</html>
