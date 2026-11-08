@@ -9,7 +9,7 @@ This is an internal server module. Web `0.20.0-alpha.7` now exposes it through
 the [J7 API](JEWELLERY_API.md), enforcing `TRYON_JEWELLERY=1`, account/store
 ownership, approved base views, item ownership, same origin, explicit consent,
 request IDs, concurrency, credit reservation/refund and review before reusable
-storage. The interactive jewellery studio screen remains J8.
+storage. The interactive [J8 studio](JEWELLERY_STUDIO.md) is now implemented.
 
 ## Module contract
 

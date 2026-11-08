@@ -11,7 +11,7 @@ in `0.20.0-alpha.3`; J4 adds the [internal portrait adapter](JEWELLERY_PORTRAITS
 in `0.20.0-alpha.4`. [Interactive views, approval and storage](AVATAR_VIEWS.md)
 are implemented in J5 (`0.20.0-alpha.5`). J6 supplies the internal adapter and
 [J7 adds guarded try-on and reuse API routes](JEWELLERY_API.md)
-(`0.20.0-alpha.7`); the jewellery studio screen remains J8.
+(`0.20.0-alpha.7`); the [J8 jewellery studio](JEWELLERY_STUDIO.md) is now implemented.
 
 ## Enable and use
 

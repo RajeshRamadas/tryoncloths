@@ -232,3 +232,34 @@ test('zero credits and the female pilot flag reject paid work, and result capaci
     const other=await(await create({finger:'index'})).json();assert.equal((await save(other)).status,409);assert.equal((await save(first)).status,200);assert.equal(calls(),3);
   },{generate:async input=>url(await sharp(input.base).modulate({brightness:++count===1?.95:.85}).png().toBuffer())});
 });
+
+test('J8 hands looks retain view/item metadata, reopen free and share only labelled images without changing raw pixels',async()=>fixture(async({store,a,avatar,item,create,request,base,calls,directory})=>{
+  const p=await(await create()).json(),before=store.billing.balance(a.org);
+  const input={avatarId:avatar.id,view:'hands',name:'Evening ring',image:p.image,receipt:p.receipt,itemsJson:[{itemId:item.id,name:item.name,type:'ring',attributes:item.attributes,hand:'right',finger:'ring'}],reviewed:true,storageConsent:true};
+  const saved=await request('/api/jewellery/looks','POST',input);assert.equal(saved.status,200);const look=await saved.json();
+  const listed=(await(await request('/api/looks?avatar='+avatar.id,'GET')).json()).looks[0];assert.equal(listed.view,'hands');assert.equal(listed.itemsJson[0].type,'ring');assert.equal(listed.itemsJson[0].hand,'right');
+  assert.equal((await sharp(store.lookImage(a,look.id)).metadata()).height,1024);
+  const opened=await(await request('/api/jewellery/looks/'+look.id,'GET')).json();assert.equal(opened.name,'Evening ring');assert.equal(opened.avatarId,avatar.id);assert.equal(opened.view,'hands');
+  assert.equal((await request('/api/jewellery/looks','POST',{...input,image:opened.image,receipt:undefined,baseLookId:look.id,itemsJson:opened.itemsJson})).status,200);
+  const share=await(await request('/api/looks/'+look.id+'/share','POST',{days:7,sharingConsent:true})).json();const html=await(await fetch(share.url)).text();assert.match(html,/AI preview — actual piece may differ in detail/);assert.match(html,/Gold ring/);
+  const image=Buffer.from(await(await fetch(share.url+'/image')).arrayBuffer());assert.equal((await sharp(image).metadata()).height,1076);assert.equal((await sharp(store.lookImage(a,look.id)).metadata()).height,1024);
+  assert.equal(calls(),1);assert.equal(store.billing.balance(a.org),before);
+  const reopened=new AccountStore(directory);try{assert.equal(reopened.listLooks(a,avatar.id)[0].view,'hands');assert.equal(reopened.listLooks(a,avatar.id)[0].itemsJson[0].itemId,item.id);}finally{reopened.close();}
+  const next=await create({base:opened.image,baseLookId:look.id,baseReviewed:true});assert.equal(next.status,200);assert.equal((await next.json()).reused,false);assert.equal(calls(),2);
+}));
+
+test('J8 look saves enforce review, original verified output, current session, tenant, view and item boundaries',async()=>fixture(async({store,a,b,avatar,item,create,request,cb,calls})=>{
+  const p=await(await create()).json(),input={avatarId:avatar.id,view:'hands',name:'Private ring',image:p.image,receipt:p.receipt,itemsJson:[{itemId:item.id,name:item.name,type:'ring',attributes:item.attributes,hand:'right',finger:'ring'}],reviewed:true,storageConsent:true};
+  for(const change of [{reviewed:false},{storageConsent:false},{receipt:undefined},{view:'portrait'},{itemsJson:[]},{itemsJson:Array(11).fill(input.itemsJson[0])},{image:url(await sharp(template.png).modulate({brightness:.5}).png().toBuffer())},{store:b.id}])assert.ok([400,409].includes((await request('/api/jewellery/looks','POST',{...input,...change})).status));
+  assert.equal((await request('/api/jewellery/looks','POST',input,'')).status,401);assert.equal((await request('/api/jewellery/looks','POST',input,cb)).status,404);
+  const saved=await(await request('/api/jewellery/looks','POST',input)).json();assert.equal((await request('/api/jewellery/looks/'+saved.id,'GET',undefined,cb)).status,404);
+  assert.equal((await request('/api/jewellery/looks/'+saved.id,'GET',undefined,'')).status,401);assert.equal((await request('/api/looks','POST',{...input,garments:['Ring']})).status,400,'legacy clothing path cannot accept square hands looks');assert.equal(calls(),1);
+}));
+
+test('J8 bangle count is a validated preview override and changes reuse without editing the catalogue',async()=>fixture(async({store,a,create,calls})=>{
+  const item=(await store.garments.save(a,{category:'jewellery',name:'Bangles',garmentType:'bangles',attributes:{metal:'silver',count:2},image:photo},{jewelleryEnabled:true})).garment;
+  const p=await create({itemId:item.id,hand:undefined,finger:undefined,wrist:'left',count:4});assert.equal(p.status,200);
+  assert.equal(store.garments.get(a,item.id,{category:'jewellery',jewelleryEnabled:true}).attributes.count,2);
+  assert.equal((await create({itemId:item.id,hand:undefined,finger:undefined,wrist:'left',count:25})).status,400);
+  assert.equal((await create({count:4})).status,400);assert.equal(calls(),1);
+}));

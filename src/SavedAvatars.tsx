@@ -87,16 +87,17 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
         <button className="button primary" disabled={busy} onClick={() => void use(item)}>Use {item.name}</button>
         {cloud && !localView && <button className="button secondary" disabled={busy} onClick={()=>void showLooks(item)}>View looks ({item.looksCount || 0}) for {item.name}</button>}
         {cloud&&!localView&&viewsAvailable&&!busy&&<a className="button secondary" href={'/avatar-views?avatar='+encodeURIComponent(item.id)}>Manage views for {item.name}</a>}
+        {cloud&&!localView&&viewsAvailable&&!busy&&<a className="button secondary" href={'/jewellery?avatar='+encodeURIComponent(item.id)}>Jewellery for {item.name}</a>}
         {confirmDelete === item.id ? <div className="saved-delete"><p>Delete this saved copy{cloud && !localView ? viewsAvailable?" and its saved looks and views":" and its saved looks" : ""}?</p><button className="button secondary" disabled={busy} onClick={() => void remove(item.id)}>Confirm deletion</button><button className="button back-button" disabled={busy} onClick={() => setConfirmDelete(null)}>Cancel deletion</button></div>
           : <button className="button back-button" disabled={busy} aria-label={`Delete ${item.name}`} onClick={() => setConfirmDelete(item.id)}>Delete</button>}</div>
       </article>)}</section>)}</div>
       {cloud && !localView && looksFor && <section aria-label={`Looks for ${looksFor.name}`}><h3>Looks for {looksFor.name}</h3>
         {!looks.length && <p>No looks saved for this avatar yet.</p>}
         {looks.map(look=><article className="saved-avatar-item" key={look.id}><img src={look.thumbnail} alt={`Saved look: ${look.name}`}/><div><h3>{look.name}</h3><p>{look.garments.join(" · ")}</p>
-          <button className="button primary" disabled={busy} onClick={()=>void useLook(look)}>Open look {look.name}</button>
+          <>{look.itemsJson?.length?<a className="button primary" href={'/jewellery?avatar='+encodeURIComponent(look.avatarId)+'&look='+encodeURIComponent(look.id)}>Open jewellery look {look.name}</a>:<button className="button primary" disabled={busy} onClick={()=>void useLook(look)}>Open look {look.name}</button>}</>
           <button className="button secondary" disabled={busy} onClick={()=>setShareLook(shareLook===look.id?null:look.id)}>Share {look.name}</button>
           <PurchaseLook key={`purchase-${look.id}`} lookId={look.id} disabled={busy} initialPurchase={{purchasedAt:look.purchasedAt??null,purchasedSize:look.purchasedSize??null}}/>
-          {shareLook===look.id && <ShareLook key={look.id} lookId={look.id} disabled={busy}/>}
+          {shareLook===look.id && <ShareLook key={look.id} lookId={look.id} disabled={busy} kind={look.itemsJson?.length?'jewellery':'outfit'}/>}
           {confirmLookDelete===look.id ? <><button className="button secondary" disabled={busy} onClick={()=>void removeLook(look.id)}>Confirm look deletion</button><button className="button back-button" disabled={busy} onClick={()=>setConfirmLookDelete(null)}>Cancel</button></> : <button className="button back-button" disabled={busy} onClick={()=>setConfirmLookDelete(look.id)}>Delete look {look.name}</button>}
         </div></article>)}
       </section>}

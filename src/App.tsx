@@ -224,6 +224,7 @@ export default function App() {
   const [provider, setProvider] = useState<"gemini" | "openai" | null>(null);
   const [femaleEnabled,setFemaleEnabled]=useState(false);
   const [tryOnAvailable, setTryOnAvailable] = useState(false);
+  const [jewelleryAvailable,setJewelleryAvailable]=useState(false);
   const [personalized, setPersonalized] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generationFailed, setGenerationFailed] = useState(false);
@@ -251,7 +252,7 @@ export default function App() {
 
   function checkService() {
     setService("checking");
-    setTryOnAvailable(false);
+    setTryOnAvailable(false);setJewelleryAvailable(false);
     setAiConsent(false);
     requestApi("/api/health")
       .then(async (r) => {
@@ -262,6 +263,7 @@ export default function App() {
         if (!r.ok) throw new Error();
         const data = await r.json();
         if (data.accountsAvailable) setAccountState(s => ({...s,enabled:true}));
+        setJewelleryAvailable(data.jewelleryAvailable===true&&data.jewelleryContract==='jewellery-tryon-v1');
         setFemaleEnabled(data.supportedBodies?.includes("female") === true);
         const supported = data.personalizationContract === "customer-avatar-v4" && ["gemini", "openai"].includes(data.provider);
         setProvider(supported ? data.provider : null);
@@ -947,9 +949,9 @@ export default function App() {
                     <button className="button secondary full-width" disabled={!approved || !saveConsent || !avatarName.trim() || exporting || needsCustomerGeneration} onClick={() => void keepAvatar()}>Save avatar for reuse</button>
                     <p className="small-footnote">{accountState.enabled ? "Saved privately to the signed-in store account. Reopen from any browser signed in to that account. Original photos are not stored." : "Saves the avatar image, name, body profile and measurements here. Original photos are not saved. Anyone using this browser or app can open it."} Delete saved copies from Saved avatars when no longer needed.</p>
                   </div>}
-                  <button className="button secondary full-width try-clothes-button" disabled={!approved || exporting || needsCustomerGeneration} onClick={() => setOutfitOpen(true)}>
+                  <div className="fitting-room-actions"><button className="button secondary full-width try-clothes-button" disabled={!approved || exporting || needsCustomerGeneration} onClick={() => setOutfitOpen(true)}>
                     Try clothes <ArrowRight size={16}/>
-                  </button>
+                  </button>{jewelleryAvailable&&accountState.account&&avatarId&&<button className="button secondary" disabled={!approved||exporting||needsCustomerGeneration} onClick={()=>location.assign('/jewellery?avatar='+encodeURIComponent(avatarId))}>Jewellery <ArrowRight size={16}/></button>}</div>
                   <p className="small-footnote">Approve the avatar to try separate tops, trousers and shoes. Outfit changes use no AI calls.</p>
                   <p className="small-footnote">
                     {isNative

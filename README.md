@@ -119,6 +119,12 @@ failed checks and free reuse of reviewed, saved results for the exact same
 starting view, item and placement. Enable `TRYON_JEWELLERY=1` with account
 storage and Gemini configuration to expose the API; the interactive jewellery
 studio screen is the next task, J8.
+Web `0.20.0-alpha.8` adds the [J8 jewellery studio](docs/JEWELLERY_STUDIO.md).
+Open and approve a saved avatar, then choose **Jewellery** beside **Try clothes**.
+Prepare reusable views, select catalogue/link/upload items, set placement, stack
+and undo pieces, review and save a look, then download/share labelled results.
+Saved looks and exact approved adaptations reopen without new AI requests.
+[Screen captures with dummy data](docs/testing/jewellery-studio/README.md).
 
 ## Validation
 

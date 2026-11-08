@@ -73,7 +73,7 @@ export class JewelleryStore{
     this.current(account,context);
     const payload=Buffer.from(JSON.stringify({contract:JEWELLERY_CONTRACT,store:account.id,user:account.user.id,id:context.id,avatarId:context.avatarId,
       view:context.view,nonce:context.nonce,revision:context.revision,itemId:context.itemId,itemVersion:context.itemVersion,
-      imageHash:hash(Buffer.from(image.split(',')[1],'base64')),expires:Date.now()+24*3600000})).toString('base64url');
+      selection:context.selection,title:context.title,imageHash:hash(Buffer.from(image.split(',')[1],'base64')),expires:Date.now()+24*3600000})).toString('base64url');
     return payload+'.'+createHmac('sha256',this.store.views.key).update('jewellery:'+payload).digest('hex');
   }
   async context(account,input,{provider,model,guard=()=>{}}){
@@ -83,8 +83,9 @@ export class JewelleryStore{
       if(['image','type','attributes','title'].some(key=>input[key]!==undefined))throw fail('Use the saved item details, or upload a separate jewellery item.');
       item=this.store.garments.row(account,input.itemId,catalogue);
       if(item.needsTypeReview||item.stock==='out')throw fail('Choose available jewellery with a confirmed type.',409);
-      selection=jewellerySelection({...input,type:item.garmentType,attributes:JSON.parse(item.attributesJson)});
-    }else selection=jewellerySelection(input);
+      if(input.count!==undefined&&item.garmentType!=='bangles')throw fail('Piece count overrides are supported for bangles only.');
+      selection=jewellerySelection({...input,type:item.garmentType,attributes:{...JSON.parse(item.attributesJson),...(input.count!==undefined?{count:input.count}:{})}});
+    }else{if(input.count!==undefined&&input.type!=='bangles')throw fail('Piece count overrides are supported for bangles only.');selection=jewellerySelection({...input,attributes:{...input.attributes,...(input.count!==undefined?{count:input.count}:{})}});}
     const {view}=selection,reference=this.store.views.context(account,input.avatarId,view==='full'?'portrait':view);
     const context={avatarId:input.avatarId,view,nonce:reference.nonce,revision:view==='full'?null:reference.revision,itemId:item?.id??null,itemVersion:item?itemVersion(item):null};
     const current=()=>{guard();this.current(account,context);};
@@ -97,7 +98,7 @@ export class JewelleryStore{
       // encoding differences cannot turn the same starting view into a miss.
       const supplied=await normalizeJewelleryView(suppliedRaw,view);current();
       if(hash(supplied)!==hash(saved)){
-        if(input.baseReceipt!==undefined&&input.baseResultId!==undefined)throw fail('Use one proof for the current jewellery base.');
+        if([input.baseReceipt,input.baseResultId,input.baseLookId].filter(v=>v!==undefined).length>1)throw fail('Use one proof for the current jewellery base.');
         if(input.baseReceipt!==undefined){
           if(input.baseReviewed!==true)throw fail('Review this jewellery result before using it as the next base.');
           const claims=this.claims(account,input.baseReceipt),original=Buffer.from(input.base.split(',')[1],'base64');
@@ -105,10 +106,14 @@ export class JewelleryStore{
         }else if(input.baseResultId!==undefined){
           const row=this.db.prepare("SELECT r.image FROM garment_results r JOIN garments g ON g.account=r.account AND g.id=r.garmentId WHERE r.account=? AND r.id=? AND r.avatarId=? AND r.view=? AND g.category='jewellery'").get(account.id,input.baseResultId,context.avatarId,view);
           if(!row||hash(await normalizeJewelleryView(Buffer.from(row.image),view))!==hash(supplied))throw fail('The approved base result is unavailable for this avatar view.',409);
+        }else if(input.baseLookId!==undefined){
+          if(input.baseReviewed!==true)throw fail('Review this saved jewellery look before adding another item.');
+          const row=this.db.prepare("SELECT image FROM looks WHERE account=? AND id=? AND avatarId=? AND view=? AND itemsJson<>'[]'").get(account.id,input.baseLookId,context.avatarId,view);
+          if(!row||hash(await normalizeJewelleryView(Buffer.from(row.image),view))!==hash(supplied))throw fail('The saved jewellery look is unavailable for this avatar view.',409);
         }else throw fail('Use an approved saved view or a verified, reviewed jewellery result as the base.');
       }
       base=supplied;
-    }else if(input.baseReceipt!==undefined||input.baseResultId!==undefined||input.baseReviewed!==undefined)throw fail('Provide the original base PNG with its review proof.');
+    }else if(input.baseReceipt!==undefined||input.baseResultId!==undefined||input.baseLookId!==undefined||input.baseReviewed!==undefined)throw fail('Provide the original base PNG with its review proof.');
     if(item)photo={image:Buffer.from(item.image),imageHash:item.imageHash};
     else photo=await productImage(input.image);
     current();

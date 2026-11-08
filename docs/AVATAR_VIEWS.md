@@ -187,4 +187,4 @@ flag off until those operator checks are complete. No APK or deployment was made
 J6's internal [jewellery adaptation adapter](JEWELLERY_TRYON.md) is implemented
 in `0.20.0-alpha.6`. [J7's public route, credit/refund integration and adaptation
 reuse](JEWELLERY_API.md) are implemented in `0.20.0-alpha.7`; the jewellery
-studio UI is next in J8.
+studio UI is now implemented in [J8](JEWELLERY_STUDIO.md).

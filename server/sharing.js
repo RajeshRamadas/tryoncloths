@@ -2,6 +2,7 @@ import {brandHeader,brandContact,brandCss} from './branding.js';
 import {createHash,randomBytes} from 'node:crypto';
 import {requireRole} from './tenancy.js';
 import {installEventsSchema,recordEvent} from './events.js';
+import {labelledJewelleryImage,JEWELLERY_PREVIEW_LABEL} from './jewellery-looks.js';
 
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 const hash=token=>createHash('sha256').update(token).digest('hex');
@@ -51,7 +52,7 @@ export class ShareStore {
   }
   resolve(token){
     if(!/^[A-Za-z0-9_-]{43}$/.test(token))return null;
-    return this.db.prepare(`SELECT sl.tokenHash,sl.look,sl.store,sl.expiresAt,l.garments,s.org,s.name,s.phone,s.brandingJson
+    return this.db.prepare(`SELECT sl.tokenHash,sl.look,sl.store,sl.expiresAt,l.garments,l.itemsJson,s.org,s.name,s.phone,s.brandingJson
       FROM share_links sl JOIN looks l ON l.account=sl.store AND l.id=sl.look JOIN stores s ON s.id=sl.store
       WHERE sl.tokenHash=? AND sl.revokedAt IS NULL AND sl.expiresAt>?`).get(hash(token),Date.now())||null;
   }
@@ -82,13 +83,14 @@ export function installShareRoutes(app,store,{requireUser,sameOrigin,wrap,public
     const row=shares.resolve(req.params.token);if(!row)return gone(res);
     const image=store.lookImage({id:row.store},row.look);if(!image)return gone(res);
     // Revalidate on every reuse so a revoked link cannot be served from a fresh cache.
-    const rendered=await store.branding.render(row.store,image);if(!shares.resolve(req.params.token))return gone(res);headers(res).set('Cache-Control','private, max-age=300, no-cache').type('png').send(rendered);
+    const labelled=row.itemsJson!=='[]'?await labelledJewelleryImage(image):image;
+    const rendered=await store.branding.render(row.store,labelled);if(!shares.resolve(req.params.token))return gone(res);headers(res).set('Cache-Control','private, max-age=300, no-cache').type('png').send(rendered);
   }));
   app.get('/s/:token',wrap((req,res)=>{
     const row=shares.resolve(req.params.token);if(!row)return gone(res);
     const branding=store.branding.read(row.store);
     const clothes=JSON.parse(row.garments).map(label=>`<li>${escape(label)}</li>`).join('');
-    const body=`${brandHeader(branding,`/s/${req.params.token}/logo`)}<article><h2>Your outfit preview</h2><img src="/s/${escape(req.params.token)}/image" alt="Shared outfit preview"><ul>${clothes}</ul><p><small>Approximate visual styling. This image does not predict size, fit or fabric drape.</small></p></article><p>Available until ${escape(new Date(row.expiresAt).toISOString().slice(0,10))} (UTC).</p>${brandContact(branding)}`;
+    const body=`${brandHeader(branding,`/s/${req.params.token}/logo`)}<article><h2>${row.itemsJson!=='[]'?'Your jewellery preview':'Your outfit preview'}</h2><img src="/s/${escape(req.params.token)}/image" alt="Shared outfit preview"><ul>${clothes}</ul><p><small>${row.itemsJson!=='[]'?escape(JEWELLERY_PREVIEW_LABEL):'Approximate visual styling. This image does not predict size, fit or fabric drape.'}</small></p></article><p>Available until ${escape(new Date(row.expiresAt).toISOString().slice(0,10))} (UTC).</p>${brandContact(branding)}`;
     if(req.method==='GET')shares.view(row);
     headers(res).type('html').send(document('Outfit preview',body));
   }));
