@@ -67,7 +67,8 @@ export async function detectFaces(bytes, { landmarks = false, upper = false } = 
     const tensor = api.tf.tensor3d(new Uint8Array(data), [info.height, info.width, 3]);
     try {
       const task = api.detectAllFaces(tensor, new api.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }));
-      const results = await (landmarks ? task.withFaceLandmarks(true) : task);
+      // Await the real promise: ComposableTask.then does not forward rejection.
+      const results = await (landmarks ? task.withFaceLandmarks(true).run() : task.run());
       const sx = width / info.width, sy = cropHeight / info.height;
       return results.map(result => {
         const detection = landmarks ? result.detection : result;

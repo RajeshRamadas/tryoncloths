@@ -97,10 +97,13 @@ Enable `TRYON_JEWELLERY=1` with account storage, then open **Catalogue → Jewel
 Jewellery try-on and portrait/hands views remain later work; catalogue actions use no AI credits.
 Web `0.20.0-alpha.2` adds the internal [J2 local face comparison helper](docs/JEWELLERY_IDENTITY.md)
 for future jewellery checks. Descriptors stay in memory; pilot threshold calibration
-and generation integration are still pending.
+and public generation-route integration are still pending.
 Web `0.20.0-alpha.3` adds [J3 hands templates and anchors](docs/JEWELLERY_HANDS.md):
 12 static male/female hand references across six tones, ready for later jewellery
 views. Selecting these assets uses no AI credits; the interactive hands flow is pending.
+Web `0.20.0-alpha.4` adds the internal [J4 portrait-generation adapter](docs/JEWELLERY_PORTRAITS.md)
+with face, framing and identity checks. Account routes, approval and storage follow in J5;
+no new generation screen or live paid request is added by this update.
 
 ## Validation
 

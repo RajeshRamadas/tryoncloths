@@ -84,5 +84,6 @@ and latency on the Lightsail instance have not been measured by this task.
 The helper is intended for checking edits of the same consented customer.
 
 [J3 hands templates and anchors](JEWELLERY_HANDS.md) are implemented in
-`0.20.0-alpha.3`; J4 portrait generation is next. Jewellery try-on remains
+`0.20.0-alpha.3`. [J4's portrait adapter](JEWELLERY_PORTRAITS.md) uses the local
+comparison in `0.20.0-alpha.4`; J5 view routes and approval are next. Jewellery try-on remains
 pending. No production deployment or APK build is part of J2.
