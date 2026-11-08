@@ -83,5 +83,6 @@ appearances and image conditions. That evidence remains pending. Runtime memory
 and latency on the Lightsail instance have not been measured by this task.
 The helper is intended for checking edits of the same consented customer.
 
-J3 hands templates and anchors are the next task; jewellery try-on remains
+[J3 hands templates and anchors](JEWELLERY_HANDS.md) are implemented in
+`0.20.0-alpha.3`; J4 portrait generation is next. Jewellery try-on remains
 pending. No production deployment or APK build is part of J2.
