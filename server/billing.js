@@ -127,19 +127,19 @@ export async function trialWatermark(image){
   const result=await sharp(source,{limitInputPixels:25_000_000}).composite([{input:overlay,gravity:'southeast'}]).png().toBuffer();
   return `data:image/png;base64,${result.toString('base64')}`;
 }
-export async function meter(req,{billing,account,pool='ai',action,beforeCommit},fn){
+export async function meter(req,{billing,account,pool='ai',action,beforeReserve,beforeCommit},fn){
   // Ephemeral pilots have no organisation or ledger; their existing paid limits
   // remain in force. Account-backed deployments always meter the provider call.
   if(!billing)return fn();
-  const hold=billing.reserve({org:account.org,store:account.id,user:account.user.id,pool,action,requestId:req.body.requestId});
+  const reserve=()=>{beforeReserve?.();return billing.reserve({org:account.org,store:account.id,user:account.user.id,pool,action,requestId:req.body.requestId});};
+  const hold=beforeReserve?billing.transaction(reserve):reserve();
   try{
     let image=await fn();
     if(typeof image!=='string'||!/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(image))throw new ProviderError('invalid_image');
     try { await sharp(Buffer.from(image.split(',')[1],'base64'),{limitInputPixels:25_000_000}).png().toBuffer(); } catch { throw new ProviderError('invalid_image'); }
     if(billing.db.prepare('SELECT status FROM orgs WHERE id=?').get(account.org)?.status==='trial')image=await trialWatermark(image);
     // Optional synchronous consent/ownership guard after image validation.
-    beforeCommit?.();
-    billing.commit(hold);return image;
+    billing.transaction(()=>{beforeCommit?.(image);billing.commit(hold);});return image;
   }catch(e){billing.refund(hold,'failed');throw e;}
 }
 export function creditStatus(store,account){

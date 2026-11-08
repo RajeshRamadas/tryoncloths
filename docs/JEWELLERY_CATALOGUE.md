@@ -8,7 +8,8 @@ Catalogue actions do not call AI or use credits. J2 adds the internal
 Jewellery generation, portrait and hands views, sizing and overlays remain
 later tasks J5–J12. J3 supplies [static hand references and anchors](JEWELLERY_HANDS.md)
 in `0.20.0-alpha.3`; J4 adds the [internal portrait adapter](JEWELLERY_PORTRAITS.md)
-in `0.20.0-alpha.4`. Interactive views, approval and storage are still pending.
+in `0.20.0-alpha.4`. [Interactive views, approval and storage](AVATAR_VIEWS.md)
+are implemented in J5 (`0.20.0-alpha.5`); jewellery try-on remains pending.
 
 ## Enable and use
 

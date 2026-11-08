@@ -1,4 +1,5 @@
 import {Analytics,installAnalyticsRoutes} from './analytics.js';
+import {AvatarViewStore} from './avatar-view-store.js';
 import {installTrackingSchema,validateLookTracking,attributeLook,lookAttribution} from './analytics-tracking.js';
 import {transaction,installSharedCatalogueSchema} from './catalogue-fields.js';
 import {installSyncSchema,installSyncRoutes} from './catalogue-sync.js';
@@ -66,10 +67,10 @@ export class AccountStore {
     this.garments = new GarmentStore(this);
     try { migrateTenancy(this.db); migrateUserSessions(this.db); this.billing=new BillingStore(this.db); installAdminSchema(this.db); this.customers=new CustomerStore(this.db); this.sharing=new ShareStore(this); installWhatsAppSchema(this.db); this.sizes=new SizeStore(this); installTrackingSchema(this.db); this.analytics=new Analytics(this); installSharedCatalogueSchema(this.db); installSyncSchema(this.db); installPhotoSchema(this.db); this.branding=new BrandingStore(this); }
     catch (error) { this.db.close(); throw error; }
-    try { this.imageSlots=new ImageSlots(this.billing); this.shoppers=new ShopperBudgets(this); installShopifyShopperSchema(this); }
+    try { this.imageSlots=new ImageSlots(this.billing); this.shoppers=new ShopperBudgets(this); installShopifyShopperSchema(this); this.views=new AvatarViewStore(this);this.customers.onRemove=(account,id)=>{for(const row of this.db.prepare('SELECT id FROM avatars WHERE account=? AND customer=?').all(account.id,id))this.views.invalidate(account.id,row.id);}; }
     catch (error) { this.db.close(); throw error; }
   }
-  close() { this.db.close(); }
+  close() { this.views?.close();this.db.close(); }
   async register(input) {
     const email = emailValue(input.email);
     const name = typeof input.name === "string" ? input.name.trim() : "";
@@ -216,7 +217,7 @@ export class AccountStore {
   lookImage(account,id) { const row=this.db.prepare("SELECT image FROM looks WHERE account=? AND id=?").get(account.id,id);return row?Buffer.from(row.image):null; }
   removeLook(account,id) { return this.db.prepare("DELETE FROM looks WHERE account=? AND id=?").run(account.id,id).changes>0; }
   image(account,id) { const row=this.db.prepare("SELECT image FROM avatars WHERE account=? AND id=?").get(account.id,id); return row ? Buffer.from(row.image) : null; }
-  remove(account,id) { return this.db.prepare("DELETE FROM avatars WHERE account=? AND id=?").run(account.id,id).changes>0; }
+  remove(account,id) { this.views?.invalidate(account.id,id);return this.db.prepare("DELETE FROM avatars WHERE account=? AND id=?").run(account.id,id).changes>0; }
 }
 
 function token(req) { return (req.get("cookie") || "").split(";").map(x=>x.trim()).find(x=>x.startsWith(`${cookieName}=`))?.slice(cookieName.length+1) || ""; }

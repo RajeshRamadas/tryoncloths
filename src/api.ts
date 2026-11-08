@@ -40,7 +40,7 @@ export async function requestApi(
     const response=await fetch(`${studioUrl}${path}`, {
       ...init,
       headers,
-      signal: controller.signal,
+      signal: init.signal ? AbortSignal.any([controller.signal,init.signal]) : controller.signal,
       credentials: Capacitor.isNativePlatform() ? "omit" : "same-origin",
     });
     if(["/api/personalize","/api/tryon","/api/billing/verify"].includes(path))window.dispatchEvent(new Event("forme-credits-changed"));

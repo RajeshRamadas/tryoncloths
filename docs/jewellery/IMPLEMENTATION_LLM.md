@@ -5,13 +5,16 @@ As of 2026-10-30 · Baseline: `main` web **0.15.0** · Stage: later, after comme
 Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 **J2 implemented in web `0.20.0-alpha.2`**;
 **J3 implemented in web `0.20.0-alpha.3`**;
-**J4 implemented in web `0.20.0-alpha.4`**. See
+**J4 implemented in web `0.20.0-alpha.4`**;
+**J5 implemented in web `0.20.0-alpha.5`**. See
 [catalogue setup](../JEWELLERY_CATALOGUE.md) and
 [local identity-check scope and validation](../JEWELLERY_IDENTITY.md), plus
 [hands assets and placement coordinates](../JEWELLERY_HANDS.md), and the
-[portrait adapter and its checks](../JEWELLERY_PORTRAITS.md).
-J5 is the next code task; J5–J12 remain pending. J4 calls the internal J2 check;
-pilot threshold calibration and public generation-route integration remain outstanding.
+[portrait adapter and its checks](../JEWELLERY_PORTRAITS.md), plus
+[authenticated view creation, approval and storage](../AVATAR_VIEWS.md).
+J6 is the next code task; J6–J12 remain pending. J5 exposes guarded portrait and
+hands views. Pilot threshold calibration and live provider quality/cost checks
+remain outstanding; jewellery try-on is not yet available.
 The separate commercial C16.5
 live service/legal/cost and pilot evidence remains outstanding.
 
@@ -184,12 +187,17 @@ are recorded in the linked guide; store operator pilot sign-off remains pending.
 3. `POST /api/avatars/:id/views/:kind/approve {image}`: validates PNG size per view, stores with `approvedAt`.
 4. `GET /api/avatars/:id/views/:kind` streams PNG; `DELETE` removes.
 5. `GET /api/avatars/:id/views/portrait/anchors`: compute anchors per DESIGN §8 from the stored portrait; cache in memory by view hash.
-6. Health adds `jewelleryAvailable` when `TRYON_JEWELLERY=1` and the provider is Gemini with a key.
+6. Health adds `avatarViewsAvailable` when `TRYON_JEWELLERY=1` and account storage is available, plus `portraitGenerationAvailable` when the provider is Gemini with a key. Keep `jewelleryAvailable` false until J7 actually exposes try-on.
 
 **Acceptance.**
 
-- [ ] Another store's avatar id → 404 on every view route.
-- [ ] Deleting the avatar removes its views.
+- [x] Another store's avatar id → 404 on every view route.
+- [x] Deleting the avatar removes its views.
+
+J5 also includes the web view-management page, signed preview approval, explicit
+review/storage consent, durable receipt keys, stale-preview invalidation and
+cancellation/credit-refund guards. The approval request must include its server
+receipt; arbitrary images cannot be approved just by supplying a PNG.
 
 ## Try-on
 
