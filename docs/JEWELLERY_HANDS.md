@@ -124,6 +124,7 @@ Release validation for `0.20.0-alpha.3`: **317 backend tests, 112 browser tests
 and the production web build passed**. The offline preparation workflow also
 reproduced all 24 shipped PNG/JSON files byte for byte from its source manifest.
 
-J4 portrait generation is next. Human pilot review, exact customer complexion
+[J4's internal portrait adapter](JEWELLERY_PORTRAITS.md) is implemented in
+`0.20.0-alpha.4`; J5 view storage and API are next. Human pilot review, exact customer complexion
 matching, jewellery fidelity, physical sizing and Lightsail runtime performance
 are not established by these asset tests. No APK is built.

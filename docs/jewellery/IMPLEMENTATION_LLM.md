@@ -4,12 +4,14 @@ As of 2026-10-30 · Baseline: `main` web **0.15.0** · Stage: later, after comme
 
 Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 **J2 implemented in web `0.20.0-alpha.2`**;
-**J3 implemented in web `0.20.0-alpha.3`**. See
+**J3 implemented in web `0.20.0-alpha.3`**;
+**J4 implemented in web `0.20.0-alpha.4`**. See
 [catalogue setup](../JEWELLERY_CATALOGUE.md) and
 [local identity-check scope and validation](../JEWELLERY_IDENTITY.md), plus
-[hands assets and placement coordinates](../JEWELLERY_HANDS.md).
-J4 is the next code task; J4–J12 remain pending. J2 is an internal helper;
-pilot threshold calibration and integration into generation remain outstanding.
+[hands assets and placement coordinates](../JEWELLERY_HANDS.md), and the
+[portrait adapter and its checks](../JEWELLERY_PORTRAITS.md).
+J5 is the next code task; J5–J12 remain pending. J4 calls the internal J2 check;
+pilot threshold calibration and public generation-route integration remain outstanding.
 The separate commercial C16.5
 live service/legal/cost and pilot evidence remains outstanding.
 
@@ -166,8 +168,8 @@ are recorded in the linked guide; store operator pilot sign-off remains pending.
 
 **Acceptance.**
 
-- [ ] Stubbed provider: request has face photo first, avatar second, 3:4 aspect, hair instruction only when `hairBehindEars` is true.
-- [ ] Faceless, wrongly framed or different-person outputs are rejected with the right codes.
+- [x] Stubbed provider: request has face photo first, avatar second, 3:4 aspect, hair instruction only when `hairBehindEars` is true.
+- [x] Faceless, wrongly framed or different-person outputs are rejected with the right codes.
 
 ### Task J5 — views storage and API
 
