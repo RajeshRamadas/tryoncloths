@@ -36,8 +36,9 @@ async function avatarInput(buffer) {
   } catch { throw new ProviderError('portrait_input'); }
 }
 
-/** J4's initial portrait must have one complete face filling 35–55% of height. */
-export async function requirePortraitFraming(png,{detect=detectFaces}={}) {
+/** Initial portraits default to 35–55%; J6 permits 30–60% after jewellery edits. */
+export async function requirePortraitFraming(png,{detect=detectFaces,minFaceRatio=.35,maxFaceRatio=.55}={}) {
+  if(!Number.isFinite(minFaceRatio)||!Number.isFinite(maxFaceRatio)||minFaceRatio<=0||maxFaceRatio>=1||minFaceRatio>maxFaceRatio)throw new ProviderError('face_check');
   let meta;
   try {if(!Buffer.isBuffer(png))throw new Error();meta=await sharp(png,{limitInputPixels:25_000_000}).metadata();if(meta.format!=='png'||meta.pages>1)throw new Error();}
   catch {throw new ProviderError('invalid_image');}
@@ -51,7 +52,7 @@ export async function requirePortraitFraming(png,{detect=detectFaces}={}) {
   if(!box||!['x','y','width','height'].every(key=>Number.isFinite(box[key]))||box.width<=0||box.height<=0)
     throw new ProviderError('face_check');
   if(box.x<0||box.y<0||box.x+box.width>PORTRAIT_WIDTH||box.y+box.height>PORTRAIT_HEIGHT||
-      box.height<PORTRAIT_HEIGHT*.35||box.height>PORTRAIT_HEIGHT*.55)throw new ProviderError('framing_changed');
+      box.height<PORTRAIT_HEIGHT*minFaceRatio||box.height>PORTRAIT_HEIGHT*maxFaceRatio)throw new ProviderError('framing_changed');
 }
 
 // Internal adapter: J5 must enforce flag, account ownership, fresh-photo consent,

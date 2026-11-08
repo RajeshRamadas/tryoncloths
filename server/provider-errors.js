@@ -5,6 +5,8 @@ const messages = {
   identity_mismatch: "The result changed the customer's face and was rejected.",
   portrait_input: "Use a clear customer face photo and an approved full-body avatar PNG. No image-generation request was sent.",
   framing_changed: "The portrait framing changed or cropped the customer's face. The result was rejected; a provider charge may still apply. No automatic retry was made.",
+  jewellery_input: "Choose a supported jewellery item, placement and matching approved view. No image-generation request was sent.",
+  hands_changed: "The result changed or removed the hands and was rejected. A provider charge may still apply; no automatic retry was made.",
   configuration: "The server's OpenAI key or image-model configuration is missing or invalid.",
   credentials: "OpenAI rejected the server's API key or access permissions. Check the key, project permissions and any required organization verification for image models.",
   model: "The configured OpenAI model was not found or is unavailable to this project. Check TRYON_OPENAI_MODEL.",

@@ -108,6 +108,11 @@ Web `0.20.0-alpha.5` adds [J5 saved avatar views](docs/AVATAR_VIEWS.md).
 With account storage and `TRYON_JEWELLERY=1`, open **Saved avatars → Manage views**
 to create a one-credit Gemini portrait or free sample hands, review and save it,
 then reuse it from the same store account. Jewellery try-on remains pending.
+Web `0.20.0-alpha.6` adds the internal [J6 jewellery try-on adapter](docs/JEWELLERY_TRYON.md):
+type-specific placement and approximate size cues, an optional second product
+angle, and face, identity, framing and hand-retention checks. The public route,
+credit/refund integration and adaptation reuse follow in J7; the jewellery
+try-on screen follows in J8. This update adds no public paid-generation action.
 
 ## Validation
 
