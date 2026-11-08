@@ -11,7 +11,8 @@ Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 **J7 implemented in web `0.20.0-alpha.7`**;
 **J8 implemented in web `0.20.0-alpha.8`**;
 **J9 implemented in web `0.20.0-alpha.9`**;
-**J10 implemented in web `0.20.0-alpha.10`**. See
+**J10 implemented in web `0.20.0-alpha.10`**;
+**J11 implemented in web `0.20.0-alpha.11`**. See
 [catalogue setup](../JEWELLERY_CATALOGUE.md) and
 [local identity-check scope and validation](../JEWELLERY_IDENTITY.md), plus
 [hands assets and placement coordinates](../JEWELLERY_HANDS.md), and the
@@ -21,8 +22,9 @@ Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 [guarded try-on API, approval and free reuse](../JEWELLERY_API.md), and
 [the jewellery studio, saved looks and sharing](../JEWELLERY_STUDIO.md), and
 [free cut-out placement, save/share and validation](../JEWELLERY_OVERLAY.md), and
-[costed variant comparisons and complete-look boards](../JEWELLERY_COMPARE_COMPLETE.md).
-J11 is the next code task; J11–J12 remain pending. J8 exposes view preparation,
+[costed variant comparisons and complete-look boards](../JEWELLERY_COMPARE_COMPLETE.md), and
+[optional sizing profiles, conversions and necklace guides](../JEWELLERY_SIZING.md).
+J12 evaluation/release is the next task and remains pending. J8 exposes view preparation,
 item selection, stacking/review, saved looks, labelled downloads and sharing.
 Pilot threshold calibration and live provider quality/cost checks remain outstanding.
 The separate commercial C16.5
@@ -331,8 +333,10 @@ J10 implementation: [variant groups, guarded comparison and complete-look workfl
 
 **Acceptance.**
 
-- [ ] Table-driven unit tests for ring and bangle conversions.
-- [ ] Guide lines move with the portrait's anchors.
+- [x] Table-driven unit tests for ring and bangle conversions.
+- [x] Guide lines move with the portrait's anchors.
+
+J11 implementation: [reference charts, optional measurements and anchor-based guides](../JEWELLERY_SIZING.md).
 
 ### Task J12 — tests, evaluation, docs, release
 

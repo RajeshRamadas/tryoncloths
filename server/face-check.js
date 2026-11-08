@@ -55,7 +55,7 @@ const average = points => ({
   y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
 });
 
-export async function detectFaces(bytes, { landmarks = false, upper = false } = {}) {
+export async function detectFaces(bytes, { landmarks = false, upper = false, necklace = false } = {}) {
   return withFaceApi(async api => {
     const { width, height } = await sharp(bytes).metadata();
     const cropHeight = upper ? Math.max(1, Math.round(height * 0.55)) : height;
@@ -77,6 +77,7 @@ export async function detectFaces(bytes, { landmarks = false, upper = false } = 
         if (landmarks) {
           const left = average(result.landmarks.getLeftEye());
           const right = average(result.landmarks.getRightEye());
+          if(necklace){const chin=result.landmarks.getJawOutline()[8];face.neckBase={x:chin.x*sx,y:(chin.y+box.height*.55)*sy};}
           face.eyes = { left: { x: left.x * sx, y: left.y * sy }, right: { x: right.x * sx, y: right.y * sy } };
         }
         return face;
@@ -85,7 +86,7 @@ export async function detectFaces(bytes, { landmarks = false, upper = false } = 
       if (error instanceof ProviderError) throw error;
       throw new ProviderError("face_check");
     } finally {
-      tensor.dispose();
+      tensor.dispose();if(necklace)data.fill(0);
     }
   });
 }
