@@ -6,7 +6,8 @@ stores can save jewellery product photos and structured details for reuse.
 Catalogue actions do not call AI or use credits. J2 adds the internal
 [local face comparison helper](JEWELLERY_IDENTITY.md) in `0.20.0-alpha.2`.
 Jewellery generation, portrait and hands views, sizing and overlays remain
-later tasks J3–J12.
+later tasks J4–J12. J3 supplies [static hand references and anchors](JEWELLERY_HANDS.md)
+in `0.20.0-alpha.3`; the interactive hands-view flow is still pending.
 
 ## Enable and use
 

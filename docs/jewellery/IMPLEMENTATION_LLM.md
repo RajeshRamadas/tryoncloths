@@ -3,10 +3,12 @@
 As of 2026-10-30 · Baseline: `main` web **0.15.0** · Stage: later, after commercial R1 · Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md) · Design: [`DESIGN.md`](DESIGN.md)
 
 Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
-**J2 implemented in web `0.20.0-alpha.2`**. See
+**J2 implemented in web `0.20.0-alpha.2`**;
+**J3 implemented in web `0.20.0-alpha.3`**. See
 [catalogue setup](../JEWELLERY_CATALOGUE.md) and
-[local identity-check scope and validation](../JEWELLERY_IDENTITY.md).
-J3 is the next code task; J3–J12 remain pending. J2 is an internal helper;
+[local identity-check scope and validation](../JEWELLERY_IDENTITY.md), plus
+[hands assets and placement coordinates](../JEWELLERY_HANDS.md).
+J4 is the next code task; J4–J12 remain pending. J2 is an internal helper;
 pilot threshold calibration and integration into generation remain outstanding.
 The separate commercial C16.5
 live service/legal/cost and pilot evidence remains outstanding.
@@ -140,8 +142,12 @@ flowchart TB
 
 **Acceptance.**
 
-- [ ] 12 PNG + 12 JSON present; tests pass.
-- [ ] Missing tone falls back to the default tone with a warning in the response.
+- [x] 12 PNG + 12 JSON present; tests pass.
+- [x] Missing tone falls back to the default tone with a warning in the response.
+
+J3 assets were generated once with Image Gen and normalized by the separate
+offline preparation script. Development image/anchor review and automated checks
+are recorded in the linked guide; store operator pilot sign-off remains pending.
 
 ## Avatar views
 

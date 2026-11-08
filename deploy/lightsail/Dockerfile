@@ -27,6 +27,7 @@ COPY src/profiles.js ./src/profiles.js
 COPY src/jewellery-definitions.js ./src/jewellery-definitions.js
 COPY public/avatar-library*.png ./public/
 COPY public/avatar-tones ./public/avatar-tones
+COPY public/hands ./public/hands
 # Source checkouts may use restrictive permissions; the runtime user must read
 # the root-owned application and assets without gaining write access.
 RUN chmod -R a+rX /app && mkdir -p /app/data && chown node:node /app/data && chmod 700 /app/data
