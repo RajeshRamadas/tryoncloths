@@ -263,7 +263,7 @@ export default function App() {
         if (!r.ok) throw new Error();
         const data = await r.json();
         if (data.accountsAvailable) setAccountState(s => ({...s,enabled:true}));
-        setJewelleryAvailable(data.jewelleryAvailable===true&&data.jewelleryContract==='jewellery-tryon-v1');
+        setJewelleryAvailable(data.jewelleryOverlayAvailable===true||data.jewelleryAvailable===true&&data.jewelleryContract==='jewellery-tryon-v1');
         setFemaleEnabled(data.supportedBodies?.includes("female") === true);
         const supported = data.personalizationContract === "customer-avatar-v4" && ["gemini", "openai"].includes(data.provider);
         setProvider(supported ? data.provider : null);

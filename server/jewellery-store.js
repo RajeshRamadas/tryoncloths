@@ -1,5 +1,6 @@
 import {createHash,createHmac,timingSafeEqual,randomBytes} from 'node:crypto';
 import sharp from 'sharp';
+import {combinedMode} from '../src/jewellery-overlay.js';
 import {transaction} from './catalogue-fields.js';
 import {productImage} from './garment-store.js';
 import {handsTemplate} from './hands-templates.js';
@@ -57,7 +58,7 @@ export class JewelleryStore{
     this.actor(account);this.store.requireAvatar(account,context.avatarId);
     const epoch=this.db.prepare('SELECT * FROM avatar_view_epochs WHERE store=? AND avatarId=?').get(account.id,context.avatarId);
     if(!epoch||epoch.nonce!==context.nonce||context.view!=='full'&&epoch[context.view+'Revision']!==context.revision)throw fail('The avatar or approved view changed. Reopen it before continuing.',409);
-    if(context.itemId){const item=this.store.garments.row(account,context.itemId,catalogue);if(itemVersion(item)!==context.itemVersion||item.needsTypeReview||item.stock==='out')throw fail('This jewellery item changed or is unavailable. Review it again.',409);}
+    if(context.itemId){const item=this.store.garments.row(account,context.itemId,catalogue);if(context.overlayHash&&hash(Buffer.concat([Buffer.from(item.overlayPng||[]),Buffer.from(item.overlayAnchor||'')]))!==context.overlayHash)throw fail('The transparent cut-out changed. Reload it before continuing.',409);if(itemVersion(item)!==context.itemVersion||item.needsTypeReview||item.stock==='out')throw fail('This jewellery item changed or is unavailable. Review it again.',409);}
   }
   claims(account,receipt){
     try{
@@ -73,7 +74,7 @@ export class JewelleryStore{
     this.current(account,context);
     const payload=Buffer.from(JSON.stringify({contract:JEWELLERY_CONTRACT,store:account.id,user:account.user.id,id:context.id,avatarId:context.avatarId,
       view:context.view,nonce:context.nonce,revision:context.revision,itemId:context.itemId,itemVersion:context.itemVersion,
-      selection:context.selection,title:context.title,imageHash:hash(Buffer.from(image.split(',')[1],'base64')),expires:Date.now()+24*3600000})).toString('base64url');
+      mode:context.mode||'ai',previewMode:combinedMode(context.baseMode,context.mode||'ai'),overlayHash:context.overlayHash,selection:context.selection,title:context.title,imageHash:hash(Buffer.from(image.split(',')[1],'base64')),expires:Date.now()+24*3600000})).toString('base64url');
     return payload+'.'+createHmac('sha256',this.store.views.key).update('jewellery:'+payload).digest('hex');
   }
   async context(account,input,{provider,model,guard=()=>{}}){
@@ -91,24 +92,27 @@ export class JewelleryStore{
     const current=()=>{guard();this.current(account,context);};
     const source=view==='full'?Buffer.from(reference.avatar.image):this.store.views.get(account,input.avatarId,view).image;
     const saved=await normalizeJewelleryView(source,view);current();
-    let base=saved;
+    let base=saved,baseMode=null;
     if(input.base!==undefined){
       const suppliedRaw=await jewelleryPng(input.base,view,{legacyFull:view==='full'});current();
       // Compare canonical pixels/canvas, so opaque alpha or harmless PNG
       // encoding differences cannot turn the same starting view into a miss.
       const supplied=await normalizeJewelleryView(suppliedRaw,view);current();
-      if(hash(supplied)!==hash(saved)){
+      if(hash(supplied)!==hash(saved)||input.baseReceipt!==undefined||input.baseResultId!==undefined||input.baseLookId!==undefined){
         if([input.baseReceipt,input.baseResultId,input.baseLookId].filter(v=>v!==undefined).length>1)throw fail('Use one proof for the current jewellery base.');
         if(input.baseReceipt!==undefined){
           if(input.baseReviewed!==true)throw fail('Review this jewellery result before using it as the next base.');
           const claims=this.claims(account,input.baseReceipt),original=Buffer.from(input.base.split(',')[1],'base64');
+          baseMode=claims.previewMode||'ai';
           if(claims.avatarId!==context.avatarId||claims.view!==view||claims.imageHash!==hash(original))throw fail('Use the original reviewed result for this avatar view.',409);
         }else if(input.baseResultId!==undefined){
-          const row=this.db.prepare("SELECT r.image FROM garment_results r JOIN garments g ON g.account=r.account AND g.id=r.garmentId WHERE r.account=? AND r.id=? AND r.avatarId=? AND r.view=? AND g.category='jewellery'").get(account.id,input.baseResultId,context.avatarId,view);
+          const row=this.db.prepare("SELECT r.image,r.previewMode FROM garment_results r JOIN garments g ON g.account=r.account AND g.id=r.garmentId WHERE r.account=? AND r.id=? AND r.avatarId=? AND r.view=? AND g.category='jewellery'").get(account.id,input.baseResultId,context.avatarId,view);
+          baseMode=row?.previewMode||'ai';
           if(!row||hash(await normalizeJewelleryView(Buffer.from(row.image),view))!==hash(supplied))throw fail('The approved base result is unavailable for this avatar view.',409);
         }else if(input.baseLookId!==undefined){
           if(input.baseReviewed!==true)throw fail('Review this saved jewellery look before adding another item.');
-          const row=this.db.prepare("SELECT image FROM looks WHERE account=? AND id=? AND avatarId=? AND view=? AND itemsJson<>'[]'").get(account.id,input.baseLookId,context.avatarId,view);
+          const row=this.db.prepare("SELECT image,previewMode FROM looks WHERE account=? AND id=? AND avatarId=? AND view=? AND itemsJson<>'[]'").get(account.id,input.baseLookId,context.avatarId,view);
+          baseMode=row?.previewMode||'ai';
           if(!row||hash(await normalizeJewelleryView(Buffer.from(row.image),view))!==hash(supplied))throw fail('The saved jewellery look is unavailable for this avatar view.',409);
         }else throw fail('Use an approved saved view or a verified, reviewed jewellery result as the base.');
       }
@@ -126,25 +130,25 @@ export class JewelleryStore{
     }
     const title=item?.name||(typeof input.title==='string'?input.title.slice(0,100):'');
     context.id=hash(JSON.stringify({contract:JEWELLERY_CONTRACT,...context,baseHash:hash(base),itemHash:photo.imageHash,angleHash:angle?.imageHash??null,selection,title,provider,model}));
-    current();return {...context,base,product:photo.image,secondAngle:angle?.image,selection,title,anchors,bodyType:reference.avatar.body_type};
+    current();return {...context,base,baseMode,product:photo.image,secondAngle:angle?.image,selection,title,anchors,bodyType:reference.avatar.body_type};
   }
   cached(account,context){
     this.current(account,context);if(!context.itemId)return null;
-    const row=this.db.prepare('SELECT image FROM garment_results WHERE account=? AND id=? AND avatarId=? AND garmentId=? AND view=?').get(account.id,context.id,context.avatarId,context.itemId,context.view);
-    return row?{image:dataUrl(row.image),resultId:context.id}:null;
+    const row=this.db.prepare('SELECT image,previewMode FROM garment_results WHERE account=? AND id=? AND avatarId=? AND garmentId=? AND view=?').get(account.id,context.id,context.avatarId,context.itemId,context.view);
+    return row?{image:dataUrl(row.image),resultId:context.id,previewMode:row.previewMode}:null;
   }
   async approve(account,id,input,{guard=()=>{}}={}){
     if(input.reviewed!==true||input.storageConsent!==true)throw fail('Review this jewellery result and confirm customer agreement to save it for reuse.');
-    const context=this.claims(account,input.receipt);if(context.id!==id)throw fail('Use the receipt for this jewellery result.',409);
+    const context=this.claims(account,input.receipt);if(context.mode==='overlay')throw fail('Overlay previews are saved as looks, not paid AI adaptations.');if(context.id!==id)throw fail('Use the receipt for this jewellery result.',409);
     if(!context.itemId)throw fail('Automatic reuse requires a saved catalogue item. Keep or download this upload preview; no regeneration is required.');
     const image=await jewelleryPng(input.image,context.view);
     if(hash(image)!==context.imageHash)throw fail('The result changed. Save the original generated PNG.',409);
     return transaction(this.db,()=>{
       guard();this.current(account,context);
-      const exists=this.db.prepare('SELECT image FROM garment_results WHERE account=? AND id=?').get(account.id,id);
+      const exists=this.db.prepare('SELECT image,previewMode FROM garment_results WHERE account=? AND id=?').get(account.id,id);
       if(exists&&hash(exists.image)!==context.imageHash)throw fail('Another reviewed result is already saved for this starting state and item. Keep or download this preview; it was not substituted for the saved image.',409);
       if(!exists&&this.db.prepare('SELECT count(*) n FROM garment_results WHERE account=?').get(account.id).n>=200)throw fail('Your store holds up to 200 saved adaptations. Remove an unused result first.',409);
-      this.db.prepare('INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt,view) VALUES(?,?,?,?,?,?,?) ON CONFLICT(account,id) DO NOTHING').run(account.id,id,context.avatarId,context.itemId,image,Date.now(),context.view);
+      this.db.prepare('INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt,view,previewMode) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO NOTHING').run(account.id,id,context.avatarId,context.itemId,image,Date.now(),context.view,context.previewMode||'ai');
       return {ok:true,resultId:id,view:context.view};
     });
   }

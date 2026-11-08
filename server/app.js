@@ -208,6 +208,7 @@ export function createApp({
     res.json({
       status: "ok",
       jewelleryAvailable,
+      jewelleryOverlayAvailable:Boolean(jewelleryEnabled&&accountStore),
       jewelleryContract:JEWELLERY_CONTRACT,
       jewelleryTypes:Object.keys(jewelleryTypes),
       jewelleryCatalogueAvailable:Boolean(jewelleryEnabled&&accountStore),

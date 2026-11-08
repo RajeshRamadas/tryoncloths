@@ -119,6 +119,13 @@ failed checks and free reuse of reviewed, saved results for the exact same
 starting view, item and placement. Enable `TRYON_JEWELLERY=1` with account
 storage and Gemini configuration to expose the API; the interactive jewellery
 studio screen is the next task, J8.
+Web `0.20.0-alpha.9` adds [J9 free jewellery overlays](docs/JEWELLERY_OVERLAY.md).
+Owners/managers attach transparent PNG cut-outs in **Jewellery catalogue**.
+Staff choose **Overlay · free** in the Jewellery studio to drag, pinch, scale,
+rotate and mirror pieces on saved avatar views. Reviewed looks save, reopen,
+export and share with an **Overlay preview** label, without Gemini or AI credits.
+The jewellery pilot flag and account sign-in are still required.
+
 Web `0.20.0-alpha.8` adds the [J8 jewellery studio](docs/JEWELLERY_STUDIO.md).
 Open and approve a saved avatar, then choose **Jewellery** beside **Try clothes**.
 Prepare reusable views, select catalogue/link/upload items, set placement, stack

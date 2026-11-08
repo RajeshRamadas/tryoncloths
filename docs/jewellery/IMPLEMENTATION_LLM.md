@@ -9,7 +9,8 @@ Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 **J5 implemented in web `0.20.0-alpha.5`**;
 **J6 implemented in web `0.20.0-alpha.6`**;
 **J7 implemented in web `0.20.0-alpha.7`**;
-**J8 implemented in web `0.20.0-alpha.8`**. See
+**J8 implemented in web `0.20.0-alpha.8`**;
+**J9 implemented in web `0.20.0-alpha.9`**. See
 [catalogue setup](../JEWELLERY_CATALOGUE.md) and
 [local identity-check scope and validation](../JEWELLERY_IDENTITY.md), plus
 [hands assets and placement coordinates](../JEWELLERY_HANDS.md), and the
@@ -17,8 +18,9 @@ Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 [authenticated view creation, approval and storage](../AVATAR_VIEWS.md), and
 [jewellery prompt, scale and result checks](../JEWELLERY_TRYON.md), plus the
 [guarded try-on API, approval and free reuse](../JEWELLERY_API.md), and
-[the jewellery studio, saved looks and sharing](../JEWELLERY_STUDIO.md).
-J9 is the next code task; J9–J12 remain pending. J8 exposes view preparation,
+[the jewellery studio, saved looks and sharing](../JEWELLERY_STUDIO.md), and
+[free cut-out placement, save/share and validation](../JEWELLERY_OVERLAY.md).
+J10 is the next code task; J10–J12 remain pending. J8 exposes view preparation,
 item selection, stacking/review, saved looks, labelled downloads and sharing.
 Pilot threshold calibration and live provider quality/cost checks remain outstanding.
 The separate commercial C16.5
@@ -276,7 +278,7 @@ request is included in J7.
 - [x] Clothing studio unchanged (existing e2e regression coverage retained).
 
 J8 implementation: [staff workflow, storage and validation](../JEWELLERY_STUDIO.md).
-J9 remains next; generation is still behind the pilot flag and provider configuration.
+J9 now adds free overlays; paid generation remains behind provider configuration.
 
 ## P1 / P2
 
@@ -294,8 +296,10 @@ J9 remains next; generation is still behind the pilot flag and provider configur
 
 **Acceptance.**
 
-- [ ] Earrings land within 10 px of the anchor on the fixture portrait before manual adjustment.
-- [ ] No network request to `/api/jewellery/tryon` in overlay mode.
+- [x] Earrings land within 10 px of the anchor on the fixture portrait before manual adjustment.
+- [x] No network request to `/api/jewellery/tryon` in overlay mode.
+
+J9 implementation: [cut-out preparation, placement editor and verification](../JEWELLERY_OVERLAY.md).
 
 ### Task J10 — compare metals and complete look
 

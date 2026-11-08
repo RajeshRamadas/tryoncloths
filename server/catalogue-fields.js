@@ -4,7 +4,7 @@ export const legacyGarmentColumns='account,id,name,garmentType,variant,sourceUrl
 export function transaction(db,fn){if(db.isTransaction)return fn();db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}}
 export function installCatalogueSchema(db){transaction(db,()=>{
  const columns=new Set(db.prepare('PRAGMA table_info(garments)').all().map(c=>c.name));
- for(const [name,type] of Object.entries({sku:'TEXT',brand:"TEXT NOT NULL DEFAULT ''",priceInr:'REAL',mrpInr:'REAL',sizesJson:"TEXT NOT NULL DEFAULT '[]'",stock:"TEXT NOT NULL DEFAULT 'in' CHECK(stock IN ('in','low','out'))",externalId:'TEXT',source:"TEXT NOT NULL DEFAULT 'manual'",updatedAt:'INTEGER',colourLabel:"TEXT NOT NULL DEFAULT ''",needsTypeReview:'INTEGER NOT NULL DEFAULT 0',category:"TEXT NOT NULL DEFAULT 'garment' CHECK(category IN ('garment','jewellery'))",attributesJson:"TEXT NOT NULL DEFAULT '{}'",overlayPng:'BLOB'}))if(!columns.has(name))db.exec(`ALTER TABLE garments ADD COLUMN ${name} ${type}`);
+ for(const [name,type] of Object.entries({sku:'TEXT',brand:"TEXT NOT NULL DEFAULT ''",priceInr:'REAL',mrpInr:'REAL',sizesJson:"TEXT NOT NULL DEFAULT '[]'",stock:"TEXT NOT NULL DEFAULT 'in' CHECK(stock IN ('in','low','out'))",externalId:'TEXT',source:"TEXT NOT NULL DEFAULT 'manual'",updatedAt:'INTEGER',colourLabel:"TEXT NOT NULL DEFAULT ''",needsTypeReview:'INTEGER NOT NULL DEFAULT 0',category:"TEXT NOT NULL DEFAULT 'garment' CHECK(category IN ('garment','jewellery'))",attributesJson:"TEXT NOT NULL DEFAULT '{}'",overlayPng:'BLOB',overlayAnchor:'TEXT'}))if(!columns.has(name))db.exec(`ALTER TABLE garments ADD COLUMN ${name} ${type}`);
  db.exec(`UPDATE garments SET updatedAt=savedAt WHERE updatedAt IS NULL;
  CREATE UNIQUE INDEX IF NOT EXISTS garments_csv_sku ON garments(account,source,sku) WHERE source='csv' AND sku IS NOT NULL;
  CREATE UNIQUE INDEX IF NOT EXISTS garments_external ON garments(account,source,externalId) WHERE externalId IS NOT NULL;
@@ -39,7 +39,7 @@ export function installSharedCatalogueSchema(db){transaction(db,()=>{
  const columns=db.prepare('PRAGMA table_info(garments)').all().map(c=>c.name);
  const local=columns.map(c=>'g.'+c).join(','),shared=columns.map(c=>c==='account'?'b.id':c==='id'?"'master:'||g.account||':'||g.id":'g.'+c).join(',');
  const visible=db.prepare("SELECT 1 FROM sqlite_master WHERE type='view' AND name='catalogue_visible'").get();
- if(visible&&!['category','attributesJson','overlayPng'].every(name=>db.prepare('PRAGMA table_info(catalogue_visible)').all().some(column=>column.name===name)))db.exec('DROP VIEW catalogue_visible');
+ if(visible&&!['category','attributesJson','overlayPng','overlayAnchor'].every(name=>db.prepare('PRAGMA table_info(catalogue_visible)').all().some(column=>column.name===name)))db.exec('DROP VIEW catalogue_visible');
  db.exec(`CREATE VIEW IF NOT EXISTS catalogue_visible AS
  SELECT ${local},NULL AS sharedFrom,NULL AS sharedId,0 AS readOnly FROM garments g WHERE g.source<>'master'
  UNION ALL SELECT ${shared},g.account AS sharedFrom,g.id AS sharedId,1 AS readOnly FROM catalogue_master m JOIN orgs o ON o.id=m.org AND o.plan='chain' JOIN stores b ON b.org=m.org AND b.id<>m.store JOIN garments g ON g.account=m.store AND g.source<>'master';`);

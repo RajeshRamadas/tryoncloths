@@ -25,6 +25,7 @@ COPY --from=build /app/dist ./dist
 COPY server ./server
 COPY src/profiles.js ./src/profiles.js
 COPY src/jewellery-definitions.js ./src/jewellery-definitions.js
+COPY src/jewellery-overlay.js ./src/jewellery-overlay.js
 COPY public/avatar-library*.png ./public/
 COPY public/avatar-tones ./public/avatar-tones
 COPY public/hands ./public/hands
