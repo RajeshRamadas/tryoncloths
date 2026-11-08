@@ -45,7 +45,7 @@ test('three legacy stores migrate once with unchanged credentials, cookies and s
   old.prepare('INSERT INTO looks VALUES(?,?,?,?,?,?,?,?)').run('look',account,'avatar','Look','["Shirt"]',bytes,bytes,2);
   old.prepare('INSERT INTO garments(account,id,name,garmentType,variant,sourceUrl,imageHash,signature,colour,image,thumbnail,savedAt) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(account,'garment','Shirt','shirt','blue','https://example.test/shirt','hash','00','[0,0,0]',bytes,bytes,3);
   old.prepare('INSERT INTO garment_links VALUES(?,?,?)').run(account,'garment','https://example.test/shirt');
-  old.prepare('INSERT INTO garment_results VALUES(?,?,?,?,?,?)').run(account,'result','avatar','garment',bytes,4);
+  old.prepare('INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt) VALUES(?,?,?,?,?,?)').run(account,'result','avatar','garment',bytes,4);
  }
  const tables=['accounts','sessions','avatars','looks','garments','garment_links','garment_results'];
  const snapshots=tables.map(table=>{

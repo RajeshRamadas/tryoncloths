@@ -81,7 +81,7 @@ test('jewellery persists and matches by photo or URL without crossing clothing c
 }));
 
 test('jewellery routes enforce feature flag, owner/manager roles, same origin and tenant isolation',async()=>fixture(async({store,a,ca,cb,request,input,calls})=>{
- const health=await (await request('/api/health')).json();assert.equal(health.jewelleryCatalogueAvailable,true);assert.equal(health.jewelleryAvailable,false);
+ const health=await (await request('/api/health')).json();assert.equal(health.jewelleryCatalogueAvailable,true);assert.equal(health.jewelleryAvailable,true);
  const item=(await (await request('/api/garments','POST',input)).json()).garment;
  assert.equal((await request('/api/jewellery/types')).status,200);
  for(const cookie of ['',cb]){assert.equal((await request('/api/garments/'+item.id+'?category=jewellery','GET',undefined,cookie)).status,cookie?404:401);assert.equal((await request('/api/garments/'+item.id+'?category=jewellery','DELETE',undefined,cookie)).status,cookie?404:401);}

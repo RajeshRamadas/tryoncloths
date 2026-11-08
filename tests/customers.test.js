@@ -93,7 +93,7 @@ test('customer erasure cascades to avatars, looks, adaptations and share links w
  const av=await store.save(a,avatar(image,c.id)),avOther=await store.save(b,avatar(image,other.id));
  const look=await store.saveLook(a,{image,avatarId:av.id,name:'Look',garments:['Shirt']});
  store.db.prepare('INSERT INTO garments(account,id,name,garmentType,variant,sourceUrl,imageHash,signature,colour,image,thumbnail,savedAt) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').run(a.id,'shirt','Shirt','top','','','hash','sig','blue',Buffer.from('png'),Buffer.from('png'),Date.now());
- store.db.prepare('INSERT INTO garment_results VALUES(?,?,?,?,?,?)').run(a.id,'adaptation',av.id,'shirt',Buffer.from('png'),Date.now());
+ store.db.prepare('INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt) VALUES(?,?,?,?,?,?)').run(a.id,'adaptation',av.id,'shirt',Buffer.from('png'),Date.now());
  store.db.prepare('INSERT INTO share_links(tokenHash,store,look,expiresAt,createdBy) VALUES(?,?,?,?,?)').run('hash',a.id,look.id,Date.now()+10000,a.user.id);
  const deleted=await request(`/api/customers/${c.id}`,'DELETE');assert.equal(deleted.status,200);
  for(const [table,column] of [['customers','store'],['avatars','account'],['looks','account'],['garment_results','account'],['share_links','store']])assert.equal(store.db.prepare(`SELECT count(*) AS n FROM ${table} WHERE ${column}=?`).get(a.id).n,0,table);

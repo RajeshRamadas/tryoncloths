@@ -33,7 +33,7 @@ test('CSV SKU upsert isolates stores, preserves product IDs and adaptations for 
  const first=await (await upload(csv([{sku:'SAME'}]))).json();assert.equal(first.created,1);await upload(csv([{sku:'SAME'}]),cb);const item=store.garments.list(a)[0],other=store.garments.list(b)[0];assert.notEqual(item.id,other.id);
  // A representative existing result exercises image-change cleanup without AI calls.
  const raw=store.garments.row(a,item.id);const av=await store.save(a,{image:`data:image/png;base64,${Buffer.from(raw.image).toString('base64')}`,name:'Customer',profileId:'regular',heightCm:175,weightKg:72,source:'imported'});
- store.db.prepare('INSERT INTO garment_results VALUES(?,?,?,?,?,?)').run(a.id,'result',av.id,item.id,raw.image,Date.now());
+ store.db.prepare('INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt) VALUES(?,?,?,?,?,?)').run(a.id,'result',av.id,item.id,raw.image,Date.now());
  const update=await (await upload(csv([{sku:'SAME',price:'899',stock:'low'}]))).json();assert.equal(update.updated,1);assert.equal(store.garments.get(a,item.id).priceInr,899);assert.equal(store.db.prepare('SELECT count(*) AS n FROM garment_results').get().n,1);assert.equal(store.garments.get(b,other.id).priceInr,999.5);
  setRed();const changed=await (await upload(csv([{sku:'SAME',price:'899',stock:'low'}]))).json();assert.equal(changed.updated,1);assert.equal(store.garments.list(a)[0].id,item.id);assert.equal(store.db.prepare('SELECT count(*) AS n FROM garment_results').get().n,0);
  assert.equal((await request(`/api/catalogue/${item.id}`,'PATCH',{stock:'out',priceInr:799})).status,200);assert.equal((await (await request('/api/catalogue')).json()).total,0);assert.equal((await (await request('/api/catalogue?stock=out')).json()).total,1);

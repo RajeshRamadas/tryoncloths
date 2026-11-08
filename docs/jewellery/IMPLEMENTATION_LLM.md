@@ -7,16 +7,19 @@ Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 **J3 implemented in web `0.20.0-alpha.3`**;
 **J4 implemented in web `0.20.0-alpha.4`**;
 **J5 implemented in web `0.20.0-alpha.5`**;
-**J6 implemented in web `0.20.0-alpha.6`**. See
+**J6 implemented in web `0.20.0-alpha.6`**;
+**J7 implemented in web `0.20.0-alpha.7`**. See
 [catalogue setup](../JEWELLERY_CATALOGUE.md) and
 [local identity-check scope and validation](../JEWELLERY_IDENTITY.md), plus
 [hands assets and placement coordinates](../JEWELLERY_HANDS.md), and the
 [portrait adapter and its checks](../JEWELLERY_PORTRAITS.md), plus
 [authenticated view creation, approval and storage](../AVATAR_VIEWS.md), and
-[jewellery prompt, scale and result checks](../JEWELLERY_TRYON.md).
-J7 is the next code task; J7–J12 remain pending. J5 exposes guarded portrait and
-hands views; J6 is an internal adapter with no route or UI. Pilot threshold calibration and live provider quality/cost checks
-remain outstanding; jewellery try-on is not yet available.
+[jewellery prompt, scale and result checks](../JEWELLERY_TRYON.md), plus the
+[guarded try-on API, approval and free reuse](../JEWELLERY_API.md).
+J8 is the next code task; J8–J12 remain pending. J5 exposes guarded portrait and
+hands views; J7 exposes the J6 adapter through account-scoped, metered API routes.
+The jewellery studio screen is not implemented yet. Pilot threshold calibration
+and live provider quality/cost checks remain outstanding.
 The separate commercial C16.5
 live service/legal/cost and pilot evidence remains outstanding.
 
@@ -225,7 +228,7 @@ receipt; arbitrary images cannot be approved just by supplying a PNG.
 
 J6 implementation: [adapter contract and validation](../JEWELLERY_TRYON.md).
 Clothing prompts are unchanged. No public route, credits or reuse wiring is
-added in this stage; `jewelleryAvailable` remains false until J7.
+added in this stage; J7 now supplies those guarded routes.
 
 ### Task J7 — `POST /api/jewellery/tryon` and reuse
 
@@ -243,9 +246,13 @@ added in this stage; `jewelleryAvailable` remains false until J7.
 
 **Acceptance.**
 
-- [ ] Reuse hit → no provider call and no credit.
-- [ ] Wrong view for type (ring on portrait) → 400.
-- [ ] Identity mismatch → 502 `identity_mismatch` and refund.
+- [x] Reuse hit → no provider call and no credit.
+- [x] Wrong view for type (ring on portrait) → 400.
+- [x] Identity mismatch → 502 `identity_mismatch` and refund.
+
+J7 implementation: [API contract, exact-context reuse and validation](../JEWELLERY_API.md).
+J8 remains the next task. No new jewellery try-on screen, APK, deployment or
+live paid provider request is included in J7.
 
 ### Task J8 — Jewellery studio UI
 

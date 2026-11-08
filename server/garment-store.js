@@ -83,6 +83,10 @@ export class GarmentStore {
       CREATE INDEX IF NOT EXISTS garment_results_item ON garment_results(account,garmentId);
       CREATE INDEX IF NOT EXISTS garment_results_avatar ON garment_results(account,avatarId);
     `);
+    transaction(this.db,()=>{
+      if(!this.db.prepare('PRAGMA table_info(garment_results)').all().some(column=>column.name==='view'))
+        this.db.exec("ALTER TABLE garment_results ADD COLUMN view TEXT NOT NULL DEFAULT 'full'");
+    });
     installCatalogueSchema(this.db);
   }
   row(account, id, options={}) {
@@ -227,7 +231,7 @@ export class GarmentStore {
     const exists = this.db.prepare('SELECT id FROM garment_results WHERE account=? AND id=?').get(account.id, receipt.id);
     if (!exists && this.db.prepare('SELECT count(*) AS n FROM garment_results WHERE account=?').get(account.id).n >= 200)
       throw problem('Your store holds up to 200 saved adaptations. Remove an unused result or garment first.', 409);
-    this.db.prepare('INSERT INTO garment_results VALUES(?,?,?,?,?,?) ON CONFLICT(account,id) DO NOTHING').run(account.id, receipt.id, receipt.avatarId, garmentId, image, Date.now());
+    this.db.prepare('INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt) VALUES(?,?,?,?,?,?) ON CONFLICT(account,id) DO NOTHING').run(account.id, receipt.id, receipt.avatarId, garmentId, image, Date.now());
     return { id: receipt.id };
   }
   removeResult(account, garmentId, id) {

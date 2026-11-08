@@ -1,5 +1,8 @@
 import {MonthlyAnalytics,installAnalyticsUnsubscribe} from './analytics-mail.js';
 import {installAvatarViewRoutes} from './avatar-view-routes.js';
+import {installJewelleryRoutes} from './jewellery-routes.js';
+import {JEWELLERY_CONTRACT} from './jewellery-tryon.js';
+import {jewelleryTypes} from './jewellery-types.js';
 import {CatalogueSync} from './catalogue-sync.js';
 import {ShopifyShopper} from './shopify-shopper.js';
 import {installShopifyShopperPublic} from './shopify-shopper-routes.js';
@@ -109,6 +112,7 @@ export function createApp({
   shopperConfigurationSource = {status:'injected',code:'programmatic_configuration'},
   jewelleryEnabled = process.env.TRYON_JEWELLERY === '1',
   avatarViewOptions = {},
+  jewelleryOptions = {},
   photoOptions = {},
   femaleEnabled = process.env.TRYON_FEMALE_PROFILES === "true",
   tryOn = geminiTryOn,
@@ -196,12 +200,16 @@ export function createApp({
   app.use(express.json({ limit: "15mb" }));
   const staffGenerate=(fn,input)=>accountStore?.imageSlots?accountStore.imageSlots.run({kind:'staff'},signal=>fn({...input,signal})):fn(input);
   installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, analyticsReports, catalogueSync, photoJobs, shopifyShopper,jewelleryEnabled, campaignConfig:{provider,model,apiKey,tryOn:input=>staffGenerate(tryOn,input),femaleEnabled} });
-  installGarmentRoutes(app, accountStore, { provider, model,jewelleryEnabled });
+  const jewelleryAvailable=Boolean(jewelleryEnabled&&accountStore&&provider==='gemini'&&apiKey);
+  installGarmentRoutes(app, accountStore, { provider, model,jewelleryEnabled,jewelleryAvailable });
   installAvatarViewRoutes(app,accountStore,{enabled:jewelleryEnabled,provider,apiKey,model,femaleEnabled,rateLimit,...avatarViewOptions});
+  installJewelleryRoutes(app,accountStore,{...jewelleryOptions,enabled:jewelleryEnabled,provider,apiKey,model,femaleEnabled,rateLimit});
   app.get("/api/health", (_req, res) =>
     res.json({
       status: "ok",
-      jewelleryAvailable:false,
+      jewelleryAvailable,
+      jewelleryContract:JEWELLERY_CONTRACT,
+      jewelleryTypes:Object.keys(jewelleryTypes),
       jewelleryCatalogueAvailable:Boolean(jewelleryEnabled&&accountStore),
       avatarViewsAvailable:Boolean(jewelleryEnabled&&accountStore),
       portraitGenerationAvailable:Boolean(jewelleryEnabled&&accountStore&&provider==='gemini'&&apiKey),

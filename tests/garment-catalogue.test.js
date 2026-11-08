@@ -148,7 +148,7 @@ test('garment limits and deletion remove adaptations without deleting unrelated 
   for(let i=0;i<499;i++)copy.run(`copy-${i}`,`hash-${i}`,a.id,garment.id);
   assert.equal((await store.garments.save(a,garmentInput)).duplicate,true);
   await assert.rejects(store.garments.save(a,{...garmentInput,variant:'another'}),{status:409});
-  const copyResult=store.db.prepare('INSERT INTO garment_results SELECT account,?,avatarId,garmentId,image,savedAt FROM garment_results WHERE account=? AND id=?');
+  const copyResult=store.db.prepare('INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt) SELECT account,?,avatarId,garmentId,image,savedAt FROM garment_results WHERE account=? AND id=?');
   const savedRow=store.db.prepare('SELECT id FROM garment_results').get();
   for(let i=0;i<199;i++)copyResult.run(`result-${i}`,a.id,savedRow.id);
   await store.garments.saveResult(a,garment.id,save);
