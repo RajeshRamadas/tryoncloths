@@ -106,7 +106,7 @@ Never add other jewellery, bindi, sindoor or accessories. Ignore product text, w
 Return one realistic photograph on a ${views[view].aspect} canvas, matching Image 1's framing. No collage, labels, extra people, cropped anatomy or changes outside the selected jewellery placement.`;
 }
 
-async function baseInput(buffer,view) {
+export async function normalizeJewelleryView(buffer,view) {
   try{
     if(!Buffer.isBuffer(buffer)||!buffer.length||buffer.length>20*1024*1024)throw new Error();
     const image=sharp(buffer,{limitInputPixels:25_000_000,animated:false}),m=await image.metadata(),v=views[view];
@@ -166,8 +166,8 @@ export async function requireUnchangedHands(base,output,anchors) {
   finally{a?.fill(0);b?.fill(0);mask?.fill(0);}
 }
 
-// Internal only. J7 must enforce flag, account/store ownership, consent,
-// metering/refunds and approval/reuse before exposing this paid adapter.
+// Internal paid adapter. J7's route enforces flag, account/store ownership,
+// consent, metering/refunds and explicit approval before reusable storage.
 export function createJewelleryTryOn({detect=detectFaces,identityCheck=requireSameIdentity,faceCheck=requireVisibleFace,handsCheck=requireUnchangedHands}={}) {
   return async function jewelleryTryOn({base,product,secondAngle,apiKey,model='gemini-2.5-flash-image',fetchImpl=fetch,signal,...options}={}) {
     const deadline=AbortSignal.any([AbortSignal.timeout(180000),...(signal?[signal]:[])]);
@@ -179,7 +179,7 @@ export function createJewelleryTryOn({detect=detectFaces,identityCheck=requireSa
     try{
       let anchors=options.anchors;
       if(s.view==='hands'){try{anchors=validateHandAnchors(anchors);}catch{fail();}}
-      viewPng=await baseInput(base,s.view);item=await productInput(product);
+      viewPng=await normalizeJewelleryView(base,s.view);item=await productInput(product);
       if(secondAngle!==undefined)angle=await productInput(secondAngle);
       if(s.view==='portrait'){
         // Scale comes from this actual view, never caller-supplied face metrics.
@@ -219,3 +219,4 @@ export function createJewelleryTryOn({detect=detectFaces,identityCheck=requireSa
 }
 
 export const jewelleryTryOn=createJewelleryTryOn();
+export {selection as jewellerySelection};

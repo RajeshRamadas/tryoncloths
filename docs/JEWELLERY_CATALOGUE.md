@@ -9,7 +9,9 @@ Jewellery generation, portrait and hands views, sizing and overlays remain
 later tasks J5–J12. J3 supplies [static hand references and anchors](JEWELLERY_HANDS.md)
 in `0.20.0-alpha.3`; J4 adds the [internal portrait adapter](JEWELLERY_PORTRAITS.md)
 in `0.20.0-alpha.4`. [Interactive views, approval and storage](AVATAR_VIEWS.md)
-are implemented in J5 (`0.20.0-alpha.5`); jewellery try-on remains pending.
+are implemented in J5 (`0.20.0-alpha.5`). J6 supplies the internal adapter and
+[J7 adds guarded try-on and reuse API routes](JEWELLERY_API.md)
+(`0.20.0-alpha.7`); the jewellery studio screen remains J8.
 
 ## Enable and use
 
@@ -97,8 +99,9 @@ catalogue capacity. Shared-master metadata follows its category and remains
 read-only. Changed jewellery attributes invalidate any stored item adaptations.
 
 Health returns `jewelleryCatalogueAvailable` only when the flag and account
-storage are enabled. `jewelleryAvailable` stays false until actual try-on is
-implemented; consumers must not advertise generation from the catalogue flag.
+storage are enabled. Since J7, `jewelleryAvailable` additionally requires Gemini
+and a configured image key; `jewelleryContract` identifies its adapter. Consumers
+must not advertise generation from the catalogue flag alone.
 No face photos, descriptors, provider credentials or AI outputs are added by J1.
 
 ## Verification

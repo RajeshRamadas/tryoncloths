@@ -21,7 +21,7 @@ export function installGarmentRoutes(app, store, config) {
       await fn(req, res, owner);
     } catch (error) { res.status(error.status || 500).json({ error: error.status ? error.message : 'The store catalogue is unavailable. No AI request was made by this catalogue action.' }); }
   };
-  app.get('/api/jewellery/types',wrap((req,res)=>{catalogueCategory('jewellery',{jewelleryEnabled:config.jewelleryEnabled});res.json({types:jewelleryTypes,metals:jewelleryMetals,bangleSizes,tryOnAvailable:false});}));
+  app.get('/api/jewellery/types',wrap((req,res)=>{catalogueCategory('jewellery',{jewelleryEnabled:config.jewelleryEnabled});res.json({types:jewelleryTypes,metals:jewelleryMetals,bangleSizes,tryOnAvailable:Boolean(config.jewelleryAvailable)});}));
   app.get('/api/garments', wrap((req, res, owner) => res.json(store.garments.browse(owner,{...req.query,limit:req.query.limit??200},req.catalogueOptions))));
   app.post('/api/garments/match', wrap(async (req, res, owner) => res.json(await store.garments.matches(owner, {...req.body,category:req.catalogueOptions.category},req.catalogueOptions))));
   app.post('/api/garments', wrap(async (req, res, owner) => {

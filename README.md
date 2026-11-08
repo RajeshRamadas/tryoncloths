@@ -113,6 +113,12 @@ type-specific placement and approximate size cues, an optional second product
 angle, and face, identity, framing and hand-retention checks. The public route,
 credit/refund integration and adaptation reuse follow in J7; the jewellery
 try-on screen follows in J8. This update adds no public paid-generation action.
+Web `0.20.0-alpha.7` adds the [J7 jewellery try-on API](docs/JEWELLERY_API.md):
+account-scoped generation, explicit consent, one-credit metering, refunds on
+failed checks and free reuse of reviewed, saved results for the exact same
+starting view, item and placement. Enable `TRYON_JEWELLERY=1` with account
+storage and Gemini configuration to expose the API; the interactive jewellery
+studio screen is the next task, J8.
 
 ## Validation
 

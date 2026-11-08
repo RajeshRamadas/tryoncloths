@@ -5,12 +5,11 @@ Web `0.20.0-alpha.6` implements Task J6 from
 [design sections 6–7](jewellery/DESIGN.md). It prepares a single Gemini image
 request and rejects invalid results before returning a PNG data URL.
 
-This is an internal server module. There is no new HTTP endpoint, screen,
-database migration or paid action in the running app. `jewelleryAvailable`
-remains false. J7 must enforce `TRYON_JEWELLERY=1`, authenticated store ownership,
-approved base views, item ownership, origin, explicit provider consent, request
-IDs, concurrency, credit reservation/refund and review/approval before exposing
-it. J7 also adds saved adaptation reuse; J8 adds the jewellery studio screen.
+This is an internal server module. Web `0.20.0-alpha.7` now exposes it through
+the [J7 API](JEWELLERY_API.md), enforcing `TRYON_JEWELLERY=1`, account/store
+ownership, approved base views, item ownership, same origin, explicit consent,
+request IDs, concurrency, credit reservation/refund and review before reusable
+storage. The interactive jewellery studio screen remains J8.
 
 ## Module contract
 
@@ -125,7 +124,7 @@ web build passed**. No live paid provider request was sent.
 
 Live Gemini jewellery fidelity, tiny stone/count reproduction, side placement,
 chain drape, identity-threshold calibration, hand thresholds and Lightsail
-performance remain unverified. J7 must refund failed acceptance checks and
-save only explicitly approved results for reuse. J6 does not claim that the
+performance remain unverified. J7 refunds failed acceptance checks and
+saves only explicitly approved results for reuse. J6 does not claim that the
 interactive jewellery try-on workflow is available yet. No APK or production
 deployment is part of this change.

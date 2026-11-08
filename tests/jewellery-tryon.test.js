@@ -218,7 +218,7 @@ test('real local face models accept an unchanged independent synthetic portrait 
   await assert.rejects(jewelleryTryOn({...input,base,fetchImpl:async()=>{calls++;return reply();}}),code('missing_face'));assert.equal(calls,3);
 });
 
-test('adapter adds no public route, persistence or logs; public jewellery try-on remains disabled for J7',async()=>{
+test('adapter adds no persistence or logs; J7 exposes it through the guarded route installer',async()=>{
   const source=await readFile(new URL('../server/jewellery-tryon.js',import.meta.url),'utf8');assert.doesNotMatch(source,/console\s*\.|\b(?:writeFile|appendFile|createWriteStream)\s*\(|\bdb\s*\.|\.(?:json|send|write)\s*\(/);
-  const app=await readFile(new URL('../server/app.js',import.meta.url),'utf8');assert.doesNotMatch(app,/from\s+['"].*jewellery-tryon/);assert.match(app,/jewelleryAvailable:\s*false/);
+  const app=await readFile(new URL('../server/app.js',import.meta.url),'utf8');assert.match(app,/installJewelleryRoutes\(app,accountStore/);
 });
