@@ -3,8 +3,7 @@
 Web `0.20.0-alpha.7` implements J7 from the
 [jewellery implementation guide](jewellery/IMPLEMENTATION_LLM.md). It connects
 the [J6 adapter](JEWELLERY_TRYON.md) to store authentication, consent, metering,
-review and reusable adaptations. **The interactive jewellery studio is J8 and
-is not included yet.** The existing catalogue and avatar-view screens remain.
+review and reusable adaptations. **The interactive [J8 jewellery studio](JEWELLERY_STUDIO.md) is now implemented.** The existing catalogue and avatar-view screens remain.
 
 ## Configuration and boundaries
 
@@ -165,6 +164,6 @@ tests are injected; no real AI service is called.
 Release validation: **374 backend tests, 118 browser tests and the production
 web build passed**. No live paid provider request was sent.
 
-J8 adds the staff-facing jewellery picker, stacking/review, download and sharing
-flow. Live provider placement/fidelity, identity/hand threshold calibration,
+[J8](JEWELLERY_STUDIO.md) now adds the staff-facing picker, stacking/review,
+download and sharing flow. Live provider placement/fidelity, identity/hand threshold calibration,
 quota/cost, retention, Lightsail load and pilot-store validation remain separate.

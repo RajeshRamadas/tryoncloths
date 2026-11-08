@@ -8,18 +8,19 @@ Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 **J4 implemented in web `0.20.0-alpha.4`**;
 **J5 implemented in web `0.20.0-alpha.5`**;
 **J6 implemented in web `0.20.0-alpha.6`**;
-**J7 implemented in web `0.20.0-alpha.7`**. See
+**J7 implemented in web `0.20.0-alpha.7`**;
+**J8 implemented in web `0.20.0-alpha.8`**. See
 [catalogue setup](../JEWELLERY_CATALOGUE.md) and
 [local identity-check scope and validation](../JEWELLERY_IDENTITY.md), plus
 [hands assets and placement coordinates](../JEWELLERY_HANDS.md), and the
 [portrait adapter and its checks](../JEWELLERY_PORTRAITS.md), plus
 [authenticated view creation, approval and storage](../AVATAR_VIEWS.md), and
 [jewellery prompt, scale and result checks](../JEWELLERY_TRYON.md), plus the
-[guarded try-on API, approval and free reuse](../JEWELLERY_API.md).
-J8 is the next code task; J8–J12 remain pending. J5 exposes guarded portrait and
-hands views; J7 exposes the J6 adapter through account-scoped, metered API routes.
-The jewellery studio screen is not implemented yet. Pilot threshold calibration
-and live provider quality/cost checks remain outstanding.
+[guarded try-on API, approval and free reuse](../JEWELLERY_API.md), and
+[the jewellery studio, saved looks and sharing](../JEWELLERY_STUDIO.md).
+J9 is the next code task; J9–J12 remain pending. J8 exposes view preparation,
+item selection, stacking/review, saved looks, labelled downloads and sharing.
+Pilot threshold calibration and live provider quality/cost checks remain outstanding.
 The separate commercial C16.5
 live service/legal/cost and pilot evidence remains outstanding.
 
@@ -251,8 +252,8 @@ added in this stage; J7 now supplies those guarded routes.
 - [x] Identity mismatch → 502 `identity_mismatch` and refund.
 
 J7 implementation: [API contract, exact-context reuse and validation](../JEWELLERY_API.md).
-J8 remains the next task. No new jewellery try-on screen, APK, deployment or
-live paid provider request is included in J7.
+J8 now supplies the jewellery screen. No APK, deployment or live paid provider
+request is included in J7.
 
 ### Task J8 — Jewellery studio UI
 
@@ -271,8 +272,11 @@ live paid provider request is included in J7.
 
 **Acceptance.**
 
-- [ ] Browser test (mocked APIs): create portrait → earrings → nose pin → undo → save look.
-- [ ] Clothing studio unchanged (existing e2e passes).
+- [x] Browser test (injected generation): create portrait → earrings → nose pin → undo → save look.
+- [x] Clothing studio unchanged (existing e2e regression coverage retained).
+
+J8 implementation: [staff workflow, storage and validation](../JEWELLERY_STUDIO.md).
+J9 remains next; generation is still behind the pilot flag and provider configuration.
 
 ## P1 / P2
 

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link2, Search, Sparkles, Upload } from "lucide-react";
 import { requestApi } from "./api";
 import { readPhoto } from "./images";
+import {readProductPhotos} from './product-photos';
 
 import { garmentChoices, guessGarmentType, type GarmentType } from "./garment-types";
 import GarmentCatalogue, { MatchSuggestions } from "./GarmentCatalogue";
@@ -87,13 +88,8 @@ export default function LinkTryOn({ catalogueEnabled=false, avatarId, sessionId,
         if(found.linked.length===1){await loadStored(found.linked[0]);return;}
         if(found.linked.length>1){applyProduct('',[]);setMatches(found);setNotice('Choose the saved product and variant below, or read the website again.');return;}
       }
-      const response = await requestApi("/api/product-link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: url.trim() }) }, 45000);
-      const data = await response.json();
-      accountExpired(data.code);
-      if (!response.ok) throw new Error(data.error || "The product link could not be read.");
-      const valid = (Array.isArray(data.images) ? data.images : []).filter((item: ProductImage) => typeof item?.image === "string" && item.image.startsWith("data:image/jpeg;base64,"));
-      if (!valid.length) throw new Error("No product images were found. Upload the product image instead.");
-      applyProduct(typeof data.title === "string" ? data.title : "", valid, typeof data.url==='string'?data.url:url.trim());
+      const data=await readProductPhotos(url.trim()),valid=data.images;
+      applyProduct(data.title,valid,data.url);
       if(catalogueEnabled){try{setMatches(await matchGarments({image:valid[0].image}));}catch{setNotice('Photos loaded. The duplicate check is unavailable; saving will still check exact duplicates.');}}
     } catch (e) {
       setError(e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError") ? "The website took too long to respond. Try again or upload the product image." : (e as Error).message);
