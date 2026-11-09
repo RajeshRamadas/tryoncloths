@@ -98,6 +98,15 @@ button:disabled {
 }
 .file {
   font-size: 0.9rem;
+  min-width: 0;
+  max-width: 100%;
+}
+/* A file input's intrinsic width depends on the system font; keep it inside narrow panels. */
+.file input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 4px;
 }
 #error {
   color: #8f231c;
