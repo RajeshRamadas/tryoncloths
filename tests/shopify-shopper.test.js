@@ -5,6 +5,9 @@ import {DatabaseSync} from 'node:sqlite';
 import path from 'node:path';
 import {readFile} from 'node:fs/promises';
 import {statfsSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+// Any existing absolute directory that is normally not tmpfs (the repository checkout).
+const nonTmpfsDirectory=fileURLToPath(new URL('..',import.meta.url));
 import {shopifyFixture,signedQuery,shopifySecret,publicStudio} from './helpers/shopify-shopper.js';
 import {verifyShopifyQuery,shopDomain} from '../server/shopify-security.js';
 import {ShopifyShopper,digest} from '../server/shopify-shopper.js';
@@ -165,8 +168,8 @@ test('transient state enforces logical expiry, bounded capacity, one-use across 
     for(let i=0;i<10000;i++)first.put('proxy',String(i),true,5000);assert.throws(()=>second.put('proxy','too-many',true,5000),{status:503});
   }finally{one.close();two.close();}
   assert.throws(()=>new ShopperState({directory:'relative'}),/absolute/);
-  if(Number(statfsSync('/workspace').type)!==0x01021994){assert.throws(()=>new ShopperState({directory:'/workspace'}),/tmpfs/);
-    const unavailable=new ShopifyShopper(f.store,{...f.options,state:undefined,stateDirectory:'/workspace'});assert.equal(unavailable.summary(f.a).available,false);}
+  if(Number(statfsSync(nonTmpfsDirectory).type)!==0x01021994){assert.throws(()=>new ShopperState({directory:nonTmpfsDirectory}),/tmpfs/);
+    const unavailable=new ShopifyShopper(f.store,{...f.options,state:undefined,stateDirectory:nonTmpfsDirectory});assert.equal(unavailable.summary(f.a).available,false);}
   const oauth=f.service.start(f.a,{shopDomain:'sample.myshopify.com'},f.staffToken);assert.ok(!JSON.stringify(f.store.db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all()).includes('shopper_state'));assert.ok(!f.store.db.prepare('SELECT * FROM shopper_shopify_installations').all().length);
   const raw=await readFile(path.join(f.directory,'accounts.sqlite'));assert.ok(!raw.includes(Buffer.from(new URL(oauth.authorizationUrl).searchParams.get('state'))));
 }));
