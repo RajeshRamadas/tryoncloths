@@ -213,6 +213,8 @@ export function createApp({
       jewelleryTypes:Object.keys(jewelleryTypes),
       jewelleryCatalogueAvailable:Boolean(jewelleryEnabled&&accountStore),
       avatarViewsAvailable:Boolean(jewelleryEnabled&&accountStore),
+      customerHandsGenerationAvailable:Boolean(jewelleryEnabled&&accountStore&&provider==='gemini'&&apiKey),
+      customerHandsContract:'customer-hands-v1',
       portraitGenerationAvailable:Boolean(jewelleryEnabled&&accountStore&&provider==='gemini'&&apiKey),
       personalizationAvailable: Boolean(apiKey),
       provider,

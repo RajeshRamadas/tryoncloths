@@ -14,7 +14,8 @@ Implementation update (2026-11-09): **J1 implemented in web `0.20.0-alpha.1`**;
 **J10 implemented in web `0.20.0-alpha.10`**;
 **J11 implemented in web `0.20.0-alpha.11`**;
 **J12 tooling and release preparation implemented in web `0.21.0-rc.1`**;
-**J13 (P1 JF-3 jewellery analytics) implemented in web `0.21.0-rc.2`**. See
+**J13 (P1 JF-3 jewellery analytics) implemented in web `0.21.0-rc.2`**;
+**J14 (P1 JA-4 customer hand photos) implemented in web `0.21.0-rc.3`**. See
 [catalogue setup](../JEWELLERY_CATALOGUE.md) and
 [local identity-check scope and validation](../JEWELLERY_IDENTITY.md), plus
 [hands assets and placement coordinates](../JEWELLERY_HANDS.md), and the
@@ -377,7 +378,23 @@ Implemented in web `0.21.0-rc.2`. [Workflow, metric definitions and history limi
 J13 validation: 435 backend tests, 136 browser tests and production build passed;
 flag-off/on runtime staging also passed. No live request, APK or deployment.
 
-Next unimplemented P1 jewellery extension: JA-4 customer hand photo support,
-using design §4.2. Standard hands remain available; custom hand photos are not
-silently accepted or positioned with template anchors. Live rollout and
+JA-4 customer hand photos now follow in J14 below, using design §4.2.
+Standard hands remain free; photo geometry is authored for each customer. Live rollout and
 independent identity calibration remain separate operational work.
+
+
+### Task J14 — customer hand photos (JA-4, P1)
+
+Implemented in web `0.21.0-rc.3`. [Workflow, consent, geometry, checks and limits](../CUSTOMER_HAND_PHOTOS.md).
+
+- Upload/camera input and twelve manually authored photo markers; no template-pose substitution.
+- One Gemini cleanup request/credit with explicit own-hands/marker/complexion confirmation and provider consent.
+- Skin-area and per-hand retention heuristics, not an anatomy/identity detector; required staff review and separate storage agreement.
+- Signed/persisted photo geometry for approved views, looks and paid reuse, including after view replacement.
+- Existing pilot flag, female gate, roles, job leases, attempt limits, refunds and no automatic retry.
+- Live provider and customer-photo quality remain unverified; J12 pilot gates stay pending.
+
+J14 validation: 450 backend tests, 141 browser tests, production build and runtime
+staging passed; ten focused view/hand browser tests were rerun after marker UI
+polish. No paid/live call, APK or deployment. Customer-photo/provider visual
+validation and the J12 live pilot remain outstanding.

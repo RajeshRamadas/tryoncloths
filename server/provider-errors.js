@@ -1,4 +1,5 @@
 const messages = {
+  hands_input: "Use a clear photo of the customer’s own two hands, palms down with all fingers and wrists visible, and mark each finger and wrist. No image-generation request was sent.",
   face_input: "Use one clear, front-facing customer photo with the full head visible. No image-generation request was sent.",
   face_check: "The studio could not complete its local face check. No customer avatar was accepted. Check the server installation before trying again.",
   missing_face: "The generated image did not contain one clearly detectable face. It was rejected and cannot be approved or exported. A provider charge may still apply; no automatic retry was made.",
