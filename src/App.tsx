@@ -33,6 +33,7 @@ import {
   DEFAULT_TEMPLATE_TONE,
 } from "./profiles";
 import { downloadAvatar, libraryForIndex, readPhoto } from "./images";
+import BodyPhotoHints from "./BodyPhotoHints";
 import { isNative, capturePhoto, clearNativeExports } from "./native";
 import { requestApi } from "./api";
 import StudioConnection from "./StudioConnection";
@@ -797,6 +798,7 @@ export default function App() {
                           }}
                         />
                       </div>
+                      {body && <BodyPhotoHints photo={body} />}
                       <p className="photo-hint">
                         <Camera size={13} /> Clear light. Natural pose. No filters.
                       </p>
