@@ -1,3 +1,4 @@
+import {openStoreTools} from '../helpers/studio-navigation.js';
 import {test,expect} from '@playwright/test';
 import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
@@ -11,7 +12,7 @@ async function setup(page,run){
  const photo=await sharp({create:{width:200,height:300,channels:3,background:'#3466aa'}}).png().toBuffer();let ai=0;
  const server=createApp({accountStore:store,accessMode:'public',apiKey:'test',tryOn:async()=>{ai++;throw new Error('No AI request expected');},catalogueOptions:{fetchImage:async()=>({body:photo})}}).listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const api=`http://127.0.0.1:${server.address().port}`;
  await page.route('**/api/**',async route=>{const u=new URL(route.request().url()),response=await route.fetch({url:api+u.pathname+u.search,headers:{...route.request().headers(),host:new URL(api).host,origin:api}});await route.fulfill({response});});
- try{await page.goto('/');await page.getByLabel('Account email').fill('catalogue@example.test');await page.getByLabel('Account password').fill('test-password-long');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByRole('link',{name:'Catalogue',exact:true}).click();await expect(page.getByRole('heading',{name:'Store catalogue',exact:true})).toBeVisible();await run({store,owner,ai:()=>ai});}finally{await page.unrouteAll({behavior:'wait'});await new Promise(r=>server.close(r));store.close();await rm(dir,{recursive:true,force:true});}
+ try{await page.goto('/');await page.getByLabel('Account email').fill('catalogue@example.test');await page.getByLabel('Account password').fill('test-password-long');await page.getByRole('button',{name:'Sign in',exact:true}).click();await openStoreTools(page);await page.getByRole('link',{name:'Catalogue',exact:true}).click();await expect(page.getByRole('heading',{name:'Store catalogue',exact:true})).toBeVisible();await run({store,owner,ai:()=>ai});}finally{await page.unrouteAll({behavior:'wait'});await new Promise(r=>server.close(r));store.close();await rm(dir,{recursive:true,force:true});}
 }
 const csv='name,type,sku,brand,price,mrp,sizes,colour,stock,product_url,image_url\nBlue shirt,shirt,BLUE,Example,999,1299,M|L,Blue,in,,https://shop.example/blue.jpg\nRed shirt,shirt,RED,Example,899,1199,S|M,Red,out,,https://shop.example/red.jpg\nBad price,shirt,BAD,Example,-1,1200,M,Red,in,,https://shop.example/bad.jpg\n';
 async function upload(page,buffer,name='products.csv'){await page.getByLabel('Product spreadsheet').setInputFiles({name,mimeType:name.endsWith('.csv')?'text/csv':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer});await page.getByRole('button',{name:'Import selected spreadsheet',exact:true}).click();}

@@ -153,7 +153,7 @@ export default function LinkTryOn({ catalogueEnabled=false, avatarId, sessionId,
     <h2><Link2 size={20}/> From any clothing website</h2>
     <p>Paste a product link. The studio finds the product photos; choose the photo and what to put on the avatar.</p>
     {catalogueEnabled&&<GarmentCatalogue disabled={busy} refresh={catalogueRevision} onUse={g=>void chooseStored(g)} onDelete={id=>{if(saved?.id===id)setSaved(null);setMatches(m=>({exact:m.exact.filter(g=>g.id!==id),linked:m.linked.filter(g=>g.id!==id),similar:m.similar.filter(g=>g.id!==id)}));}} onBusy={onBusy}/>}
-    {!available && <p className="small-footnote" role="note">Product-link try-on needs the Gemini provider configured on the studio. Sample layers below still work.</p>}
+    {!available && <p className="small-footnote" role="note">Product-link try-on needs the Gemini provider configured on the studio. Choose Sample clothes for free previews.</p>}
     <div className="link-row">
       <input type="url" inputMode="url" placeholder="https://www.example.com/men-shirt/123" aria-label="Product link" value={url} disabled={busy}
         onChange={e => setUrl(e.target.value)} onKeyDown={e => { if (e.key === "Enter") void findProduct(); }}/>

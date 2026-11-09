@@ -1,3 +1,4 @@
+import {openStoreTools} from '../helpers/studio-navigation.js';
 import {test,expect} from '@playwright/test';
 import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
@@ -17,7 +18,7 @@ test('zero-credit avatar shows billing help, a funded retry uses a fresh request
  try{
   await page.route('**/api/**',async route=>{const u=new URL(route.request().url());if(u.pathname==='/api/personalize')ids.push(route.request().postDataJSON().requestId);const response=await route.fetch({url:api+u.pathname+u.search,headers:{...route.request().headers(),host:new URL(api).host,origin:api}});await route.fulfill({response});});
   await page.goto('/');await page.getByLabel('Account email').fill('credits@example.test');await page.getByLabel('Account password').fill('test-password-long');await page.getByRole('button',{name:'Sign in',exact:true}).click();
-  await expect(page.getByRole('link',{name:'Billing',exact:true})).toBeVisible();
+  await openStoreTools(page);await expect(page.getByRole('link',{name:'Billing',exact:true})).toBeVisible();await page.getByRole('button',{name:'Close store tools',exact:true}).click();
   await page.getByLabel('The customer agrees to use their photos for this avatar session.').check();
   await page.getByLabel('Upload face photo').setInputFiles(customerPhotos[0].face);await page.getByLabel('Upload full-body photo').setInputFiles(customerPhotos[0].body);
   await page.getByRole('button',{name:'Continue to match'}).click();await page.getByRole('checkbox',{name:/The customer agrees to send their face photo/}).check();

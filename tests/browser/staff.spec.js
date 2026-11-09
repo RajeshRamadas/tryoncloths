@@ -1,3 +1,4 @@
+import {openStoreTools} from '../helpers/studio-navigation.js';
 import {test,expect} from '@playwright/test';
 import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
@@ -16,7 +17,7 @@ test('owner invites staff, staff accepts and logs in, manager rules and disablin
  try {
   await route(page);await route(staff);await page.goto('/');
   await page.getByLabel('Account email').fill('owner@example.test');await page.getByLabel('Account password').fill('owner-password-long');await page.getByRole('button',{name:'Sign in',exact:true}).click();
-  await page.getByRole('button',{name:'Staff',exact:true}).click();
+  await openStoreTools(page);await page.getByRole('button',{name:'Staff',exact:true}).click();
   await page.getByLabel('Staff email').fill('assistant@example.test');await page.getByRole('button',{name:'Send invitation',exact:true}).click();
   await expect(page.getByRole('status').filter({hasText:'Invitation emailed'})).toBeVisible();expect(mail).toHaveLength(1);
   const token=mail[0].text.match(/\/invite#([A-Za-z0-9_-]{43})/)[1];
@@ -25,11 +26,11 @@ test('owner invites staff, staff accepts and logs in, manager rules and disablin
   await staff.getByLabel('Your name').fill('Anita');await staff.getByLabel('Forme password').fill('anita-password-long');await staff.getByRole('button',{name:'Accept invitation'}).click();
   await expect(staff.getByRole('status')).toContainText('Invitation accepted');
   await staff.getByRole('link',{name:'Go to sign in'}).click();await staff.getByLabel('Account email').fill('assistant@example.test');await staff.getByLabel('Account password').fill('anita-password-long');await staff.getByRole('button',{name:'Sign in',exact:true}).click();
-  await expect(staff.getByRole('region',{name:'Store account',exact:true})).toContainText('Anita · staff');await expect(staff.getByRole('button',{name:'Staff',exact:true})).toHaveCount(0);
+  await expect(staff.getByRole('region',{name:'Store account',exact:true})).toContainText('Anita · staff');await openStoreTools(staff);await expect(staff.getByRole('button',{name:'Staff',exact:true})).toHaveCount(0);await expect(staff.getByRole('link',{name:'Billing',exact:true})).toHaveCount(0);await expect(staff.getByRole('link',{name:'Branding',exact:true})).toHaveCount(0);await staff.getByRole('button',{name:'Close store tools',exact:true}).click();
   await page.getByRole('button',{name:'Close staff',exact:true}).click();await page.getByRole('button',{name:'Staff',exact:true}).click();
   await page.getByLabel('Role for Anita').selectOption('manager');
   await expect(page.getByRole('status').filter({hasText:'Staff access updated'})).toBeVisible();
-  await staff.reload();await staff.getByRole('button',{name:'Staff',exact:true}).click();
+  await staff.reload();await openStoreTools(staff);await staff.getByRole('button',{name:'Staff',exact:true}).click();
   await expect(staff.getByLabel('Invitation role').locator('option')).toHaveCount(1);
   await expect(staff.getByRole('button',{name:'Disable Example store',exact:true})).toHaveCount(0);
   await page.getByRole('button',{name:'Disable Anita',exact:true}).click();

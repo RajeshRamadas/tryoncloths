@@ -1,3 +1,4 @@
+import {openStoreTools} from '../helpers/studio-navigation.js';
 import {test,expect} from '@playwright/test';
 import {mkdtemp,rm} from 'node:fs/promises';
 import path from 'node:path';
@@ -22,7 +23,7 @@ async function setup(page,run,{plan='growth',role='owner'}={}){
 }
 
 test('owner configures monthly shopper budgets on mobile, sees usage and pauses with unsaved edits',async({page})=>setup(page,async({store,account,ai})=>{
-  await page.setViewportSize({width:390,height:844});await page.getByRole('link',{name:'Shopper spending',exact:true}).click();
+  await page.setViewportSize({width:390,height:844});await openStoreTools(page);await page.getByRole('link',{name:'Shopper spending',exact:true}).click();
   await expect(page.getByText('Widget not available yet.',{exact:false})).toBeVisible();await expect(page.getByText('Shopper spending is paused.',{exact:true})).toBeVisible();
   await page.getByLabel('Store monthly limit',{exact:true}).fill('50');await page.getByLabel('Organisation monthly limit',{exact:true}).fill('200');await page.getByLabel('Allow shopper spending when the widget is ready',{exact:true}).check();
   await page.getByRole('button',{name:'Save shopper limits',exact:true}).click();await expect(page.getByRole('status')).toContainText('Shopper limits saved.');
@@ -44,7 +45,7 @@ test('stale owner tab cannot overwrite newer organisation limits; refresh preser
 }));
 
 test('manager sees read-only counters, staff is denied, and ineligible owners can prepare limits without allowing spending',async({page})=>setup(page,async({store,account,ai})=>{
-  await page.getByRole('link',{name:'Shopper spending',exact:true}).click();await expect(page.getByText('Only the owner can change limits or pause spending.',{exact:false})).toBeVisible();await expect(page.getByRole('button',{name:'Save shopper limits',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Pause shopper spending now',exact:true})).toHaveCount(0);
+  await openStoreTools(page);await page.getByRole('link',{name:'Shopper spending',exact:true}).click();await expect(page.getByText('Only the owner can change limits or pause spending.',{exact:false})).toBeVisible();await expect(page.getByRole('button',{name:'Save shopper limits',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Pause shopper spending now',exact:true})).toHaveCount(0);
   store.db.prepare("UPDATE memberships SET role='staff' WHERE user=? AND store=?").run(account.user.id,account.id);await page.reload();await expect(page.getByRole('alert')).toBeVisible();await expect(page.getByLabel('Store monthly limit',{exact:true})).toHaveCount(0);
   store.db.prepare("UPDATE memberships SET role='owner' WHERE user=? AND store=?").run(account.user.id,account.id);store.db.prepare("UPDATE orgs SET plan='starter' WHERE id=?").run(account.org);await page.reload();
   await expect(page.getByLabel('Allow shopper spending when the widget is ready',{exact:true})).toBeDisabled();await page.getByLabel('Store monthly limit',{exact:true}).fill('25');await page.getByLabel('Organisation monthly limit',{exact:true}).fill('100');await page.getByRole('button',{name:'Save shopper limits',exact:true}).click();await expect(page.getByRole('status')).toContainText('Shopper limits saved.');expect(store.shoppers.view(account).paused).toBe(true);expect(ai()).toBe(0);

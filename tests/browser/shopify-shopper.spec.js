@@ -1,3 +1,4 @@
+import {openStoreTools} from '../helpers/studio-navigation.js';
 import {test,expect} from '@playwright/test';
 import {shopifyFixture,publicStudio} from '../helpers/shopify-shopper.js';
 import {fileURLToPath} from 'node:url';
@@ -12,7 +13,7 @@ async function setup(page,run){
 
 test('owner selects a synced Shopify product, enables setup preview and opens a branded single-use launch on mobile without photos or credits',async({page})=>setup(page,async f=>{
   await f.install();await f.product();f.configure();await f.store.branding.update(f.a,{displayName:'River & Co',primaryColor:'#224466'});await f.login();await page.setViewportSize({width:390,height:844});
-  await page.getByRole('link',{name:'Shopper spending',exact:true}).click();await page.getByRole('link',{name:'Shopify widget',exact:true}).click();await expect(page.getByText('sample.myshopify.com',{exact:true})).toBeVisible();
+  await openStoreTools(page);await page.getByRole('link',{name:'Shopper spending',exact:true}).click();await page.getByRole('link',{name:'Shopify widget',exact:true}).click();await expect(page.getByText('sample.myshopify.com',{exact:true})).toBeVisible();
   await page.getByLabel('Allow Blue shirt',{exact:true}).check();await expect(page.getByRole('status')).toContainText('Product selection saved.');
   await page.getByRole('button',{name:'Enable setup preview',exact:true}).click();await expect(page.getByRole('status')).toContainText('Setup preview enabled.');await page.screenshot({path:'test-results/shopify-owner-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   const launch=new URL(f.service.launch(f.proxy()));await page.goto('/shopper'+launch.hash);await expect(page.getByRole('heading',{name:'River & Co',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Blue shirt',exact:true})).toBeVisible();await expect(page.getByRole('status')).toContainText('No photos were collected and no AI credits were used.');
