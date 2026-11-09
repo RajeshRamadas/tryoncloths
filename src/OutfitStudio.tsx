@@ -222,7 +222,12 @@ export default function OutfitStudio({
   function select(garment: Garment) {
     update([
       ...layers.filter((l) => l.garment.category !== category),
-      { garment, placement: { ...garment.placement } },
+      {
+        garment,
+        placement: { ...garment.placement },
+        // Imported tops are flat product shapes, so the arms go in front by default.
+        armsInFront: !!garment.imported && garment.category === "shirt",
+      },
     ]);
   }
   function selectOutfit(ids: readonly string[]) {
@@ -280,7 +285,7 @@ export default function OutfitStudio({
       setImports((items) => items.map((g) => (g.id === next.id ? next : g)));
       update(
         layers.map((l) =>
-          l.garment.id === next.id ? { garment: next, placement: { ...next.placement } } : l,
+          l.garment.id === next.id ? { ...l, garment: next, placement: { ...next.placement } } : l,
         ),
       );
     } catch (e) {
@@ -785,6 +790,26 @@ export default function OutfitStudio({
               >
                 Reset placement
               </button>
+              {category === "shirt" && (
+                <label className="consent">
+                  <input
+                    type="checkbox"
+                    checked={!!selected.armsInFront}
+                    disabled={busy}
+                    onChange={(e) =>
+                      update(
+                        layers.map((l) =>
+                          l === selected ? { ...l, armsInFront: e.target.checked } : l,
+                        ),
+                      )
+                    }
+                  />
+                  <span>
+                    Show forearms and hands in front of this top. Turn off for long sleeves that
+                    already cover the arms.
+                  </span>
+                </label>
+              )}
               {selected.garment.cutout && (
                 <fieldset className="garment-cutout">
                   <legend>Background removal</legend>

@@ -17,6 +17,9 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
   hints when the head or feet are cut off, the customer is small, off-centre, turned
   or tilted, or the arms are raised, held out or crossed. The photo is not uploaded for
   the check and no credit is used. See [body photo check](docs/BODY_PHOTO_CHECK.md).
+- Imported tops no longer hide the avatar's arms: the forearms and hands are found on the
+  device and drawn in front of the top, with a per-top switch for long sleeves. See
+  [clothing layers](docs/CLOTHING_LAYERS.md#arms-in-front-of-tops).
 
 ## 0.21.0-rc.3
 

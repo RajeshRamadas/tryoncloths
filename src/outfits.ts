@@ -2,6 +2,7 @@ import { avatarCanvas, loadImage } from "./images";
 import { colourGarmentPixels, type GarmentColour } from "./garment-colours";
 import { SAMPLE_GARMENTS } from "./sample-wardrobe";
 import { defaultGarmentPlacement, prepareGarmentLayer } from "./garment-layer";
+import { armMask } from "./arm-mask";
 import { CUTOUT_DEFAULT_TOLERANCE, removeBackground, transparentShare } from "./jewellery-cutout";
 
 export type Category = "shirt" | "trousers" | "shoes";
@@ -17,7 +18,12 @@ export type Garment = {
   /** Present when the layer was cut out from a product photo on this device. */
   cutout?: CutoutSettings;
 };
-export type Layer = { garment: Garment; placement: Placement };
+export type Layer = {
+  garment: Garment;
+  placement: Placement;
+  /** Draw the avatar's forearms and hands over this top (imported tops default to on). */
+  armsInFront?: boolean;
+};
 
 // Coordinates use the original 384 × 942 standard pose. Generated portraits
 // use the padded 692 × 1038 reference; staff can adjust for generation drift.
@@ -94,7 +100,45 @@ export async function renderOutfit(base: string, layers: Layer[]): Promise<HTMLC
       p.height * canvas.height,
     );
   }
+  if (layers.some((l) => l.garment.category === "shirt" && l.armsInFront)) {
+    const arms = await armOverlay(base);
+    if (arms) ctx.drawImage(arms, 0, 0, canvas.width, canvas.height);
+  }
   return canvas;
+}
+
+// The avatar's forearms and hands, cut out on the device. Bounded: a session uses a handful of
+// bases (sample, generated avatar, AI try-on results).
+const armOverlays = new Map<string, Promise<HTMLCanvasElement | null>>();
+export function armOverlay(base: string): Promise<HTMLCanvasElement | null> {
+  let overlay = armOverlays.get(base);
+  if (!overlay) {
+    overlay = (async () => {
+      try {
+        const avatar = await loadImage(base);
+        const { segmentPose } = await import("./body-pose");
+        const pose = await segmentPose(avatar);
+        if (!pose) return null;
+        const canvas = document.createElement("canvas");
+        canvas.width = pose.width;
+        canvas.height = pose.height;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+        ctx.drawImage(avatar, 0, 0, pose.width, pose.height);
+        const pixels = ctx.getImageData(0, 0, pose.width, pose.height);
+        const mask = armMask(pose.landmarks, pose.person, pose.width, pose.height, pixels.data);
+        if (!mask) return null;
+        for (let i = 0; i < mask.length; i++)
+          pixels.data[i * 4 + 3] = Math.round((pixels.data[i * 4 + 3] * mask[i]) / 255);
+        ctx.putImageData(pixels, 0, 0);
+        return canvas;
+      } catch {
+        return null;
+      }
+    })();
+    armOverlays.set(base, overlay);
+    if (armOverlays.size > 4) armOverlays.delete(armOverlays.keys().next().value!);
+  }
+  return overlay;
 }
 
 export type LayerSource = {
