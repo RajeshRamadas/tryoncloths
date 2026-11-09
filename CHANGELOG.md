@@ -2,6 +2,13 @@
 
 Release notes for the Forme web studio, newest first. Feature guides live in [docs/](docs/); the [README](README.md) describes what the app does today.
 
+## Unreleased
+
+- Jewellery cut-outs can now be made from a product photo on a plain backdrop (PNG,
+  JPEG or WebP). The background is removed on the staff device with no AI credit,
+  with a tolerance control and an option to clear ring holes and chain loops. See
+  [automatic background removal](docs/JEWELLERY_OVERLAY.md#automatic-background-removal).
+
 ## 0.21.0-rc.3
 
 Web `0.21.0-rc.3` adds [J14 customer hand photos](docs/CUSTOMER_HAND_PHOTOS.md):

@@ -563,7 +563,7 @@ test("free cut-out upload → anchored mobile editor → drag/scale/rotate/reset
         .filter({ has: page.getByRole("heading", { name: "Gold drop earrings", exact: true }) });
       await item.getByText("Transparent cut-out", { exact: true }).click();
       await item
-        .getByLabel("Cut-out PNG", { exact: true })
+        .getByLabel("Cut-out photo", { exact: true })
         .setInputFiles({ name: "gold-drop.png", mimeType: "image/png", buffer: cutout });
       await item
         .getByLabel("I agree to store or remove this cut-out in the store catalogue.", {
@@ -705,6 +705,72 @@ test("free cut-out upload → anchored mobile editor → drag/scale/rotate/reset
       await page.setViewportSize({ width: 1440, height: 1050 });
       await page.evaluate(() => scrollTo(0, 0));
       await page.screenshot({ path: "test-results/jewellery-overlay-desktop.png" });
+    },
+    { overlayOnly: true },
+  ));
+
+test("a JPEG product photo on a plain backdrop becomes a saved cut-out on the device with tolerance controls and no paid route", async ({
+  page,
+}) =>
+  fixture(
+    page,
+    async ({ store, account }) => {
+      const paid = [];
+      page.on("request", (r) => {
+        if (/^\/api\/jewellery\/(tryon|overlay)/.test(new URL(r.url()).pathname))
+          paid.push(r.url());
+      });
+      const before = store.billing.balance(account.org);
+      const photo = await sharp(
+        Buffer.from(
+          '<svg width="600" height="600" xmlns="http://www.w3.org/2000/svg"><rect width="600" height="600" fill="#f4f3ef"/><path d="M300 90 Q270 100 300 130 Q330 100 300 90" fill="none" stroke="#c89d37" stroke-width="10"/><path d="M300 125 Q190 260 300 420 Q410 260 300 125" fill="#cfa640" stroke="#a57927" stroke-width="6"/><circle cx="300" cy="270" r="40" fill="#a92e3c"/></svg>',
+        ),
+      )
+        .jpeg({ quality: 85 })
+        .toBuffer();
+      await page.locator(".jewellery-navigation summary").click();
+      await page.getByRole("link", { name: "Jewellery catalogue", exact: true }).click();
+      const item = page
+        .locator(".catalogue-item")
+        .filter({ has: page.getByRole("heading", { name: "Gold drop earrings", exact: true }) });
+      await item.getByText("Transparent cut-out", { exact: true }).click();
+      await item
+        .getByLabel("Cut-out photo", { exact: true })
+        .setInputFiles({ name: "gold-drop.jpg", mimeType: "image/jpeg", buffer: photo });
+      await expect(
+        item.getByText("Background removed on this device. Check the edges before saving.", {
+          exact: true,
+        }),
+      ).toBeVisible();
+      const preview = item.getByAltText("Selected transparent jewellery cut-out");
+      await expect(preview).toBeVisible();
+      const corner = await preview.evaluate(async (img) => {
+        await img.decode();
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        return {
+          corner: ctx.getImageData(2, 2, 1, 1).data[3],
+          centre: ctx.getImageData(300, 270, 1, 1).data[3],
+        };
+      });
+      expect(corner).toEqual({ corner: 0, centre: 255 });
+      await item.getByLabel("Background tolerance", { exact: true }).fill("48");
+      await item
+        .getByLabel("Clear enclosed gaps, such as ring holes and chain loops", { exact: true })
+        .uncheck();
+      await expect(preview).toBeVisible();
+      await item
+        .getByLabel("I agree to store or remove this cut-out in the store catalogue.", {
+          exact: true,
+        })
+        .check();
+      await item.getByRole("button", { name: "Save cut-out", exact: true }).click();
+      await expect(item.getByText("Overlay ready · free placement", { exact: true })).toBeVisible();
+      expect(paid).toEqual([]);
+      expect(store.billing.balance(account.org)).toBe(before);
     },
     { overlayOnly: true },
   ));

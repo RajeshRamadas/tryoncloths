@@ -11,8 +11,11 @@ hands can be reused.
 
 1. An owner or manager opens **Jewellery catalogue**, saves a product normally,
    then expands **Transparent cut-out** on its card.
-2. Upload a single jewellery piece as a transparent PNG, confirm storage consent,
-   and choose **Save cut-out**. The anchor follows the catalogue type. Source
+2. Upload a single jewellery piece as a transparent PNG, or a product photo on a
+   plain backdrop (PNG, JPEG or WebP under 10 MB). A photo without transparency has
+   its background removed on the staff device, with no upload, Gemini request or
+   AI credit; see [automatic background removal](#automatic-background-removal).
+   Check the preview, confirm storage consent, and choose **Save cut-out**. The anchor follows the catalogue type. Source
    images must be at least 200 × 200 px, at most 2048 px per side, 4 megapixels
    and 2 MB. The server checks the decoded image for visible content and genuine
    transparency, trims transparent margins and removes metadata. A solid
@@ -45,6 +48,27 @@ cannot erase existing jewellery; use an undecorated view or undo first. AI
 adaptation remains available separately with explicit provider consent and the
 existing credit rules. A look combining both modes is labelled **AI + Overlay
 preview — actual piece may differ in detail**.
+
+## Automatic background removal
+
+`src/jewellery-cutout.js` runs in the browser before anything is saved:
+
+- The backdrop colour is the median of the photo's border pixels. If fewer than 60%
+  of border pixels match it, the photo is rejected as too busy; use a plain backdrop
+  or supply a transparent PNG.
+- Backdrop is flood-filled from the edges, following smooth gradients, vignettes and
+  soft shadows. With **Clear enclosed gaps** (default on), enclosed areas that closely
+  match the backdrop, such as ring holes and chain loops, are cleared too; small light
+  details such as pearls or highlights are kept.
+- Edge pixels are feathered and the backdrop colour is removed from them to avoid a
+  halo. Photos are scaled to at most 2048 px per side and 4 megapixels, and the PNG
+  is shrunk if needed to stay under 2 MB.
+- **Background tolerance** (default 32) can be raised when backdrop remains, or lowered
+  when light metal, white stones or pearls are cut away. Silver or white pieces on a
+  white backdrop are the hardest case; a contrasting backdrop works best.
+
+A PNG that already has transparency is used as supplied. The saved result still goes
+through the server validation below, so the stored asset format is unchanged.
 
 ## API and storage
 

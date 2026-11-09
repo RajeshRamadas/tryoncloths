@@ -14,7 +14,7 @@ remains, grouped by what they need.
 | Calibrate standard avatars against real body measurements; define height/build bands | Sample profiles have no calibrated measurements | [LEVEL_1](LEVEL_1.md) |
 | Local pose/silhouette analysis to assist the full-body photo review | Manual staff review only | [LEVEL_1](LEVEL_1.md) |
 | Aligned transparent garment layers and masks for the clothing compositor | Sample layers come from nine AI-created textures; no aligned masks | [LEVEL_1](LEVEL_1.md) |
-| Automatic background removal for jewellery product photos | Free overlays need a store-supplied transparent PNG | [jewellery requirements](jewellery/REQUIREMENTS.md) §9 |
+| ~~Automatic background removal for jewellery product photos~~ | Done: local, on-device cut-out from plain-backdrop photos ([overlay guide](JEWELLERY_OVERLAY.md#automatic-background-removal)) | [jewellery requirements](jewellery/REQUIREMENTS.md) §9 |
 | Extra jewellery types (nose-ring chains to ear, hair accessories) | Open decision | [jewellery requirements](jewellery/REQUIREMENTS.md) §10 |
 | Portrait capture as part of the default avatar flow for jewellery stores (+1 credit per customer) | Open decision | [jewellery requirements](jewellery/REQUIREMENTS.md) §10 |
 | 3D / AR live-camera try-on | Out of scope today; possible later with a separate engine | [jewellery requirements](jewellery/REQUIREMENTS.md) §9 |
