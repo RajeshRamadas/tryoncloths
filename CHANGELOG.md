@@ -13,6 +13,10 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
   on the device, stray specks are cleaned from the mask, and the layer is placed by
   measuring its torso, waistband or shoe pair rather than its outline, so sleeves no
   longer shrink a top. See [clothing layers](docs/CLOTHING_LAYERS.md).
+- Full-body customer photos are now checked on the device with a pose model. Staff see
+  hints when the head or feet are cut off, the customer is small, off-centre, turned
+  or tilted, or the arms are raised, held out or crossed. The photo is not uploaded for
+  the check and no credit is used. See [body photo check](docs/BODY_PHOTO_CHECK.md).
 
 ## 0.21.0-rc.3
 

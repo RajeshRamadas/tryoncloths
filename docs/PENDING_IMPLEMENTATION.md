@@ -12,7 +12,7 @@ remains, grouped by what they need.
 | --- | --- | --- |
 | Automatic body measurements and fit prediction from customer photos | Profile is chosen from an illustrative height/weight rule plus staff correction | [README](../README.md), [LEVEL_1](LEVEL_1.md) |
 | Calibrate standard avatars against real body measurements; define height/build bands | Sample profiles have no calibrated measurements | [LEVEL_1](LEVEL_1.md) |
-| Local pose/silhouette analysis to assist the full-body photo review | Manual staff review only | [LEVEL_1](LEVEL_1.md) |
+| ~~Local pose/silhouette analysis to assist the full-body photo review~~ | Done: on-device pose hints for framing, stance and arms ([body photo check](BODY_PHOTO_CHECK.md)). Still open: calibrating the thresholds on pilot photos, and using the landmarks for occlusion masks or profile matching | [LEVEL_1](LEVEL_1.md) |
 | ~~Aligned transparent garment layers and masks for the clothing compositor~~ | Done: product photos become cleaned, mask-aligned layers on the device ([clothing layers](CLOTHING_LAYERS.md)). Still open: avatar-side occlusion masks (arms over sleeves) and pose warping, which need body segmentation | [LEVEL_1](LEVEL_1.md) |
 | ~~Automatic background removal for jewellery product photos~~ | Done: local, on-device cut-out from plain-backdrop photos ([overlay guide](JEWELLERY_OVERLAY.md#automatic-background-removal)) | [jewellery requirements](jewellery/REQUIREMENTS.md) §9 |
 | Extra jewellery types (nose-ring chains to ear, hair accessories) | Open decision | [jewellery requirements](jewellery/REQUIREMENTS.md) §10 |
