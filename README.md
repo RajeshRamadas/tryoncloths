@@ -126,6 +126,10 @@ Unit/API tests cover matching, invalid inputs, consent, request origin, decoded 
 
 The existing Android APK remains 0.7.0; no APK was built for this web release. Without account storage enabled, the [local library](docs/SAVED_AVATARS.md) remains available on the same browser/app.
 
+## Pending work
+
+Outstanding code, live-service validation, launch and housekeeping items are tracked in [docs/PENDING_IMPLEMENTATION.md](docs/PENDING_IMPLEMENTATION.md).
+
 ## Release history
 
 Version-by-version notes, including the commercial (C1–C16) and jewellery (J1–J14) milestones, are in [CHANGELOG.md](CHANGELOG.md).

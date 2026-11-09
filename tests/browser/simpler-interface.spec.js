@@ -103,7 +103,9 @@ test("compact store menu keeps customer work visible and traps focus above the c
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
     await expect(trigger).toBeFocused();
-    expect(await page.evaluate(() => document.body.style.overflow)).not.toBe("hidden");
+    // Escape closes the native dialog at once; React restores body scrolling in an effect
+    // cleanup a frame later, so wait for it instead of reading it immediately.
+    await expect.poll(() => page.evaluate(() => document.body.style.overflow)).not.toBe("hidden");
     await openStoreTools(page);
     await page.mouse.click(2, 2);
     await expect(dialog).toBeHidden();
