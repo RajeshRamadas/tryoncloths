@@ -245,6 +245,7 @@ export default function JewelleryOverlayUpload({
                   earlobe: "Earlobe",
                   nostril: "Nostril",
                   hairParting: "Hair parting",
+                  hairSide: "Side of the head",
                   neckBase: "Neck base",
                   finger: "Finger",
                   wrist: "Wrist",

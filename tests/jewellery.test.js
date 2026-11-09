@@ -80,8 +80,8 @@ async function fixture(run, { flag = true } = {}) {
   }
 }
 
-test("18 shared types choose portrait, hands and full-body views with the 50 cm necklace boundary", () => {
-  assert.equal(Object.keys(jewelleryTypes).length, 18);
+test("20 shared types choose portrait, hands and full-body views with the 50 cm necklace boundary", () => {
+  assert.equal(Object.keys(jewelleryTypes).length, 20);
   assert.equal(jewelleryMetals.length, 7);
   for (const [type, definition] of Object.entries(jewelleryTypes)) {
     for (const field of [
@@ -160,6 +160,12 @@ test("Indian title hints respect specific types and word boundaries", () => {
     ["Chandbali earrings", "drop_earrings"],
     ["Diamond stud", "stud_earrings"],
     ["Nath nose ring", "nose_ring"],
+    ["Bridal nath with chain", "nath_chain"],
+    ["Nose ring with chain", "nath_chain"],
+    ["Kundan passa", "hair_accessory"],
+    ["Pearl jhoomar", "hair_accessory"],
+    ["Gold hair pin", "hair_accessory"],
+    ["Bridal hair accessories", "hair_accessory"],
     ["Nose pin", "nose_pin"],
     ["Maang tikka", "maang_tikka"],
     ["Matha patti", "matha_patti"],

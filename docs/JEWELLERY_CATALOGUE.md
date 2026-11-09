@@ -35,12 +35,22 @@ The URL is recorded for future matching; this page does not fetch or extract
 photos from a retailer. Edit an existing item to change its attributes or price.
 Use a distinct variant for separate metals, stones or SKUs sharing a photo.
 
-The catalogue supports 18 types: stud earrings, drop/chandbali earrings, jhumka,
-nose pin, nose ring/nath, maang tikka, matha patti, choker, necklace/chain,
+The catalogue supports 20 types: stud earrings, drop/chandbali earrings, jhumka,
+nose pin, nose ring/nath, nath with chain, maang tikka, matha patti, hair
+accessory/passa, choker, necklace/chain,
 pendant, long/rani haar, mangalsutra, ring, bangles/kada, bracelet, watch, waist
 belt/kamarbandh and anklets/payal. Title hints recognise Indian terms, but are
 suggestions for staff confirmation. Toe rings and jewellery sets have no new
 type in J1.
+
+**Nath with chain** is a nose ring whose chain runs across the cheek to the hair
+by the same-side ear. Its cut-out should show the ring at the left edge and the
+chain running right; it is flipped automatically for the wearer's right side and
+starts sized from the nostril to the ear. **Hair accessory / passa** covers pieces
+seen from the front: passa or jhoomar, hair pins, clips and brooches, placed in
+the hair above the temple on one side. Record its size in **Pendant height (mm)**
+to size the overlay (40 mm when blank). Juda and choti ornaments worn at the back
+of the head are not covered, because the studio's views face the camera.
 
 ## Fields and view selection
 

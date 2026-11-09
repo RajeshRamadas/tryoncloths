@@ -32,6 +32,11 @@ export function guessJewelleryType(title: string): JewelleryType | null {
   if (/\btoe\s*rings?\b/.test(t)) return null;
   const rules: [RegExp, JewelleryType][] = [
     [/\bmatha\s*patti\b/, "matha_patti"],
+    [
+      /\b(?:passa|jhoomar|jhumar|hair\s*(?:clips?|pins?|accessor(?:y|ies)|brooch(?:es)?)|hairpins?|barrettes?)\b/,
+      "hair_accessory",
+    ],
+    [/\bnath\b.*\bchain\b|\bchain\b.*\bnath\b|\bnose\s*rings?\s+with\s+chain\b/, "nath_chain"],
     [/\b(?:maang\s*)?tikka\b/, "maang_tikka"],
     [/\bnose\s*(?:pin|stud)s?\b/, "nose_pin"],
     [/\b(?:nose\s*rings?|nath)\b/, "nose_ring"],

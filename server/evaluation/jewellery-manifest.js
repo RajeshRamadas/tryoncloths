@@ -119,7 +119,7 @@ export function validateJewelleryManifest(input) {
     if (jewelleryTypes[i.type].sides.length && !["left", "right", "both"].includes(i.side))
       throw new Error("Choose an explicit side for portrait pieces.");
     if (
-      (["nose_pin", "nose_ring"].includes(i.type) && i.side === "both") ||
+      (["nose_pin", "nose_ring", "nath_chain"].includes(i.type) && i.side === "both") ||
       (jewelleryTypes[i.type].pair && attributes.pair && i.side !== "both") ||
       (jewelleryTypes[i.type].pair && !attributes.pair && i.side === "both")
     )
@@ -200,8 +200,10 @@ export function jewelleryTemplate() {
     "jhumka",
     "nose_pin",
     "nose_ring",
+    "nath_chain",
     "maang_tikka",
     "matha_patti",
+    "hair_accessory",
     "choker",
     "necklace",
     "pendant",
