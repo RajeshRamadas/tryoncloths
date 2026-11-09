@@ -44,7 +44,7 @@ Use the studio's real HTTPS origin, for example `https://studio.example.com`, wi
 
 ## Build from source
 
-Install Node.js 22.12+ (24 recommended), JDK 21, and Android Studio/SDK with API 36 and Build Tools 35.0.0. Set `JAVA_HOME` and `ANDROID_HOME` to those installations, or let Android Studio manage them.
+Install Node.js 24+, JDK 21, and Android Studio/SDK with API 36 and Build Tools 35.0.0. Set `JAVA_HOME` and `ANDROID_HOME` to those installations, or let Android Studio manage them.
 
 ```sh
 npm ci

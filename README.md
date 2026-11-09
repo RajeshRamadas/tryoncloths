@@ -16,7 +16,7 @@ The Android app includes native camera/gallery selection, standard-body selectio
 
 ## Run locally
 
-Requires Node.js 22.12+ (validated with Node.js 24).
+Requires Node.js 24 or newer (see `.nvmrc`).
 
 ```sh
 git clone https://github.com/RajeshRamadas/tryoncloths.git
