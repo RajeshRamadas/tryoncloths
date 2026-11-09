@@ -2,8 +2,10 @@ import { isNative, shareAvatar } from "./native";
 import { preparePhoto, orientCanvas } from "./photo-orientation";
 
 import { profiles, templateLibrary, DEFAULT_TEMPLATE_TONE } from "./profiles";
-import {requestApi} from './api';
-export function libraryForIndex(index:number, tone=DEFAULT_TEMPLATE_TONE) { return templateLibrary(profiles[index]?.body || 'male', tone); }
+import { requestApi } from "./api";
+export function libraryForIndex(index: number, tone = DEFAULT_TEMPLATE_TONE) {
+  return templateLibrary(profiles[index]?.body || "male", tone);
+}
 
 export const LIBRARY_URL = "/avatar-library.png";
 
@@ -13,9 +15,7 @@ export async function loadImage(source: string): Promise<HTMLImageElement> {
     image.onload = () => resolve(image);
     image.onerror = () =>
       reject(
-        new Error(
-          "This image could not be opened. Please choose a JPEG, PNG, or WebP image.",
-        ),
+        new Error("This image could not be opened. Please choose a JPEG, PNG, or WebP image."),
       );
     image.src = source;
   });
@@ -24,8 +24,7 @@ export async function loadImage(source: string): Promise<HTMLImageElement> {
 export async function readPhoto(file: File): Promise<string> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
     throw new Error("Choose a JPEG, PNG, or WebP photo.");
-  if (file.size > 10 * 1024 * 1024)
-    throw new Error("Choose a photo smaller than 10 MB.");
+  if (file.size > 10 * 1024 * 1024) throw new Error("Choose a photo smaller than 10 MB.");
   const { source, orientation } = await preparePhoto(file);
   const url = URL.createObjectURL(source);
   try {
@@ -49,7 +48,10 @@ export async function readPhoto(file: File): Promise<string> {
   }
 }
 
-export async function avatarCanvas(index: number, tone=DEFAULT_TEMPLATE_TONE): Promise<HTMLCanvasElement> {
+export async function avatarCanvas(
+  index: number,
+  tone = DEFAULT_TEMPLATE_TONE,
+): Promise<HTMLCanvasElement> {
   const image = await loadImage(libraryForIndex(index, tone));
   const panelWidth = image.width / 4;
   const canvas = document.createElement("canvas");
@@ -76,8 +78,8 @@ export async function downloadAvatar(
   index: number,
   personalized: string | null,
   name: string,
-  tone=DEFAULT_TEMPLATE_TONE,
-  branding?:{storeFooter?:boolean},
+  tone = DEFAULT_TEMPLATE_TONE,
+  branding?: { storeFooter?: boolean },
 ) {
   let canvas: HTMLCanvasElement;
   if (personalized) {
@@ -87,16 +89,40 @@ export async function downloadAvatar(
     canvas.height = image.height;
     canvas.getContext("2d")!.drawImage(image, 0, 0);
   } else canvas = await avatarCanvas(index, tone);
-  if(branding){const response=await requestApi('/api/exports/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:canvas.toDataURL('image/png'),storeFooter:branding.storeFooter})},30000);if(!response.ok){const data=await response.json();throw new Error(data.error||'The branded export could not be prepared.');}const url=URL.createObjectURL(await response.blob());try{const image=await loadImage(url);canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;canvas.getContext('2d')!.drawImage(image,0,0);}finally{URL.revokeObjectURL(url);}}
+  if (branding) {
+    const response = await requestApi(
+      "/api/exports/image",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: canvas.toDataURL("image/png"),
+          storeFooter: branding.storeFooter,
+        }),
+      },
+      30000,
+    );
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || "The branded export could not be prepared.");
+    }
+    const url = URL.createObjectURL(await response.blob());
+    try {
+      const image = await loadImage(url);
+      canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      canvas.getContext("2d")!.drawImage(image, 0, 0);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
   if (isNative) {
     return await shareAvatar(canvas.toDataURL("image/png"), name);
   }
   const blob = await new Promise<Blob>((resolve, reject) =>
     canvas.toBlob(
-      (b) =>
-        b
-          ? resolve(b)
-          : reject(new Error("Download failed. Please try again.")),
+      (b) => (b ? resolve(b) : reject(new Error("Download failed. Please try again."))),
       "image/png",
     ),
   );

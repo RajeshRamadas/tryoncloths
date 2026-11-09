@@ -1,0 +1,15 @@
+# Generated, vendored or binary content
+node_modules/
+dist/
+android/
+downloads/
+public/
+package-lock.json
+deploy/**/package-lock.json
+test-results/
+playwright-report/
+
+# Prose and templates are kept as written
+*.md
+*.html
+*.liquid

@@ -10,8 +10,19 @@ export type SampleGarment = {
 };
 
 type Variant = readonly [id: string, name: string, hex: string];
-function variants(category: Category, source: string, reference: number, colours: readonly Variant[]): SampleGarment[] {
-  return colours.map(([id, name, hex]) => ({ id, name, category, source: `/garments/${source}.webp`, colour: { hex, reference } }));
+function variants(
+  category: Category,
+  source: string,
+  reference: number,
+  colours: readonly Variant[],
+): SampleGarment[] {
+  return colours.map(([id, name, hex]) => ({
+    id,
+    name,
+    category,
+    source: `/garments/${source}.webp`,
+    colour: { hex, reference },
+  }));
 }
 function original(category: Category, id: string, name: string): SampleGarment {
   return { id, name, category, source: `/garments/${id}.webp` };
@@ -79,12 +90,32 @@ export const SAMPLE_GARMENTS: readonly SampleGarment[] = [
 ];
 
 export const SAMPLE_OUTFITS = [
-  { id: "weekend", name: "Weekend casual", garments: ["white-tee", "blue-jeans", "white-sneakers"] },
+  {
+    id: "weekend",
+    name: "Weekend casual",
+    garments: ["white-tee", "blue-jeans", "white-sneakers"],
+  },
   { id: "office", name: "Office classic", garments: ["blue-shirt", "navy-chinos", "brown-shoes"] },
   { id: "earth", name: "Earth tones", garments: ["forest-tee", "sand-chinos", "tan-sneakers"] },
-  { id: "monochrome", name: "Monochrome", garments: ["black-tee", "black-jeans", "black-sneakers"] },
-  { id: "summer", name: "Summer light", garments: ["sage-shirt", "cream-chinos", "white-sneakers"] },
-  { id: "evening", name: "Evening smart", garments: ["burgundy-shirt", "charcoal-chinos", "black-shoes"] },
+  {
+    id: "monochrome",
+    name: "Monochrome",
+    garments: ["black-tee", "black-jeans", "black-sneakers"],
+  },
+  {
+    id: "summer",
+    name: "Summer light",
+    garments: ["sage-shirt", "cream-chinos", "white-sneakers"],
+  },
+  {
+    id: "evening",
+    name: "Evening smart",
+    garments: ["burgundy-shirt", "charcoal-chinos", "black-shoes"],
+  },
   { id: "colour", name: "Colour pop", garments: ["cobalt-tee", "grey-jeans", "red-sneakers"] },
-  { id: "pastels", name: "Soft pastels", garments: ["blush-tee", "light-blue-jeans", "grey-sneakers"] },
+  {
+    id: "pastels",
+    name: "Soft pastels",
+    garments: ["blush-tee", "light-blue-jeans", "grey-sneakers"],
+  },
 ] as const;

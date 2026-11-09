@@ -7,8 +7,29 @@
   "pilotStart": "2026-07-01",
   "pilotEnd": "2026-08-29",
   "stores": [
-    {"id": "store-01", "baselineVisits": 100, "baselinePieces": 200, "pilotVisits": 120, "pilotPieces": 360, "sharesCreated": 600},
-    {"id": "store-02", "baselineVisits": 100, "baselinePieces": 200, "pilotVisits": 120, "pilotPieces": 360, "sharesCreated": 600},
-    {"id": "store-03", "baselineVisits": 100, "baselinePieces": 200, "pilotVisits": 120, "pilotPieces": 360, "sharesCreated": 600}
+    {
+      "id": "store-01",
+      "baselineVisits": 100,
+      "baselinePieces": 200,
+      "pilotVisits": 120,
+      "pilotPieces": 360,
+      "sharesCreated": 600
+    },
+    {
+      "id": "store-02",
+      "baselineVisits": 100,
+      "baselinePieces": 200,
+      "pilotVisits": 120,
+      "pilotPieces": 360,
+      "sharesCreated": 600
+    },
+    {
+      "id": "store-03",
+      "baselineVisits": 100,
+      "baselinePieces": 200,
+      "pilotVisits": 120,
+      "pilotPieces": 360,
+      "sharesCreated": 600
+    }
   ]
 }

@@ -33,7 +33,7 @@ Only if deliberately switching providers, set `TRYON_PROVIDER=openai`, `OPENAI_A
 For AWS Lightsail, follow the [step-by-step Lightsail deployment guide](AWS_LIGHTSAIL.md), which includes Docker, automatic HTTPS, server secrets, and Android connection steps.
 
 1. Create a key in [Google AI Studio](https://aistudio.google.com/apikey) for a project allowed to use Gemini image generation. Enable API billing and check the project's image-model access and quotas.
-2. Deploy this repository to a Node.js 22.12+ host with a public HTTPS URL. Use build command `npm ci && npm run build` and start command `npm start`. The server reads the host's `PORT` variable (default 3001).
+2. Deploy this repository to a Node.js 24+ host with a public HTTPS URL. Use build command `npm ci && npm run build` and start command `npm start`. The server reads the host's `PORT` variable (default 3001).
 3. In that host's **secret environment variables**, set `TRYON_GEMINI_API_KEY` to your key and `TRYON_MOBILE_TOKEN` to a separate random store access code of at least 24 characters. Do not paste the API key into chat, GitHub, frontend `VITE_` variables, or Android source. For local development, use an ignored `.env` file based on `.env.example`.
 4. Keep `TRYON_GEMINI_MODEL=gemini-2.5-flash-image`, or select a supported Gemini image-generation model. Text-only chat models will not produce an avatar through this adapter.
 5. Restart/deploy the server. In Android, open **Studio connection** and enter its HTTPS origin and the **store access code**, not the Gemini API key. A server from before version 0.4 must be updated: the app requires the `customer-avatar-v4` contract.

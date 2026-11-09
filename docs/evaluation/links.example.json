@@ -1,6 +1,4 @@
 {
   "version": 1,
-  "links": [
-    { "id": "shirt-01", "url": "https://shop.example/replace-with-real-product-url" }
-  ]
+  "links": [{ "id": "shirt-01", "url": "https://shop.example/replace-with-real-product-url" }]
 }

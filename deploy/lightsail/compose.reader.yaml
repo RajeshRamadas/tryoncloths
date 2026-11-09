@@ -30,7 +30,7 @@ services:
     cpus: 0.75
     logging:
       driver: json-file
-      options: {max-size: "5m", max-file: "2"}
+      options: { max-size: "5m", max-file: "2" }
 networks:
   reader_shared:
     external: true

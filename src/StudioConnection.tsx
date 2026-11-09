@@ -1,12 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Cloud, LoaderCircle, X } from "lucide-react";
 import { isNative } from "./native";
-import {
-  disconnectStudio,
-  requestApi,
-  setStudioConnection,
-  studioConnection,
-} from "./api";
+import { disconnectStudio, requestApi, setStudioConnection, studioConnection } from "./api";
 
 export default function StudioConnection({
   onChange,
@@ -24,7 +19,10 @@ export default function StudioConnection({
   const [message, setMessage] = useState("");
   useEffect(() => {
     if (open) {
-      setUrl(studioConnection().url || (!isNative && window.location.protocol === "https:" ? window.location.origin : ""));
+      setUrl(
+        studioConnection().url ||
+          (!isNative && window.location.protocol === "https:" ? window.location.origin : ""),
+      );
       setMessage("");
       dialog.current?.showModal();
     } else {
@@ -47,10 +45,14 @@ export default function StudioConnection({
             : "The studio could not be reached. Check the address and try again.",
         );
       const health = await response.json();
-      if (health.status !== "ok")
-        throw new Error("This address is not a Forme studio.");
-      if (health.personalizationContract !== "customer-avatar-v4" || !["gemini", "openai"].includes(health.provider))
-        throw new Error("Update the app and studio server to support customer-avatar generation with provider-specific consent.");
+      if (health.status !== "ok") throw new Error("This address is not a Forme studio.");
+      if (
+        health.personalizationContract !== "customer-avatar-v4" ||
+        !["gemini", "openai"].includes(health.provider)
+      )
+        throw new Error(
+          "Update the app and studio server to support customer-avatar generation with provider-specific consent.",
+        );
       onChange();
       setOpen(false);
     } catch (error) {
@@ -96,8 +98,8 @@ export default function StudioConnection({
           <span className="eyebrow">YOUR STORE</span>
           <h2>Connect your studio</h2>
           <p>
-            Connect to your store’s private studio for customer avatar generation.
-            Sample avatars work without a connection.
+            Connect to your store’s private studio for customer avatar generation. Sample avatars
+            work without a connection.
           </p>
           <label>
             Studio address
@@ -125,8 +127,8 @@ export default function StudioConnection({
             />
           </label>
           <p className="small-footnote">
-            Ask your store administrator for these details. The access code is
-            kept only for this app session.
+            Ask your store administrator for these details. The access code is kept only for this
+            app session.
           </p>
           {message && (
             <p role="alert" className="error-banner">

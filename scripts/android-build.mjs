@@ -7,18 +7,10 @@ const tasks = process.argv.slice(2);
 if (
   !tasks.length ||
   tasks.some(
-    (task) =>
-      ![
-        "assembleDebug",
-        "lintDebug",
-        "bundleRelease",
-        "assembleRelease",
-      ].includes(task),
+    (task) => !["assembleDebug", "lintDebug", "bundleRelease", "assembleRelease"].includes(task),
   )
 ) {
-  console.error(
-    "Specify assembleDebug, lintDebug, bundleRelease, or assembleRelease.",
-  );
+  console.error("Specify assembleDebug, lintDebug, bundleRelease, or assembleRelease.");
   process.exit(1);
 }
 const windows = process.platform === "win32";

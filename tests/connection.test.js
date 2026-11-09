@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 import { normalizeStudioUrl } from "../src/connection.js";
 
 test("studio address accepts HTTPS origins and removes the trailing slash", () => {
-  assert.equal(
-    normalizeStudioUrl(" https://studio.example.com/ "),
-    "https://studio.example.com",
-  );
+  assert.equal(normalizeStudioUrl(" https://studio.example.com/ "), "https://studio.example.com");
   assert.equal(
     normalizeStudioUrl("https://studio.example.com:8443"),
     "https://studio.example.com:8443",

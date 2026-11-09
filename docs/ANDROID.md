@@ -44,7 +44,7 @@ Use the studio's real HTTPS origin, for example `https://studio.example.com`, wi
 
 ## Build from source
 
-Install Node.js 22.12+ (24 recommended), JDK 21, and Android Studio/SDK with API 36 and Build Tools 35.0.0. Set `JAVA_HOME` and `ANDROID_HOME` to those installations, or let Android Studio manage them.
+Install Node.js 24+, JDK 21, and Android Studio/SDK with API 36 and Build Tools 35.0.0. Set `JAVA_HOME` and `ANDROID_HOME` to those installations, or let Android Studio manage them.
 
 ```sh
 npm ci
@@ -56,7 +56,7 @@ The result is `android/app/build/outputs/apk/debug/app-debug.apk`. `npm run andr
 
 The build wrapper supports Windows and Unix shells. Install the required JDK/SDK first. The Gradle distribution has a pinned SHA-256 checksum. Signing keys, SDK paths, generated web bundles, and Gradle caches are excluded from Git.
 
-For a hosted build, use **Actions → Build Android APK → Run workflow** on GitHub and download the resulting artifact. The workflow runs only when manually requested. It is a repeatable build recipe; a local build does not prove a GitHub Actions run succeeded.
+Hosted APK builds are disabled: the GitHub Actions Android workflow has been removed and mobile (Android and iOS) app builds are paused. Local builds with the commands above still work if needed.
 
 ## Validation and release boundary
 

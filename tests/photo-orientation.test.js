@@ -5,8 +5,13 @@ import { webpOrientation, preparePhoto } from "../src/photo-orientation.js";
 import { customerPhotos } from "./helpers/customer-photos.js";
 
 test("WebP metadata correction is bounded and neutralizes orientation before browser decoding", async () => {
-  const image = await sharp(customerPhotos[0].body).resize(384).withMetadata({ orientation: 8 }).webp().toBuffer();
-  const arrayBuffer = bytes => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  const image = await sharp(customerPhotos[0].body)
+    .resize(384)
+    .withMetadata({ orientation: 8 })
+    .webp()
+    .toBuffer();
+  const arrayBuffer = (bytes) =>
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   assert.equal(webpOrientation(arrayBuffer(image)).orientation, 8);
   for (let length = 0; length < image.length; length += 19) {
     assert.doesNotThrow(() => webpOrientation(arrayBuffer(image.subarray(0, length))));

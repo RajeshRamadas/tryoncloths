@@ -1,12 +1,12 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 
-export const digest = value => createHash('sha256').update(value).digest('hex');
+export const digest = (value) => createHash("sha256").update(value).digest("hex");
 
-export async function readJson(file, {maxBytes=1024*1024}={}) {
+export async function readJson(file, { maxBytes = 1024 * 1024 } = {}) {
   const bytes = await readFile(file);
-  if (bytes.length > maxBytes) throw new Error('Evaluation JSON exceeds its size limit.');
-  return JSON.parse(bytes.toString('utf8'));
+  if (bytes.length > maxBytes) throw new Error("Evaluation JSON exceeds its size limit.");
+  return JSON.parse(bytes.toString("utf8"));
 }
 
 export async function newReportDirectory(directory) {
@@ -15,17 +15,19 @@ export async function newReportDirectory(directory) {
 }
 
 export async function privateJson(file, data) {
-  await writeFile(file, JSON.stringify(data, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
+  await writeFile(file, JSON.stringify(data, null, 2) + "\n", { mode: 0o600, flag: "wx" });
 }
 
 export function options(args, allowed, switches = []) {
   const result = {};
   for (let i = 0; i < args.length; i++) {
     const key = args[i];
-    if (!allowed.includes(key) || Object.hasOwn(result, key)) throw new Error('Unknown or repeated command option.');
+    if (!allowed.includes(key) || Object.hasOwn(result, key))
+      throw new Error("Unknown or repeated command option.");
     if (switches.includes(key)) result[key] = true;
     else {
-      if (!args[i + 1] || args[i + 1].startsWith('--')) throw new Error('Missing command option value.');
+      if (!args[i + 1] || args[i + 1].startsWith("--"))
+        throw new Error("Missing command option value.");
       result[key] = args[++i];
     }
   }

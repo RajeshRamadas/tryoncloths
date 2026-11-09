@@ -1,7 +1,7 @@
-import {ExportBrandingChoice} from './branding';
+import { ExportBrandingChoice } from "./branding";
 import CustomerPicker from "./CustomerPicker";
-import {type CustomerRef,type Customer} from "./customers";
-import {CreditHelp} from "./Billing";
+import { type CustomerRef, type Customer } from "./customers";
+import { CreditHelp } from "./Billing";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownToLine,
@@ -25,7 +25,13 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { profiles, recommendProfile, skinTones, approximateSelection, DEFAULT_TEMPLATE_TONE } from "./profiles";
+import {
+  profiles,
+  recommendProfile,
+  skinTones,
+  approximateSelection,
+  DEFAULT_TEMPLATE_TONE,
+} from "./profiles";
 import { downloadAvatar, libraryForIndex, readPhoto } from "./images";
 import { isNative, capturePhoto, clearNativeExports } from "./native";
 import { requestApi } from "./api";
@@ -165,11 +171,7 @@ function PhotoInput({
               )}
             </span>
             <strong>{title}</strong>
-            <span>
-              {kind === "face"
-                ? "Look straight ahead"
-                : "Head to toe, standing"}
-            </span>
+            <span>{kind === "face" ? "Look straight ahead" : "Head to toe, standing"}</span>
             <span className="upload-caption">
               <Plus size={12} /> Add photo
             </span>
@@ -201,9 +203,9 @@ function PhotoInput({
 
 export default function App() {
   const [step, setStep] = useState(1);
-  const [accountState, setAccountState] = useState<AccountState>({enabled:false,account:null});
+  const [accountState, setAccountState] = useState<AccountState>({ enabled: false, account: null });
   const accountIdentity = useRef<string | null>(null);
-  const [customer,setCustomer]=useState<CustomerRef|null>(null);
+  const [customer, setCustomer] = useState<CustomerRef | null>(null);
   const [avatarId, setAvatarId] = useState<string | null>(null);
   const [openedLook, setOpenedLook] = useState<OpenedLook | undefined>();
   const [outfitOpen, setOutfitOpen] = useState(false);
@@ -214,7 +216,7 @@ export default function App() {
   const [height, setHeight] = useState("175");
   const [weight, setWeight] = useState("72");
   const [selected, setSelected] = useState("regular");
-  const [templateTone,setTemplateTone] = useState(DEFAULT_TEMPLATE_TONE);
+  const [templateTone, setTemplateTone] = useState(DEFAULT_TEMPLATE_TONE);
   const [manual, setManual] = useState(false);
   const [face, setFace] = useState<string | null>(null);
   const [body, setBody] = useState<string | null>(null);
@@ -222,15 +224,15 @@ export default function App() {
   const [aiConsent, setAiConsent] = useState(false);
   const [service, setService] = useState<ServiceState>("checking");
   const [provider, setProvider] = useState<"gemini" | "openai" | null>(null);
-  const [femaleEnabled,setFemaleEnabled]=useState(false);
+  const [femaleEnabled, setFemaleEnabled] = useState(false);
   const [tryOnAvailable, setTryOnAvailable] = useState(false);
-  const [jewelleryAvailable,setJewelleryAvailable]=useState(false);
+  const [jewelleryAvailable, setJewelleryAvailable] = useState(false);
   const [personalized, setPersonalized] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generationFailed, setGenerationFailed] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [approved, setApproved] = useState(false);
-  const [exportFooter,setExportFooter]=useState<boolean|undefined>(undefined);
+  const [exportFooter, setExportFooter] = useState<boolean | undefined>(undefined);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [help, setHelp] = useState(false);
@@ -252,7 +254,8 @@ export default function App() {
 
   function checkService() {
     setService("checking");
-    setTryOnAvailable(false);setJewelleryAvailable(false);
+    setTryOnAvailable(false);
+    setJewelleryAvailable(false);
     setAiConsent(false);
     requestApi("/api/health")
       .then(async (r) => {
@@ -262,12 +265,19 @@ export default function App() {
         }
         if (!r.ok) throw new Error();
         const data = await r.json();
-        if (data.accountsAvailable) setAccountState(s => ({...s,enabled:true}));
-        setJewelleryAvailable(data.jewelleryOverlayAvailable===true||data.jewelleryAvailable===true&&data.jewelleryContract==='jewellery-tryon-v1');
+        if (data.accountsAvailable) setAccountState((s) => ({ ...s, enabled: true }));
+        setJewelleryAvailable(
+          data.jewelleryOverlayAvailable === true ||
+            (data.jewelleryAvailable === true && data.jewelleryContract === "jewellery-tryon-v1"),
+        );
         setFemaleEnabled(data.supportedBodies?.includes("female") === true);
-        const supported = data.personalizationContract === "customer-avatar-v4" && ["gemini", "openai"].includes(data.provider);
+        const supported =
+          data.personalizationContract === "customer-avatar-v4" &&
+          ["gemini", "openai"].includes(data.provider);
         setProvider(supported ? data.provider : null);
-        setTryOnAvailable(data.tryOnAvailable === true && data.tryOnContract === "garment-tryon-v1");
+        setTryOnAvailable(
+          data.tryOnAvailable === true && data.tryOnContract === "garment-tryon-v1",
+        );
         setService(data.personalizationAvailable && supported ? "available" : "unavailable");
       })
       .catch(() => setService("unavailable"));
@@ -283,14 +293,16 @@ export default function App() {
   useEffect(() => {
     if (!isNative) return;
     const listener = NativeApp.addListener("backButton", () => {
-      const openDialog =
-        document.querySelector<HTMLDialogElement>("dialog[open]");
+      const openDialog = document.querySelector<HTMLDialogElement>("dialog[open]");
       if (openDialog) {
         openDialog.dispatchEvent(new Event("cancel", { cancelable: true }));
         return;
       }
       if (generating || exporting) return;
-      if (outfitOpen) { setOutfitOpen(false); return; }
+      if (outfitOpen) {
+        setOutfitOpen(false);
+        return;
+      }
       if (step > 1) goTo(step - 1);
       else if (face || body) setConfirmReset(true);
       else void NativeApp.minimizeApp();
@@ -316,12 +328,16 @@ export default function App() {
   }, [notice]);
 
   function accountChanged(next: AccountState) {
-    if (accountIdentity.current !== (next.account?.id || null)) { reset(); setNotice(""); }
+    if (accountIdentity.current !== (next.account?.id || null)) {
+      reset();
+      setNotice("");
+    }
     accountIdentity.current = next.account?.id || null;
     setAccountState(next);
   }
   function invalidate() {
-    setAvatarId(null); setOpenedLook(undefined);
+    setAvatarId(null);
+    setOpenedLook(undefined);
     setSaveConsent(false);
     setOutfitOpen(false);
     setGenerationFailed(false);
@@ -336,7 +352,8 @@ export default function App() {
     else setWeight(value);
     const match = recommendProfile(
       Number(field === "height" ? value : height),
-      Number(field === "weight" ? value : weight), bodyType,
+      Number(field === "weight" ? value : weight),
+      bodyType,
     );
     if (!manual && match) setSelected(match);
   }
@@ -352,7 +369,9 @@ export default function App() {
       return;
     }
     if (!validMeasurements) {
-      setError(`Enter a height from 140–${bodyType === "female" ? 200 : 210} cm and weight from 35–200 kg.`);
+      setError(
+        `Enter a height from 140–${bodyType === "female" ? 200 : 210} cm and weight from 35–200 kg.`,
+      );
       return;
     }
     setError("");
@@ -382,14 +401,23 @@ export default function App() {
     invalidate();
     setConfirmReset(false);
     setSession((s) => s + 1);
-    setNotice(
-      "New session started. Previous customer photos have been cleared.",
-    );
+    setNotice("New session started. Previous customer photos have been cleared.");
   }
-  const [creditsRequired,setCreditsRequired]=useState(false);
+  const [creditsRequired, setCreditsRequired] = useState(false);
   async function generate() {
     setCreditsRequired(false);
-    if (!face || !body || !aiConsent || !consent || !provider || service !== "available" || !bodyGenerationAllowed || generating || (accountState.enabled && !accountState.account)) return;
+    if (
+      !face ||
+      !body ||
+      !aiConsent ||
+      !consent ||
+      !provider ||
+      service !== "available" ||
+      !bodyGenerationAllowed ||
+      generating ||
+      (accountState.enabled && !accountState.account)
+    )
+      return;
     setGenerating(true);
     setRestoredAvatar(false);
     setAvatarSource("generated");
@@ -404,32 +432,57 @@ export default function App() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ requestId:crypto.randomUUID(), face, body, profileId: selected, templateTone, measurements: { heightCm: Number(height), weightKg: Number(weight) }, consent: true, consentScope: "face-and-body", consentProvider: provider, ...(accountState.enabled ? {accountStorageConsent:aiConsent,avatarName,customerId:customer?.id} : {}) }),
+          body: JSON.stringify({
+            requestId: crypto.randomUUID(),
+            face,
+            body,
+            profileId: selected,
+            templateTone,
+            measurements: { heightCm: Number(height), weightKg: Number(weight) },
+            consent: true,
+            consentScope: "face-and-body",
+            consentProvider: provider,
+            ...(accountState.enabled
+              ? { accountStorageConsent: aiConsent, avatarName, customerId: customer?.id }
+              : {}),
+          }),
         },
         200000,
       );
       const data = await response.json();
       if (!response.ok && data.code === "credits_required") setCreditsRequired(true);
-      if (!response.ok && data.code === "account_required") window.dispatchEvent(new Event("forme-account-expired"));
+      if (!response.ok && data.code === "account_required")
+        window.dispatchEvent(new Event("forme-account-expired"));
       if (!response.ok)
         throw new Error(
-          data.error ||
-            "Personalization failed. Your standard avatar is still available.",
+          data.error || "Personalization failed. Your standard avatar is still available.",
         );
-      if (data.kind !== "customer-avatar" || data.profileId !== selected || data.provider !== provider ||
-          typeof data.image !== "string" || !data.image.startsWith("data:image/png;base64,"))
-        throw new Error("The studio returned an unsupported result. Update the studio and try again.");
+      if (
+        data.kind !== "customer-avatar" ||
+        data.profileId !== selected ||
+        data.provider !== provider ||
+        typeof data.image !== "string" ||
+        !data.image.startsWith("data:image/png;base64,")
+      )
+        throw new Error(
+          "The studio returned an unsupported result. Update the studio and try again.",
+        );
       setPersonalized(data.image);
       setAvatarId(data.avatarId || null);
       setAiConsent(false);
       if (data.accountSaveError) setError(data.accountSaveError);
-      setNotice(data.accountSaved ? "Avatar saved to your store account. Review the result before trying clothes." : "Customer avatar created. Review the face, standard body and skin tone before approval.");
-      requestAnimationFrame(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+      setNotice(
+        data.accountSaved
+          ? "Avatar saved to your store account. Review the result before trying clothes."
+          : "Customer avatar created. Review the face, standard body and skin tone before approval.",
+      );
+      requestAnimationFrame(() =>
+        previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
     } catch (e) {
       setGenerationFailed(true);
       setError(
-        e instanceof Error &&
-          (e.name === "TimeoutError" || e.name === "AbortError")
+        e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")
           ? "The request timed out. Please check before retrying; the provider may have processed it."
           : (e as Error).message,
       );
@@ -437,35 +490,77 @@ export default function App() {
       setGenerating(false);
     }
   }
-  function selectCustomer(next:CustomerRef|null,measurements?:Customer['measurements']) {
+  function selectCustomer(next: CustomerRef | null, measurements?: Customer["measurements"]) {
     if (next?.id === customer?.id) return;
-    reset(); setCustomer(next);
-    if(next)setAvatarName(next.name.slice(0,60));
-    if(measurements){if(measurements.heightCm!=null)setHeight(String(measurements.heightCm));if(measurements.weightKg!=null)setWeight(String(measurements.weightKg));if(measurements.bodyProfileId){setSelected(measurements.bodyProfileId);setManual(true);}}
+    reset();
+    setCustomer(next);
+    if (next) setAvatarName(next.name.slice(0, 60));
+    if (measurements) {
+      if (measurements.heightCm != null) setHeight(String(measurements.heightCm));
+      if (measurements.weightKg != null) setWeight(String(measurements.weightKg));
+      if (measurements.bodyProfileId) {
+        setSelected(measurements.bodyProfileId);
+        setManual(true);
+      }
+    }
   }
   function useSavedAvatar(image: string, details: AvatarDetails) {
-    if(details.avatarId)setCustomer(details.customerId ? {id:details.customerId,name:details.customerName || 'Customer',phoneE164:details.customerPhone || ''} : null);
+    if (details.avatarId)
+      setCustomer(
+        details.customerId
+          ? {
+              id: details.customerId,
+              name: details.customerName || "Customer",
+              phoneE164: details.customerPhone || "",
+            }
+          : null,
+      );
     invalidate();
-    setFace(null); setBody(null); setConsent(false);
-    setSession(s => s + 1);
-    setAvatarId(details.avatarId || null); setOpenedLook(details.look);
-    setSelected(details.profileId); setTemplateTone(details.templateTone || DEFAULT_TEMPLATE_TONE); setManual(true);
-    setHeight(String(details.heightCm)); setWeight(String(details.weightKg));
-    setPersonalized(image); setRestoredAvatar(true); setAvatarSource(details.source); setAvatarName(details.name);
+    setFace(null);
+    setBody(null);
+    setConsent(false);
+    setSession((s) => s + 1);
+    setAvatarId(details.avatarId || null);
+    setOpenedLook(details.look);
+    setSelected(details.profileId);
+    setTemplateTone(details.templateTone || DEFAULT_TEMPLATE_TONE);
+    setManual(true);
+    setHeight(String(details.heightCm));
+    setWeight(String(details.weightKg));
+    setPersonalized(image);
+    setRestoredAvatar(true);
+    setAvatarSource(details.source);
+    setAvatarName(details.name);
     setStep(3);
     setNotice("Avatar opened without an AI request. Review it, then choose Try clothes.");
     requestAnimationFrame(() => titleRef.current?.focus());
   }
   async function keepAvatar() {
     if (!personalized || !approved || !saveConsent || exporting || needsCustomerGeneration) return;
-    setExporting(true); setError("");
+    setExporting(true);
+    setError("");
     try {
       const save = accountState.enabled ? saveAccountAvatar : saveAvatar;
-      const saved = await save(personalized, { customerId:customer?.id, name: avatarName, profileId: selected, templateTone, heightCm: Number(height), weightKg: Number(weight), source: avatarSource });
+      const saved = await save(personalized, {
+        customerId: customer?.id,
+        name: avatarName,
+        profileId: selected,
+        templateTone,
+        heightCm: Number(height),
+        weightKg: Number(weight),
+        source: avatarSource,
+      });
       if (saved?.id) setAvatarId(saved.id);
-      setNotice(accountState.enabled ? "Avatar saved to your store account. Sign in to this account on another browser to reopen it." : "Avatar saved on this device. Open Saved avatars next time; no generation is needed.");
-    } catch (e) { setError((e as Error).message); }
-    finally { setExporting(false); }
+      setNotice(
+        accountState.enabled
+          ? "Avatar saved to your store account. Sign in to this account on another browser to reopen it."
+          : "Avatar saved on this device. Open Saved avatars next time; no generation is needed.",
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setExporting(false);
+    }
   }
   async function download() {
     if (exporting || !approved || needsCustomerGeneration) return;
@@ -476,7 +571,7 @@ export default function App() {
         personalized,
         `${profile.id}${personalized ? "-personalized" : "-sample"}`,
         templateTone,
-        accountState.account?{storeFooter:exportFooter}:undefined,
+        accountState.account ? { storeFooter: exportFooter } : undefined,
       );
       setNotice(
         exported
@@ -500,15 +595,38 @@ export default function App() {
   ) : needsCustomerGeneration ? (
     <div className="pending-avatar">
       <ScanFace size={32} aria-hidden="true" />
-      <h3>{generationFailed ? "Generation did not complete" : "Customer avatar not generated yet"}</h3>
-      <p>Generate an avatar using your face and complexion with the selected {profile.name.toLowerCase()} body.</p>
+      <h3>
+        {generationFailed ? "Generation did not complete" : "Customer avatar not generated yet"}
+      </h3>
+      <p>
+        Generate an avatar using your face and complexion with the selected{" "}
+        {profile.name.toLowerCase()} body.
+      </p>
       <div className="pending-references">
-        {face && <figure><img src={face} alt="Customer identity reference" /><figcaption>Customer face</figcaption></figure>}
-        <figure><AvatarImage index={profile.index} templateTone={templateTone} /><figcaption>{profile.name} body template</figcaption></figure>
+        {face && (
+          <figure>
+            <img src={face} alt="Customer identity reference" />
+            <figcaption>Customer face</figcaption>
+          </figure>
+        )}
+        <figure>
+          <AvatarImage index={profile.index} templateTone={templateTone} />
+          <figcaption>{profile.name} body template</figcaption>
+        </figure>
       </div>
       <p className="small-footnote">These are input references, not a generated result.</p>
-      {generationFailed && error && <p className="field-error">{error}{creditsRequired&&<CreditHelp/>}</p>}
-      <button type="button" className="button secondary" disabled={generating || exporting} onClick={() => goTo(2)}>
+      {generationFailed && error && (
+        <p className="field-error">
+          {error}
+          {creditsRequired && <CreditHelp />}
+        </p>
+      )}
+      <button
+        type="button"
+        className="button secondary"
+        disabled={generating || exporting}
+        onClick={() => goTo(2)}
+      >
         Go to personalization
       </button>
     </div>
@@ -518,766 +636,960 @@ export default function App() {
 
   return (
     <>
-    <div hidden={outfitOpen}>
-    <div className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="/" aria-label="Forme home">
-          <span className="brand-symbol">
-            <Leaf size={22} />
-          </span>
-          forme<span className="brand-dot">.</span>
-        </a>
-        <span className="brand-divider" />
-        <span className="workspace-name">STORE STUDIO</span>
-        <div className="topbar-right">
-          <StudioConnection
-            disabled={generating || exporting}
-            onChange={checkService}
-          />
-          <span className="pilot-pill">
-            <span /> Level 1 · Pilot
-          </span>
-          <button
-            className="icon-button help-button"
-            aria-label="How it works"
-            onClick={() => setHelp(true)}
-          >
-            <CircleHelp size={20} />
-          </button>
-          <span className="store-avatar">ST</span>
-        </div>
-      </header>
-      <main>
-        <section className="page-heading">
-          <div>
-            <div className="eyebrow">YOUR FITTING STUDIO</div>
-            <h1>A great look starts here.</h1>
-            <p>
-              {jewelleryAvailable ? "Open a saved avatar or create one, then try clothes and jewellery." : "Open a saved avatar or create one, then try clothes."}
-            </p>
-          </div>
-          <button
-            className="button secondary new-session"
-            disabled={generating || exporting}
-            onClick={() => setConfirmReset(true)}
-          >
-            <Plus size={16} /> New session
-          </button>
-        </section>
-        {!isNative && <StoreAccount available={accountState.enabled} jewelleryEnabled={jewelleryAvailable} disabled={generating || exporting} onChange={accountChanged}/>}
-        <div className="saved-avatars-entry"><SavedAvatars key={accountState.account?.id || "local"} cloud={accountState.enabled} disabled={generating || exporting || (accountState.enabled && !accountState.account)} onUse={useSavedAvatar}/><span>Already have an avatar? Reopen it here without generating again.</span></div>
-        <nav className="steps" aria-label="Avatar creation steps">
-          {["Customer details", "Match & personalize", "Review & save"].map(
-            (label, i) => (
+      <div hidden={outfitOpen}>
+        <div className="app-shell">
+          <header className="topbar">
+            <a className="brand" href="/" aria-label="Forme home">
+              <span className="brand-symbol">
+                <Leaf size={22} />
+              </span>
+              forme<span className="brand-dot">.</span>
+            </a>
+            <span className="brand-divider" />
+            <span className="workspace-name">STORE STUDIO</span>
+            <div className="topbar-right">
+              <StudioConnection disabled={generating || exporting} onChange={checkService} />
+              <span className="pilot-pill">
+                <span /> Level 1 · Pilot
+              </span>
               <button
-                key={label}
-                className={`step ${step === i + 1 ? "current" : ""} ${step > i + 1 ? "complete" : ""}`}
-                disabled={generating || i + 1 > step}
-                aria-current={step === i + 1 ? "step" : undefined}
-                onClick={() => goTo(i + 1)}
+                className="icon-button help-button"
+                aria-label="How it works"
+                onClick={() => setHelp(true)}
               >
-                <span className="step-number">
-                  {step > i + 1 ? <Check size={14} /> : `0${i + 1}`}
-                </span>
-                <span>{label}</span>
-                {i < 2 && <span className="step-line" />}
+                <CircleHelp size={20} />
               </button>
-            ),
-          )}
-        </nav>
-        <div className="studio-grid">
-          <aside className="details-column">
-            <section className="card customer-card">
-              <div className="card-heading">
-                <span className="section-icon">
-                  <UserRound size={17} />
-                </span>
-                <h2 ref={titleRef} tabIndex={-1}>
-                  {step === 1
-                    ? "Customer details"
-                    : step === 2
-                      ? "Personalize the avatar"
-                      : "Ready for review"}
-                </h2>
-                <span className="tiny-label">{`0${step}`}</span>
+              <span className="store-avatar">ST</span>
+            </div>
+          </header>
+          <main>
+            <section className="page-heading">
+              <div>
+                <div className="eyebrow">YOUR FITTING STUDIO</div>
+                <h1>A great look starts here.</h1>
+                <p>
+                  {jewelleryAvailable
+                    ? "Open a saved avatar or create one, then try clothes and jewellery."
+                    : "Open a saved avatar or create one, then try clothes."}
+                </p>
               </div>
-              {customer && step !== 1 && <p className="selected-customer-summary">Saving for {customer.name} · {customer.phoneE164}</p>}
-              {step === 1 ? (
-                <>
-                  <p className="section-copy">
-                    A few details to find their closest starting point.
-                  </p>
-                  {accountState.account && <CustomerPicker key={`${accountState.account.id}-${session}`} jewelleryEnabled={jewelleryAvailable} selected={customer} disabled={generating || exporting} onSelect={selectCustomer} onUpdate={setCustomer}/>}
-                  <div className="field-label-row">
-                    <h3>Customer photos</h3>
-                    <span>Optional for a sample</span>
+              <button
+                className="button secondary new-session"
+                disabled={generating || exporting}
+                onClick={() => setConfirmReset(true)}
+              >
+                <Plus size={16} /> New session
+              </button>
+            </section>
+            {!isNative && (
+              <StoreAccount
+                available={accountState.enabled}
+                jewelleryEnabled={jewelleryAvailable}
+                disabled={generating || exporting}
+                onChange={accountChanged}
+              />
+            )}
+            <div className="saved-avatars-entry">
+              <SavedAvatars
+                key={accountState.account?.id || "local"}
+                cloud={accountState.enabled}
+                disabled={
+                  generating || exporting || (accountState.enabled && !accountState.account)
+                }
+                onUse={useSavedAvatar}
+              />
+              <span>Already have an avatar? Reopen it here without generating again.</span>
+            </div>
+            <nav className="steps" aria-label="Avatar creation steps">
+              {["Customer details", "Match & personalize", "Review & save"].map((label, i) => (
+                <button
+                  key={label}
+                  className={`step ${step === i + 1 ? "current" : ""} ${step > i + 1 ? "complete" : ""}`}
+                  disabled={generating || i + 1 > step}
+                  aria-current={step === i + 1 ? "step" : undefined}
+                  onClick={() => goTo(i + 1)}
+                >
+                  <span className="step-number">
+                    {step > i + 1 ? <Check size={14} /> : `0${i + 1}`}
+                  </span>
+                  <span>{label}</span>
+                  {i < 2 && <span className="step-line" />}
+                </button>
+              ))}
+            </nav>
+            <div className="studio-grid">
+              <aside className="details-column">
+                <section className="card customer-card">
+                  <div className="card-heading">
+                    <span className="section-icon">
+                      <UserRound size={17} />
+                    </span>
+                    <h2 ref={titleRef} tabIndex={-1}>
+                      {step === 1
+                        ? "Customer details"
+                        : step === 2
+                          ? "Personalize the avatar"
+                          : "Ready for review"}
+                    </h2>
+                    <span className="tiny-label">{`0${step}`}</span>
                   </div>
-                  <label className="consent photo-consent">
-                    <input
-                      type="checkbox"
-                      checked={consent}
-                      disabled={generating || exporting}
-                      onChange={(e) => {
-                        setConsent(e.target.checked);
-                        if (!e.target.checked) {
-                          setFace(null);
-                          setBody(null);
-                          setAiConsent(false);
-                          setSession((s) => s + 1);
-                          invalidate();
+                  {customer && step !== 1 && (
+                    <p className="selected-customer-summary">
+                      Saving for {customer.name} · {customer.phoneE164}
+                    </p>
+                  )}
+                  {step === 1 ? (
+                    <>
+                      <p className="section-copy">
+                        A few details to find their closest starting point.
+                      </p>
+                      {accountState.account && (
+                        <CustomerPicker
+                          key={`${accountState.account.id}-${session}`}
+                          jewelleryEnabled={jewelleryAvailable}
+                          selected={customer}
+                          disabled={generating || exporting}
+                          onSelect={selectCustomer}
+                          onUpdate={setCustomer}
+                        />
+                      )}
+                      <div className="field-label-row">
+                        <h3>Customer photos</h3>
+                        <span>Optional for a sample</span>
+                      </div>
+                      <label className="consent photo-consent">
+                        <input
+                          type="checkbox"
+                          checked={consent}
+                          disabled={generating || exporting}
+                          onChange={(e) => {
+                            setConsent(e.target.checked);
+                            if (!e.target.checked) {
+                              setFace(null);
+                              setBody(null);
+                              setAiConsent(false);
+                              setSession((s) => s + 1);
+                              invalidate();
+                            }
+                          }}
+                        />
+                        <span>
+                          The customer agrees to use their photos for this avatar session.
+                        </span>
+                      </label>
+                      <div className="photo-grid" key={session}>
+                        <PhotoInput
+                          kind="face"
+                          value={face}
+                          disabled={!consent || generating}
+                          onChange={(value) => {
+                            invalidate();
+                            setFace(value);
+                          }}
+                        />
+                        <PhotoInput
+                          kind="body"
+                          value={body}
+                          disabled={!consent || generating}
+                          onChange={(value) => {
+                            invalidate();
+                            setBody(value);
+                          }}
+                        />
+                      </div>
+                      <p className="photo-hint">
+                        <Camera size={13} /> Clear light. Natural pose. No filters.
+                      </p>
+                      <div className="section-separator" />
+                      <div className="field-label-row">
+                        <h3>Body measurements</h3>
+                        <span>Approximate is okay</span>
+                      </div>
+                      <label className="body-library-select">
+                        Body library
+                        <select
+                          aria-label="Body library"
+                          value={bodyType}
+                          disabled={generating || exporting}
+                          onChange={(e) => {
+                            invalidate();
+                            setManual(false);
+                            setSelected(
+                              recommendProfile(Number(height), Number(weight), e.target.value) ||
+                                (e.target.value === "female" ? "f-regular" : "regular"),
+                            );
+                          }}
+                        >
+                          <option value="male">Male</option>
+                          <option value="female">Female</option>
+                        </select>
+                      </label>
+                      <div className="measurement-grid">
+                        <label>
+                          Height
+                          <div className="unit-input">
+                            <input
+                              aria-label="Height in centimeters"
+                              type="number"
+                              min="140"
+                              max={bodyType === "female" ? 200 : 210}
+                              value={height}
+                              onChange={(e) => updateMeasurement("height", e.target.value)}
+                            />
+                            <span>cm</span>
+                          </div>
+                        </label>
+                        <label>
+                          Weight
+                          <div className="unit-input">
+                            <input
+                              aria-label="Weight in kilograms"
+                              type="number"
+                              min="35"
+                              max="200"
+                              value={weight}
+                              onChange={(e) => updateMeasurement("weight", e.target.value)}
+                            />
+                            <span>kg</span>
+                          </div>
+                        </label>
+                      </div>
+                      {!validMeasurements && (
+                        <p className="field-error">
+                          Use 140–{bodyType === "female" ? 200 : 210} cm and 35–200 kg for this
+                          adult sample library.
+                        </p>
+                      )}
+                      <div className="library-label">
+                        <span>Avatar library</span>
+                        <span>
+                          Adult {bodyType} · 24 combinations <ChevronDown size={13} />
+                        </span>
+                      </div>
+                      <div className="inline-note">
+                        <Leaf size={16} />
+                        <p>
+                          We match an approximate frame. Staff can adjust the profile using the
+                          full-body photo.
+                        </p>
+                      </div>
+                    </>
+                  ) : step === 2 ? (
+                    <>
+                      <p className="section-copy">
+                        Generate the customer’s face and matching skin tone on the selected standard
+                        body using both customer photos.
+                      </p>
+                      <div className="summary-row">
+                        <span>Selected profile</span>
+                        <strong>{profile.name}</strong>
+                      </div>
+                      <div className="summary-row">
+                        <span>Customer measurements</span>
+                        <strong>
+                          {height} cm · {weight} kg
+                        </strong>
+                      </div>
+                      <div className="summary-row">
+                        <span>Face and hair</span>
+                        <strong>From the customer’s face photo</strong>
+                      </div>
+                      <div className="summary-row">
+                        <span>Skin tone</span>
+                        <strong>Match the customer’s photos</strong>
+                      </div>
+                      <div className="mini-photos">
+                        {face ? (
+                          <img src={face} alt="Customer face reference" />
+                        ) : (
+                          <span>
+                            <ScanFace />
+                          </span>
+                        )}
+                        {body ? (
+                          <img
+                            src={body}
+                            alt="Customer full-body reference for avatar generation"
+                          />
+                        ) : (
+                          <span>
+                            <UserRound />
+                          </span>
+                        )}
+                        <div>
+                          <strong>{face && body ? "Photos ready" : "Photos not added"}</strong>
+                          <p>
+                            {face && body
+                              ? "Both photos are sent only when you generate."
+                              : "Both photos are needed to personalize."}
+                          </p>
+                        </div>
+                      </div>
+                      <div
+                        className={`service-note ${service === "available" && bodyGenerationAllowed ? "available" : ""}`}
+                      >
+                        <span className="status-dot" />
+                        <div>
+                          <strong>
+                            {!bodyGenerationAllowed
+                              ? "Female personalization is not enabled on this studio"
+                              : service === "checking"
+                                ? "Checking avatar generation…"
+                                : service === "available"
+                                  ? "Customer avatar generation available"
+                                  : service === "unauthorized"
+                                    ? "Studio connection required"
+                                    : "Customer avatar generation unavailable"}
+                          </strong>
+                          <p>
+                            {!bodyGenerationAllowed
+                              ? "You can browse and export female templates. The studio administrator must enable the female pilot before sending customer photos."
+                              : service === "available"
+                                ? "One generation, then reuse the approved avatar."
+                                : service === "unauthorized"
+                                  ? "Open Studio connection (the cloud icon at the top) and enter your store access code. Then confirm generation consent. Your photos have not been sent."
+                                  : "Connect an updated studio with AI generation enabled. This preview has not used your photos."}
+                          </p>
+                        </div>
+                      </div>
+                      {accountState.enabled && (
+                        <div className="save-avatar-box">
+                          <label>
+                            Customer / avatar name
+                            <input
+                              maxLength={60}
+                              value={avatarName}
+                              disabled={generating || exporting}
+                              onChange={(e) => setAvatarName(e.target.value)}
+                            />
+                          </label>
+                          <p>
+                            {accountState.account
+                              ? `The generated avatar and measurements will be saved to ${accountState.account.name}. Original photos are not kept.`
+                              : "Sign in to a store account above before generating. Your avatar will be saved to that account."}
+                          </p>
+                        </div>
+                      )}
+                      {service === "available" && bodyGenerationAllowed && (
+                        <label className="consent">
+                          <input
+                            type="checkbox"
+                            checked={aiConsent}
+                            disabled={generating || exporting}
+                            onChange={(e) => setAiConsent(e.target.checked)}
+                          />
+                          <span>
+                            The customer agrees to send their face photo, full-body photo and
+                            approximate height/weight to {providerLabel}’s image-generation service
+                            to generate their avatar and match skin tone. Provider retention terms
+                            apply.{" "}
+                            {accountState.enabled &&
+                              "The customer also agrees to save the generated avatar and measurements to this store account."}
+                          </span>
+                        </label>
+                      )}
+                      <button
+                        className="button primary full-width"
+                        disabled={
+                          service !== "available" ||
+                          !bodyGenerationAllowed ||
+                          !face ||
+                          !body ||
+                          !aiConsent ||
+                          (accountState.enabled && !accountState.account) ||
+                          generating
                         }
-                      }}
-                    />
-                    <span>
-                      The customer agrees to use their photos for this avatar
-                      session.
-                    </span>
-                  </label>
-                  <div className="photo-grid" key={session}>
-                    <PhotoInput
-                      kind="face"
-                      value={face}
-                      disabled={!consent || generating}
-                      onChange={(value) => {
-                        invalidate();
-                        setFace(value);
-                      }}
-                    />
-                    <PhotoInput
-                      kind="body"
-                      value={body}
-                      disabled={!consent || generating}
-                      onChange={(value) => {
-                        invalidate();
-                        setBody(value);
-                      }}
-                    />
-                  </div>
-                  <p className="photo-hint">
-                    <Camera size={13} /> Clear light. Natural pose. No filters.
-                  </p>
-                  <div className="section-separator" />
-                  <div className="field-label-row">
-                    <h3>Body measurements</h3>
-                    <span>Approximate is okay</span>
-                  </div>
-                  <label className="body-library-select">Body library<select aria-label="Body library" value={bodyType} disabled={generating || exporting} onChange={e=>{invalidate();setManual(false);setSelected(recommendProfile(Number(height),Number(weight),e.target.value) || (e.target.value === "female" ? "f-regular" : "regular"));}}><option value="male">Male</option><option value="female">Female</option></select></label>
-                  <div className="measurement-grid">
-                    <label>
-                      Height
-                      <div className="unit-input">
-                        <input
-                          aria-label="Height in centimeters"
-                          type="number"
-                          min="140"
-                          max={bodyType === "female" ? 200 : 210}
-                          value={height}
-                          onChange={(e) =>
-                            updateMeasurement("height", e.target.value)
-                          }
-                        />
-                        <span>cm</span>
+                        onClick={() => void generate()}
+                      >
+                        {generating ? (
+                          <LoaderCircle className="spin" size={16} />
+                        ) : (
+                          <Sparkles size={16} />
+                        )}
+                        {generating
+                          ? "Creating avatar…"
+                          : personalized
+                            ? "Create again"
+                            : "Generate customer avatar"}
+                      </button>
+                      {service === "available" &&
+                        face &&
+                        body &&
+                        !aiConsent &&
+                        !personalized &&
+                        !generating && (
+                          <p className="small-footnote">
+                            Check the consent box above to enable customer avatar generation.
+                          </p>
+                        )}
+                      {personalized && (
+                        <button
+                          className="text-button"
+                          disabled={generating || exporting}
+                          onClick={() => {
+                            invalidate();
+                            setNotice(
+                              "Generated avatar discarded. Generate again to create a customer result.",
+                            );
+                          }}
+                        >
+                          Discard generated avatar
+                        </button>
+                      )}
+                      <p className="small-footnote">
+                        Check the suggested body with the customer. Height and weight alone cannot
+                        determine body proportions.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="section-copy">Check the result together before keeping it.</p>
+                      {needsCustomerGeneration && (
+                        <p className="error-banner" role="alert">
+                          The photos or body profile changed. Go back and generate a new customer
+                          avatar before approving or exporting.
+                        </p>
+                      )}
+                      <div className="review-type">
+                        <span className="section-icon">
+                          {personalized ? <ScanFace size={22} /> : <UserRound size={22} />}
+                        </span>
+                        <div>
+                          <strong>
+                            {personalized
+                              ? "Personalized avatar"
+                              : needsCustomerGeneration
+                                ? "New generation required"
+                                : "Standard sample avatar"}
+                          </strong>
+                          <p>
+                            {personalized
+                              ? "Customer face and skin tone on the selected standard body"
+                              : needsCustomerGeneration
+                                ? "Generate again with the current photos and selected body."
+                                : "Sample face · no customer face applied"}
+                          </p>
+                        </div>
                       </div>
-                    </label>
-                    <label>
-                      Weight
-                      <div className="unit-input">
-                        <input
-                          aria-label="Weight in kilograms"
-                          type="number"
-                          min="35"
-                          max="200"
-                          value={weight}
-                          onChange={(e) =>
-                            updateMeasurement("weight", e.target.value)
-                          }
-                        />
-                        <span>kg</span>
+                      {personalized && face && body && (
+                        <div className="mini-photos">
+                          <img src={face!} alt="Original customer face for skin-tone review" />
+                          <img src={body!} alt="Original customer body for skin-tone review" />
+                          <p>
+                            Compare the face and skin tone with the original photos. Check the neck,
+                            arms, hands, legs and feet.
+                          </p>
+                        </div>
+                      )}
+                      {restoredAvatar && personalized && (
+                        <p className="saved-avatar-note">
+                          {avatarSource === "imported"
+                            ? "Imported avatar PNG. Check that this is the correct full-body avatar and body profile."
+                            : "Reopened customer avatar. Original photos were not saved; review the avatar with the customer."}{" "}
+                          No new AI generation was used.
+                        </p>
+                      )}
+                      <div className="summary-row">
+                        <span>Body profile</span>
+                        <strong>{profile.name}</strong>
                       </div>
-                    </label>
-                  </div>
-                  {!validMeasurements && (
-                    <p className="field-error">
-                      Use 140–{bodyType === "female" ? 200 : 210} cm and 35–200 kg for this adult sample
-                      library.
-                    </p>
+                      <div className="summary-row">
+                        <span>Height / weight</span>
+                        <strong>
+                          {height} cm / {weight} kg
+                        </strong>
+                      </div>
+                      <ul className="review-list">
+                        <li>
+                          <Check size={15} /> Check the customer’s face and hair
+                        </li>
+                        <li>
+                          <Check size={15} /> Confirm the approximate body profile
+                        </li>
+                        <li>
+                          <Check size={15} /> Confirm consistent skin tone across face and body
+                        </li>
+                      </ul>
+                      <label className="consent approval-consent">
+                        <input
+                          type="checkbox"
+                          checked={approved}
+                          disabled={needsCustomerGeneration || exporting}
+                          onChange={(e) => setApproved(e.target.checked)}
+                        />
+                        <span>
+                          {personalized
+                            ? "The customer approves the face, body and skin tone of this avatar."
+                            : "I have reviewed this standard sample avatar."}
+                        </span>
+                      </label>
+                      {accountState.account && (
+                        <ExportBrandingChoice
+                          key={accountState.account.id}
+                          onChange={setExportFooter}
+                        />
+                      )}
+                      <button
+                        className="button primary full-width"
+                        disabled={!approved || exporting || needsCustomerGeneration}
+                        onClick={() => void download()}
+                      >
+                        <ArrowDownToLine size={16} />{" "}
+                        {exporting
+                          ? "Preparing PNG…"
+                          : isNative
+                            ? "Save or share avatar"
+                            : "Download avatar"}
+                      </button>
+                      {personalized && (
+                        <div className="save-avatar-box">
+                          <label>
+                            Avatar name
+                            <input
+                              maxLength={60}
+                              value={avatarName}
+                              disabled={exporting}
+                              onChange={(e) => setAvatarName(e.target.value)}
+                            />
+                          </label>
+                          <label className="consent">
+                            <input
+                              type="checkbox"
+                              checked={saveConsent}
+                              disabled={!approved || exporting}
+                              onChange={(e) => setSaveConsent(e.target.checked)}
+                            />
+                            <span>
+                              {accountState.enabled
+                                ? "The customer agrees to save this avatar and measurements to the store account for reuse."
+                                : "The customer agrees to save this avatar and measurements on this device for reuse."}
+                            </span>
+                          </label>
+                          <button
+                            className="button secondary full-width"
+                            disabled={
+                              !approved ||
+                              !saveConsent ||
+                              !avatarName.trim() ||
+                              exporting ||
+                              needsCustomerGeneration
+                            }
+                            onClick={() => void keepAvatar()}
+                          >
+                            Save avatar for reuse
+                          </button>
+                          <p className="small-footnote">
+                            {accountState.enabled
+                              ? "Saved privately to the signed-in store account. Reopen from any browser signed in to that account. Original photos are not stored."
+                              : "Saves the avatar image, name, body profile and measurements here. Original photos are not saved. Anyone using this browser or app can open it."}{" "}
+                            Delete saved copies from Saved avatars when no longer needed.
+                          </p>
+                        </div>
+                      )}
+                      <div className="fitting-room-actions">
+                        <button
+                          className="button secondary full-width try-clothes-button"
+                          disabled={!approved || exporting || needsCustomerGeneration}
+                          onClick={() => setOutfitOpen(true)}
+                        >
+                          Try clothes <ArrowRight size={16} />
+                        </button>
+                        {jewelleryAvailable && accountState.account && avatarId && (
+                          <button
+                            className="button secondary"
+                            disabled={!approved || exporting || needsCustomerGeneration}
+                            onClick={() =>
+                              location.assign("/jewellery?avatar=" + encodeURIComponent(avatarId))
+                            }
+                          >
+                            Jewellery <ArrowRight size={16} />
+                          </button>
+                        )}
+                      </div>
+                      <p className="small-footnote">
+                        Approve the avatar to try separate tops, trousers and shoes. Outfit changes
+                        use no AI calls.
+                      </p>
+                      <p className="small-footnote">
+                        {isNative
+                          ? "Save a PNG using the share sheet. Session photos stay in memory; temporary exports are cleared on the next session, export, or app launch."
+                          : "Downloads a PNG backup. To reopen here later, choose Save avatar for reuse. Original photos stay in this session."}
+                      </p>
+                    </>
                   )}
-                  <div className="library-label">
-                    <span>Avatar library</span>
-                    <span>
-                      Adult {bodyType} · 24 combinations <ChevronDown size={13} />
-                    </span>
-                  </div>
-                  <div className="inline-note">
-                    <Leaf size={16} />
-                    <p>
-                      We match an approximate frame. Staff can adjust the
-                      profile using the full-body photo.
-                    </p>
-                  </div>
-                </>
-              ) : step === 2 ? (
-                <>
-                  <p className="section-copy">
-                    Generate the customer’s face and matching skin tone on the
-                    selected standard body using both customer photos.
-                  </p>
-                  <div className="summary-row">
-                    <span>Selected profile</span>
-                    <strong>{profile.name}</strong>
-                  </div>
-                  <div className="summary-row">
-                    <span>Customer measurements</span>
-                    <strong>
-                      {height} cm · {weight} kg
-                    </strong>
-                  </div>
-                  <div className="summary-row">
-                    <span>Face and hair</span>
-                    <strong>From the customer’s face photo</strong>
-                  </div>
-                  <div className="summary-row">
-                    <span>Skin tone</span>
-                    <strong>Match the customer’s photos</strong>
-                  </div>
-                  <div className="mini-photos">
-                    {face ? (
-                      <img src={face} alt="Customer face reference" />
-                    ) : (
-                      <span>
-                        <ScanFace />
-                      </span>
-                    )}
-                    {body ? (
-                      <img
-                        src={body}
-                        alt="Customer full-body reference for avatar generation"
-                      />
-                    ) : (
-                      <span>
-                        <UserRound />
-                      </span>
-                    )}
-                    <div>
-                      <strong>
-                        {face && body ? "Photos ready" : "Photos not added"}
-                      </strong>
-                      <p>
-                        {face && body
-                          ? "Both photos are sent only when you generate."
-                          : "Both photos are needed to personalize."}
-                      </p>
+                  {error && (
+                    <div role="alert" className="error-banner">
+                      {error}
+                      {creditsRequired && <CreditHelp />}
                     </div>
-                  </div>
-                  <div
-                    className={`service-note ${service === "available" && bodyGenerationAllowed ? "available" : ""}`}
-                  >
-                    <span className="status-dot" />
-                    <div>
-                      <strong>
-                        {!bodyGenerationAllowed
-                          ? "Female personalization is not enabled on this studio"
-                          : service === "checking"
-                          ? "Checking avatar generation…"
-                          : service === "available"
-                            ? "Customer avatar generation available"
-                            : service === "unauthorized"
-                              ? "Studio connection required"
-                              : "Customer avatar generation unavailable"}
-                      </strong>
-                      <p>
-                        {!bodyGenerationAllowed
-                          ? "You can browse and export female templates. The studio administrator must enable the female pilot before sending customer photos."
-                          : service === "available"
-                          ? "One generation, then reuse the approved avatar."
-                          : service === "unauthorized"
-                            ? "Open Studio connection (the cloud icon at the top) and enter your store access code. Then confirm generation consent. Your photos have not been sent."
-                            : "Connect an updated studio with AI generation enabled. This preview has not used your photos."}
-                      </p>
-                    </div>
-                  </div>
-                  {accountState.enabled && <div className="save-avatar-box"><label>Customer / avatar name<input maxLength={60} value={avatarName} disabled={generating || exporting} onChange={e=>setAvatarName(e.target.value)}/></label><p>{accountState.account ? `The generated avatar and measurements will be saved to ${accountState.account.name}. Original photos are not kept.` : "Sign in to a store account above before generating. Your avatar will be saved to that account."}</p></div>}
-                  {service === "available" && bodyGenerationAllowed && (
-                    <label className="consent">
-                      <input
-                        type="checkbox"
-                        checked={aiConsent}
+                  )}
+                  <div className="form-navigation">
+                    {step > 1 && (
+                      <button
+                        className="button back-button"
                         disabled={generating || exporting}
-                        onChange={(e) => setAiConsent(e.target.checked)}
-                      />
-                      <span>
-                        The customer agrees to send their face photo, full-body
-                        photo and approximate height/weight to {providerLabel}’s image-generation
-                        service to generate their avatar and match skin tone.
-                        Provider retention terms apply. {accountState.enabled && "The customer also agrees to save the generated avatar and measurements to this store account."}
-                      </span>
-                    </label>
-                  )}
-                  <button
-                    className="button primary full-width"
-                    disabled={
-                      service !== "available" ||
-                      !bodyGenerationAllowed ||
-                      !face ||
-                      !body ||
-                      !aiConsent ||
-                      (accountState.enabled && !accountState.account) ||
-                      generating
-                    }
-                    onClick={() => void generate()}
-                  >
-                    {generating ? (
-                      <LoaderCircle className="spin" size={16} />
-                    ) : (
-                      <Sparkles size={16} />
+                        onClick={() => goTo(step - 1)}
+                      >
+                        <ArrowLeft size={15} /> Back
+                      </button>
                     )}
-                    {generating
-                      ? "Creating avatar…"
-                      : personalized
-                        ? "Create again"
-                        : "Generate customer avatar"}
+                    {step < 3 && (
+                      <button
+                        className="button primary continue-button"
+                        disabled={
+                          !validMeasurements ||
+                          generating ||
+                          exporting ||
+                          (step === 2 && needsCustomerGeneration)
+                        }
+                        onClick={() => goTo(step + 1)}
+                      >
+                        {step === 1 ? "Continue to match" : "Review avatar"}
+                        <ArrowRight size={16} />
+                      </button>
+                    )}
+                  </div>
+                </section>
+                <div className="privacy-note">
+                  <ShieldCheck size={20} />
+                  <div>
+                    <strong>A little care goes a long way.</strong>
+                    <p>
+                      Photos stay in this session until you explicitly generate. Generation sends
+                      both photos and approximate measurements to the AI service.
+                    </p>
+                  </div>
+                </div>
+              </aside>
+              <section ref={previewRef} className="preview-card" aria-label="Avatar preview">
+                <div className="preview-top">
+                  <span>
+                    <span className="live-dot" />{" "}
+                    {personalized
+                      ? "PERSONALIZED PREVIEW"
+                      : needsCustomerGeneration
+                        ? "CUSTOMER AVATAR · NOT GENERATED"
+                        : "AVATAR PREVIEW"}
+                  </span>
+                  <button
+                    className="icon-button"
+                    aria-label="Expand avatar preview"
+                    onClick={() => setExpanded(true)}
+                  >
+                    <Expand size={16} />
                   </button>
-                  {service === "available" && face && body && !aiConsent && !personalized && !generating && (
-                    <p className="small-footnote">Check the consent box above to enable customer avatar generation.</p>
+                </div>
+                <div className={`avatar-stage ${needsCustomerGeneration ? "pending-stage" : ""}`}>
+                  {preview}
+                  {!needsCustomerGeneration && (
+                    <span className="sample-badge">
+                      {personalized ? "Review required" : "Sample avatar"}
+                    </span>
                   )}
-                  {personalized && (
+                  {!needsCustomerGeneration && (
+                    <div className="avatar-meta">
+                      <span>{profile.name} profile</span>
+                      <strong>
+                        {personalized ? "A familiar face. A fresh start." : "Your starting point."}
+                      </strong>
+                      <span>
+                        {personalized
+                          ? restoredAvatar
+                            ? "Reopened avatar · no new generation"
+                            : "Created for this session"
+                          : "Fixed pose · reusable body profile"}
+                      </span>
+                    </div>
+                  )}
+                  {generating && (
+                    <div className="generating-overlay">
+                      <LoaderCircle className="spin" size={28} />
+                      <strong>Creating your avatar</strong>
+                      <span>This can take a moment.</span>
+                    </div>
+                  )}
+                </div>
+                <div className="preview-bottom">
+                  <div>
+                    <span className="status-dot" />
+                    <span>
+                      {approved
+                        ? "Reviewed and approved"
+                        : personalized
+                          ? "Ready for customer review"
+                          : needsCustomerGeneration
+                            ? "Waiting for customer avatar generation"
+                            : "Standard avatar · face not personalized"}
+                    </span>
+                  </div>
+                  <span className="preview-ratio">FULL BODY</span>
+                </div>
+              </section>
+              <aside className="profiles-column">
+                <section className="card profile-card">
+                  <div className="card-heading">
+                    <span className="section-icon">
+                      <ScanFace size={18} />
+                    </span>
+                    <h2>Find their frame</h2>
+                  </div>
+                  <p className="section-copy">
+                    Start with a close match.
+                    <br /> Adjust it together.
+                  </p>
+                  <fieldset className="template-tones" disabled={generating || exporting}>
+                    <legend>Template skin tone</legend>
+                    <div className="tone-options" role="group" aria-label="Template skin tone">
+                      {skinTones.map((tone) => (
+                        <button
+                          key={tone.id}
+                          type="button"
+                          aria-pressed={templateTone === tone.id}
+                          aria-label={`Template tone: ${tone.name}`}
+                          onClick={() => {
+                            if (templateTone !== tone.id) {
+                              invalidate();
+                              setTemplateTone(tone.id);
+                            }
+                          }}
+                        >
+                          <span
+                            className="tone-swatch"
+                            style={{ backgroundColor: tone.swatch }}
+                            aria-hidden="true"
+                          />
+                          <span>{tone.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p>
+                      Six sample complexion ranges for each body. Personalization matches the
+                      customer’s photos automatically, not the template colour.
+                    </p>
+                  </fieldset>
+                  <div className="profile-grid">
+                    {profiles
+                      .filter((p) => p.body === bodyType)
+                      .map((p) => (
+                        <button
+                          key={p.id}
+                          className={`profile-option ${selected === p.id ? "selected" : ""}`}
+                          disabled={generating || exporting}
+                          aria-label={`Select ${p.name} profile`}
+                          aria-pressed={selected === p.id}
+                          onClick={() => changeProfile(p.id)}
+                        >
+                          <div className="profile-thumbnail">
+                            <AvatarImage index={p.index} templateTone={templateTone} />
+                            {selected === p.id && (
+                              <span className="selection-check">
+                                <Check size={12} />
+                              </span>
+                            )}
+                          </div>
+                          <div className="profile-option-label">
+                            <strong>{p.name}</strong>
+                            {p.id === recommendation && (
+                              <span
+                                className="recommended-mark"
+                                title="Suggested from height and weight"
+                              >
+                                ✦
+                              </span>
+                            )}
+                          </div>
+                          <span className="profile-description">{p.description}</span>
+                        </button>
+                      ))}
+                  </div>
+                  {approximation && (
+                    <p className="approximation-bands" aria-label="Approximate measurement bands">
+                      Entered measurements: height {approximation.heightBand.min}–
+                      {approximation.heightBand.max} cm band · weight {approximation.weightBand.min}
+                      –{approximation.weightBand.max} kg band. The suggested frame is approximate;
+                      compare it with the customer.
+                    </p>
+                  )}
+                  <div className="recommendation">
+                    <Sparkles size={16} />
+                    <p>
+                      {recommendation ? (
+                        <>
+                          <strong>{profiles.find((p) => p.id === recommendation)?.name}</strong> is
+                          a starting suggestion from height and weight.
+                        </>
+                      ) : (
+                        "Enter valid measurements to see a suggestion."
+                      )}
+                    </p>
+                  </div>
+                  {manual && recommendation && selected !== recommendation && (
                     <button
                       className="text-button"
                       disabled={generating || exporting}
                       onClick={() => {
                         invalidate();
-                        setNotice("Generated avatar discarded. Generate again to create a customer result.");
+                        setSelected(recommendation);
+                        setManual(false);
                       }}
                     >
-                      Discard generated avatar
+                      <RotateCcw size={12} /> Use suggested profile
                     </button>
                   )}
-                  <p className="small-footnote">
-                    Check the suggested body with the customer. Height and
-                    weight alone cannot determine body proportions.
+                  <p className="profile-footnote">
+                    Illustrative profiles, not calibrated sizing. Athletic build is selected by
+                    staff.
                   </p>
-                </>
-              ) : (
-                <>
-                  <p className="section-copy">
-                    Check the result together before keeping it.
-                  </p>
-                  {needsCustomerGeneration && (
-                    <p className="error-banner" role="alert">
-                      The photos or body profile changed. Go back and generate a new customer avatar before approving or exporting.
-                    </p>
-                  )}
-                  <div className="review-type">
-                    <span className="section-icon">
-                      {personalized ? (
-                        <ScanFace size={22} />
-                      ) : (
-                        <UserRound size={22} />
-                      )}
-                    </span>
-                    <div>
-                      <strong>
-                        {personalized
-                          ? "Personalized avatar"
-                          : needsCustomerGeneration ? "New generation required" : "Standard sample avatar"}
-                      </strong>
-                      <p>
-                        {personalized
-                          ? "Customer face and skin tone on the selected standard body"
-                          : needsCustomerGeneration ? "Generate again with the current photos and selected body." : "Sample face · no customer face applied"}
-                      </p>
-                    </div>
+                </section>
+                <section className="next-card">
+                  <span className="next-label">MADE FOR WHAT’S NEXT</span>
+                  <div className="next-card-icon">
+                    <ImagePlus size={22} />
                   </div>
-                  {personalized && face && body && (
-                    <div className="mini-photos">
-                      <img src={face!} alt="Original customer face for skin-tone review" />
-                      <img src={body!} alt="Original customer body for skin-tone review" />
-                      <p>Compare the face and skin tone with the original photos. Check the neck, arms, hands, legs and feet.</p>
-                    </div>
-                  )}
-                  {restoredAvatar && personalized && <p className="saved-avatar-note">{avatarSource === "imported" ? "Imported avatar PNG. Check that this is the correct full-body avatar and body profile." : "Reopened customer avatar. Original photos were not saved; review the avatar with the customer."} No new AI generation was used.</p>}
-                  <div className="summary-row">
-                    <span>Body profile</span>
-                    <strong>{profile.name}</strong>
-                  </div>
-                  <div className="summary-row">
-                    <span>Height / weight</span>
-                    <strong>
-                      {height} cm / {weight} kg
-                    </strong>
-                  </div>
-                  <ul className="review-list">
-                    <li>
-                      <Check size={15} /> Check the customer’s face and hair
-                    </li>
-                    <li>
-                      <Check size={15} /> Confirm the approximate body profile
-                    </li>
-                    <li>
-                      <Check size={15} /> Confirm consistent skin tone across face and body
-                    </li>
-                  </ul>
-                  <label className="consent approval-consent">
-                    <input
-                      type="checkbox"
-                      checked={approved}
-                      disabled={needsCustomerGeneration || exporting}
-                      onChange={(e) => setApproved(e.target.checked)}
-                    />
-                    <span>
-                      {personalized
-                        ? "The customer approves the face, body and skin tone of this avatar."
-                        : "I have reviewed this standard sample avatar."}
-                    </span>
-                  </label>
-                  {accountState.account&&<ExportBrandingChoice key={accountState.account.id} onChange={setExportFooter}/>}
-                  <button
-                    className="button primary full-width"
-                    disabled={!approved || exporting || needsCustomerGeneration}
-                    onClick={() => void download()}
-                  >
-                    <ArrowDownToLine size={16} />{" "}
-                    {exporting
-                      ? "Preparing PNG…"
-                      : isNative
-                        ? "Save or share avatar"
-                        : "Download avatar"}
-                  </button>
-                  {personalized && <div className="save-avatar-box">
-                    <label>Avatar name<input maxLength={60} value={avatarName} disabled={exporting} onChange={e => setAvatarName(e.target.value)}/></label>
-                    <label className="consent"><input type="checkbox" checked={saveConsent} disabled={!approved || exporting} onChange={e => setSaveConsent(e.target.checked)}/><span>{accountState.enabled ? "The customer agrees to save this avatar and measurements to the store account for reuse." : "The customer agrees to save this avatar and measurements on this device for reuse."}</span></label>
-                    <button className="button secondary full-width" disabled={!approved || !saveConsent || !avatarName.trim() || exporting || needsCustomerGeneration} onClick={() => void keepAvatar()}>Save avatar for reuse</button>
-                    <p className="small-footnote">{accountState.enabled ? "Saved privately to the signed-in store account. Reopen from any browser signed in to that account. Original photos are not stored." : "Saves the avatar image, name, body profile and measurements here. Original photos are not saved. Anyone using this browser or app can open it."} Delete saved copies from Saved avatars when no longer needed.</p>
-                  </div>}
-                  <div className="fitting-room-actions"><button className="button secondary full-width try-clothes-button" disabled={!approved || exporting || needsCustomerGeneration} onClick={() => setOutfitOpen(true)}>
-                    Try clothes <ArrowRight size={16}/>
-                  </button>{jewelleryAvailable&&accountState.account&&avatarId&&<button className="button secondary" disabled={!approved||exporting||needsCustomerGeneration} onClick={()=>location.assign('/jewellery?avatar='+encodeURIComponent(avatarId))}>Jewellery <ArrowRight size={16}/></button>}</div>
-                  <p className="small-footnote">Approve the avatar to try separate tops, trousers and shoes. Outfit changes use no AI calls.</p>
-                  <p className="small-footnote">
-                    {isNative
-                      ? "Save a PNG using the share sheet. Session photos stay in memory; temporary exports are cleared on the next session, export, or app launch."
-                      : "Downloads a PNG backup. To reopen here later, choose Save avatar for reuse. Original photos stay in this session."}
-                  </p>
-                </>
-              )}
-              {error && (
-                <div role="alert" className="error-banner">
-                  {error}{creditsRequired&&<CreditHelp/>}
-                </div>
-              )}
-              <div className="form-navigation">
-                {step > 1 && (
-                  <button
-                    className="button back-button"
-                    disabled={generating || exporting}
-                    onClick={() => goTo(step - 1)}
-                  >
-                    <ArrowLeft size={15} /> Back
-                  </button>
-                )}
-                {step < 3 && (
-                  <button
-                    className="button primary continue-button"
-                    disabled={!validMeasurements || generating || exporting || (step === 2 && needsCustomerGeneration)}
-                    onClick={() => goTo(step + 1)}
-                  >
-                    {step === 1 ? "Continue to match" : "Review avatar"}
-                    <ArrowRight size={16} />
-                  </button>
-                )}
-              </div>
-            </section>
-            <div className="privacy-note">
-              <ShieldCheck size={20} />
-              <div>
-                <strong>A little care goes a long way.</strong>
-                <p>
-                  Photos stay in this session until you explicitly generate.
-                  Generation sends both photos and approximate measurements to the AI service.
-                </p>
-              </div>
+                  <h3>
+                    One avatar.
+                    <br /> More possibilities.
+                  </h3>
+                  <p>An approved avatar becomes the starting point for future outfit previews.</p>
+                  <span className="coming-soon">
+                    Clothing try-on · Next phase <ArrowRight size={13} />
+                  </span>
+                </section>
+              </aside>
             </div>
-          </aside>
-          <section ref={previewRef} className="preview-card" aria-label="Avatar preview">
-            <div className="preview-top">
+            <footer>
               <span>
-                <span className="live-dot" />{" "}
-                {personalized ? "PERSONALIZED PREVIEW" : needsCustomerGeneration ? "CUSTOMER AVATAR · NOT GENERATED" : "AVATAR PREVIEW"}
+                <LockKeyhole size={13} /> Customer-first, by design
               </span>
-              <button
-                className="icon-button"
-                aria-label="Expand avatar preview"
-                onClick={() => setExpanded(true)}
-              >
-                <Expand size={16} />
-              </button>
-            </div>
-            <div className={`avatar-stage ${needsCustomerGeneration ? "pending-stage" : ""}`}>
-              {preview}
-              {!needsCustomerGeneration && <span className="sample-badge">
-                {personalized ? "Review required" : "Sample avatar"}
-              </span>}
-              {!needsCustomerGeneration && <div className="avatar-meta">
-                <span>{profile.name} profile</span>
-                <strong>
-                  {personalized
-                    ? "A familiar face. A fresh start."
-                    : "Your starting point."}
-                </strong>
-                <span>
-                  {personalized
-                    ? restoredAvatar ? "Reopened avatar · no new generation" : "Created for this session"
-                    : "Fixed pose · reusable body profile"}
-                </span>
-              </div>}
-              {generating && (
-                <div className="generating-overlay">
-                  <LoaderCircle className="spin" size={28} />
-                  <strong>Creating your avatar</strong>
-                  <span>This can take a moment.</span>
-                </div>
-              )}
-            </div>
-            <div className="preview-bottom">
-              <div>
-                <span className="status-dot" />
-                <span>
-                  {approved
-                    ? "Reviewed and approved"
-                    : personalized
-                      ? "Ready for customer review"
-                      : needsCustomerGeneration ? "Waiting for customer avatar generation" : "Standard avatar · face not personalized"}
-                </span>
+              <p>An approximate visual preview. Not a measurement or fit guarantee.</p>
+              <span>
+                FORME STUDIO <span className="footer-dot">·</span> LEVEL 1
+              </span>
+            </footer>
+          </main>
+          <div className="toast-region" role="status" aria-live="polite">
+            {notice && (
+              <div className="toast">
+                <CheckCheck size={17} />
+                {notice}
               </div>
-              <span className="preview-ratio">FULL BODY</span>
-            </div>
-          </section>
-          <aside className="profiles-column">
-            <section className="card profile-card">
-              <div className="card-heading">
-                <span className="section-icon">
-                  <ScanFace size={18} />
-                </span>
-                <h2>Find their frame</h2>
+            )}
+          </div>
+          <dialog
+            ref={dialogRef}
+            className={expanded ? "expanded-dialog" : ""}
+            onCancel={() => {
+              setHelp(false);
+              setExpanded(false);
+              setConfirmReset(false);
+            }}
+            aria-label={
+              help
+                ? "How Avatar Studio works"
+                : confirmReset
+                  ? "Start a new session"
+                  : "Expanded avatar preview"
+            }
+          >
+            <button
+              className="dialog-close icon-button"
+              aria-label="Close dialog"
+              onClick={() => {
+                setHelp(false);
+                setExpanded(false);
+                setConfirmReset(false);
+              }}
+            >
+              <X size={20} />
+            </button>
+            {help ? (
+              <div className="help-content">
+                <span className="eyebrow">WELCOME TO FORME</span>
+                <h2>
+                  A familiar face.
+                  <br /> A simple starting point.
+                </h2>
+                <ol>
+                  <li>
+                    <strong>Add customer details.</strong>
+                    <p>
+                      Use consented photos and enter height and weight. You can explore the sample
+                      library without photos.
+                    </p>
+                  </li>
+                  <li>
+                    <strong>Choose a close body profile.</strong>
+                    <p>
+                      The suggestion uses a basic height/weight rule. Staff review the full-body
+                      photo and adjust the profile. Automated photo-based measurements are not
+                      included.
+                    </p>
+                  </li>
+                  <li>
+                    <strong>Personalize, review, and download.</strong>
+                    <p>
+                      With consent, generate the customer’s face and matching skin tone on the
+                      chosen standard body. Review all exposed skin and approve before export.
+                      Sample downloads are available only in sessions without customer photos.
+                    </p>
+                  </li>
+                </ol>
+                <p className="small-footnote">
+                  Original photos stay in memory and are cleared on reload or a new session.
+                  {accountState.enabled
+                    ? "Generated avatars are saved to the signed-in store account with customer consent. Reopen them from another browser using the same account."
+                    : "You can explicitly save approved avatars on this device and reuse them for clothing try-on. This local library is not synced across devices."}
+                  Keep a downloaded PNG backup.
+                </p>
               </div>
-              <p className="section-copy">
-                Start with a close match.
-                <br /> Adjust it together.
-              </p>
-              <fieldset className="template-tones" disabled={generating || exporting}>
-                <legend>Template skin tone</legend>
-                <div className="tone-options" role="group" aria-label="Template skin tone">
-                  {skinTones.map(tone=><button key={tone.id} type="button" aria-pressed={templateTone===tone.id} aria-label={`Template tone: ${tone.name}`} onClick={()=>{
-                    if(templateTone!==tone.id){invalidate();setTemplateTone(tone.id);}
-                  }}><span className="tone-swatch" style={{backgroundColor:tone.swatch}} aria-hidden="true"/><span>{tone.name}</span></button>)}
-                </div>
-                <p>Six sample complexion ranges for each body. Personalization matches the customer’s photos automatically, not the template colour.</p>
-              </fieldset>
-              <div className="profile-grid">
-                {profiles.filter(p=>p.body===bodyType).map((p) => (
-                  <button
-                    key={p.id}
-                    className={`profile-option ${selected === p.id ? "selected" : ""}`}
-                    disabled={generating || exporting}
-                    aria-label={`Select ${p.name} profile`}
-                    aria-pressed={selected === p.id}
-                    onClick={() => changeProfile(p.id)}
-                  >
-                    <div className="profile-thumbnail">
-                      <AvatarImage index={p.index} templateTone={templateTone} />
-                      {selected === p.id && (
-                        <span className="selection-check">
-                          <Check size={12} />
-                        </span>
-                      )}
-                    </div>
-                    <div className="profile-option-label">
-                      <strong>{p.name}</strong>
-                      {p.id === recommendation && (
-                        <span
-                          className="recommended-mark"
-                          title="Suggested from height and weight"
-                        >
-                          ✦
-                        </span>
-                      )}
-                    </div>
-                    <span className="profile-description">{p.description}</span>
+            ) : confirmReset ? (
+              <div className="help-content">
+                <h2>Start fresh?</h2>
+                <p>
+                  The current photos and generated result will be cleared from this browser session.
+                  Saved copies remain in the avatar library. Save or download an approved avatar
+                  first if you want to keep it.
+                </p>
+                <div className="dialog-actions">
+                  <button className="button secondary" onClick={() => setConfirmReset(false)}>
+                    Keep working
                   </button>
-                ))}
+                  <button className="button primary" onClick={reset}>
+                    Start new session
+                  </button>
+                </div>
               </div>
-              {approximation&&<p className="approximation-bands" aria-label="Approximate measurement bands">Entered measurements: height {approximation.heightBand.min}–{approximation.heightBand.max} cm band · weight {approximation.weightBand.min}–{approximation.weightBand.max} kg band. The suggested frame is approximate; compare it with the customer.</p>}
-              <div className="recommendation">
-                <Sparkles size={16} />
+            ) : expanded ? (
+              <div className="expanded-preview">
+                {preview}
                 <p>
-                  {recommendation ? (
-                    <>
-                      <strong>
-                        {profiles.find((p) => p.id === recommendation)?.name}
-                      </strong>{" "}
-                      is a starting suggestion from height and weight.
-                    </>
-                  ) : (
-                    "Enter valid measurements to see a suggestion."
-                  )}
+                  {profile.name} · {personalized ? "Personalized avatar" : "Standard sample avatar"}
                 </p>
               </div>
-              {manual && recommendation && selected !== recommendation && (
-                <button
-                  className="text-button"
-                  disabled={generating || exporting}
-                  onClick={() => {
-                    invalidate();
-                    setSelected(recommendation);
-                    setManual(false);
-                  }}
-                >
-                  <RotateCcw size={12} /> Use suggested profile
-                </button>
-              )}
-              <p className="profile-footnote">
-                Illustrative profiles, not calibrated sizing. Athletic build is
-                selected by staff.
-              </p>
-            </section>
-            <section className="next-card">
-              <span className="next-label">MADE FOR WHAT’S NEXT</span>
-              <div className="next-card-icon">
-                <ImagePlus size={22} />
-              </div>
-              <h3>
-                One avatar.
-                <br /> More possibilities.
-              </h3>
-              <p>
-                An approved avatar becomes the starting point for future outfit
-                previews.
-              </p>
-              <span className="coming-soon">
-                Clothing try-on · Next phase <ArrowRight size={13} />
-              </span>
-            </section>
-          </aside>
+            ) : null}
+          </dialog>
         </div>
-        <footer>
-          <span>
-            <LockKeyhole size={13} /> Customer-first, by design
-          </span>
-          <p>
-            An approximate visual preview. Not a measurement or fit guarantee.
-          </p>
-          <span>
-            FORME STUDIO <span className="footer-dot">·</span> LEVEL 1
-          </span>
-        </footer>
-      </main>
-      <div className="toast-region" role="status" aria-live="polite">
-        {notice && (
-          <div className="toast">
-            <CheckCheck size={17} />
-            {notice}
-          </div>
-        )}
       </div>
-      <dialog
-        ref={dialogRef}
-        className={expanded ? "expanded-dialog" : ""}
-        onCancel={() => {
-          setHelp(false);
-          setExpanded(false);
-          setConfirmReset(false);
-        }}
-        aria-label={
-          help
-            ? "How Avatar Studio works"
-            : confirmReset
-              ? "Start a new session"
-              : "Expanded avatar preview"
-        }
-      >
-        <button
-          className="dialog-close icon-button"
-          aria-label="Close dialog"
-          onClick={() => {
-            setHelp(false);
-            setExpanded(false);
-            setConfirmReset(false);
+      {approved && !needsCustomerGeneration && (
+        <OutfitStudio
+          key={`${session}-${selected}-${templateTone}`}
+          active={outfitOpen}
+          jewelleryEnabled={jewelleryAvailable}
+          templateTone={templateTone}
+          customerId={customer?.id}
+          catalogueEnabled={Boolean(accountState.account)}
+          avatarId={accountState.account ? avatarId : null}
+          openedLook={openedLook}
+          profile={profile}
+          personalized={personalized}
+          tryOn={{ available: tryOnAvailable && bodyGenerationAllowed, providerLabel }}
+          onBack={() => {
+            setOutfitOpen(false);
+            requestAnimationFrame(() => titleRef.current?.focus());
           }}
-        >
-          <X size={20} />
-        </button>
-        {help ? (
-          <div className="help-content">
-            <span className="eyebrow">WELCOME TO FORME</span>
-            <h2>
-              A familiar face.
-              <br /> A simple starting point.
-            </h2>
-            <ol>
-              <li>
-                <strong>Add customer details.</strong>
-                <p>
-                  Use consented photos and enter height and weight. You can
-                  explore the sample library without photos.
-                </p>
-              </li>
-              <li>
-                <strong>Choose a close body profile.</strong>
-                <p>
-                  The suggestion uses a basic height/weight rule. Staff review
-                  the full-body photo and adjust the profile. Automated
-                  photo-based measurements are not included.
-                </p>
-              </li>
-              <li>
-                <strong>Personalize, review, and download.</strong>
-                <p>
-                  With consent, generate the customer’s face and matching skin
-                  tone on the chosen standard body. Review all exposed skin and
-                  approve before export. Sample downloads are available only in
-                  sessions without customer photos.
-                </p>
-              </li>
-            </ol>
-            <p className="small-footnote">
-              Original photos stay in memory and are cleared on reload or a new session.
-              {accountState.enabled ? "Generated avatars are saved to the signed-in store account with customer consent. Reopen them from another browser using the same account." : "You can explicitly save approved avatars on this device and reuse them for clothing try-on. This local library is not synced across devices."}
-              Keep a downloaded PNG backup.
-            </p>
-          </div>
-        ) : confirmReset ? (
-          <div className="help-content">
-            <h2>Start fresh?</h2>
-            <p>
-              The current photos and generated result will be cleared from this
-              browser session. Saved copies remain in the avatar library.
-              Save or download an approved avatar first if you want to keep it.
-            </p>
-            <div className="dialog-actions">
-              <button
-                className="button secondary"
-                onClick={() => setConfirmReset(false)}
-              >
-                Keep working
-              </button>
-              <button className="button primary" onClick={reset}>
-                Start new session
-              </button>
-            </div>
-          </div>
-        ) : expanded ? (
-          <div className="expanded-preview">
-            {preview}
-            <p>
-              {profile.name} ·{" "}
-              {personalized ? "Personalized avatar" : "Standard sample avatar"}
-            </p>
-          </div>
-        ) : null}
-      </dialog>
-    </div>
-    </div>
-    {approved && !needsCustomerGeneration && <OutfitStudio key={`${session}-${selected}-${templateTone}`} active={outfitOpen} jewelleryEnabled={jewelleryAvailable} templateTone={templateTone} customerId={customer?.id} catalogueEnabled={Boolean(accountState.account)} avatarId={accountState.account ? avatarId : null} openedLook={openedLook} profile={profile} personalized={personalized} tryOn={{ available: tryOnAvailable && bodyGenerationAllowed, providerLabel }} onBack={() => { setOutfitOpen(false); requestAnimationFrame(() => titleRef.current?.focus()); }} onBusy={setExporting}/>}
+          onBusy={setExporting}
+        />
+      )}
     </>
   );
 }

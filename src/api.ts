@@ -22,11 +22,7 @@ export function disconnectStudio() {
   studioToken = "";
 }
 
-export async function requestApi(
-  path: string,
-  init: RequestInit = {},
-  timeoutMs = 10000,
-) {
+export async function requestApi(path: string, init: RequestInit = {}, timeoutMs = 10000) {
   if (!path.startsWith("/api/")) throw new Error("Invalid studio request.");
   if (Capacitor.isNativePlatform() && !studioUrl)
     throw new Error(
@@ -37,13 +33,14 @@ export async function requestApi(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response=await fetch(`${studioUrl}${path}`, {
+    const response = await fetch(`${studioUrl}${path}`, {
       ...init,
       headers,
-      signal: init.signal ? AbortSignal.any([controller.signal,init.signal]) : controller.signal,
+      signal: init.signal ? AbortSignal.any([controller.signal, init.signal]) : controller.signal,
       credentials: Capacitor.isNativePlatform() ? "omit" : "same-origin",
     });
-    if(["/api/personalize","/api/tryon","/api/billing/verify"].includes(path))window.dispatchEvent(new Event("forme-credits-changed"));
+    if (["/api/personalize", "/api/tryon", "/api/billing/verify"].includes(path))
+      window.dispatchEvent(new Event("forme-credits-changed"));
     return response;
   } finally {
     clearTimeout(timer);

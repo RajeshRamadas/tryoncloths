@@ -1,26 +1,43 @@
 const messages = {
-  hands_input: "Use a clear photo of the customer’s own two hands, palms down with all fingers and wrists visible, and mark each finger and wrist. No image-generation request was sent.",
-  face_input: "Use one clear, front-facing customer photo with the full head visible. No image-generation request was sent.",
-  face_check: "The studio could not complete its local face check. No customer avatar was accepted. Check the server installation before trying again.",
-  missing_face: "The generated image did not contain one clearly detectable face. It was rejected and cannot be approved or exported. A provider charge may still apply; no automatic retry was made.",
+  hands_input:
+    "Use a clear photo of the customer’s own two hands, palms down with all fingers and wrists visible, and mark each finger and wrist. No image-generation request was sent.",
+  face_input:
+    "Use one clear, front-facing customer photo with the full head visible. No image-generation request was sent.",
+  face_check:
+    "The studio could not complete its local face check. No customer avatar was accepted. Check the server installation before trying again.",
+  missing_face:
+    "The generated image did not contain one clearly detectable face. It was rejected and cannot be approved or exported. A provider charge may still apply; no automatic retry was made.",
   identity_mismatch: "The result changed the customer's face and was rejected.",
-  portrait_input: "Use a clear customer face photo and an approved full-body avatar PNG. No image-generation request was sent.",
-  framing_changed: "The portrait framing changed or cropped the customer's face. The result was rejected; a provider charge may still apply. No automatic retry was made.",
-  jewellery_input: "Choose a supported jewellery item, placement and matching approved view. No image-generation request was sent.",
-  hands_changed: "The result changed or removed the hands and was rejected. A provider charge may still apply; no automatic retry was made.",
+  portrait_input:
+    "Use a clear customer face photo and an approved full-body avatar PNG. No image-generation request was sent.",
+  framing_changed:
+    "The portrait framing changed or cropped the customer's face. The result was rejected; a provider charge may still apply. No automatic retry was made.",
+  jewellery_input:
+    "Choose a supported jewellery item, placement and matching approved view. No image-generation request was sent.",
+  hands_changed:
+    "The result changed or removed the hands and was rejected. A provider charge may still apply; no automatic retry was made.",
   configuration: "The server's OpenAI key or image-model configuration is missing or invalid.",
-  credentials: "OpenAI rejected the server's API key or access permissions. Check the key, project permissions and any required organization verification for image models.",
-  model: "The configured OpenAI model was not found or is unavailable to this project. Check TRYON_OPENAI_MODEL.",
-  quota: "OpenAI reported a quota or rate limit. Check the OpenAI project's billing and model quota; this is separate from the app's attempt limit.",
-  request: "OpenAI rejected the generation request. Check the image model, its supported inputs and the project's billing or regional requirements.",
-  timeout: "OpenAI did not finish before the request timed out. A timed-out request may still incur a provider charge.",
-  network: "The server could not connect to OpenAI. Check its internet connection and access to api.openai.com.",
+  credentials:
+    "OpenAI rejected the server's API key or access permissions. Check the key, project permissions and any required organization verification for image models.",
+  model:
+    "The configured OpenAI model was not found or is unavailable to this project. Check TRYON_OPENAI_MODEL.",
+  quota:
+    "OpenAI reported a quota or rate limit. Check the OpenAI project's billing and model quota; this is separate from the app's attempt limit.",
+  request:
+    "OpenAI rejected the generation request. Check the image model, its supported inputs and the project's billing or regional requirements.",
+  timeout:
+    "OpenAI did not finish before the request timed out. A timed-out request may still incur a provider charge.",
+  network:
+    "The server could not connect to OpenAI. Check its internet connection and access to api.openai.com.",
   unavailable: "OpenAI is temporarily unavailable. Try again later.",
   blocked: "OpenAI blocked this generation. No customer avatar was returned.",
-  no_image: "OpenAI returned no image. Check that the configured model supports image output; a provider charge may still apply.",
-  invalid_image: "OpenAI returned an unusable image. No customer avatar was created; a provider charge may still apply.",
+  no_image:
+    "OpenAI returned no image. Check that the configured model supports image output; a provider charge may still apply.",
+  invalid_image:
+    "OpenAI returned an unusable image. No customer avatar was created; a provider charge may still apply.",
   response: "OpenAI returned an unreadable response. No customer avatar was created.",
-  unknown: "Customer avatar generation could not be completed. No new customer avatar was created. A timed-out request may still incur a provider charge; retries are never automatic.",
+  unknown:
+    "Customer avatar generation could not be completed. No new customer avatar was created. A timed-out request may still incur a provider charge; retries are never automatic.",
 };
 
 export class ProviderError extends Error {
@@ -28,17 +45,31 @@ export class ProviderError extends Error {
     const safeCode = Object.hasOwn(messages, code) ? code : "unknown";
     super(messages[safeCode]);
     this.code = safeCode;
-    this.providerStatus = Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
+    this.providerStatus =
+      Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
   }
 }
 
 export function providerErrorDetails(error, provider = "openai") {
   // Never expose arbitrary provider bodies, SDK messages, keys, or customer data.
-  const code = error instanceof ProviderError && Object.hasOwn(messages, error.code) ? error.code : "unknown";
-  const message = provider === "gemini"
-    ? messages[code].replaceAll("OpenAI", "Gemini").replaceAll("TRYON_OPENAI_MODEL", "TRYON_GEMINI_MODEL").replaceAll("api.openai.com", "generativelanguage.googleapis.com").replace(" and any required organization verification for image models", " and Google project access")
-    : messages[code];
-  return { code, message, providerStatus: error instanceof ProviderError ? error.providerStatus : null };
+  const code =
+    error instanceof ProviderError && Object.hasOwn(messages, error.code) ? error.code : "unknown";
+  const message =
+    provider === "gemini"
+      ? messages[code]
+          .replaceAll("OpenAI", "Gemini")
+          .replaceAll("TRYON_OPENAI_MODEL", "TRYON_GEMINI_MODEL")
+          .replaceAll("api.openai.com", "generativelanguage.googleapis.com")
+          .replace(
+            " and any required organization verification for image models",
+            " and Google project access",
+          )
+      : messages[code];
+  return {
+    code,
+    message,
+    providerStatus: error instanceof ProviderError ? error.providerStatus : null,
+  };
 }
 
 export async function providerRequest(url, options, fetchImpl = fetch) {
@@ -46,22 +77,41 @@ export async function providerRequest(url, options, fetchImpl = fetch) {
   try {
     response = await fetchImpl(url, options);
   } catch (error) {
-    throw new ProviderError(["TimeoutError", "AbortError"].includes(error?.name) ? "timeout" : "network");
+    throw new ProviderError(
+      ["TimeoutError", "AbortError"].includes(error?.name) ? "timeout" : "network",
+    );
   }
   if (response.ok) return response;
   const status = response.status;
-  let code = status === 401 || status === 403 ? "credentials"
-    : status === 404 ? "model"
-    : status === 429 ? "quota"
-    : status === 408 || status === 504 ? "timeout"
-    : status >= 500 ? "unavailable" : "request";
+  let code =
+    status === 401 || status === 403
+      ? "credentials"
+      : status === 404
+        ? "model"
+        : status === 429
+          ? "quota"
+          : status === 408 || status === 504
+            ? "timeout"
+            : status >= 500
+              ? "unavailable"
+              : "request";
   const body = await response.json().catch(() => null);
   const providerCode = body?.error?.code || body?.error?.type;
   if (providerCode === "invalid_api_key") code = "credentials";
   else if (providerCode === "model_not_found") code = "model";
-  else if (["insufficient_quota", "billing_hard_limit_reached", "billing_not_active"].includes(providerCode)) code = "quota";
+  else if (
+    ["insufficient_quota", "billing_hard_limit_reached", "billing_not_active"].includes(
+      providerCode,
+    )
+  )
+    code = "quota";
   else if (providerCode === "content_policy_violation") code = "blocked";
-  if (body?.error?.details?.some(detail => ["API_KEY_INVALID", "API_KEY_EXPIRED"].includes(detail.reason))) code = "credentials";
+  if (
+    body?.error?.details?.some((detail) =>
+      ["API_KEY_INVALID", "API_KEY_EXPIRED"].includes(detail.reason),
+    )
+  )
+    code = "credentials";
   throw new ProviderError(code, status);
 }
 
@@ -69,27 +119,48 @@ export async function providerJson(response) {
   try {
     return await response.json();
   } catch (error) {
-    throw new ProviderError(["TimeoutError", "AbortError"].includes(error?.name) ? "timeout" : "response");
+    throw new ProviderError(
+      ["TimeoutError", "AbortError"].includes(error?.name) ? "timeout" : "response",
+    );
   }
 }
 
 export async function checkOpenAIAccess({ apiKey, model = "gpt-image-1.5", fetchImpl = fetch }) {
-  if (!apiKey || !/^(gpt-image-[a-zA-Z0-9.-]+|chatgpt-image-latest)$/.test(model)) throw new ProviderError("configuration");
-  const response = await providerRequest(`https://api.openai.com/v1/models/${model}`, {
-    method: "GET",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    signal: AbortSignal.timeout(15000),
-  }, fetchImpl);
+  if (!apiKey || !/^(gpt-image-[a-zA-Z0-9.-]+|chatgpt-image-latest)$/.test(model))
+    throw new ProviderError("configuration");
+  const response = await providerRequest(
+    `https://api.openai.com/v1/models/${model}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(15000),
+    },
+    fetchImpl,
+  );
   const data = await providerJson(response);
   if (data?.object !== "model" || typeof data?.id !== "string") throw new ProviderError("response");
   return { model, providerStatus: response.status, modelAccessible: true };
 }
 
-export async function checkGeminiAccess({ apiKey, model = "gemini-2.5-flash-image", fetchImpl = fetch }) {
+export async function checkGeminiAccess({
+  apiKey,
+  model = "gemini-2.5-flash-image",
+  fetchImpl = fetch,
+}) {
   if (!apiKey || !/^[a-zA-Z0-9.-]+$/.test(model)) throw new ProviderError("configuration");
-  const response = await providerRequest(`https://generativelanguage.googleapis.com/v1beta/models/${model}`, {
-    method: "GET", headers: { "x-goog-api-key": apiKey }, signal: AbortSignal.timeout(15000),
-  }, fetchImpl);
+  const response = await providerRequest(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}`,
+    {
+      method: "GET",
+      headers: { "x-goog-api-key": apiKey },
+      signal: AbortSignal.timeout(15000),
+    },
+    fetchImpl,
+  );
   const data = await providerJson(response);
-  return { model, providerStatus: response.status, supportsGenerateContent: data?.supportedGenerationMethods?.includes("generateContent") === true };
+  return {
+    model,
+    providerStatus: response.status,
+    supportsGenerateContent: data?.supportedGenerationMethods?.includes("generateContent") === true,
+  };
 }

@@ -1,36 +1,221 @@
-import {openStoreTools} from '../helpers/studio-navigation.js';
-import {test,expect} from '@playwright/test';
-import {mkdtemp,rm} from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import {createHmac} from 'node:crypto';
-import {AccountStore} from '../helpers/pilot-accounts.js';
-import {createApp,standardAvatar} from '../../server/app.js';
-async function setup(page,run){
- const dir=await mkdtemp(path.join(os.tmpdir(),'forme-wa-browser-')),store=new AccountStore(dir);
- const owner=await store.register({name:'Lookbook store',email:'wa@example.test',password:'test-password-long'});
- const customer=store.customers.save(owner,{name:'Asha',phoneE164:'9876543210',marketingOptIn:true,whatsappConsent:true});
- const image=`data:image/png;base64,${(await standardAvatar('regular')).toString('base64')}`;
- const av=await store.save(owner,{image,customerId:customer.id,name:'Regular avatar',profileId:'regular',heightCm:175,weightKg:72,source:'imported'});
- await store.saveLook(owner,{image,avatarId:av.id,name:'Blue outfit',garments:['Blue shirt']});
- await store.garments.save(owner,{image,name:'Blue store shirt',garmentType:'shirt',variant:'blue',sourceUrl:''});
- let sends=0,ai=0,lastPayload;
- const options={secretKey:'ab'.repeat(32),appSecret:'app-secret',verifyToken:'verify-secret',publicUrl:'https://studio.example.test',fetchImpl:async(url,init)=>{if(url.includes('/messages')){sends++;lastPayload=JSON.parse(init.body);return new Response(JSON.stringify({messages:[{id:'wamid_'+sends}]}));}return new Response(JSON.stringify(url.includes('/phone_numbers')?{data:[{id:'123456789'}]}:{id:'123456789'}));}};
- const server=createApp({accountStore:store,accessMode:'public',apiKey:'test',rateLimit:false,whatsappOptions:options,tryOn:async()=>{ai++;return image;}}).listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const api=`http://127.0.0.1:${server.address().port}`;
- const handler=async route=>{const u=new URL(route.request().url()),response=await route.fetch({url:api+u.pathname+u.search,headers:{...route.request().headers(),host:new URL(api).host,origin:api}});await route.fulfill({response});};await page.route('**/api/**',handler);
- try{await page.goto('/');await page.getByLabel('Account email').fill('wa@example.test');await page.getByLabel('Account password').fill('test-password-long');await page.getByRole('button',{name:'Sign in',exact:true}).click();await openStoreTools(page);await page.getByRole('link',{name:'WhatsApp',exact:true}).click();await expect(page.getByRole('heading',{name:'WhatsApp lookbooks'})).toBeVisible();await run({store,owner,customer,api,sends:()=>sends,ai:()=>ai,payload:()=>lastPayload});}
- finally{await page.unrouteAll({behavior:'wait'});await new Promise(r=>server.close(r));store.close();await rm(dir,{recursive:true,force:true});}
+import { openStoreTools } from "../helpers/studio-navigation.js";
+import { test, expect } from "@playwright/test";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { createHmac } from "node:crypto";
+import { AccountStore } from "../helpers/pilot-accounts.js";
+import { createApp, standardAvatar } from "../../server/app.js";
+async function setup(page, run) {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "forme-wa-browser-")),
+    store = new AccountStore(dir);
+  const owner = await store.register({
+    name: "Lookbook store",
+    email: "wa@example.test",
+    password: "test-password-long",
+  });
+  const customer = store.customers.save(owner, {
+    name: "Asha",
+    phoneE164: "9876543210",
+    marketingOptIn: true,
+    whatsappConsent: true,
+  });
+  const image = `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;
+  const av = await store.save(owner, {
+    image,
+    customerId: customer.id,
+    name: "Regular avatar",
+    profileId: "regular",
+    heightCm: 175,
+    weightKg: 72,
+    source: "imported",
+  });
+  await store.saveLook(owner, {
+    image,
+    avatarId: av.id,
+    name: "Blue outfit",
+    garments: ["Blue shirt"],
+  });
+  await store.garments.save(owner, {
+    image,
+    name: "Blue store shirt",
+    garmentType: "shirt",
+    variant: "blue",
+    sourceUrl: "",
+  });
+  let sends = 0,
+    ai = 0,
+    lastPayload;
+  const options = {
+    secretKey: "ab".repeat(32),
+    appSecret: "app-secret",
+    verifyToken: "verify-secret",
+    publicUrl: "https://studio.example.test",
+    fetchImpl: async (url, init) => {
+      if (url.includes("/messages")) {
+        sends++;
+        lastPayload = JSON.parse(init.body);
+        return new Response(JSON.stringify({ messages: [{ id: "wamid_" + sends }] }));
+      }
+      return new Response(
+        JSON.stringify(
+          url.includes("/phone_numbers") ? { data: [{ id: "123456789" }] } : { id: "123456789" },
+        ),
+      );
+    },
+  };
+  const server = createApp({
+    accountStore: store,
+    accessMode: "public",
+    apiKey: "test",
+    rateLimit: false,
+    whatsappOptions: options,
+    tryOn: async () => {
+      ai++;
+      return image;
+    },
+  }).listen(0, "127.0.0.1");
+  await new Promise((r) => server.once("listening", r));
+  const api = `http://127.0.0.1:${server.address().port}`;
+  const handler = async (route) => {
+    const u = new URL(route.request().url()),
+      response = await route.fetch({
+        url: api + u.pathname + u.search,
+        headers: { ...route.request().headers(), host: new URL(api).host, origin: api },
+      });
+    await route.fulfill({ response });
+  };
+  await page.route("**/api/**", handler);
+  try {
+    await page.goto("/");
+    await page.getByLabel("Account email").fill("wa@example.test");
+    await page.getByLabel("Account password").fill("test-password-long");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await openStoreTools(page);
+    await page.getByRole("link", { name: "WhatsApp", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "WhatsApp lookbooks" })).toBeVisible();
+    await run({
+      store,
+      owner,
+      customer,
+      api,
+      sends: () => sends,
+      ai: () => ai,
+      payload: () => lastPayload,
+    });
+  } finally {
+    await page.unrouteAll({ behavior: "wait" });
+    await new Promise((r) => server.close(r));
+    store.close();
+    await rm(dir, { recursive: true, force: true });
+  }
 }
-async function connect(page){await page.getByLabel('Meta phone number ID').fill('123456789');await page.getByLabel('WhatsApp Business account ID').fill('987654321');await page.getByLabel('Business access token').fill('test-private-token');await page.getByRole('button',{name:'Verify and connect WhatsApp',exact:true}).click();await expect(page.getByText('WhatsApp Business number verified and connected.')).toBeVisible();await expect(page.getByLabel('Business access token')).toHaveValue('');}
+async function connect(page) {
+  await page.getByLabel("Meta phone number ID").fill("123456789");
+  await page.getByLabel("WhatsApp Business account ID").fill("987654321");
+  await page.getByLabel("Business access token").fill("test-private-token");
+  await page.getByRole("button", { name: "Verify and connect WhatsApp", exact: true }).click();
+  await expect(page.getByText("WhatsApp Business number verified and connected.")).toBeVisible();
+  await expect(page.getByLabel("Business access token")).toHaveValue("");
+}
 
-test('owner connects securely, sends a saved look and sees signed delivery and STOP opt-out effects on mobile',async({page})=>setup(page,async({store,owner,customer,api,sends,payload})=>{
- await page.setViewportSize({width:390,height:844});await connect(page);await page.getByLabel('Lookbook customer').selectOption(customer.id);await page.getByLabel('Blue outfit',{exact:true}).check();await page.getByLabel('The customer agrees to publish and receive these outfits through WhatsApp.').check();await page.getByRole('button',{name:'Send saved lookbook',exact:true}).click();await expect(page.getByText('Meta accepted the message. Delivery confirmation will appear in history.')).toBeVisible();expect(sends()).toBe(1);expect(payload().template.name).toBe('look_share');
- const event=JSON.stringify({object:'whatsapp_business_account',entry:[{changes:[{value:{metadata:{phone_number_id:'123456789'},statuses:[{id:'wamid_1',status:'delivered'}],messages:[{id:'stop-1',from:'919876543210',text:{body:'STOP'}}]}}]}]});await fetch(api+'/api/whatsapp/webhook',{method:'POST',headers:{'Content-Type':'application/json','X-Hub-Signature-256':'sha256='+createHmac('sha256','app-secret').update(event).digest('hex')},body:event});
- await page.getByRole('button',{name:'Refresh WhatsApp status'}).click();await expect(page.getByText(/look_share · accepted · delivered/)).toBeVisible();expect(store.customers.get(owner,customer.id).marketingOptIn).toBe(false);await expect(page.getByText(/Marketing permission is not recorded/)).toBeVisible();await page.screenshot({path:'test-results/whatsapp-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-}));
+test("owner connects securely, sends a saved look and sees signed delivery and STOP opt-out effects on mobile", async ({
+  page,
+}) =>
+  setup(page, async ({ store, owner, customer, api, sends, payload }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await connect(page);
+    await page.getByLabel("Lookbook customer").selectOption(customer.id);
+    await page.getByLabel("Blue outfit", { exact: true }).check();
+    await page
+      .getByLabel("The customer agrees to publish and receive these outfits through WhatsApp.")
+      .check();
+    await page.getByRole("button", { name: "Send saved lookbook", exact: true }).click();
+    await expect(
+      page.getByText("Meta accepted the message. Delivery confirmation will appear in history."),
+    ).toBeVisible();
+    expect(sends()).toBe(1);
+    expect(payload().template.name).toBe("look_share");
+    const event = JSON.stringify({
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: "123456789" },
+                statuses: [{ id: "wamid_1", status: "delivered" }],
+                messages: [{ id: "stop-1", from: "919876543210", text: { body: "STOP" } }],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    await fetch(api + "/api/whatsapp/webhook", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Hub-Signature-256":
+          "sha256=" + createHmac("sha256", "app-secret").update(event).digest("hex"),
+      },
+      body: event,
+    });
+    await page.getByRole("button", { name: "Refresh WhatsApp status" }).click();
+    await expect(page.getByText(/look_share · accepted · delivered/)).toBeVisible();
+    expect(store.customers.get(owner, customer.id).marketingOptIn).toBe(false);
+    await expect(page.getByText(/Marketing permission is not recorded/)).toBeVisible();
+    await page.screenshot({ path: "test-results/whatsapp-mobile.png", fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+  }));
 
-test('new arrivals quote credits, generate once, require review and enforce weekly marketing cap',async({page})=>setup(page,async({customer,sends,ai,store,owner})=>{
- await connect(page);const section=page.locator('section').filter({has:page.getByRole('heading',{name:'New arrivals on you',exact:true})});await section.getByLabel('Asha',{exact:true}).check();await section.getByLabel('Blue store shirt',{exact:true}).check();await section.getByRole('button',{name:'Check AI credit cost'}).click();await expect(section.getByText(/Up to 1 AI credits/)).toBeVisible();await section.getByLabel('The selected customers agree to reuse their saved avatars with the AI provider for these new-arrival previews and save the results.').check();await section.getByRole('button',{name:'Prepare new-arrival campaign'}).click();await expect(section.getByRole('button',{name:'Generate outfit for Asha'})).toBeVisible();await section.getByRole('button',{name:'Generate outfit for Asha'}).click();await expect(section.getByAltText('New arrival for Asha')).toBeVisible();expect(ai()).toBe(1);await expect(section.getByRole('button',{name:'Send new arrivals to Asha'})).toBeDisabled();await section.getByLabel('I approve this customer’s face, body, clothing and skin tone.').check();await section.getByLabel('Asha agrees to publish and receive this new-arrival lookbook.').check();await section.getByRole('button',{name:'Send new arrivals to Asha'}).click();await expect(page.getByText('Meta accepted the message. Delivery confirmation will appear in history.')).toBeVisible();expect(sends()).toBe(1);
- await section.getByLabel('Asha agrees to publish and receive this new-arrival lookbook.').check();await section.getByRole('button',{name:'Send new arrivals to Asha'}).click();await expect(page.getByRole('alert')).toContainText('every 7 days');expect(sends()).toBe(1);expect(ai()).toBe(1);
- await page.reload();await expect(page.getByLabel('Saved campaigns')).toBeVisible();const key=store.db.prepare('SELECT id FROM whatsapp_campaigns').get().id;await page.getByLabel('Saved campaigns').selectOption(key);await expect(page.getByAltText('New arrival for Asha')).toBeVisible();expect(ai()).toBe(1);
-}));
+test("new arrivals quote credits, generate once, require review and enforce weekly marketing cap", async ({
+  page,
+}) =>
+  setup(page, async ({ customer, sends, ai, store, owner }) => {
+    await connect(page);
+    const section = page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: "New arrivals on you", exact: true }) });
+    await section.getByLabel("Asha", { exact: true }).check();
+    await section.getByLabel("Blue store shirt", { exact: true }).check();
+    await section.getByRole("button", { name: "Check AI credit cost" }).click();
+    await expect(section.getByText(/Up to 1 AI credits/)).toBeVisible();
+    await section
+      .getByLabel(
+        "The selected customers agree to reuse their saved avatars with the AI provider for these new-arrival previews and save the results.",
+      )
+      .check();
+    await section.getByRole("button", { name: "Prepare new-arrival campaign" }).click();
+    await expect(section.getByRole("button", { name: "Generate outfit for Asha" })).toBeVisible();
+    await section.getByRole("button", { name: "Generate outfit for Asha" }).click();
+    await expect(section.getByAltText("New arrival for Asha")).toBeVisible();
+    expect(ai()).toBe(1);
+    await expect(section.getByRole("button", { name: "Send new arrivals to Asha" })).toBeDisabled();
+    await section
+      .getByLabel("I approve this customer’s face, body, clothing and skin tone.")
+      .check();
+    await section
+      .getByLabel("Asha agrees to publish and receive this new-arrival lookbook.")
+      .check();
+    await section.getByRole("button", { name: "Send new arrivals to Asha" }).click();
+    await expect(
+      page.getByText("Meta accepted the message. Delivery confirmation will appear in history."),
+    ).toBeVisible();
+    expect(sends()).toBe(1);
+    await section
+      .getByLabel("Asha agrees to publish and receive this new-arrival lookbook.")
+      .check();
+    await section.getByRole("button", { name: "Send new arrivals to Asha" }).click();
+    await expect(page.getByRole("alert")).toContainText("every 7 days");
+    expect(sends()).toBe(1);
+    expect(ai()).toBe(1);
+    await page.reload();
+    await expect(page.getByLabel("Saved campaigns")).toBeVisible();
+    const key = store.db.prepare("SELECT id FROM whatsapp_campaigns").get().id;
+    await page.getByLabel("Saved campaigns").selectOption(key);
+    await expect(page.getByAltText("New arrival for Asha")).toBeVisible();
+    expect(ai()).toBe(1);
+  }));

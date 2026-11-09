@@ -4,9 +4,11 @@ import { customerPhotos } from "./customer-photos.js";
 // Exercise the Android UI/bridge contract without pretending these are device tests.
 export async function nativeBridge(page, photos) {
   if (!photos) {
-    photos = await Promise.all([customerPhotos[0].face, customerPhotos[0].body].map(async path =>
-      `data:image/jpeg;base64,${(await readFile(path)).toString("base64")}`,
-    ));
+    photos = await Promise.all(
+      [customerPhotos[0].face, customerPhotos[0].body].map(
+        async (path) => `data:image/jpeg;base64,${(await readFile(path)).toString("base64")}`,
+      ),
+    );
   }
   await page.addInitScript(
     ({ photos }) => {
@@ -37,13 +39,11 @@ export async function nativeBridge(page, photos) {
         ],
         nativePromise: async (plugin, method, options) => {
           window.__nativeCalls.push({ plugin, method, options });
-          if (window.__nativeErrors[plugin])
-            throw new Error(window.__nativeErrors[plugin]);
+          if (window.__nativeErrors[plugin]) throw new Error(window.__nativeErrors[plugin]);
           if (plugin === "Camera") return { dataUrl: photos[nextPhoto++ % photos.length] };
           if (method === "writeFile")
             return { uri: "file:///cache/forme-exports/approved-avatar.png" };
-          if (method === "removeListener")
-            delete window.__nativeListeners[options.callbackId];
+          if (method === "removeListener") delete window.__nativeListeners[options.callbackId];
           return {};
         },
         nativeCallback: (plugin, method, options, callback) => {

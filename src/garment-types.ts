@@ -1,7 +1,19 @@
 export const garmentChoices = [
-  ["dress","Dress"], ["skirt","Skirt"], ["saree","Saree"], ["lehenga","Lehenga"], ["blouse","Blouse"],
-  ["shirt", "Shirt"], ["tshirt", "T-shirt"], ["top", "Top"], ["jacket", "Jacket"], ["kurta", "Kurta"],
-  ["trousers", "Trousers"], ["jeans", "Jeans"], ["shorts", "Shorts"], ["shoes", "Shoes"], ["outfit", "Full outfit"],
+  ["dress", "Dress"],
+  ["skirt", "Skirt"],
+  ["saree", "Saree"],
+  ["lehenga", "Lehenga"],
+  ["blouse", "Blouse"],
+  ["shirt", "Shirt"],
+  ["tshirt", "T-shirt"],
+  ["top", "Top"],
+  ["jacket", "Jacket"],
+  ["kurta", "Kurta"],
+  ["trousers", "Trousers"],
+  ["jeans", "Jeans"],
+  ["shorts", "Shorts"],
+  ["shoes", "Shoes"],
+  ["outfit", "Full outfit"],
 ] as const;
 export type GarmentType = (typeof garmentChoices)[number][0];
 

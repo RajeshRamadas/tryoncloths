@@ -1,44 +1,417 @@
-import {test,expect} from '@playwright/test';
-import {mkdtemp,rm,readFile} from 'node:fs/promises';
-import {tmpdir} from 'node:os';
-import {join} from 'node:path';
-import sharp from 'sharp';
-import {AccountStore} from '../helpers/pilot-accounts.js';
-import {createApp,standardAvatar} from '../../server/app.js';
-import {handsTemplate} from '../../server/hands-templates.js';
-const url=b=>'data:image/png;base64,'+b.toString('base64'),face=await readFile(new URL('../fixtures/customers/red-plaid-face.jpg',import.meta.url)),portrait=await sharp({create:{width:1152,height:1536,channels:3,background:'#dedbd5'}}).composite([{input:await sharp(face).extract({left:20,top:0,width:160,height:210}).resize(1020,1339).png().toBuffer(),left:66,top:80}]).png().toBuffer();
-async function fixture(page,run,{enabled=true}={}){
-  const directory=await mkdtemp(join(tmpdir(),'forme-j11-browser-')),store=new AccountStore(directory),account=await store.register({email:'j11@example.test',name:'Jewellery store',password:'test-password-long'}),customer=store.customers.save(account,{name:'Asha',phoneE164:'9876543210',measurements:{heightCm:175,weightKg:72,chestCm:98,ringSizeIn:14}}),avatar=await store.save(account,{image:url(await standardAvatar('regular')),customerId:customer.id,name:'Asha avatar',profileId:'regular',heightCm:175,weightKg:72,source:'imported'}),hands=await handsTemplate('male','medium');
-  for(const kind of ['portrait','hands']){const c=store.views.context(account,avatar.id,kind),image=url(kind==='hands'?hands.png:portrait),receipt=store.views.receipt(account,avatar.id,kind,c,image,{tone:'medium',sourceKind:kind==='hands'?'template':'generated'});await store.views.approve(account,avatar.id,kind,{image,receipt,reviewed:true,storageConsent:true});}
-  let anchor={anchors:{neckBase:{x:575,y:1150}},pxPerMm:4,width:1152,height:1536};store.views.anchors=async()=>anchor;
-  for(const [name,type,extra,color] of [['Gold ring','ring',{ringSizeIn:14},'#c6a346'],['Gold bangles','bangles',{bangleSize:'2.4'},'#d2b659'],['Princess chain','necklace',{lengthCm:45},'#bb9633']])await store.garments.save(account,{category:'jewellery',name,garmentType:type,attributes:{metal:'yellow_gold',...extra},image:url(await sharp(Buffer.from(`<svg width="240" height="240"><rect width="100%" height="100%" fill="#eeeae1"/><circle cx="120" cy="120" r="65" fill="none" stroke="${color}" stroke-width="16"/></svg>`)).png().toBuffer())},{jewelleryEnabled:true});
-  let calls=0;const app=createApp({accountStore:store,accessMode:'public',provider:'gemini',apiKey:'test-only',jewelleryEnabled:enabled,rateLimit:false,jewelleryOptions:{computeFullGuide:async()=>({width:1024,height:1536,anchors:{neckBase:{x:512,y:305}},pxPerMm:.6}),generate:async()=>{calls++;throw new Error('Unexpected provider request');}}}),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const api='http://127.0.0.1:'+server.address().port;
-  await page.route('**/api/**',async route=>{const u=new URL(route.request().url());try{const response=await route.fetch({url:api+u.pathname+u.search,headers:{...route.request().headers(),host:new URL(api).host,origin:api}});await route.fulfill({response});}catch{await route.abort().catch(()=>{});}});
-  try{await page.setViewportSize({width:390,height:844});await page.goto('/');await page.getByLabel('Account email').fill('j11@example.test');await page.getByLabel('Account password').fill('test-password-long');await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.getByRole('button',{name:'Sign out',exact:true})).toBeVisible();await run({store,account,customer,avatar,calls:()=>calls,setAnchor:value=>{anchor=value;}});}finally{await page.unrouteAll({behavior:'wait'}).catch(()=>{});await new Promise(r=>server.close(r));store.close();await rm(directory,{recursive:true,force:true});}
+import { test, expect } from "@playwright/test";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import sharp from "sharp";
+import { AccountStore } from "../helpers/pilot-accounts.js";
+import { createApp, standardAvatar } from "../../server/app.js";
+import { handsTemplate } from "../../server/hands-templates.js";
+const url = (b) => "data:image/png;base64," + b.toString("base64"),
+  face = await readFile(new URL("../fixtures/customers/red-plaid-face.jpg", import.meta.url)),
+  portrait = await sharp({
+    create: { width: 1152, height: 1536, channels: 3, background: "#dedbd5" },
+  })
+    .composite([
+      {
+        input: await sharp(face)
+          .extract({ left: 20, top: 0, width: 160, height: 210 })
+          .resize(1020, 1339)
+          .png()
+          .toBuffer(),
+        left: 66,
+        top: 80,
+      },
+    ])
+    .png()
+    .toBuffer();
+async function fixture(page, run, { enabled = true } = {}) {
+  const directory = await mkdtemp(join(tmpdir(), "forme-j11-browser-")),
+    store = new AccountStore(directory),
+    account = await store.register({
+      email: "j11@example.test",
+      name: "Jewellery store",
+      password: "test-password-long",
+    }),
+    customer = store.customers.save(account, {
+      name: "Asha",
+      phoneE164: "9876543210",
+      measurements: { heightCm: 175, weightKg: 72, chestCm: 98, ringSizeIn: 14 },
+    }),
+    avatar = await store.save(account, {
+      image: url(await standardAvatar("regular")),
+      customerId: customer.id,
+      name: "Asha avatar",
+      profileId: "regular",
+      heightCm: 175,
+      weightKg: 72,
+      source: "imported",
+    }),
+    hands = await handsTemplate("male", "medium");
+  for (const kind of ["portrait", "hands"]) {
+    const c = store.views.context(account, avatar.id, kind),
+      image = url(kind === "hands" ? hands.png : portrait),
+      receipt = store.views.receipt(account, avatar.id, kind, c, image, {
+        tone: "medium",
+        sourceKind: kind === "hands" ? "template" : "generated",
+      });
+    await store.views.approve(account, avatar.id, kind, {
+      image,
+      receipt,
+      reviewed: true,
+      storageConsent: true,
+    });
+  }
+  let anchor = {
+    anchors: { neckBase: { x: 575, y: 1150 } },
+    pxPerMm: 4,
+    width: 1152,
+    height: 1536,
+  };
+  store.views.anchors = async () => anchor;
+  for (const [name, type, extra, color] of [
+    ["Gold ring", "ring", { ringSizeIn: 14 }, "#c6a346"],
+    ["Gold bangles", "bangles", { bangleSize: "2.4" }, "#d2b659"],
+    ["Princess chain", "necklace", { lengthCm: 45 }, "#bb9633"],
+  ])
+    await store.garments.save(
+      account,
+      {
+        category: "jewellery",
+        name,
+        garmentType: type,
+        attributes: { metal: "yellow_gold", ...extra },
+        image: url(
+          await sharp(
+            Buffer.from(
+              `<svg width="240" height="240"><rect width="100%" height="100%" fill="#eeeae1"/><circle cx="120" cy="120" r="65" fill="none" stroke="${color}" stroke-width="16"/></svg>`,
+            ),
+          )
+            .png()
+            .toBuffer(),
+        ),
+      },
+      { jewelleryEnabled: true },
+    );
+  let calls = 0;
+  const app = createApp({
+      accountStore: store,
+      accessMode: "public",
+      provider: "gemini",
+      apiKey: "test-only",
+      jewelleryEnabled: enabled,
+      rateLimit: false,
+      jewelleryOptions: {
+        computeFullGuide: async () => ({
+          width: 1024,
+          height: 1536,
+          anchors: { neckBase: { x: 512, y: 305 } },
+          pxPerMm: 0.6,
+        }),
+        generate: async () => {
+          calls++;
+          throw new Error("Unexpected provider request");
+        },
+      },
+    }),
+    server = app.listen(0, "127.0.0.1");
+  await new Promise((r) => server.once("listening", r));
+  const api = "http://127.0.0.1:" + server.address().port;
+  await page.route("**/api/**", async (route) => {
+    const u = new URL(route.request().url());
+    try {
+      const response = await route.fetch({
+        url: api + u.pathname + u.search,
+        headers: { ...route.request().headers(), host: new URL(api).host, origin: api },
+      });
+      await route.fulfill({ response });
+    } catch {
+      await route.abort().catch(() => {});
+    }
+  });
+  try {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    await page.getByLabel("Account email").fill("j11@example.test");
+    await page.getByLabel("Account password").fill("test-password-long");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+    await run({
+      store,
+      account,
+      customer,
+      avatar,
+      calls: () => calls,
+      setAnchor: (value) => {
+        anchor = value;
+      },
+    });
+  } finally {
+    await page.unrouteAll({ behavior: "wait" }).catch(() => {});
+    await new Promise((r) => server.close(r));
+    store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
 }
-async function studio(page,avatar){await page.goto('/jewellery?avatar='+avatar.id);await expect(page.getByRole('heading',{name:'Try jewellery.',exact:true})).toBeVisible();}
-const review=page=>page.getByLabel('I have checked the customer, complexion, proportions and jewellery placement in this preview.',{exact:true});
-const consent=page=>page.getByLabel('The customer agrees to send this avatar view and jewellery product photo to Google Gemini. A new preview uses 1 AI credit; an approved exact match is reused free.',{exact:true});
+async function studio(page, avatar) {
+  await page.goto("/jewellery?avatar=" + avatar.id);
+  await expect(page.getByRole("heading", { name: "Try jewellery.", exact: true })).toBeVisible();
+}
+const review = (page) =>
+  page.getByLabel(
+    "I have checked the customer, complexion, proportions and jewellery placement in this preview.",
+    { exact: true },
+  );
+const consent = (page) =>
+  page.getByLabel(
+    "The customer agrees to send this avatar view and jewellery product photo to Google Gemini. A new preview uses 1 AI credit; an approved exact match is reused free.",
+    { exact: true },
+  );
 
-test('customer profile records millimetres and string bangle sizes without losing clothing measurements',async({page})=>fixture(page,async({store,account,customer,calls})=>{
-  await page.getByLabel('Customer mobile number',{exact:true}).fill('987');await page.getByRole('button',{name:'Find customer',exact:true}).click();await page.getByRole('button',{name:'Asha · +919876543210',exact:true}).click();await page.getByRole('button',{name:'Edit customer',exact:true}).click();await page.getByText('Optional jewellery measurements',{exact:true}).click();await page.getByLabel('Finger circumference (mm)',{exact:true}).fill('54');await page.getByLabel('Existing ring inner diameter (mm)',{exact:true}).fill('17.2');await page.getByLabel('Hand circumference at widest knuckles (mm)',{exact:true}).fill('209.5');await page.getByLabel('Known Indian bangle size',{exact:true}).selectOption('2.10');await page.getByRole('button',{name:'Save customer',exact:true}).click();await expect(page.getByLabel('Finger circumference (mm)',{exact:true})).toHaveCount(0);const saved=store.customers.get(account,customer.id).measurements;expect(saved.chestCm).toBe(98);expect(saved.fingerCircumferenceMm).toBe(54);expect(saved.ringSizeIn).toBe(14);expect(saved.bangleSizeIn).toBe('2.10');expect(calls()).toBe(0);
-}));
-test('ring/bangle help is advisory, saves under the linked customer, survives reload and never uses AI or changes catalogue sizes',async({page})=>fixture(page,async({store,account,customer,avatar,calls})=>{
-  const before=store.billing.balance(account.org);await studio(page,avatar);await page.getByRole('button',{name:/^Gold ring/}).click();await expect(page.getByText('Suggested Indian ring size 14 · Medium confidence',{exact:true})).toBeVisible();await page.getByText('Customer measurements · Asha',{exact:true}).click();await page.getByLabel('Known Indian ring size',{exact:true}).fill('');await page.getByLabel('Finger circumference (mm)',{exact:true}).fill('60');await expect(page.getByText('Suggested Indian ring size 20 · Low confidence',{exact:true})).toBeVisible();await expect(page.getByText(/Catalogue size 14 differs/)).toBeVisible();await review(page).check();await consent(page).check();await expect(page.getByRole('button',{name:'Try jewellery — up to 1 AI credit',exact:true})).toBeEnabled();
-  await page.getByLabel('Known Indian bangle size',{exact:true}).selectOption('2.10');await page.getByLabel('Hand circumference at widest knuckles (mm)',{exact:true}).fill('209.5');await page.getByLabel('The customer agrees to save these jewellery measurements to their profile.',{exact:true}).check();await page.getByRole('button',{name:'Save jewellery measurements',exact:true}).click();await expect(page.getByText('Jewellery measurements saved to the customer profile. No AI credit used.',{exact:true})).toBeVisible();expect(store.customers.get(account,customer.id).measurements.chestCm).toBe(98);expect(store.customers.get(account,customer.id).measurements.bangleSizeIn).toBe('2.10');
-  await page.reload();await page.getByRole('button',{name:/^Gold ring/}).click();await expect(page.getByText('Suggested Indian ring size 20 · Low confidence',{exact:true})).toBeVisible();await page.getByRole('button',{name:/^Gold bangles/}).click();await expect(page.getByText('Suggested bangle size 2.10 · Medium confidence',{exact:true})).toBeVisible();await expect(page.getByText(/Catalogue size 2.4 differs/)).toBeVisible();await review(page).check();await consent(page).check();await expect(page.getByRole('button',{name:'Try jewellery — up to 1 AI credit',exact:true})).toBeEnabled();expect(store.garments.list(account,{category:'jewellery',jewelleryEnabled:true}).find(i=>i.name==='Gold bangles').attributes.bangleSize).toBe('2.4');expect(calls()).toBe(0);expect(store.billing.balance(account.org)).toBe(before);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.locator('.jewellery-size-help').screenshot({path:'test-results/jewellery-size-help-mobile.png'});
-}));
-test('portrait and full-body necklace guides follow saved anchors, show real-length labels and make no provider request',async({page})=>fixture(page,async({store,account,avatar,setAnchor,calls})=>{
-  const before=store.billing.balance(account.org);await studio(page,avatar);await page.getByRole('button',{name:/^Princess chain/}).click();await page.getByRole('button',{name:'Show necklace length guide — free',exact:true}).click();await expect(page.getByRole('img',{name:'Illustrative necklace length guide',exact:true})).toBeVisible();const path=page.locator('[data-guide="princess"]');await expect(path).toHaveAttribute('transform','translate(575 1150) rotate(0)');await expect(page.getByText('Selected piece · 45 cm',{exact:true})).toBeVisible();await expect(page.getByText('Opera · 80 cm · extends below this view',{exact:true})).toBeVisible();await page.locator('.jewellery-necklace-guide').screenshot({path:'test-results/necklace-guide-portrait-mobile.png'});
-  setAnchor({anchors:{neckBase:{x:610,y:1100}},pxPerMm:4,width:1152,height:1536});await page.reload();await page.getByRole('button',{name:'Show necklace length guide — free',exact:true}).click();await expect(page.locator('[data-guide="princess"]')).toHaveAttribute('transform','translate(610 1100) rotate(0)');await page.getByRole('button',{name:'Full body view',exact:true}).click();await page.getByRole('button',{name:'Show necklace length guide — free',exact:true}).click();await expect(page.locator('[data-guide="princess"]')).toHaveAttribute('transform','translate(512 305) rotate(0)');await expect(page.getByText('Opera · 80 cm',{exact:true})).toBeVisible();await page.getByLabel('Matinee · 60 cm',{exact:true}).uncheck();await expect(page.locator('[data-guide="matinee"]')).toHaveCount(0);expect(calls()).toBe(0);expect(store.billing.balance(account.org)).toBe(before);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.locator('.jewellery-necklace-guide').screenshot({path:'test-results/necklace-guide-full-mobile.png'});await page.setViewportSize({width:1440,height:1100});await page.screenshot({path:'test-results/jewellery-sizing-desktop.png',fullPage:true});
-}));
-test('ending a session clears sizing and prevents late guide results; disabled pilots hide the new profile fields',async({page})=>{
-  await fixture(page,async({store,avatar,calls})=>{await studio(page,avatar);let enter,release;const started=new Promise(r=>enter=r),gate=new Promise(r=>release=r);await page.route('**/api/jewellery/necklace-guide?*',async route=>{enter();await gate;try{await route.fulfill({status:200,json:{width:1152,height:1536,anchors:{neckBase:{x:575,y:1100}},pxPerMm:3,warning:'Test guide'}});}catch{}});try{await page.getByRole('button',{name:'Show necklace length guide — free',exact:true}).click();await started;const cookie=(await page.context().cookies()).find(c=>c.name==='forme_session');store.logout(cookie.value);await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await expect(page.getByRole('alert')).toContainText('session ended or changed');release();await expect(page.getByRole('img',{name:'Illustrative necklace length guide',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Show necklace length guide — free',exact:true})).toHaveCount(0);expect(calls()).toBe(0);}finally{release();await page.unroute('**/api/jewellery/necklace-guide?*');}});
-  await fixture(page,async({avatar})=>{await page.getByRole('button',{name:'New customer',exact:true}).click();await expect(page.getByText('Optional jewellery measurements',{exact:true})).toHaveCount(0);await studio(page,avatar);await expect(page.getByRole('button',{name:'Show necklace length guide — free',exact:true})).toHaveCount(0);},{enabled:false});
+test("customer profile records millimetres and string bangle sizes without losing clothing measurements", async ({
+  page,
+}) =>
+  fixture(page, async ({ store, account, customer, calls }) => {
+    await page.getByLabel("Customer mobile number", { exact: true }).fill("987");
+    await page.getByRole("button", { name: "Find customer", exact: true }).click();
+    await page.getByRole("button", { name: "Asha · +919876543210", exact: true }).click();
+    await page.getByRole("button", { name: "Edit customer", exact: true }).click();
+    await page.getByText("Optional jewellery measurements", { exact: true }).click();
+    await page.getByLabel("Finger circumference (mm)", { exact: true }).fill("54");
+    await page.getByLabel("Existing ring inner diameter (mm)", { exact: true }).fill("17.2");
+    await page
+      .getByLabel("Hand circumference at widest knuckles (mm)", { exact: true })
+      .fill("209.5");
+    await page.getByLabel("Known Indian bangle size", { exact: true }).selectOption("2.10");
+    await page.getByRole("button", { name: "Save customer", exact: true }).click();
+    await expect(page.getByLabel("Finger circumference (mm)", { exact: true })).toHaveCount(0);
+    const saved = store.customers.get(account, customer.id).measurements;
+    expect(saved.chestCm).toBe(98);
+    expect(saved.fingerCircumferenceMm).toBe(54);
+    expect(saved.ringSizeIn).toBe(14);
+    expect(saved.bangleSizeIn).toBe("2.10");
+    expect(calls()).toBe(0);
+  }));
+test("ring/bangle help is advisory, saves under the linked customer, survives reload and never uses AI or changes catalogue sizes", async ({
+  page,
+}) =>
+  fixture(page, async ({ store, account, customer, avatar, calls }) => {
+    const before = store.billing.balance(account.org);
+    await studio(page, avatar);
+    await page.getByRole("button", { name: /^Gold ring/ }).click();
+    await expect(
+      page.getByText("Suggested Indian ring size 14 · Medium confidence", { exact: true }),
+    ).toBeVisible();
+    await page.getByText("Customer measurements · Asha", { exact: true }).click();
+    await page.getByLabel("Known Indian ring size", { exact: true }).fill("");
+    await page.getByLabel("Finger circumference (mm)", { exact: true }).fill("60");
+    await expect(
+      page.getByText("Suggested Indian ring size 20 · Low confidence", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText(/Catalogue size 14 differs/)).toBeVisible();
+    await review(page).check();
+    await consent(page).check();
+    await expect(
+      page.getByRole("button", { name: "Try jewellery — up to 1 AI credit", exact: true }),
+    ).toBeEnabled();
+    await page.getByLabel("Known Indian bangle size", { exact: true }).selectOption("2.10");
+    await page
+      .getByLabel("Hand circumference at widest knuckles (mm)", { exact: true })
+      .fill("209.5");
+    await page
+      .getByLabel("The customer agrees to save these jewellery measurements to their profile.", {
+        exact: true,
+      })
+      .check();
+    await page.getByRole("button", { name: "Save jewellery measurements", exact: true }).click();
+    await expect(
+      page.getByText("Jewellery measurements saved to the customer profile. No AI credit used.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    expect(store.customers.get(account, customer.id).measurements.chestCm).toBe(98);
+    expect(store.customers.get(account, customer.id).measurements.bangleSizeIn).toBe("2.10");
+    await page.reload();
+    await page.getByRole("button", { name: /^Gold ring/ }).click();
+    await expect(
+      page.getByText("Suggested Indian ring size 20 · Low confidence", { exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: /^Gold bangles/ }).click();
+    await expect(
+      page.getByText("Suggested bangle size 2.10 · Medium confidence", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText(/Catalogue size 2.4 differs/)).toBeVisible();
+    await review(page).check();
+    await consent(page).check();
+    await expect(
+      page.getByRole("button", { name: "Try jewellery — up to 1 AI credit", exact: true }),
+    ).toBeEnabled();
+    expect(
+      store.garments
+        .list(account, { category: "jewellery", jewelleryEnabled: true })
+        .find((i) => i.name === "Gold bangles").attributes.bangleSize,
+    ).toBe("2.4");
+    expect(calls()).toBe(0);
+    expect(store.billing.balance(account.org)).toBe(before);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page
+      .locator(".jewellery-size-help")
+      .screenshot({ path: "test-results/jewellery-size-help-mobile.png" });
+  }));
+test("portrait and full-body necklace guides follow saved anchors, show real-length labels and make no provider request", async ({
+  page,
+}) =>
+  fixture(page, async ({ store, account, avatar, setAnchor, calls }) => {
+    const before = store.billing.balance(account.org);
+    await studio(page, avatar);
+    await page.getByRole("button", { name: /^Princess chain/ }).click();
+    await page
+      .getByRole("button", { name: "Show necklace length guide — free", exact: true })
+      .click();
+    await expect(
+      page.getByRole("img", { name: "Illustrative necklace length guide", exact: true }),
+    ).toBeVisible();
+    const path = page.locator('[data-guide="princess"]');
+    await expect(path).toHaveAttribute("transform", "translate(575 1150) rotate(0)");
+    await expect(page.getByText("Selected piece · 45 cm", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("Opera · 80 cm · extends below this view", { exact: true }),
+    ).toBeVisible();
+    await page
+      .locator(".jewellery-necklace-guide")
+      .screenshot({ path: "test-results/necklace-guide-portrait-mobile.png" });
+    setAnchor({
+      anchors: { neckBase: { x: 610, y: 1100 } },
+      pxPerMm: 4,
+      width: 1152,
+      height: 1536,
+    });
+    await page.reload();
+    await page
+      .getByRole("button", { name: "Show necklace length guide — free", exact: true })
+      .click();
+    await expect(page.locator('[data-guide="princess"]')).toHaveAttribute(
+      "transform",
+      "translate(610 1100) rotate(0)",
+    );
+    await page.getByRole("button", { name: "Full body view", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Show necklace length guide — free", exact: true })
+      .click();
+    await expect(page.locator('[data-guide="princess"]')).toHaveAttribute(
+      "transform",
+      "translate(512 305) rotate(0)",
+    );
+    await expect(page.getByText("Opera · 80 cm", { exact: true })).toBeVisible();
+    await page.getByLabel("Matinee · 60 cm", { exact: true }).uncheck();
+    await expect(page.locator('[data-guide="matinee"]')).toHaveCount(0);
+    expect(calls()).toBe(0);
+    expect(store.billing.balance(account.org)).toBe(before);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page
+      .locator(".jewellery-necklace-guide")
+      .screenshot({ path: "test-results/necklace-guide-full-mobile.png" });
+    await page.setViewportSize({ width: 1440, height: 1100 });
+    await page.screenshot({ path: "test-results/jewellery-sizing-desktop.png", fullPage: true });
+  }));
+test("ending a session clears sizing and prevents late guide results; disabled pilots hide the new profile fields", async ({
+  page,
+}) => {
+  await fixture(page, async ({ store, avatar, calls }) => {
+    await studio(page, avatar);
+    let enter, release;
+    const started = new Promise((r) => (enter = r)),
+      gate = new Promise((r) => (release = r));
+    await page.route("**/api/jewellery/necklace-guide?*", async (route) => {
+      enter();
+      await gate;
+      try {
+        await route.fulfill({
+          status: 200,
+          json: {
+            width: 1152,
+            height: 1536,
+            anchors: { neckBase: { x: 575, y: 1100 } },
+            pxPerMm: 3,
+            warning: "Test guide",
+          },
+        });
+      } catch {}
+    });
+    try {
+      await page
+        .getByRole("button", { name: "Show necklace length guide — free", exact: true })
+        .click();
+      await started;
+      const cookie = (await page.context().cookies()).find((c) => c.name === "forme_session");
+      store.logout(cookie.value);
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+      await expect(page.getByRole("alert")).toContainText("session ended or changed");
+      release();
+      await expect(
+        page.getByRole("img", { name: "Illustrative necklace length guide", exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: "Show necklace length guide — free", exact: true }),
+      ).toHaveCount(0);
+      expect(calls()).toBe(0);
+    } finally {
+      release();
+      await page.unroute("**/api/jewellery/necklace-guide?*");
+    }
+  });
+  await fixture(
+    page,
+    async ({ avatar }) => {
+      await page.getByRole("button", { name: "New customer", exact: true }).click();
+      await expect(page.getByText("Optional jewellery measurements", { exact: true })).toHaveCount(
+        0,
+      );
+      await studio(page, avatar);
+      await expect(
+        page.getByRole("button", { name: "Show necklace length guide — free", exact: true }),
+      ).toHaveCount(0);
+    },
+    { enabled: false },
+  );
 });
 
-test('a guide for a different saved reference is rejected without disabling the selected piece',async({page})=>fixture(page,async({avatar,calls})=>{
-  await studio(page,avatar);await page.getByRole('button',{name:/^Princess chain/}).click();await review(page).check();await consent(page).check();await expect(page.getByRole('button',{name:'Try jewellery — up to 1 AI credit',exact:true})).toBeEnabled();
-  await page.route('**/api/jewellery/necklace-guide?*',async route=>{await route.fulfill({status:200,json:{width:1152,height:1536,anchors:{neckBase:{x:575,y:1100}},pxPerMm:3,sourceHash:'different-approved-image',warning:'Test guide'}});});
-  await page.getByRole('button',{name:'Show necklace length guide — free',exact:true}).click();await expect(page.getByText(/The saved reference changed. Reload the studio/)).toBeVisible();await expect(page.getByRole('img',{name:'Illustrative necklace length guide',exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Try jewellery — up to 1 AI credit',exact:true})).toBeEnabled();expect(calls()).toBe(0);
-}));
+test("a guide for a different saved reference is rejected without disabling the selected piece", async ({
+  page,
+}) =>
+  fixture(page, async ({ avatar, calls }) => {
+    await studio(page, avatar);
+    await page.getByRole("button", { name: /^Princess chain/ }).click();
+    await review(page).check();
+    await consent(page).check();
+    await expect(
+      page.getByRole("button", { name: "Try jewellery — up to 1 AI credit", exact: true }),
+    ).toBeEnabled();
+    await page.route("**/api/jewellery/necklace-guide?*", async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: {
+          width: 1152,
+          height: 1536,
+          anchors: { neckBase: { x: 575, y: 1100 } },
+          pxPerMm: 3,
+          sourceHash: "different-approved-image",
+          warning: "Test guide",
+        },
+      });
+    });
+    await page
+      .getByRole("button", { name: "Show necklace length guide — free", exact: true })
+      .click();
+    await expect(page.getByText(/The saved reference changed. Reload the studio/)).toBeVisible();
+    await expect(
+      page.getByRole("img", { name: "Illustrative necklace length guide", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Try jewellery — up to 1 AI credit", exact: true }),
+    ).toBeEnabled();
+    expect(calls()).toBe(0);
+  }));
