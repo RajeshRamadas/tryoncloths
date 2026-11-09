@@ -1,10 +1,10 @@
+import {resolveHandsGeometry} from './hands-geometry.js';
 import {createHash,createHmac,timingSafeEqual,randomBytes} from 'node:crypto';
 import sharp from 'sharp';
 import {visualAttributes} from './jewellery-types.js';
 import {combinedMode} from '../src/jewellery-overlay.js';
 import {transaction} from './catalogue-fields.js';
 import {productImage} from './garment-store.js';
-import {handsTemplate} from './hands-templates.js';
 import {viewPng} from './avatar-view-store.js';
 import {JEWELLERY_CONTRACT,jewellerySelection,normalizeJewelleryView} from './jewellery-tryon.js';
 
@@ -75,7 +75,7 @@ export class JewelleryStore{
     this.current(account,context);
     const payload=Buffer.from(JSON.stringify({contract:JEWELLERY_CONTRACT,store:account.id,user:account.user.id,id:context.id,avatarId:context.avatarId,
       view:context.view,nonce:context.nonce,revision:context.revision,itemId:context.itemId,itemVersion:context.itemVersion,
-      mode:context.mode||'ai',previewMode:combinedMode(context.baseMode,context.mode||'ai'),overlayHash:context.overlayHash,selection:context.selection,title:context.title,imageHash:hash(Buffer.from(image.split(',')[1],'base64')),expires:Date.now()+24*3600000})).toString('base64url');
+      ...(context.handsGeometry?{handsGeometry:context.handsGeometry}:{}),mode:context.mode||'ai',previewMode:combinedMode(context.baseMode,context.mode||'ai'),overlayHash:context.overlayHash,selection:context.selection,title:context.title,imageHash:hash(Buffer.from(image.split(',')[1],'base64')),expires:Date.now()+24*3600000})).toString('base64url');
     return payload+'.'+createHmac('sha256',this.store.views.key).update('jewellery:'+payload).digest('hex');
   }
   async context(account,input,{provider,model,guard=()=>{}}){
@@ -93,7 +93,7 @@ export class JewelleryStore{
     const current=()=>{guard();this.current(account,context);};
     const source=view==='full'?Buffer.from(reference.avatar.image):this.store.views.get(account,input.avatarId,view).image;
     const saved=await normalizeJewelleryView(source,view);current();
-    let base=saved,baseMode=null;
+    let base=saved,baseMode=null,handsPacket;
     if(input.base!==undefined){
       const suppliedRaw=await jewelleryPng(input.base,view,{legacyFull:view==='full'});current();
       // Compare canonical pixels/canvas, so opaque alpha or harmless PNG
@@ -104,16 +104,16 @@ export class JewelleryStore{
         if(input.baseReceipt!==undefined){
           if(input.baseReviewed!==true)throw fail('Review this jewellery result before using it as the next base.');
           const claims=this.claims(account,input.baseReceipt),original=Buffer.from(input.base.split(',')[1],'base64');
-          baseMode=claims.previewMode||'ai';
+          baseMode=claims.previewMode||'ai';handsPacket=claims.handsGeometry;
           if(claims.avatarId!==context.avatarId||claims.view!==view||claims.imageHash!==hash(original))throw fail('Use the original reviewed result for this avatar view.',409);
         }else if(input.baseResultId!==undefined){
-          const row=this.db.prepare("SELECT r.image,r.previewMode FROM garment_results r JOIN garments g ON g.account=r.account AND g.id=r.garmentId WHERE r.account=? AND r.id=? AND r.avatarId=? AND r.view=? AND g.category='jewellery'").get(account.id,input.baseResultId,context.avatarId,view);
-          baseMode=row?.previewMode||'ai';
+          const row=this.db.prepare("SELECT r.image,r.previewMode,r.handsGeometryJson FROM garment_results r JOIN garments g ON g.account=r.account AND g.id=r.garmentId WHERE r.account=? AND r.id=? AND r.avatarId=? AND r.view=? AND g.category='jewellery'").get(account.id,input.baseResultId,context.avatarId,view);
+          baseMode=row?.previewMode||'ai';if(row?.handsGeometryJson)handsPacket=JSON.parse(row.handsGeometryJson);
           if(!row||hash(await normalizeJewelleryView(Buffer.from(row.image),view))!==hash(supplied))throw fail('The approved base result is unavailable for this avatar view.',409);
         }else if(input.baseLookId!==undefined){
           if(input.baseReviewed!==true)throw fail('Review this saved jewellery look before adding another item.');
-          const row=this.db.prepare("SELECT image,previewMode FROM looks WHERE account=? AND id=? AND avatarId=? AND view=? AND itemsJson<>'[]'").get(account.id,input.baseLookId,context.avatarId,view);
-          baseMode=row?.previewMode||'ai';
+          const row=this.db.prepare("SELECT image,previewMode,handsGeometryJson FROM looks WHERE account=? AND id=? AND avatarId=? AND view=? AND itemsJson<>'[]'").get(account.id,input.baseLookId,context.avatarId,view);
+          baseMode=row?.previewMode||'ai';if(row?.handsGeometryJson)handsPacket=JSON.parse(row.handsGeometryJson);
           if(!row||hash(await normalizeJewelleryView(Buffer.from(row.image),view))!==hash(supplied))throw fail('The saved jewellery look is unavailable for this avatar view.',409);
         }else throw fail('Use an approved saved view or a verified, reviewed jewellery result as the base.');
       }
@@ -123,15 +123,15 @@ export class JewelleryStore{
     else photo=await productImage(input.image);
     current();
     if(input.secondAngle!==undefined){angle=await productImage(input.secondAngle);current();}
-    let anchors;
+    let anchors,handsSourceKind,handsGeometry;
     if(view==='hands'){
-      const approved=this.store.views.get(account,input.avatarId,'hands');
-      if(approved.sourceKind!=='template')throw fail('Customer hand photos are not supported for jewellery yet.');
-      anchors=(await handsTemplate(reference.avatar.body_type,approved.tone)).anchors;current();
+      const geometry=await resolveHandsGeometry(this.store,account,input.avatarId,handsPacket,{requirePacket:Boolean(input.baseReceipt||input.baseResultId||input.baseLookId)});current();
+      anchors=geometry.anchors;handsSourceKind=geometry.sourceKind;handsGeometry=geometry.packet;
+      if(handsSourceKind==='photo')context.handsGeometryHash=hash(JSON.stringify(handsGeometry));
     }
     const title=item?.name||(typeof input.title==='string'?input.title.slice(0,100):'');
     context.id=hash(JSON.stringify({contract:JEWELLERY_CONTRACT,...context,baseHash:hash(base),itemHash:photo.imageHash,angleHash:angle?.imageHash??null,selection,title,provider,model}));
-    current();return {...context,base,baseMode,product:photo.image,secondAngle:angle?.image,selection,title,anchors,bodyType:reference.avatar.body_type};
+    current();return {...context,base,baseMode,product:photo.image,secondAngle:angle?.image,selection,title,anchors,handsSourceKind,handsGeometry,bodyType:reference.avatar.body_type};
   }
   cached(account,context){
     this.current(account,context);if(!context.itemId)return null;
@@ -149,7 +149,7 @@ export class JewelleryStore{
       const exists=this.db.prepare('SELECT image,previewMode FROM garment_results WHERE account=? AND id=?').get(account.id,id);
       if(exists&&hash(exists.image)!==context.imageHash)throw fail('Another reviewed result is already saved for this starting state and item. Keep or download this preview; it was not substituted for the saved image.',409);
       if(!exists&&this.db.prepare('SELECT count(*) n FROM garment_results WHERE account=?').get(account.id).n>=200)throw fail('Your store holds up to 200 saved adaptations. Remove an unused result first.',409);
-      this.db.prepare('INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt,view,previewMode) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO NOTHING').run(account.id,id,context.avatarId,context.itemId,image,Date.now(),context.view,context.previewMode||'ai');
+      this.db.prepare('INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt,view,previewMode,handsGeometryJson) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO NOTHING').run(account.id,id,context.avatarId,context.itemId,image,Date.now(),context.view,context.previewMode||'ai',context.handsGeometry?JSON.stringify(context.handsGeometry):null);
       return {ok:true,resultId:id,view:context.view};
     });
   }

@@ -1973,3 +1973,8 @@ dialog::backdrop {
 .jewellery-analytics-table th[scope=col] { min-width:100px; }
 .jewellery-analytics-table th[scope=row] { min-width:110px; }
 .jewellery-analytics-table td { white-space:nowrap; }
+
+.customer-hand-photo { display:block; width:100%; max-width:640px; height:auto; margin:16px auto; border:1px solid #bccdc1; background:#fff; touch-action:manipulation; }
+.hand-marker-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.hand-marker-fields input { width:100%; min-width:0; }
+.customer-hand-editor { min-width:0; }

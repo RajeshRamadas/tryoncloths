@@ -24,6 +24,7 @@ RUN --mount=type=secret,id=proxy_ca \
 COPY --from=build /app/dist ./dist
 COPY server ./server
 COPY src/profiles.js ./src/profiles.js
+COPY src/customer-hands.js ./src/customer-hands.js
 COPY src/jewellery-definitions.js ./src/jewellery-definitions.js
 COPY src/jewellery-overlay.js ./src/jewellery-overlay.js
 COPY src/complete-look.js ./src/complete-look.js

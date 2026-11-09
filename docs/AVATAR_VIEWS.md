@@ -89,7 +89,8 @@ performs the one provider request and face/framing/identity checks.
 Hands creation is `{ "kind": "hands", "source": "template" }`, optionally
 with `tone`. The body library and default tone come from the saved avatar.
 Explicit null/empty tone falls back to Medium with a warning. Arbitrary customer
-hand photos and other sources are not accepted in J5.
+hand photos were outside J5; J14 now adds the separately consented
+[customer hand photo workflow](CUSTOMER_HAND_PHOTOS.md). Other sources are rejected.
 
 Creation returns `{image, receipt, kind, tone, sourceKind, needsReview: true,
 creditsUsed, warnings}`. Approval requires:
@@ -188,3 +189,13 @@ J6's internal [jewellery adaptation adapter](JEWELLERY_TRYON.md) is implemented
 in `0.20.0-alpha.6`. [J7's public route, credit/refund integration and adaptation
 reuse](JEWELLERY_API.md) are implemented in `0.20.0-alpha.7`; the jewellery
 studio UI is now implemented in [J8](JEWELLERY_STUDIO.md).
+
+## Customer hand photos (J14)
+
+Web `0.21.0-rc.3` adds [customer hand photo cleanup](CUSTOMER_HAND_PHOTOS.md)
+next to the free template option. Mark each finger/wrist on a normalized photo,
+confirm the customer's own hands and Gemini consent, then use one cleanup
+credit. Review/save once, and reuse the approved view. Photo-specific geometry
+is retained with saved hands looks/results so it is not replaced with another
+pose's template coordinates. The existing flag, roles, metering and storage
+consent apply. Heuristic checks and staff review do not establish live quality.

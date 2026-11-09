@@ -1,3 +1,4 @@
+import {resolveHandsGeometry} from './hands-geometry.js';
 import {previewLabel} from '../src/jewellery-overlay.js';
 import {createHash} from 'node:crypto';
 import sharp from 'sharp';
@@ -32,13 +33,14 @@ export function jewelleryItems(store,account,items,view){
 export async function saveJewelleryLook(store,jewellery,account,input,guard){
   if(input.reviewed!==true||input.storageConsent!==true)throw fail('Review the complete jewellery look and confirm customer agreement to save it.');
   const items=jewelleryItems(store,account,input.itemsJson,input.view),image=await jewelleryPng(input.image,input.view);guard();
-  let claims,previewMode='ai';
-  if(input.receipt){claims=jewellery.claims(account,input.receipt);previewMode=claims.previewMode||'ai';if(claims.avatarId!==input.avatarId||claims.view!==input.view||claims.imageHash!==hash(image))throw fail('Use the original reviewed jewellery result for this avatar and view.',409);
+  let claims,previewMode='ai',handsPacket;
+  if(input.receipt){claims=jewellery.claims(account,input.receipt);previewMode=claims.previewMode||'ai';handsPacket=claims.handsGeometry;if(claims.avatarId!==input.avatarId||claims.view!==input.view||claims.imageHash!==hash(image))throw fail('Use the original reviewed jewellery result for this avatar and view.',409);
     const last=items.at(-1);if(claims.itemId!==last.itemId||claims.selection&&claims.selection.type!==last.type)throw fail('The final jewellery piece does not match its result.',409);
-  }else if(input.resultId){const row=store.db.prepare('SELECT * FROM garment_results WHERE account=? AND id=? AND avatarId=? AND view=?').get(account.id,input.resultId,input.avatarId,input.view);previewMode=row?.previewMode||'ai';if(!row||hash(row.image)!==hash(image)||row.garmentId!==items.at(-1).itemId)throw fail('The approved jewellery result is unavailable.',409);
-  }else if(input.baseLookId){const row=jewelleryLook(store,account,input.baseLookId);previewMode=row.previewMode;if(row.avatarId!==input.avatarId||row.view!==input.view||hash(row.image)!==hash(image))throw fail('Use the original saved jewellery look.',409);
+  }else if(input.resultId){const row=store.db.prepare('SELECT * FROM garment_results WHERE account=? AND id=? AND avatarId=? AND view=?').get(account.id,input.resultId,input.avatarId,input.view);previewMode=row?.previewMode||'ai';if(row?.handsGeometryJson)handsPacket=JSON.parse(row.handsGeometryJson);if(!row||hash(row.image)!==hash(image)||row.garmentId!==items.at(-1).itemId)throw fail('The approved jewellery result is unavailable.',409);
+  }else if(input.baseLookId){const row=jewelleryLook(store,account,input.baseLookId);previewMode=row.previewMode;if(row.handsGeometryJson)handsPacket=JSON.parse(row.handsGeometryJson);if(row.avatarId!==input.avatarId||row.view!==input.view||hash(row.image)!==hash(image))throw fail('Use the original saved jewellery look.',409);
   }else throw fail('A verified jewellery result or saved look is required. Keep or download the reviewed preview if its receipt is unavailable.',409);
   const check=()=>{guard();if(claims)jewellery.current(account,claims);};check();
   const labels=items.map(i=>[i.name,jewelleryMetals.find(([id])=>id===i.attributes.metal)?.[1],i.attributes.purity].filter(Boolean).join(' · ').slice(0,120));
-  return store.saveLook(account,{...input,garments:labels,garmentIds:items.flatMap(i=>i.itemId?[i.itemId]:[])},{view:input.view,itemsJson:items,previewMode,guard:check});
+  const geometry=input.view==='hands'?await resolveHandsGeometry(store,account,input.avatarId,handsPacket,{requirePacket:true}):null;check();
+  return store.saveLook(account,{...input,garments:labels,garmentIds:items.flatMap(i=>i.itemId?[i.itemId]:[])},{view:input.view,itemsJson:items,previewMode,handsGeometry:geometry?.packet,guard:check});
 }

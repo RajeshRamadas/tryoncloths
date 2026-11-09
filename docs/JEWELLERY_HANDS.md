@@ -129,3 +129,10 @@ reproduced all 24 shipped PNG/JSON files byte for byte from its source manifest.
 `0.20.0-alpha.5`. Human pilot review, exact customer complexion
 matching, jewellery fidelity, physical sizing and Lightsail runtime performance
 are not established by these asset tests. No APK is built.
+
+## Customer-photo extension
+
+[J14 customer hands](CUSTOMER_HAND_PHOTOS.md) now supplies a separate photo path
+with authored markers, one consented Gemini cleanup, review/storage and stable
+saved-look geometry. The original template assets and their authored anchors
+stay unchanged and free. A customer's photo never receives template positions.

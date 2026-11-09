@@ -120,6 +120,13 @@ starting view, item and placement. Enable `TRYON_JEWELLERY=1` with account
 storage and Gemini configuration to expose the API; the interactive jewellery
 studio screen is the next task, J8.
 
+Web `0.21.0-rc.3` adds [J14 customer hand photos](docs/CUSTOMER_HAND_PHOTOS.md):
+upload/camera input, twelve photo-specific placement markers, one consented
+Gemini cleanup credit, review/save and reuse for jewellery. Standard hands stay
+free. Saved looks retain their own geometry after the base hands view changes.
+Enabled through the existing jewellery pilot flag; live photo quality remains
+subject to pilot review.
+
 Web `0.21.0-rc.2` adds [J13 jewellery analytics](docs/JEWELLERY_ANALYTICS.md).
 With the jewellery pilot flag enabled, open **Analytics → Jewellery activity**
 for AI/reuse/overlay fittings, sessions,

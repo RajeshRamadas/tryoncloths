@@ -1,3 +1,5 @@
+import {customerHandAnchors,validateCustomerHandPoints} from './customer-hands.js';
+import {handsTemplate} from './hands-templates.js';
 import {randomBytes,createHash,createHmac,timingSafeEqual} from 'node:crypto';
 import sharp from 'sharp';
 import {transaction} from './catalogue-fields.js';
@@ -40,6 +42,7 @@ export class AvatarViewStore{
       CREATE TABLE IF NOT EXISTS avatar_view_keys(id INTEGER PRIMARY KEY CHECK(id=1),secret BLOB NOT NULL CHECK(length(secret)=32));
       CREATE TABLE IF NOT EXISTS avatar_view_jobs(store TEXT NOT NULL,avatarId TEXT NOT NULL,kind TEXT NOT NULL,
         token TEXT NOT NULL,expiresAt INTEGER NOT NULL,PRIMARY KEY(store,avatarId,kind),FOREIGN KEY(store,avatarId) REFERENCES avatars(account,id) ON DELETE CASCADE);`);
+      if(!this.db.prepare('PRAGMA table_info(avatar_views)').all().some(c=>c.name==='handPointsJson'))this.db.exec('ALTER TABLE avatar_views ADD COLUMN handPointsJson TEXT');
       this.db.prepare('INSERT OR IGNORE INTO avatar_view_keys VALUES(1,?)').run(randomBytes(32));
       // Feature-off stores with no views retain the legacy migration surface.
       // Install visual invalidation once a view context actually exists.
@@ -64,13 +67,15 @@ export class AvatarViewStore{
     const epoch=this.db.prepare('SELECT * FROM avatar_view_epochs WHERE store=? AND avatarId=?').get(account.id,id);
     if(!epoch||epoch.nonce!==context.nonce||epoch[kind+'Revision']!==context.revision)throw fail('This avatar or view changed. Reopen it before continuing.',409);return context;
   }
-  receipt(account,id,kind,context,image,{tone,sourceKind}){
-    const payload=Buffer.from(JSON.stringify({store:account.id,user:account.user.id,avatar:id,kind,nonce:context.nonce,revision:context.revision,baseHash:context.baseHash,imageHash:digest(Buffer.from(image.split(',')[1],'base64')),tone,sourceKind,createdAt:Date.now(),expires:Date.now()+30*60000})).toString('base64url');
+  receipt(account,id,kind,context,image,{tone,sourceKind,handPoints}){
+    const points=sourceKind==='photo'?validateCustomerHandPoints(handPoints):undefined;
+    if(sourceKind==='photo'&&kind!=='hands')throw fail('Customer photo geometry belongs to the hands view.');
+    const payload=Buffer.from(JSON.stringify({store:account.id,user:account.user.id,avatar:id,kind,nonce:context.nonce,revision:context.revision,baseHash:context.baseHash,imageHash:digest(Buffer.from(image.split(',')[1],'base64')),tone,sourceKind,...(points?{handPoints:points}:{}),createdAt:Date.now(),expires:Date.now()+30*60000})).toString('base64url');
     return payload+'.'+createHmac('sha256',this.key).update(payload).digest('hex');
   }
   claims(account,id,kind,receipt){
     try{
-      if(typeof receipt!=='string'||receipt.length>4096)throw new Error();const [payload,signature,extra]=receipt.split('.');
+      if(typeof receipt!=='string'||receipt.length>16384)throw new Error();const [payload,signature,extra]=receipt.split('.');
       if(extra||!/^[a-f0-9]{64}$/.test(signature)||!timingSafeEqual(createHmac('sha256',this.key).update(payload).digest(),Buffer.from(signature,'hex')))throw new Error();
       const value=JSON.parse(Buffer.from(payload,'base64url').toString());
       if(value.store!==account.id||value.user!==account.user.id||value.avatar!==id||value.kind!==kind||!Number.isFinite(value.expires)||value.expires<Date.now())throw new Error();return value;
@@ -82,13 +87,14 @@ export class AvatarViewStore{
     this.context(account,id,kind);
     if(input?.reviewed!==true||input?.storageConsent!==true)throw fail('Review this view and confirm saving it to the customer’s store account.');
     const value=this.claims(account,id,kind,input.receipt),png=await viewPng(input.image,kind);
+    const points=value.sourceKind==='photo'?JSON.stringify(validateCustomerHandPoints(value.handPoints)):null;
     if(value.imageHash!==digest(png))throw fail('The preview changed. Approve the original generated or template image.',409);
     return transaction(this.db,()=>{
       guard?.();
       const latest=this.context(account,id,kind);
       if(value.nonce!==latest.nonce||value.baseHash!==latest.baseHash)throw fail('The avatar changed. Reopen it before continuing.',409);
-      if(latest.revision!==value.revision){const existing=this.db.prepare('SELECT image,approvedAt FROM avatar_views WHERE store=? AND avatarId=? AND kind=?').get(account.id,id,kind);if(latest.revision===value.revision+1&&existing&&digest(existing.image)===value.imageHash)return {ok:true,approvedAt:existing.approvedAt};throw fail('A newer view action replaced this preview. Reopen the saved view.',409);}
-      const approvedAt=Date.now();this.db.prepare(`INSERT INTO avatar_views VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(store,avatarId,kind) DO UPDATE SET image=excluded.image,tone=excluded.tone,sourceKind=excluded.sourceKind,approvedAt=excluded.approvedAt,createdAt=excluded.createdAt`).run(account.id,id,kind,png,value.tone,value.sourceKind,approvedAt,value.createdAt);
+      if(latest.revision!==value.revision){const existing=this.db.prepare('SELECT image,approvedAt,handPointsJson,sourceKind,tone FROM avatar_views WHERE store=? AND avatarId=? AND kind=?').get(account.id,id,kind);if(latest.revision===value.revision+1&&existing&&digest(existing.image)===value.imageHash&&(value.sourceKind!=='photo'||existing.handPointsJson===points&&existing.sourceKind==='photo'&&existing.tone===value.tone))return {ok:true,approvedAt:existing.approvedAt};throw fail('A newer view action replaced this preview. Reopen the saved view.',409);}
+      const approvedAt=Date.now();this.db.prepare(`INSERT INTO avatar_views(store,avatarId,kind,image,tone,sourceKind,approvedAt,createdAt,handPointsJson) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(store,avatarId,kind) DO UPDATE SET image=excluded.image,tone=excluded.tone,sourceKind=excluded.sourceKind,approvedAt=excluded.approvedAt,createdAt=excluded.createdAt,handPointsJson=excluded.handPointsJson`).run(account.id,id,kind,png,value.tone,value.sourceKind,approvedAt,value.createdAt,points);
       this.db.prepare(`UPDATE avatar_view_epochs SET ${kind}Revision=${kind}Revision+1 WHERE store=? AND avatarId=?`).run(account.id,id);
       this.invalidate(account.id,id);return {ok:true,approvedAt};
     });
@@ -99,6 +105,12 @@ export class AvatarViewStore{
   release(token){this.db.prepare('DELETE FROM avatar_view_jobs WHERE token=?').run(token);}
   invalidate(store,id){for(const [key,value] of this.cache)if(key.startsWith(store+':'+id+':')){clearTimeout(value.timer);this.cache.delete(key);}}
   close(){for(const value of this.cache.values())clearTimeout(value.timer);this.cache.clear();this.key.fill(0);}
+  async handAnchors(account,id){
+    const context=this.context(account,id,'hands'),row=this.get(account,id,'hands');
+    if(row.sourceKind==='photo'){try{return customerHandAnchors(JSON.parse(row.handPointsJson));}catch{throw fail('Customer hand placement markers are unavailable. Reopen the saved view.',409);}}
+    if(row.sourceKind!=='template')throw fail('This hands view has no verified placement markers.',409);
+    const avatar=this.avatar(account,id),template=await handsTemplate(avatar.body_type,row.tone);this.current(account,id,'hands',context);if(digest(this.get(account,id,'hands').image)!==digest(row.image))throw fail('The hands view changed.',409);return template.anchors;
+  }
   async anchors(account,id,{compute=portraitAnchors}={}){
     const row=this.get(account,id,'portrait'),hash=digest(row.image),key=account.id+':'+id+':'+hash;
     if(this.cache.has(key))return structuredClone(this.cache.get(key).value);

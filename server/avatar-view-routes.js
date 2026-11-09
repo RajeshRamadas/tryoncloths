@@ -1,3 +1,4 @@
+import {installCustomerHandsRoutes} from './customer-hands-routes.js';
 import sharp from 'sharp';
 import {accountUser} from './accounts.js';
 import {meter,validRequestId,BillingError,billingFailure} from './billing.js';
@@ -20,7 +21,7 @@ async function photo(value){
   }catch{throw new ProviderError('face_input');}finally{bytes?.fill(0);}
 }
 
-export function installAvatarViewRoutes(app,store,{enabled,provider,apiKey,model,femaleEnabled=false,rateLimit=true,portrait=generatePortrait,faceCheck=customerFace,computeAnchors}={}){
+export function installAvatarViewRoutes(app,store,{enabled,provider,apiKey,model,femaleEnabled=false,rateLimit=true,portrait=generatePortrait,faceCheck=customerFace,computeAnchors,hands}={}){
   if(!store)return;
   const views=store.views;let preflights=0;
   const session=(req,account)=>{const current=accountUser(store,req);if(!current||current.id!==account.id||current.user.id!==account.user.id)throw fail('The store session changed. Reopen this avatar.',401);views.actor(current);return current;};
@@ -34,7 +35,7 @@ export function installAvatarViewRoutes(app,store,{enabled,provider,apiKey,model
     }catch(error){
       if(res.destroyed||res.headersSent)return;
       if(billingFailure(res,error))return;
-      if(error instanceof ProviderError){const safe=providerErrorDetails(error,'gemini');res.status(['face_input','portrait_input'].includes(error.code)?400:502).json({error:safe.message,code:safe.code});}
+      if(error instanceof ProviderError){const safe=providerErrorDetails(error,'gemini');res.status(['face_input','portrait_input','hands_input'].includes(error.code)?400:502).json({error:safe.message,code:safe.code});}
       else res.status(error.status||500).json({error:error.status?error.message:'The avatar view could not be completed. No request was automatically retried.'});
     }
   };
@@ -45,6 +46,7 @@ export function installAvatarViewRoutes(app,store,{enabled,provider,apiKey,model
   app.post('/api/avatars/:id/views/:kind/approve',wrap(async(req,res,account)=>{
     fields(req.body,['image','receipt','reviewed','storageConsent']);const result=await views.approve(account,req.params.id,req.params.kind,req.body,{guard:()=>session(req,account)});res.json(result);
   }));
+  installCustomerHandsRoutes(app,store,{wrap,session,provider,apiKey,model,femaleEnabled,rateLimit,hands});
   app.post('/api/avatars/:id/views',wrap(async(req,res,account)=>{
     const body=req.body||{};viewKind(body.kind);const id=req.params.id,kind=body.kind;
     fields(body,kind==='hands'?['kind','source','tone']:['kind','facePhoto','consent','consentScope','consentProvider','hairBehindEars','hairConsent','requestId','avatarReviewed']);
@@ -52,7 +54,7 @@ export function installAvatarViewRoutes(app,store,{enabled,provider,apiKey,model
     // A live session/ownership check is repeated after each asynchronous stage.
     const guard=()=>{const current=session(req,account);views.current(current,id,kind,context);};
     if(kind==='hands'){
-      if(body.source!=='template')throw fail('Choose a prepared hands template. Customer hand photos are not supported yet.');
+      if(body.source!=='template')throw fail('Choose a prepared hands template or the customer photo workflow.');
       const template=await handsTemplate(context.avatar.body_type,Object.hasOwn(body,'tone')?body.tone:context.avatar.template_tone);guard();
       const image=pngUrl(template.png),receipt=views.receipt(account,id,kind,context,image,{tone:template.tone,sourceKind:'template'});
       return res.json({image,receipt,kind,tone:template.tone,sourceKind:'template',anchors:template.anchors,warnings:template.warnings,needsReview:true,creditsUsed:0});

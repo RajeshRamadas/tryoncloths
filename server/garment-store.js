@@ -88,6 +88,7 @@ export class GarmentStore {
     transaction(this.db,()=>{
       if(!this.db.prepare('PRAGMA table_info(garment_results)').all().some(column=>column.name==='view'))
         this.db.exec("ALTER TABLE garment_results ADD COLUMN view TEXT NOT NULL DEFAULT 'full'");
+      if(!this.db.prepare('PRAGMA table_info(garment_results)').all().some(c=>c.name==='handsGeometryJson'))this.db.exec('ALTER TABLE garment_results ADD COLUMN handsGeometryJson TEXT');
       if(!this.db.prepare('PRAGMA table_info(garment_results)').all().some(c=>c.name==='previewMode'))this.db.exec("ALTER TABLE garment_results ADD COLUMN previewMode TEXT NOT NULL DEFAULT 'ai'");
     });
     installCatalogueSchema(this.db);

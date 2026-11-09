@@ -167,3 +167,12 @@ web build passed**. No live paid provider request was sent.
 [J8](JEWELLERY_STUDIO.md) now adds the staff-facing picker, stacking/review,
 download and sharing flow. Live provider placement/fidelity, identity/hand threshold calibration,
 quota/cost, retention, Lightsail load and pilot-store validation remain separate.
+
+## Customer-photo hands (J14)
+
+Approved [customer hands](CUSTOMER_HAND_PHOTOS.md) now work with jewellery AI
+and free overlays. Their own signed placement geometry is used rather than a
+standard template's. Saved hands looks and reusable results retain the geometry
+of their image when the current hands view changes. Older hands bases without
+geometry remain reopenable, but require starting a new fitting from the approved
+view rather than guessing coordinates. No clothing contract or prompt changes.

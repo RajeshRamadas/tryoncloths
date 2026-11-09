@@ -150,7 +150,7 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
         try{receipt=jewellery.receipt(account,context,output);}catch{}
       }},()=>store.imageSlots.run({kind:'staff',signal:cancelled.signal},async signal=>{
         live();const output=await generate({base:context.base,product:context.product,secondAngle:context.secondAngle,
-          ...context.selection,title:context.title,anchors:context.anchors,apiKey,model,signal});live();
+          ...context.selection,title:context.title,anchors:context.anchors,handsSourceKind:context.handsSourceKind,apiKey,model,signal});live();
         try{await jewelleryPng(output,context.view);}catch{throw new ProviderError('invalid_image');}live();return output;
       }));
       recordResult(false);

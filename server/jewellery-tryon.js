@@ -1,3 +1,4 @@
+import {requireCustomerHandsUnchanged} from './customer-hands.js';
 import sharp from 'sharp';
 import {cleanTitle} from './gemini-tryon.js';
 import {jewelleryTypes,jewelleryMetals,validateAttributes,chooseView,visualAttributes} from './jewellery-types.js';
@@ -168,13 +169,13 @@ export async function requireUnchangedHands(base,output,anchors) {
 
 // Internal paid adapter. J7's route enforces flag, account/store ownership,
 // consent, metering/refunds and explicit approval before reusable storage.
-export function createJewelleryTryOn({detect=detectFaces,identityCheck=requireSameIdentity,faceCheck=requireVisibleFace,handsCheck=requireUnchangedHands}={}) {
-  return async function jewelleryTryOn({base,product,secondAngle,apiKey,model='gemini-2.5-flash-image',fetchImpl=fetch,signal,...options}={}) {
+export function createJewelleryTryOn({detect=detectFaces,identityCheck=requireSameIdentity,faceCheck=requireVisibleFace,handsCheck=requireUnchangedHands,photoHandsCheck=requireCustomerHandsUnchanged}={}) {
+  return async function jewelleryTryOn({base,product,secondAngle,apiKey,model='gemini-2.5-flash-image',fetchImpl=fetch,signal,handsSourceKind='template',...options}={}) {
     const deadline=AbortSignal.any([AbortSignal.timeout(180000),...(signal?[signal]:[])]);
     const active=()=>{if(deadline.aborted)throw new ProviderError('timeout');};
     active();
     if(typeof apiKey!=='string'||!apiKey.trim()||typeof model!=='string'||model.length>100||!/^[a-zA-Z0-9.-]+$/.test(model))throw new ProviderError('configuration');
-    const s=selection(options);
+    const s=selection(options);if(!['template','photo'].includes(handsSourceKind))fail();
     let viewPng,item,angle,png;
     try{
       let anchors=options.anchors;
@@ -210,7 +211,7 @@ export function createJewelleryTryOn({detect=detectFaces,identityCheck=requireSa
       }else if(s.view==='full'){
         try{await faceCheck(png);}catch(error){throw error instanceof ProviderError&&['missing_face','face_check'].includes(error.code)?error:new ProviderError('face_check');}
       }else{
-        try{await handsCheck(viewPng,png,anchors);}catch{throw new ProviderError('hands_changed');}
+        try{await (handsSourceKind==='photo'?photoHandsCheck:handsCheck)(viewPng,png,anchors,{allowJewellery:true});}catch{throw new ProviderError('hands_changed');}
       }
       active();return `data:image/png;base64,${png.toString('base64')}`;
     }catch(error){active();throw error instanceof ProviderError?error:new ProviderError('unknown');}
