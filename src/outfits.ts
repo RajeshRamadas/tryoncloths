@@ -1,6 +1,8 @@
 import { avatarCanvas, loadImage } from "./images";
 import { colourGarmentPixels, type GarmentColour } from "./garment-colours";
 import { SAMPLE_GARMENTS } from "./sample-wardrobe";
+import { defaultGarmentPlacement, prepareGarmentLayer } from "./garment-layer";
+import { CUTOUT_DEFAULT_TOLERANCE, removeBackground, transparentShare } from "./jewellery-cutout";
 
 export type Category = "shirt" | "trousers" | "shoes";
 export type Placement = { x: number; y: number; width: number; height: number };
@@ -12,6 +14,8 @@ export type Garment = {
   placement: Placement;
   imported?: boolean;
   colour?: GarmentColour;
+  /** Present when the layer was cut out from a product photo on this device. */
+  cutout?: CutoutSettings;
 };
 export type Layer = { garment: Garment; placement: Placement };
 
@@ -22,35 +26,7 @@ export function defaultPlacement(
   profile: string,
   personalized: boolean,
 ): Placement {
-  const broad =
-    profile === "f-curvy"
-      ? 1.2
-      : profile === "f-athletic"
-        ? 1.08
-        : profile === "f-slim"
-          ? 0.92
-          : profile === "broad"
-            ? 1.17
-            : profile === "athletic"
-              ? 1.1
-              : profile === "slim"
-                ? 0.9
-                : 1;
-  const box =
-    category === "shirt"
-      ? { x: 186 - 155 * broad, y: 176, width: 310 * broad, height: 316 }
-      : category === "trousers"
-        ? { x: 186 - 115 * broad, y: 474, width: 230 * broad, height: 400 }
-        : { x: 186 - 115 * broad, y: 827, width: 230 * broad, height: 92 };
-  const frame = personalized
-    ? { width: 692, height: 1038, x: 154, y: 48 }
-    : { width: 384, height: 942, x: 0, y: 0 };
-  return {
-    x: (box.x + frame.x) / frame.width,
-    y: (box.y + frame.y) / frame.height,
-    width: box.width / frame.width,
-    height: box.height / frame.height,
-  };
+  return defaultGarmentPlacement(category, profile, personalized);
 }
 
 export function sampleCatalogue(profile: string, personalized: boolean): Garment[] {
@@ -121,75 +97,100 @@ export async function renderOutfit(base: string, layers: Layer[]): Promise<HTMLC
   return canvas;
 }
 
+export type LayerSource = {
+  rgba: Uint8ClampedArray;
+  width: number;
+  height: number;
+  /** True when the file had no transparent background and needs a cut-out. */
+  photo: boolean;
+};
+export type CutoutSettings = { tolerance: number; clearEnclosed: boolean };
+export const DEFAULT_CUTOUT: CutoutSettings = {
+  tolerance: CUTOUT_DEFAULT_TOLERANCE,
+  clearEnclosed: true,
+};
+
+/** Decode a clothing file on the device, at most 1600 px on the longer side. */
+export async function readGarmentFile(file: File): Promise<LayerSource> {
+  if (
+    !["image/png", "image/webp", "image/jpeg"].includes(file.type) ||
+    file.size > 10 * 1024 * 1024
+  )
+    throw new Error("Choose a PNG, WebP or JPEG clothing image under 10 MB.");
+  const url = URL.createObjectURL(file);
+  try {
+    const image = await loadImage(url);
+    if (image.width * image.height > 16_000_000 || image.width < 32 || image.height < 32)
+      throw new Error("Use an image at least 32 × 32 pixels and no larger than 16 megapixels.");
+    const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const rgba = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    return {
+      rgba,
+      width: canvas.width,
+      height: canvas.height,
+      photo: transparentShare(rgba) < 0.02,
+    };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/**
+ * Turn a decoded clothing image into an aligned layer. Product photos on a plain backdrop
+ * have their background removed on the device first; transparent layers are used as supplied.
+ */
+export function buildGarmentLayer(
+  source: LayerSource,
+  details: { id: string; name: string; category: Category },
+  profile: string,
+  personalized: boolean,
+  cutout: CutoutSettings = DEFAULT_CUTOUT,
+): Garment {
+  const pixels = source.photo
+    ? removeBackground(source.rgba, source.width, source.height, {
+        ...cutout,
+        subject: "clothing",
+      }).rgba
+    : source.rgba;
+  const layer = prepareGarmentLayer(
+    pixels,
+    source.width,
+    source.height,
+    details.category,
+    profile,
+    personalized,
+  );
+  if (!layer) throw new Error("This layer has no visible garment.");
+  const canvas = document.createElement("canvas");
+  canvas.width = layer.width;
+  canvas.height = layer.height;
+  canvas.getContext("2d")!.putImageData(new ImageData(layer.rgba, layer.width, layer.height), 0, 0);
+  return {
+    ...details,
+    source: canvas.toDataURL("image/png"),
+    placement: layer.placement,
+    imported: true,
+    ...(source.photo ? { cutout } : {}),
+  };
+}
+
 export async function importGarment(
   file: File,
   category: Category,
   profile: string,
   personalized: boolean,
-): Promise<Garment> {
-  if (!["image/png", "image/webp"].includes(file.type) || file.size > 10 * 1024 * 1024)
-    throw new Error("Choose a transparent PNG or WebP layer under 10 MB.");
-  const url = URL.createObjectURL(file);
-  try {
-    const image = await loadImage(url);
-    if (image.width * image.height > 16_000_000 || image.width < 32 || image.height < 32)
-      throw new Error("Use a layer at least 32 × 32 pixels and no larger than 16 megapixels.");
-    const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(image.width * scale);
-    canvas.height = Math.round(image.height * scale);
-    const ctx = canvas.getContext("2d")!;
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    let left = canvas.width,
-      top = canvas.height,
-      right = -1,
-      bottom = -1,
-      transparent = 0;
-    for (let y = 0; y < canvas.height; y++)
-      for (let x = 0; x < canvas.width; x++) {
-        const alpha = pixels[(y * canvas.width + x) * 4 + 3];
-        if (alpha < 16) transparent++;
-        if (alpha > 16) {
-          left = Math.min(left, x);
-          top = Math.min(top, y);
-          right = Math.max(right, x);
-          bottom = Math.max(bottom, y);
-        }
-      }
-    if (right < left || transparent < canvas.width * canvas.height * 0.02)
-      throw new Error(
-        "This layer needs a transparent background and a visible garment. Product photos with a solid background cannot be overlaid directly.",
-      );
-    const trimmed = document.createElement("canvas");
-    trimmed.width = right - left + 1;
-    trimmed.height = bottom - top + 1;
-    trimmed
-      .getContext("2d")!
-      .drawImage(
-        canvas,
-        left,
-        top,
-        trimmed.width,
-        trimmed.height,
-        0,
-        0,
-        trimmed.width,
-        trimmed.height,
-      );
-    const placement = defaultPlacement(category, profile, personalized);
-    // Preserve the imported garment's aspect ratio at its initial width.
-    const aspect = personalized ? 692 / 1038 : 384 / 942;
-    placement.height = Math.min(0.95, (placement.width * aspect * trimmed.height) / trimmed.width);
-    return {
-      id: crypto.randomUUID(),
-      name: file.name.replace(/\.[^.]+$/, "").slice(0, 70),
-      category,
-      source: trimmed.toDataURL("image/png"),
-      placement,
-      imported: true,
-    };
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+): Promise<{ garment: Garment; source: LayerSource }> {
+  const source = await readGarmentFile(file);
+  const garment = buildGarmentLayer(
+    source,
+    { id: crypto.randomUUID(), name: file.name.replace(/\.[^.]+$/, "").slice(0, 70), category },
+    profile,
+    personalized,
+  );
+  return { garment, source };
 }
