@@ -4,7 +4,7 @@ Forme Studio is an installable Android app for the Level 1 store-assisted avatar
 
 ## Install the test app
 
-[Download forme-android-debug.apk](https://github.com/RajeshRamadas/tryoncloths/raw/refs/heads/main/downloads/forme-android-debug.apk) onto your Android phone. Open the file and, if Android asks, allow installation from the browser or file manager you used. This is a debug build for testing, not a Google Play release. Android 7.0/API 24 or newer is required, with Android System WebView/Chrome 108 or newer. Android 10+ with an updated WebView is recommended. The download's SHA-256 is recorded in [SHA256SUMS](../downloads/SHA256SUMS).
+[Download forme-android-debug.apk](https://github.com/RajeshRamadas/tryoncloths/raw/6a13c5fd60e27668e6a21f04c62e2bb8f9d67187/downloads/forme-android-debug.apk) onto your Android phone. Open the file and, if Android asks, allow installation from the browser or file manager you used. This is a debug build for testing, not a Google Play release. Android 7.0/API 24 or newer is required, with Android System WebView/Chrome 108 or newer. Android 10+ with an updated WebView is recommended. The download's SHA-256 is recorded in the [download notes](../downloads/README.md).
 
 The app ID is `com.rajeshramadas.tryoncloths`. If Android reports a signing conflict with an older development copy, uninstall that copy before installing the new APK. Session photos are not durable app records; export anything you need first.
 
