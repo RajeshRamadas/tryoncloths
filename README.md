@@ -198,7 +198,7 @@ Cloud tasks already have an isolated checkout. Work in the existing repository; 
 
 ## Clothing try-on
 
-Version 0.6 includes **Try clothes** after avatar approval: independent tops/trousers/shoes, nine realistic AI-created sample garments, transparent PNG/WebP import, placement controls, reset and reviewed PNG download/Android sharing. Clothing changes are composed locally with no AI requests. See [usage, layer preparation and limitations](docs/CLOTHING_TRYON.md). This is an approximate 2D preview, not a fit or drape simulation.
+**Try clothes** after avatar approval now includes **44 sample colour/style choices**: 20 tops, 13 trousers and 11 footwear pairs, with eight one-tap complete outfits and 2,860 possible combinations. Search by colour or style, mix individual pieces, import transparent PNG/WebP layers, adjust placement, reset and download the reviewed PNG. The nine original AI-created garment textures supply the colour variants locally, with no AI request when selecting clothes. See [usage, layer preparation and limitations](docs/CLOTHING_TRYON.md). This web update does not rebuild the Android APK. This is an approximate 2D preview, not a fit or drape simulation.
 
 ## Try clothes from any website
 
