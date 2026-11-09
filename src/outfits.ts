@@ -3,6 +3,8 @@ import { colourGarmentPixels, type GarmentColour } from "./garment-colours";
 import { SAMPLE_GARMENTS } from "./sample-wardrobe";
 import { defaultGarmentPlacement, prepareGarmentLayer } from "./garment-layer";
 import { armMask } from "./arm-mask";
+import { poseMapping, referenceLandmarks, triangleAffine, warpTriangles } from "./pose-fit";
+import type { PoseSegmentation } from "./body-pose";
 import { CUTOUT_DEFAULT_TOLERANCE, removeBackground, transparentShare } from "./jewellery-cutout";
 
 export type Category = "shirt" | "trousers" | "shoes";
@@ -23,6 +25,8 @@ export type Layer = {
   placement: Placement;
   /** Draw the avatar's forearms and hands over this top (imported tops default to on). */
   armsInFront?: boolean;
+  /** Warp the layer from the template's body to the avatar's detected pose. */
+  fitToPose?: boolean;
 };
 
 // Coordinates use the original 384 × 942 standard pose. Generated portraits
@@ -79,32 +83,114 @@ export async function baseAvatar(
   return personalized || (await avatarCanvas(index, templateTone)).toDataURL("image/png");
 }
 
-export async function renderOutfit(base: string, layers: Layer[]): Promise<HTMLCanvasElement> {
+/** The standard template the placements were made against, to fit layers to a drifted body. */
+export type PoseReference = { template: string; personalized: boolean };
+
+export async function renderOutfit(
+  base: string,
+  layers: Layer[],
+  reference?: PoseReference,
+): Promise<HTMLCanvasElement> {
   const avatar = await loadImage(base);
   const canvas = document.createElement("canvas");
   canvas.width = avatar.naturalWidth;
   canvas.height = avatar.naturalHeight;
   const ctx = canvas.getContext("2d")!;
   ctx.drawImage(avatar, 0, 0);
+  const fitting =
+    reference && reference.template !== base && layers.some((l) => l.fitToPose)
+      ? await poseLandmarkPair(base, reference)
+      : null;
   // Shoes beneath trouser cuffs; the shirt hem sits over the waistband.
   for (const category of ["shoes", "trousers", "shirt"] as Category[]) {
     const layer = layers.find((item) => item.garment.category === category);
     if (!layer) continue;
     const image = await loadImage(await garmentSource(layer.garment));
     const p = layer.placement;
-    ctx.drawImage(
-      image,
-      p.x * canvas.width,
-      p.y * canvas.height,
-      p.width * canvas.width,
-      p.height * canvas.height,
-    );
+    const rect = {
+      x: p.x * canvas.width,
+      y: p.y * canvas.height,
+      width: p.width * canvas.width,
+      height: p.height * canvas.height,
+    };
+    const map =
+      layer.fitToPose && fitting ? poseMapping(category, fitting.reference, fitting.actual) : null;
+    if (map) drawWarped(ctx, image, rect, map);
+    else ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height);
   }
   if (layers.some((l) => l.garment.category === "shirt" && l.armsInFront)) {
     const arms = await armOverlay(base);
     if (arms) ctx.drawImage(arms, 0, 0, canvas.width, canvas.height);
   }
   return canvas;
+}
+
+function drawWarped(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  rect: { x: number; y: number; width: number; height: number },
+  map: (p: { x: number; y: number }) => { x: number; y: number },
+) {
+  const { width, height } = ctx.canvas;
+  for (const t of warpTriangles(
+    rect,
+    image.naturalWidth,
+    image.naturalHeight,
+    map,
+    width,
+    height,
+  )) {
+    const m = triangleAffine(t.src, t.dst);
+    if (!m) continue;
+    // Clip to the destination triangle, grown by half a pixel so neighbours leave no seam.
+    const cx = (t.dst[0].x + t.dst[1].x + t.dst[2].x) / 3,
+      cy = (t.dst[0].y + t.dst[1].y + t.dst[2].y) / 3;
+    ctx.save();
+    ctx.beginPath();
+    t.dst.forEach((q, i) => {
+      const d = Math.hypot(q.x - cx, q.y - cy) || 1,
+        x = q.x + ((q.x - cx) / d) * 0.6,
+        y = q.y + ((q.y - cy) / d) * 0.6;
+      if (i) ctx.lineTo(x, y);
+      else ctx.moveTo(x, y);
+    });
+    ctx.closePath();
+    ctx.clip();
+    ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+    ctx.drawImage(image, 0, 0);
+    ctx.restore();
+  }
+}
+
+// Pose of each image (avatar, template, AI try-on results), detected once on the device.
+const poses = new Map<string, Promise<PoseSegmentation | null>>();
+function imagePose(source: string): Promise<PoseSegmentation | null> {
+  let pose = poses.get(source);
+  if (!pose) {
+    pose = (async () => {
+      try {
+        const [{ segmentPose }, image] = await Promise.all([
+          import("./body-pose"),
+          loadImage(source),
+        ]);
+        return await segmentPose(image);
+      } catch {
+        return null;
+      }
+    })();
+    poses.set(source, pose);
+    if (poses.size > 6) poses.delete(poses.keys().next().value!);
+  }
+  return pose;
+}
+
+async function poseLandmarkPair(base: string, reference: PoseReference) {
+  const [actual, template] = await Promise.all([imagePose(base), imagePose(reference.template)]);
+  if (!actual || !template) return null;
+  return {
+    actual: actual.landmarks,
+    reference: referenceLandmarks(template.landmarks, reference.personalized),
+  };
 }
 
 // The avatar's forearms and hands, cut out on the device. Bounded: a session uses a handful of
@@ -115,9 +201,7 @@ export function armOverlay(base: string): Promise<HTMLCanvasElement | null> {
   if (!overlay) {
     overlay = (async () => {
       try {
-        const avatar = await loadImage(base);
-        const { segmentPose } = await import("./body-pose");
-        const pose = await segmentPose(avatar);
+        const [avatar, pose] = await Promise.all([loadImage(base), imagePose(base)]);
         if (!pose) return null;
         const canvas = document.createElement("canvas");
         canvas.width = pose.width;

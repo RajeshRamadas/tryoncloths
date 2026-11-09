@@ -24,6 +24,10 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
   ear) and **Hair accessory / passa** (passa, jhoomar, hair pins, clips). Both work with
   AI try-on and transparent cut-out overlays, and title hints recognise them. See the
   [jewellery catalogue](docs/JEWELLERY_CATALOGUE.md).
+- Imported clothes now follow a generated customer avatar's actual body. Tops, trousers
+  and shoes are warped from the template to where the avatar's shoulders, hips and ankles
+  are, on the device and with no credit. See
+  [clothing layers](docs/CLOTHING_LAYERS.md#fit-to-the-avatars-pose).
 
 ## 0.21.0-rc.3
 
