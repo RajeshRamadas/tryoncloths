@@ -118,6 +118,10 @@ async function fixture(run, { generate, extra = {} } = {}) {
     },
   });
   const server = app.listen(0, "127.0.0.1");
+  // Image work between requests can leave a pooled fetch socket idle for longer than the
+  // default 5 s server keep-alive on slow CI runners. The server and client share one event
+  // loop, so the server may close that socket just as fetch reuses it (ECONNRESET).
+  server.keepAliveTimeout = 60_000;
   await new Promise((r) => server.once("listening", r));
   const base = "http://127.0.0.1:" + server.address().port;
   const request = (endpoint, method = "POST", body, cookie = ca, origin = base) =>
