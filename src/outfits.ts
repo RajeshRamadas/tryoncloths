@@ -1,8 +1,10 @@
 import { avatarCanvas, loadImage } from "./images";
+import { colourGarmentPixels, type GarmentColour } from "./garment-colours";
+import { SAMPLE_GARMENTS } from "./sample-wardrobe";
 
 export type Category = "shirt" | "trousers" | "shoes";
 export type Placement = { x: number; y: number; width: number; height: number };
-export type Garment = { id: string; name: string; category: Category; source: string; placement: Placement; imported?: boolean };
+export type Garment = { id: string; name: string; category: Category; source: string; placement: Placement; imported?: boolean; colour?: GarmentColour };
 export type Layer = { garment: Garment; placement: Placement };
 
 // Coordinates use the original 384 × 942 standard pose. Generated portraits
@@ -20,17 +22,34 @@ export function defaultPlacement(category: Category, profile: string, personaliz
 
 export function sampleCatalogue(profile: string, personalized: boolean): Garment[] {
   if (profile.startsWith("f-")) return [];
-  return ([
-    ["shirt", "navy-tee", "Navy T-shirt"],
-    ["shirt", "cream-tee", "Cream T-shirt"],
-    ["shirt", "blue-shirt", "Blue button-down shirt"],
-    ["trousers", "blue-jeans", "Blue jeans"],
-    ["trousers", "charcoal-chinos", "Charcoal chinos"],
-    ["trousers", "sand-chinos", "Sand chinos"],
-    ["shoes", "white-sneakers", "White sneakers"],
-    ["shoes", "black-sneakers", "Black sneakers"],
-    ["shoes", "brown-shoes", "Brown leather shoes"],
-  ] as const).map(([category, id, name]) => ({ id, name, category, source: `/garments/${id}.webp`, placement: defaultPlacement(category, profile, personalized) }));
+  return SAMPLE_GARMENTS.map(garment => ({ ...garment, placement: defaultPlacement(garment.category, profile, personalized) }));
+}
+
+// Bounded by the shipped catalogue. Imported layers bypass this cache and the
+// colour transform so user uploads remain exactly as supplied.
+const sampleSources = new Map<string, Promise<string>>();
+export async function garmentSource(garment: Garment): Promise<string> {
+  if (!garment.colour || garment.imported) return garment.source;
+  const colour = garment.colour;
+  const key = `${garment.source}:${colour.hex}:${colour.reference}`;
+  let source = sampleSources.get(key);
+  if (!source) {
+    source = (async () => {
+      const image = await loadImage(garment.source);
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(image, 0, 0);
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      colourGarmentPixels(pixels.data, colour);
+      ctx.putImageData(pixels, 0, 0);
+      return canvas.toDataURL("image/png");
+    })();
+    sampleSources.set(key, source);
+    // A transient load failure must not permanently poison a sample.
+    void source.catch(() => sampleSources.delete(key));
+  }
+  return source;
 }
 
 export async function baseAvatar(index: number, personalized: string | null, templateTone='medium'): Promise<string> {
@@ -48,7 +67,7 @@ export async function renderOutfit(base: string, layers: Layer[]): Promise<HTMLC
   for (const category of ["shoes", "trousers", "shirt"] as Category[]) {
     const layer = layers.find(item => item.garment.category === category);
     if (!layer) continue;
-    const image = await loadImage(layer.garment.source);
+    const image = await loadImage(await garmentSource(layer.garment));
     const p = layer.placement;
     ctx.drawImage(image, p.x * canvas.width, p.y * canvas.height, p.width * canvas.width, p.height * canvas.height);
   }

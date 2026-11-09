@@ -138,3 +138,88 @@ test("footwear can switch or clear independently without changing the upper body
   await expect(page.getByRole("button", { name: "Navy T-shirt Sample" })).toHaveAttribute("aria-pressed", "true");
   expect(missing).toEqual([]);
 });
+
+test("expanded wardrobe searches all categories, renders real colour variants and exports the displayed pixels", async ({ page }) => {
+  const aiRequests = [], missing = [];
+  page.on('request', request => { if (/\/api\/(personalize|tryon)(\?|$)/.test(request.url())) aiRequests.push(request.url()); });
+  page.on('response', response => { if (response.url().includes('/garments/') && !response.ok()) missing.push(response.url()); });
+  await sampleStudio(page);
+  const original = await outputBytes(page);
+  await expect(page.getByText(/44 sample items · 2,860 possible combinations/)).toBeVisible();
+  await expect(page.locator('.garment-grid button')).toHaveCount(21);
+  await page.getByLabel('Search sample clothes').fill('red');
+  await expect(page.locator('.garment-grid button')).toHaveCount(2);
+  const red = page.getByRole('button', { name: 'Red T-shirt Sample', exact: true });
+  await expect(red.locator('img')).toHaveAttribute('src', /^data:image\/png;base64,/);
+  const thumbnail = Buffer.from((await red.locator('img').getAttribute('src')).split(',')[1], 'base64');
+  const { data, info } = await sharp(thumbnail).raw().toBuffer({ resolveWithObject: true });
+  const chest = (Math.floor(info.height * .5) * info.width + Math.floor(info.width * .5)) * info.channels;
+  expect(data[chest]).toBeGreaterThan(data[chest + 1] * 1.5);
+  await red.click();
+  await approve(page);
+  const redOutfit = await outputBytes(page);
+  expect(redOutfit.equals(original)).toBe(false);
+  const head = { left: 0, top: 0, width: 384, height: 170 };
+  expect((await sharp(redOutfit).extract(head).raw().toBuffer()).equals(await sharp(original).extract(head).raw().toBuffer())).toBe(true);
+  await page.getByRole('button', { name: 'Trousers', exact: true }).click();
+  await page.getByLabel('Search sample clothes').fill('');
+  await expect(page.locator('.garment-grid button')).toHaveCount(14);
+  await page.getByRole('button', { name: 'Olive chinos Sample', exact: true }).click();
+  await page.getByRole('button', { name: 'Shoes', exact: true }).click();
+  await expect(page.locator('.garment-grid button')).toHaveCount(12);
+  await page.getByRole('button', { name: 'Tan leather shoes Sample', exact: true }).click();
+  await approve(page);
+  const composed = await outputBytes(page);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download outfit', exact: true }).click();
+  expect((await sharp(await (await download).path()).raw().toBuffer()).equals(await sharp(composed).raw().toBuffer())).toBe(true);
+  expect(aiRequests).toEqual([]);
+  expect(missing).toEqual([]);
+});
+
+test("complete sample outfits replace all three layers, reset review, and keep individual choices editable", async ({ page }) => {
+  const aiRequests = [];
+  page.on('request', request => { if (/\/api\/(personalize|tryon)(\?|$)/.test(request.url())) aiRequests.push(request.url()); });
+  await sampleStudio(page);
+  const outfits = page.getByRole('group', { name: 'Complete sample outfits' });
+  for (const name of ['Weekend casual', 'Office classic', 'Earth tones', 'Monochrome', 'Summer light', 'Evening smart', 'Colour pop', 'Soft pastels']) {
+    const choice = outfits.getByRole('button', { name: new RegExp('^' + name) });
+    await choice.click();
+    await expect(choice).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Download outfit', exact: true })).toBeDisabled();
+    await approve(page);
+    await expect(page.getByAltText('Avatar wearing the selected outfit')).toBeVisible();
+  }
+  await page.getByRole('button', { name: 'Trousers', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Light blue jeans Sample', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Black jeans Sample', exact: true }).click();
+  await expect(outfits.locator('[aria-pressed="true"]')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Shoes', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Grey sneakers Sample', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Shirts & tops', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Blush pink T-shirt Sample', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Reset outfit', exact: true }).click();
+  await expect(outfits.locator('[aria-pressed="true"]')).toHaveCount(0);
+  expect(aiRequests).toEqual([]);
+});
+
+test("sample search keeps imported clothing usable and the enlarged catalogue fits mobile", async ({ page }) => {
+  await sampleStudio(page);
+  const transparent = await sharp({ create: { width: 150, height: 150, channels: 4, background: '#805050' } })
+    .extend({ top: 20, bottom: 20, left: 20, right: 20, background: '#00000000' }).png().toBuffer();
+  await page.getByLabel('Import clothing layer').setInputFiles({ name: 'Store top.png', mimeType: 'image/png', buffer: transparent });
+  await page.getByLabel('Search sample clothes').fill('not-a-colour');
+  await expect(page.getByText(/No sample clothes match this search/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Store top Your layer', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Clear sample search', exact: true }).click();
+  await expect(page.locator('.garment-grid button')).toHaveCount(22);
+  await page.getByRole('group', { name: 'Complete sample outfits' }).getByRole('button', { name: /^Earth tones/ }).click();
+  await approve(page);
+  await page.setViewportSize({ width: 1440, height: 1200 });
+  await page.getByRole('heading', { name: 'Complete outfit combinations' }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/colour-wardrobe-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('heading', { name: 'Choose your clothes' }).evaluate(heading => heading.scrollIntoView({ block: 'start' }));
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/colour-wardrobe-mobile.png' });
+});
