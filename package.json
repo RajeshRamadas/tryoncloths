@@ -46,7 +46,7 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "saxes": "^6.0.0",
-    "sharp": "^0.34.0",
+    "sharp": "^0.35.5",
     "xlsx": "npm:@e965/xlsx@0.20.3"
   },
   "devDependencies": {
