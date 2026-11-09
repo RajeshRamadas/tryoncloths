@@ -31,6 +31,6 @@ The four profiles use the generated sample image approved for prototype explorat
 - Benchmark a real provider account with consented test images, including face fidelity, changes to the body, cost, latency, and failures.
 - Evaluate local pose/silhouette analysis to assist the manual full-body review, accounting for clothing and camera distortion.
 - Add authenticated store sessions, durable private avatar storage, versioning, retention/deletion, and tenant boundaries before a multi-store deployment.
-- Prepare aligned transparent garments and masks for the later clothing compositor.
+- ~~Prepare aligned transparent garments and masks for the later clothing compositor.~~ Imported layers are now cut out, cleaned and aligned on the device; see [clothing layers](CLOTHING_LAYERS.md).
 
 The earlier uploaded platform documents describe a broader proposed baseline. This file captures the revised Level 1 priority confirmed in the conversation.

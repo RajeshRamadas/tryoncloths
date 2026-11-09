@@ -1,5 +1,5 @@
-// Local, deterministic background removal for jewellery product photos.
-// Runs in the browser (catalogue cut-out upload) and in Node tests; no AI request.
+// Local, deterministic background removal for jewellery and clothing product photos.
+// Runs in the browser (jewellery cut-outs, imported clothing layers) and in Node tests; no AI request.
 // It suits pieces photographed on a plain backdrop; busy backgrounds are rejected.
 
 export const CUTOUT_DEFAULT_TOLERANCE = 32;
@@ -64,7 +64,7 @@ export function removeBackground(
   rgba,
   width,
   height,
-  { tolerance = CUTOUT_DEFAULT_TOLERANCE, clearEnclosed = true } = {},
+  { tolerance = CUTOUT_DEFAULT_TOLERANCE, clearEnclosed = true, subject = "jewellery" } = {},
 ) {
   if (!(width > 0 && height > 0) || rgba.length !== width * height * 4)
     throw new CutoutError("The image could not be read.");
@@ -179,7 +179,7 @@ export function removeBackground(
   const foregroundShare = foreground / n;
   if (foregroundShare < 0.001)
     throw new CutoutError(
-      "No jewellery was found after removing the background. Try a lower tolerance.",
+      `No ${subject} was found after removing the background. Try a lower tolerance.`,
     );
   if (foregroundShare > 0.95)
     throw new CutoutError(

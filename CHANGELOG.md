@@ -8,6 +8,11 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
   JPEG or WebP). The background is removed on the staff device with no AI credit,
   with a tolerance control and an option to clear ring holes and chain loops. See
   [automatic background removal](docs/JEWELLERY_OVERLAY.md#automatic-background-removal).
+- Clothing layers in the outfit studio can now be imported from a front-view product
+  photo (JPEG, PNG or WebP) as well as a transparent layer. The background is removed
+  on the device, stray specks are cleaned from the mask, and the layer is placed by
+  measuring its torso, waistband or shoe pair rather than its outline, so sleeves no
+  longer shrink a top. See [clothing layers](docs/CLOTHING_LAYERS.md).
 
 ## 0.21.0-rc.3
 

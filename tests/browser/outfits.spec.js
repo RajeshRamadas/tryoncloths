@@ -23,6 +23,52 @@ const outputBytes = async (page) =>
 const approve = (page) =>
   page.getByLabel("I have checked clothing placement and approve this outfit preview.").check();
 
+test("a JPEG product photo on a plain backdrop is cut out on the device and aligned as a top", async ({
+  page,
+}) => {
+  const apiCalls = [];
+  page.on("request", (req) => {
+    if (new URL(req.url()).pathname.startsWith("/api/")) apiCalls.push(req.url());
+  });
+  await sampleStudio(page);
+  const original = await outputBytes(page);
+  const before = apiCalls.length;
+  const photo = await sharp(
+    Buffer.from(
+      '<svg width="500" height="520" xmlns="http://www.w3.org/2000/svg"><rect width="500" height="520" fill="#f4f3ef"/><path d="M160 60 L210 40 Q250 70 290 40 L340 60 L440 150 L390 200 L350 160 L350 480 L150 480 L150 160 L110 200 L60 150 Z" fill="#2e5c8a"/></svg>',
+    ),
+  )
+    .jpeg({ quality: 85 })
+    .toBuffer();
+  await page
+    .getByLabel("Import clothing layer")
+    .setInputFiles({ name: "Store tee.jpg", mimeType: "image/jpeg", buffer: photo });
+  await expect(page.getByRole("button", { name: "Store tee Your layer" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByText("Background removed on this device")).toBeVisible();
+  await expect.poll(async () => (await outputBytes(page)).equals(original)).toBe(false);
+  const composed = await outputBytes(page);
+  // The backdrop is gone: the avatar's head above the neckline is untouched.
+  const head = { left: 110, top: 0, width: 160, height: 170 };
+  expect(
+    (await sharp(original).extract(head).removeAlpha().raw().toBuffer()).equals(
+      await sharp(composed).extract(head).removeAlpha().raw().toBuffer(),
+    ),
+  ).toBe(true);
+  await page.locator(".placement-options summary").click();
+  const width = Number(await page.getByLabel("shirt Width").inputValue());
+  expect(width).toBeGreaterThan(70);
+  expect(width).toBeLessThan(110);
+  await page.getByLabel("Clothing background tolerance").fill("60");
+  await expect(page.getByLabel("Clothing background tolerance")).toHaveValue("60");
+  await page.getByLabel("Clear enclosed gaps, such as between straps").uncheck();
+  await approve(page);
+  await expect(page.getByRole("button", { name: "Download outfit" })).toBeEnabled();
+  expect(apiCalls.slice(before)).toEqual([]);
+});
+
 test("outfits select independently, export displayed pixels without AI calls, and reset cleanly", async ({
   page,
 }) => {
@@ -79,7 +125,7 @@ test("outfits select independently, export displayed pixels without AI calls, an
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test("transparent layers import locally; opaque photos fail and profile changes discard the outfit", async ({
+test("transparent layers import locally; photos with no garment fail and profile changes discard the outfit", async ({
   page,
 }) => {
   await sampleStudio(page);
@@ -91,7 +137,7 @@ test("transparent layers import locally; opaque photos fail and profile changes 
   await page
     .getByLabel("Import clothing layer")
     .setInputFiles({ name: "opaque.png", mimeType: "image/png", buffer: opaque });
-  await expect(page.getByRole("alert")).toContainText("transparent background");
+  await expect(page.getByRole("alert")).toContainText("No clothing was found");
   const transparent = await sharp(opaque)
     .extend({ top: 20, bottom: 20, left: 20, right: 20, background: "#00000000" })
     .png()

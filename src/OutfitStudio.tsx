@@ -6,15 +6,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Download, RotateCcw, Shirt, Undo2, Upload } from "lucide-react";
 import {
   baseAvatar,
+  buildGarmentLayer,
   garmentSource,
   importGarment,
   renderOutfit,
   sampleCatalogue,
   type Category,
+  type CutoutSettings,
   type Garment,
   type Layer,
+  type LayerSource,
   type Placement,
 } from "./outfits";
+import { CUTOUT_MAX_TOLERANCE, CUTOUT_MIN_TOLERANCE } from "./jewellery-cutout";
 import { SAMPLE_OUTFITS } from "./sample-wardrobe";
 import { downloadAvatar } from "./images";
 import { isNative } from "./native";
@@ -96,6 +100,8 @@ export default function OutfitStudio({
   );
   const [sessionId] = useState(() => crypto.randomUUID());
   const [imports, setImports] = useState<Garment[]>([]);
+  // Decoded originals of imported photos, so the cut-out can be re-run on this device.
+  const importSources = useRef(new Map<string, LayerSource>());
   const [layers, setLayers] = useState<Layer[]>([]);
   const [category, setCategory] = useState<Category>("shirt");
   const [search, setSearch] = useState("");
@@ -247,14 +253,38 @@ export default function OutfitStudio({
     onBusy(true);
     setError("");
     try {
-      const garment = await importGarment(file, category, profile.id, !!personalized);
+      const { garment, source } = await importGarment(file, category, profile.id, !!personalized);
+      if (source.photo) importSources.current.set(garment.id, source);
       setImports((items) => [...items, garment]);
       select(garment);
+      if (garment.cutout)
+        setNotice("Background removed on this device. Check the edges and placement.");
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
       onBusy(false);
+    }
+  }
+  function recut(garment: Garment, cutout: CutoutSettings) {
+    const source = importSources.current.get(garment.id);
+    if (!source) return;
+    try {
+      const next = buildGarmentLayer(
+        source,
+        { id: garment.id, name: garment.name, category: garment.category },
+        profile.id,
+        !!personalized,
+        cutout,
+      );
+      setImports((items) => items.map((g) => (g.id === next.id ? next : g)));
+      update(
+        layers.map((l) =>
+          l.garment.id === next.id ? { garment: next, placement: { ...next.placement } } : l,
+        ),
+      );
+    } catch (e) {
+      setError((e as Error).message);
     }
   }
   async function keepLook() {
@@ -519,7 +549,7 @@ export default function OutfitStudio({
               <span aria-hidden="true">
                 {catalogue.length
                   ? `Free · ${catalogue.length} styles`
-                  : "Import transparent clothes · free"}
+                  : "Import clothes or product photos · free"}
               </span>
             </button>
             <button
@@ -654,11 +684,11 @@ export default function OutfitStudio({
                 </p>
               )}
               <details className="import-clothing">
-                <summary>Import a prepared clothing layer</summary>
+                <summary>Import a clothing layer or product photo</summary>
                 <input
                   ref={input}
                   type="file"
-                  accept="image/png,image/webp"
+                  accept="image/png,image/webp,image/jpeg"
                   aria-label="Import clothing layer"
                   className="outfit-file"
                   disabled={busy}
@@ -675,9 +705,10 @@ export default function OutfitStudio({
                   <Upload size={16} /> Import {layerNames[category]} layer
                 </button>
                 <p className="small-footnote">
-                  Transparent PNG or WebP; import footwear as a pair. Front view in the avatar’s
-                  pose. Layers stay in this session. Importing does not remove backgrounds or
-                  reshape garments.
+                  A transparent PNG or WebP layer, or a front-view product photo on a plain backdrop
+                  (JPEG, PNG or WebP), whose background is removed on this device. Import footwear
+                  as a pair. Layers line up with the neckline, waistband or feet and stay in this
+                  session. Garments are not reshaped to the pose.
                 </p>
               </details>
             </section>
@@ -754,11 +785,56 @@ export default function OutfitStudio({
               >
                 Reset placement
               </button>
+              {selected.garment.cutout && (
+                <fieldset className="garment-cutout">
+                  <legend>Background removal</legend>
+                  <label className="outfit-slider">
+                    <span>
+                      Background tolerance
+                      <output>{selected.garment.cutout.tolerance}</output>
+                    </span>
+                    <input
+                      aria-label="Clothing background tolerance"
+                      type="range"
+                      min={CUTOUT_MIN_TOLERANCE}
+                      max={CUTOUT_MAX_TOLERANCE}
+                      step="4"
+                      value={selected.garment.cutout.tolerance}
+                      disabled={busy}
+                      onChange={(e) =>
+                        recut(selected.garment, {
+                          ...selected.garment.cutout!,
+                          tolerance: Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="consent">
+                    <input
+                      type="checkbox"
+                      checked={selected.garment.cutout.clearEnclosed}
+                      disabled={busy}
+                      onChange={(e) =>
+                        recut(selected.garment, {
+                          ...selected.garment.cutout!,
+                          clearEnclosed: e.target.checked,
+                        })
+                      }
+                    />
+                    <span>Clear enclosed gaps, such as between straps</span>
+                  </label>
+                  <p className="small-footnote">
+                    Raise the tolerance if backdrop remains; lower it if the garment edges are lost.
+                    Changing these resets the placement.
+                  </p>
+                </fieldset>
+              )}
               {selected.garment.imported && (
                 <button
                   className="button back-button"
                   disabled={busy}
                   onClick={() => {
+                    importSources.current.delete(selected.garment.id);
                     setImports((items) => items.filter((g) => g.id !== selected.garment.id));
                     update(layers.filter((l) => l !== selected));
                   }}
