@@ -66,6 +66,7 @@ test('complete boards use the same-avatar saved outfit and portrait, exact inset
   const context=await prepareComplete(store,a,complete),image=await renderComplete(context),pixel=async(x,y)=>[...(await sharp(image).extract({left:x,top:y,width:1,height:1}).removeAlpha().raw().toBuffer())];assert.deepEqual(await pixel(p.layout.inset.x+40,p.layout.inset.y+40),[169,68,85]);assert.deepEqual(await pixel(0,p.layout.bodyHeight+100),[255,255,255]);assert.equal((await sharp(image).metadata()).height,p.layout.height);
   const saved=await request('/api/jewellery/complete',{...complete,sourceHash:p.sourceHash,name:'The whole look',reviewed:true,storageConsent:true});assert.equal(saved.status,200,await saved.clone().text());const board=await saved.json();assert.equal(board.view,'complete');assert.equal(board.creditsUsed,0);const row=store.listLooks(a,avatar.id).find(l=>l.id===board.id);assert.equal(row.view,'complete');assert.ok(row.garments.some(n=>n.includes('White')));assert.ok(row.itemsJson.length);
   const share=await(await request('/api/looks/'+board.id+'/share',{days:7,sharingConsent:true})).json();assert.match(await(await fetch(share.url)).text(),/Your complete look/);const publicPng=await(await fetch(share.url+'/image')).arrayBuffer();assert.equal((await sharp(Buffer.from(publicPng)).metadata()).height,p.layout.height,'already labelled board gets no duplicate footer');
+  const activity=store.analytics.report(a,{},Date.now(),{jewelleryEnabled:true}).jewellery.totals;assert.equal(activity.completeLooksSaved,1);assert.equal(activity.setsSaved,0);assert.equal(activity.looksShared,1);assert.equal(activity.shareViews,1);
   store.removeLook(a,outfit.id);store.removeLook(a,jewel.id);assert.equal((await request('/api/jewellery/looks/'+board.id,undefined,undefined,undefined,'GET')).status,200);assert.equal(store.billing.balance(a.org),before);assert.equal(calls(),0);assert.deepEqual(store.db.prepare('PRAGMA foreign_key_check').all(),[]);
 }));
 test('complete preview/save enforce consent, tenant, source hashes, source kinds and disabled pilot flag',async()=>fixture(async({store,a,b,avatar,complete,request,cb,jewel,outfit})=>{
@@ -80,3 +81,23 @@ test('complete composition supports 20 long Unicode names without cropped lines 
   const cookie='forme_session='+store.session(branch),choices=await(await request('/api/jewellery/variants/'+encodeURIComponent(sharedGold.id),undefined,cookie,undefined,'GET')).json();assert.equal(choices.variants.length,2);assert.ok(choices.variants.every(i=>!i.image&&!i.overlayPng));
 }));
 test('disabled jewellery exposes neither comparisons nor complete boards',async()=>fixture(async({request,input,complete})=>{assert.equal((await request('/api/jewellery/compare',{...input,action:'quote'})).status,404);assert.equal((await request('/api/jewellery/complete/prepare',complete)).status,404);},{enabled:false}));
+
+test('comparison analytics count explicit runs once, include both fitting variants and keep one shared session across free reuse',async()=>fixture(async({store,a,request,input,quote,runCompare})=>{
+ const sessionId=randomUUID(),q=await quote({sessionId});assert.equal(store.analytics.report(a,{},Date.now(),{jewelleryEnabled:true}).jewellery.totals.comparisonsCompleted,0);
+ assert.equal((await runCompare(q,{sessionId:'invalid'})).status,400);
+ const first=await(await runCompare(q,{sessionId})).json();for(const e of first.results)await request('/api/jewellery/results/'+e.result.resultId+'/approve',approve(e));
+ const free=await quote({sessionId}),requestIds=[randomUUID(),randomUUID()];assert.equal(free.credits,0);
+ for(let i=0;i<2;i++)assert.equal((await runCompare(free,{sessionId,requestIds})).status,200);
+ const j=store.analytics.report(a,{},Date.now(),{jewelleryEnabled:true}).jewellery.totals;assert.equal(j.comparisonsCompleted,2);assert.equal(j.comparisonsPartial,0);assert.equal(j.tryonsGenerated,2);assert.equal(j.tryonsReused,2);assert.equal(j.tryonSessions,1);
+}));
+
+test('partial comparison analytics include the delivered variant only and keep the failed variant refund',async()=>fixture(async({store,a,quote,runCompare})=>{
+ const p=await(await runCompare(await quote(),{sessionId:randomUUID()})).json();assert.equal(p.partial,true);
+ const j=store.analytics.report(a,{},Date.now(),{jewelleryEnabled:true}).jewellery.totals;assert.equal(j.comparisonsPartial,1);assert.equal(j.comparisonsCompleted,0);assert.equal(j.tryonsGenerated,1);assert.equal(j.tryonSessions,1);
+ assert.equal(store.db.prepare("SELECT count(*) n FROM ledger WHERE kind='refund'").get().n,1);
+},{generate:async(input,n)=>{if(n===2)throw new ProviderError('quota');return url(input.base);}}));
+
+test('comparison telemetry failure never discards paid previews or triggers a provider retry',async()=>fixture(async({store,a,quote,runCompare,calls})=>{
+ store.db.exec("CREATE TRIGGER reject_compare_event BEFORE INSERT ON events WHEN NEW.type='jewellery_compared' BEGIN SELECT RAISE(FAIL,'private telemetry failure');END;");
+ const before=store.billing.balance(a.org),result=await runCompare(await quote());assert.equal(result.status,200);assert.equal((await result.json()).results.length,2);assert.equal(calls(),2);assert.equal(store.billing.balance(a.org),before-2);assert.equal(store.analytics.report(a,{},Date.now(),{jewelleryEnabled:true}).jewellery.totals.comparisonsCompleted,0);
+}));

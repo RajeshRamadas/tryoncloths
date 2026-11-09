@@ -240,7 +240,7 @@ export function installAccountRoutes(app, store, { production=false, allowSignup
   installShopperBudgetRoutes(app,store,{requireUser,sameOrigin,wrap});
   installShopifyShopperOwner(app,shopifyShopper,{requireUser,sameOrigin,wrap,production});
   installBrandingRoutes(app,store,{requireUser,sameOrigin,wrap});
-  installAnalyticsRoutes(app,store,{requireUser,sameOrigin,wrap,reports:analyticsReports});
+  installAnalyticsRoutes(app,store,{requireUser,sameOrigin,wrap,reports:analyticsReports,jewelleryEnabled});
   if(catalogueSync)installSyncRoutes(app,store,catalogueSync,{requireUser,sameOrigin,wrap});
   if(photoJobs)installPhotoRoutes(app,store,photoJobs,{requireUser,sameOrigin,wrap});
   installSizeRoutes(app,store,{requireUser,sameOrigin,wrap});

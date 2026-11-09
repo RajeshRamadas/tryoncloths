@@ -24,14 +24,14 @@ function ensureSession(store,account,input){
  const id=input.sessionId?.toLowerCase();if(!id)return null;validateSession(store,account,input);
  store.db.prepare('INSERT INTO fitting_sessions(store,id,avatarId,createdBy,createdAt) VALUES(?,?,?,?,?) ON CONFLICT(store,id) DO UPDATE SET avatarId=COALESCE(fitting_sessions.avatarId,excluded.avatarId)').run(account.id,id,input.avatarId??null,account.user.id,Date.now());return id;
 }
-export function recordTryon(store,account,input,{reused=false,source='studio'}={}){
+export function recordTryon(store,account,input,{reused=false,source='studio',mode='ai'}={}){
  if(!store||!account)return;
  try{transaction(store.db,()=>{
   const sessionId=(input.sessionId||input.requestId).toLowerCase();
   ensureSession(store,account,{...input,sessionId});
   if(input.garmentId)store.db.prepare('INSERT OR IGNORE INTO session_products VALUES(?,?,?)').run(account.id,sessionId,input.garmentId);
-  recordEvent(store.db,{org:account.org,store:account.id,user:account.user.id},reused?'tryon_reused':'tryon_generated',{requestId:input.requestId.toLowerCase(),sessionId,avatarId:input.avatarId,garmentId:input.garmentId,source},{operationKey:input.requestId.toLowerCase()});
- });}catch{console.error(JSON.stringify({event:'analytics_record_failed',type:reused?'tryon_reused':'tryon_generated'}));}
+  recordEvent(store.db,{org:account.org,store:account.id,user:account.user.id},mode==='overlay'?'jewellery_overlay_applied':reused?'tryon_reused':'tryon_generated',{requestId:input.requestId.toLowerCase(),sessionId,avatarId:input.avatarId,garmentId:input.garmentId,source,category:source==='jewellery'?'jewellery':'garment',...(source==='jewellery'?{view:input.view}:{})},{operationKey:input.requestId.toLowerCase()});
+ });}catch{console.error(JSON.stringify({event:'analytics_record_failed',type:mode==='overlay'?'jewellery_overlay_applied':reused?'tryon_reused':'tryon_generated'}));}
 }
 export function validateLookTracking(store,account,input){
  validateSession(store,account,input);
@@ -47,6 +47,18 @@ export function attributeLook(store,account,id,input){
  const garmentIds=input.garmentIds===undefined?JSON.parse(previous?.garmentIdsJson||'[]'):[...new Set(input.garmentIds)];
  store.db.prepare('INSERT INTO look_attribution VALUES(?,?,?,?) ON CONFLICT(store,lookId) DO UPDATE SET sessionId=COALESCE(look_attribution.sessionId,excluded.sessionId),garmentIdsJson=excluded.garmentIdsJson').run(account.id,id,sessionId,JSON.stringify(garmentIds));
  const attribution=lookAttribution(store,account,id);
- recordEvent(store.db,{org:account.org,store:account.id,user:account.user.id},'look_saved',{lookId:id,avatarId:input.avatarId,...attribution},{operationKey:'look:'+id});
+ recordEvent(store.db,{org:account.org,store:account.id,user:account.user.id},'look_saved',{lookId:id,avatarId:input.avatarId,...attribution,...lookDimensions(store,account,id)},{operationKey:'look:'+id});
 }
 export function lookAttribution(store,account,id){const row=store.db.prepare('SELECT sessionId,garmentIdsJson FROM look_attribution WHERE store=? AND lookId=?').get(account.id,id);return {sessionId:row?.sessionId||undefined,garmentIds:JSON.parse(row?.garmentIdsJson||'[]')};}
+
+// Snapshot only IDs, bounded counts and enums; never product names, photos,
+// customer details, prices, measurements or provider inputs.
+export function lookDimensions(store,account,id){
+ const row=store.db.prepare('SELECT view,itemsJson,previewMode FROM looks WHERE account=? AND id=?').get(account.id,id);
+ if(!row)return {};
+ let items;try{items=JSON.parse(row.itemsJson);}catch{return {};}
+ if(!Array.isArray(items))return {};
+ if(!items.length)return {category:'garment',view:row.view};
+ return {category:'jewellery',view:row.view,previewMode:row.previewMode,itemCount:items.length,
+  jewelleryItemIds:[...new Set(items.flatMap(i=>typeof i?.itemId==='string'?[i.itemId]:[]))].slice(0,20)};
+}

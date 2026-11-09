@@ -140,3 +140,13 @@ cd ~/tryoncloths && git pull --ff-only origin main && cd deploy/lightsail && sud
 This is a web update, not a deployment performed by Codex. Commercial integration
 rollout remains alpha until the configured live services are validated. The next
 implementation task after C13 catalogue photos is **C15 — Store branding**.
+
+## Jewellery activity (web 0.21.0-rc.2)
+
+The [jewellery analytics section](JEWELLERY_ANALYTICS.md) implements JF-3:
+AI/reuse/overlay counts, sessions, sets, comparisons, purchases and shares, with
+store/staff/product/daily tables and separate CSV groups. Overlays do not inflate
+the existing AI try-on totals. Historical unclassified records remain explicit;
+only server-captured categories and the historical jewellery source tag establish
+jewellery attribution. This adds no provider call, message, credit charge or
+pilot rollout approval.

@@ -263,3 +263,18 @@ test('J8 bangle count is a validated preview override and changes reuse without 
   assert.equal((await create({itemId:item.id,hand:undefined,finger:undefined,wrist:'left',count:25})).status,400);
   assert.equal((await create({count:4})).status,400);assert.equal(calls(),1);
 }));
+
+test('saved sets, shares and purchase marks snapshot jewellery attribution and survive later look erasure without storing names or photos',async()=>fixture(async({store,a,avatar,item,create,request})=>{
+ const sessionId=randomUUID(),first=await(await create({sessionId})).json(),second=await(await create({sessionId,finger:'index',base:first.image,baseReceipt:first.receipt,baseReviewed:true})).json();
+ const piece={itemId:item.id,name:item.name,type:'ring',attributes:item.attributes,hand:'right',finger:'ring'};
+ const body={avatarId:avatar.id,view:'hands',image:second.image,name:'Reviewed set',itemsJson:[piece,{...piece,finger:'index'}],receipt:second.receipt,reviewed:true,storageConsent:true,sessionId};
+ const saved=await request('/api/jewellery/looks','POST',body);assert.equal(saved.status,200,await saved.clone().text());const look=await saved.json();
+ assert.equal((await request('/api/jewellery/looks','POST',{...body,name:'Renamed set'})).status,200);
+ const share=await(await request('/api/looks/'+look.id+'/share','POST',{sharingConsent:true,days:1})).json();assert.equal((await fetch(share.url)).status,200);
+ assert.equal((await request('/api/looks/'+look.id+'/purchase','POST',{size:'Adjustable'})).status,200);
+ assert.equal((await request('/api/looks/'+look.id+'/purchase','POST',{size:'Adjustable'})).status,200);
+ store.removeLook(a,look.id);
+ const report=store.analytics.report(a,{},Date.now(),{jewelleryEnabled:true}),j=report.jewellery;assert.equal(j.totals.tryonsGenerated,2);assert.equal(j.totals.tryonSessions,1);assert.equal(j.totals.looksSaved,1);assert.equal(j.totals.setsSaved,1);assert.equal(j.totals.purchases,1);assert.equal(j.totals.looksShared,1);assert.equal(j.totals.shareViews,1);assert.equal(j.totals.unattributedPurchases,0);assert.equal(j.products[0].purchases,1);
+ const refs=store.db.prepare('SELECT refJson FROM events').all().map(r=>JSON.parse(r.refJson));assert.ok(refs.every(r=>!Object.hasOwn(r,'image')&&!Object.hasOwn(r,'name')));
+ assert.ok(refs.filter(r=>r.lookId===look.id).every(r=>r.category==='jewellery'&&r.itemCount===2&&r.view==='hands'));
+}));
