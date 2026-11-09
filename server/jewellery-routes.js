@@ -1,3 +1,5 @@
+import {randomUUID} from 'node:crypto';
+import {safelyRecord} from './events.js';
 import {customerSizing,saveCustomerSizing,necklaceGuide} from './jewellery-sizing.js';
 import {prepareComplete,completePreview,saveComplete} from './jewellery-complete.js';
 import {variantChoices,comparisonVariants,comparisonQuote,verifyComparisonQuote} from './jewellery-variants.js';
@@ -54,7 +56,9 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
   app.get('/api/jewellery/looks/:id',wrap((req,res,account)=>{const row=jewelleryLook(store,account,req.params.id);res.json({id:row.id,avatarId:row.avatarId,view:row.view,previewMode:row.previewMode,name:row.name,itemsJson:JSON.parse(row.itemsJson),image:'data:image/png;base64,'+Buffer.from(row.image).toString('base64')});}));
   for(const path of ['/api/jewellery/overlay/prepare','/api/jewellery/overlay'])app.post(path,wrap(async(req,res,account)=>{
     const body=req.body||{};
-    fields(body,['avatarId','itemId','view','base','baseReceipt','baseResultId','baseLookId','baseReviewed','side','hand','finger','wrist','count','replaceExisting','placements','assetHash']);
+    fields(body,['avatarId','itemId','view','base','baseReceipt','baseResultId','baseLookId','baseReviewed','side','hand','finger','wrist','count','replaceExisting','placements','assetHash','sessionId','requestId']);
+    validateSession(store,account,body);
+    if(body.requestId!==undefined&&!validRequestId(body.requestId))throw fail('Use a fresh UUID request ID for this overlay.');
     if(preflights>=2)throw new BillingError('image_busy','The studio is checking other images. Try again shortly.',429);
     let prepared;preflights++;
     try{
@@ -64,6 +68,7 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
       if(body.assetHash!==prepared.context.overlayHash)throw fail('The cut-out changed. Reload the placement editor before applying it.',409);
       const result=await applyOverlay(prepared,body.placements);guard();jewellery.current(account,prepared.context);
       prepared.context.mode='overlay';const receipt=jewellery.receipt(account,prepared.context,result.image);
+      recordTryon(store,account,{requestId:body.requestId||randomUUID(),sessionId:body.sessionId,avatarId:prepared.context.avatarId,view:prepared.context.view,garmentId:prepared.context.itemId},{source:'jewellery',mode:'overlay'});
       res.json({...result,receipt,kind:'jewellery-overlay',view:prepared.context.view,resultId:prepared.context.id,creditsUsed:0,reused:false,needsReview:true});
     }finally{preflights--;prepared?.context.base.fill(0);prepared?.context.product.fill(0);prepared?.asset.fill(0);}
   }));
@@ -77,7 +82,8 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
     const result=await jewellery.approve(account,req.params.id,req.body,{guard:()=>session(req,account)});res.json(result);
   }));
   app.post('/api/jewellery/compare',wrap(async(req,res,account)=>{
-    const body=req.body||{};fields(body,['action','avatarId','view','itemIds','base','baseReceipt','baseResultId','baseLookId','baseReviewed','side','hand','finger','wrist','count','replaceExisting','quote','consent','consentScope','consentProvider','requestIds']);
+    const body=req.body||{};fields(body,['action','avatarId','view','itemIds','base','baseReceipt','baseResultId','baseLookId','baseReviewed','side','hand','finger','wrist','count','replaceExisting','quote','consent','consentScope','consentProvider','requestIds','sessionId']);
+    validateSession(store,account,body);
     if(!['quote','run'].includes(body.action))throw fail('Check the comparison cost before running it.');
     if(preflights>=2)throw new BillingError('image_busy','The studio is checking other images. Try again shortly.',429);
     const contexts=[];let held=true;preflights++;
@@ -96,12 +102,13 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
       if(credits&&store.billing.balance(account.org)<credits)throw new BillingError('insufficient_credits','This comparison needs '+credits+' AI credits. Add credits before running it.',402);
       if(rateLimit&&credits){const usage=store.db.prepare("SELECT count(*) n,max(createdAt) last FROM ledger WHERE org=? AND store=? AND user=? AND pool='ai' AND kind='hold' AND action='tryon' AND createdAt>?").get(account.org,account.id,account.user.id,Date.now()-3600000);if(usage.n+credits>20||usage.last&&Date.now()-usage.last<15000)throw new BillingError('jewellery_rate_limit','Wait before comparing. The pilot allows 20 attempts per hour and 15 seconds between fitting operations.',429);}
       held=false;preflights--;
+      const recordComparison=outcome=>safelyRecord(store.db,{org:account.org,store:account.id,user:account.user.id},'jewellery_compared',{category:'jewellery',view:contexts[0].view,outcome,sessionId:base.sessionId||requestIds[0].toLowerCase()},{operationKey:'compare:'+requestIds.map(id=>id.toLowerCase()).sort().join(':')});
       const results=[];
       for(let i=0;i<2;i++){
         try{guard();const result=await execute(req,res,account,{...base,itemId:itemIds[i],consent:true,consentScope:'view-and-item',consentProvider:'gemini',requestId:requestIds[i]},{prepared:contexts[i],previousRequestId:i===1?requestIds[0].toLowerCase():'',extraGuard:guard});results.push({item:family.items[i],result});}
-        catch(error){if(req.aborted||res.destroyed)throw error;session(req,account);if(!results.length)throw error;jewellery.current(account,contexts[0]);const message=error instanceof ProviderError?providerErrorDetails(error,'gemini').message:error.status?error.message:'The second variant could not be completed.';return res.json({results,partial:true,error:message+' The completed result is kept; nothing was retried.',creditsUsed:results.reduce((n,r)=>n+r.result.creditsUsed,0)});}
+        catch(error){if(req.aborted||res.destroyed)throw error;session(req,account);if(!results.length)throw error;jewellery.current(account,contexts[0]);const message=error instanceof ProviderError?providerErrorDetails(error,'gemini').message:error.status?error.message:'The second variant could not be completed.';recordComparison('partial');return res.json({results,partial:true,error:message+' The completed result is kept; nothing was retried.',creditsUsed:results.reduce((n,r)=>n+r.result.creditsUsed,0)});}
       }
-      res.json({results,partial:false,creditsUsed:results.reduce((n,r)=>n+r.result.creditsUsed,0)});
+      recordComparison('complete');res.json({results,partial:false,creditsUsed:results.reduce((n,r)=>n+r.result.creditsUsed,0)});
     }finally{if(held)preflights--;for(const c of contexts){c.base.fill(0);c.product.fill(0);c.secondAngle?.fill(0);}}
   }));
   async function execute(req,res,account,body,{prepared,previousRequestId='',extraGuard=()=>{}}={}){
@@ -125,7 +132,7 @@ export function installJewelleryRoutes(app,store,{enabled,provider,apiKey,model,
       const respond=(image,reused)=>({image,provider:'gemini',kind:'jewellery-tryon',view:context.view,type:context.selection.type,reused,
         previewMode:combinedMode(context.baseMode,'ai'),resultId:context.id,itemId:context.itemId,needsReview:true,creditsUsed:reused?0:1,reuseAvailable:Boolean(context.itemId),
         ...(receipt?{receipt}:{}),...(!receipt&&!reused?{receiptUnavailable:true,note:'Keep or download this preview. Do not regenerate just to obtain a save receipt.'}: {})});
-      const recordResult=reused=>recordTryon(store,account,{requestId:body.requestId,sessionId:body.sessionId,avatarId:context.avatarId,garmentId:context.itemId||undefined},{source:'jewellery',reused});
+      const recordResult=reused=>recordTryon(store,account,{requestId:body.requestId,sessionId:body.sessionId,avatarId:context.avatarId,view:context.view,garmentId:context.itemId||undefined},{source:'jewellery',reused});
       const cached=jewellery.cached(account,context);if(cached){try{receipt=jewellery.receipt(account,context,cached.image);}catch{}recordResult(true);return respond(cached.image,true);}
       if(provider!=='gemini'||!apiKey)throw fail('Jewellery generation requires the configured Gemini image service.',503);
       if(context.bodyType==='female'&&!femaleEnabled)throw fail('Female jewellery generation is not enabled on this studio.');

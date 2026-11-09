@@ -145,7 +145,7 @@ export function createApp({
   const payments = accountStore ? new PaymentStore(accountStore,{...paymentOptions, ...(sendMail ? {sendMail} : {})}) : null;
   app.locals.payments=payments;
   installPaymentWebhook(app,payments);
-  const analyticsReports=accountStore?new MonthlyAnalytics(accountStore,{sendMail,publicUrl}):null;
+  const analyticsReports=accountStore?new MonthlyAnalytics(accountStore,{sendMail,publicUrl,jewelleryEnabled}):null;
   app.locals.analyticsReports=analyticsReports;
   installAnalyticsUnsubscribe(app,analyticsReports);
   const whatsapp=accountStore?new WhatsApp(accountStore,{publicUrl,...whatsappOptions}):null;

@@ -99,3 +99,11 @@ test('session revocation during anchor preparation delivers no customer output, 
   await assert.rejects(saveOverlayAsset(store,branch,shared.id,{overlayPng:null}),/read-only/);
   await saveOverlayAsset(store,a,items.ring.id,{overlayPng:null});assert.equal(store.garments.get(branch,shared.id,opts).hasOverlay,false);assert.equal(store.db.prepare('SELECT overlayPng FROM garments WHERE account=? AND id=?').get(branch.id,shared.id).overlayPng,null);
 }));
+
+test('overlay application records one free jewellery fitting per request, while preparation and invalid tracking record nothing',async()=>fixture(async({store,a,request,prepare,apply,calls})=>{
+ const {randomUUID}=await import('node:crypto'),sessionId=randomUUID(),requestId=randomUUID();
+ await prepare({sessionId});const p=await prepare({sessionId});assert.equal(store.analytics.report(a,{},Date.now(),{jewelleryEnabled:true}).jewellery.totals.tryons,0);
+ assert.equal((await apply(p,{sessionId:'invalid',requestId})).status,400);assert.equal((await apply(p,{sessionId,requestId:'invalid'})).status,400);
+ for(let i=0;i<2;i++)assert.equal((await apply(p,{sessionId,requestId})).status,200);
+ const report=store.analytics.report(a,{},Date.now(),{jewelleryEnabled:true});assert.equal(report.jewellery.totals.overlays,1);assert.equal(report.jewellery.totals.tryonSessions,1);assert.equal(report.totals.tryons,0);assert.equal(report.totals.creditsUsed,0);assert.equal(calls(),0);
+}));

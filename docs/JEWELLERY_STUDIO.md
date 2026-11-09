@@ -109,3 +109,12 @@ J9 adds [free overlays](JEWELLERY_OVERLAY.md), and J10 adds
 [optional sizing help](JEWELLERY_SIZING.md). Customer hand photos and live jewellery evaluation remain later work. Real
 Gemini detail fidelity, placement, costs, identity/hand thresholds and Lightsail
 performance still require pilot evidence.
+
+## Jewellery activity reporting
+
+Owners/managers can review [jewellery analytics](JEWELLERY_ANALYTICS.md) from
+**Analytics → Jewellery activity**. The studio groups AI, free overlay and
+comparison actions for the selected avatar in one in-memory visit. Successful
+fittings, first saved sets, shares and active purchase marks are reported with
+explicit historical gaps; opening a saved look or checking a cost is not another
+fitting. No additional AI request is made for analytics.

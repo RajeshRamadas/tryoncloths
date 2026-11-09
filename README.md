@@ -120,6 +120,13 @@ starting view, item and placement. Enable `TRYON_JEWELLERY=1` with account
 storage and Gemini configuration to expose the API; the interactive jewellery
 studio screen is the next task, J8.
 
+Web `0.21.0-rc.2` adds [J13 jewellery analytics](docs/JEWELLERY_ANALYTICS.md).
+With the jewellery pilot flag enabled, open **Analytics → Jewellery activity**
+for AI/reuse/overlay fittings, sessions,
+saved sets, complete/partial comparisons, purchase marks and shares. Date/store
+filters and CSV exports retain existing owner/manager scope. Historical gaps
+remain explicit, and the report does not certify live pilot targets.
+
 Web `0.21.0-rc.1` adds [J12 private jewellery evaluation](docs/JEWELLERY_EVALUATION.md):
 a 30-item × 10-portrait review matrix, local staff scoring, identity-distance
 analysis and store-pilot reporting. Start with `npm run evaluate:jewellery -- template --out path/to/manifest.json`.

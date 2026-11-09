@@ -1968,3 +1968,8 @@ dialog::backdrop {
 .necklace-guide-legend label { display:flex; align-items:flex-start; gap:8px; font-size:14px; margin:10px 0; }
 .necklace-guide-legend input { width:auto!important; flex:none; }
 @media(max-width:480px) { .jewellery-size-help .measurement-grid { grid-template-columns:minmax(0,1fr); } }
+
+.analytics-table-scroll .jewellery-analytics-table { min-width:1100px; }
+.jewellery-analytics-table th[scope=col] { min-width:100px; }
+.jewellery-analytics-table th[scope=row] { min-width:110px; }
+.jewellery-analytics-table td { white-space:nowrap; }

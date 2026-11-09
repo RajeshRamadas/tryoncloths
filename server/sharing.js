@@ -1,3 +1,4 @@
+import {lookDimensions} from './analytics-tracking.js';
 import {previewLabel} from '../src/jewellery-overlay.js';
 import {brandHeader,brandContact,brandCss} from './branding.js';
 import {createHash,randomBytes} from 'node:crypto';
@@ -39,7 +40,7 @@ export class ShareStore {
     this.db.exec('BEGIN IMMEDIATE');
     try{
       this.db.prepare('INSERT INTO share_links(tokenHash,store,look,expiresAt,createdBy) VALUES(?,?,?,?,?)').run(id,account.id,lookId,expiresAt,account.user.id);
-      recordEvent(this.db,{org:account.org,store:account.id,user:account.user.id},'look_shared',{shareId:id,lookId});
+      recordEvent(this.db,{org:account.org,store:account.id,user:account.user.id},'look_shared',{shareId:id,lookId,...lookDimensions(this.store,account,lookId)});
       this.db.exec('COMMIT');
     }catch(e){this.db.exec('ROLLBACK');throw e;}
     return {id,token,expiresAt,customerPhone:look.phoneE164||null};
@@ -61,7 +62,7 @@ export class ShareStore {
     this.db.exec('BEGIN IMMEDIATE');
     try{
       this.db.prepare('UPDATE share_links SET views=views+1 WHERE tokenHash=?').run(row.tokenHash);
-      recordEvent(this.db,{org:row.org,store:row.store},'share_viewed',{shareId:row.tokenHash,lookId:row.look});
+      recordEvent(this.db,{org:row.org,store:row.store},'share_viewed',{shareId:row.tokenHash,lookId:row.look,...lookDimensions(this.store,{id:row.store},row.look)});
       this.db.exec('COMMIT');
     }catch(e){this.db.exec('ROLLBACK');throw e;}
   }

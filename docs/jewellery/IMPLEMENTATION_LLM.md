@@ -2,7 +2,7 @@
 
 As of 2026-10-30 · Baseline: `main` web **0.15.0** · Stage: later, after commercial R1 · Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md) · Design: [`DESIGN.md`](DESIGN.md)
 
-Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
+Implementation update (2026-11-09): **J1 implemented in web `0.20.0-alpha.1`**;
 **J2 implemented in web `0.20.0-alpha.2`**;
 **J3 implemented in web `0.20.0-alpha.3`**;
 **J4 implemented in web `0.20.0-alpha.4`**;
@@ -13,7 +13,8 @@ Implementation update (2026-11-08): **J1 implemented in web `0.20.0-alpha.1`**;
 **J9 implemented in web `0.20.0-alpha.9`**;
 **J10 implemented in web `0.20.0-alpha.10`**;
 **J11 implemented in web `0.20.0-alpha.11`**;
-**J12 tooling and release preparation implemented in web `0.21.0-rc.1`**. See
+**J12 tooling and release preparation implemented in web `0.21.0-rc.1`**;
+**J13 (P1 JF-3 jewellery analytics) implemented in web `0.21.0-rc.2`**. See
 [catalogue setup](../JEWELLERY_CATALOGUE.md) and
 [local identity-check scope and validation](../JEWELLERY_IDENTITY.md), plus
 [hands assets and placement coordinates](../JEWELLERY_HANDS.md), and the
@@ -359,5 +360,24 @@ J11 implementation: [reference charts, optional measurements and anchor-based gu
 J12 tooling: [private 30 × 10 review, identity-distance analysis and pilot counters](../JEWELLERY_EVALUATION.md).
 [Release verification](../JEWELLERY_RELEASE.md) records automated checks separately
 from outstanding live evidence. No deployment or pilot flag activation is part
-of this change. The remaining task is operational: collect consented real pilot
+of this change. The J12 operational task remains: collect consented real pilot
 results and independent identity calibration evidence before general release.
+
+
+### Task J13 — jewellery analytics (JF-3, P1)
+
+Implemented in web `0.21.0-rc.2`. [Workflow, metric definitions and history limits](../JEWELLERY_ANALYTICS.md).
+
+- Server-selected category/view/item-count snapshots on saved-look, share and purchase events.
+- Explicit successful overlay and complete/partial comparison events, deduplicated by operation IDs.
+- A shared in-memory fitting session for the selected avatar across views and actions.
+- Separate jewellery totals/days/stores/staff/products in the existing scoped report and CSV; no customer/photo/price payloads in analytics.
+- Existing AI totals, credit/refund rules and pilot gates keep their meaning. No live pilot success is inferred from activity counters.
+
+J13 validation: 435 backend tests, 136 browser tests and production build passed;
+flag-off/on runtime staging also passed. No live request, APK or deployment.
+
+Next unimplemented P1 jewellery extension: JA-4 customer hand photo support,
+using design §4.2. Standard hands remain available; custom hand photos are not
+silently accepted or positioned with template anchors. Live rollout and
+independent identity calibration remain separate operational work.
