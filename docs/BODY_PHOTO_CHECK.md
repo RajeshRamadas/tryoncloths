@@ -42,8 +42,8 @@ landmarks are stored in `body-poses.json` for the unit tests.
   pilot photos before relying on them.
 - Loose clothing such as sarees, long kurtas or coats can hide the hips and ankles, so the
   landmarks there are less reliable.
-- The landmarks are not yet used to choose the body profile or to build occlusion masks for
-  the clothing compositor.
+- The landmarks are not yet used to choose the body profile. The outfit studio uses the
+  same model for [arms in front of tops](CLOTHING_LAYERS.md#arms-in-front-of-tops).
 
 ## Updating the model
 

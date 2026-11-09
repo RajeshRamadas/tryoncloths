@@ -69,6 +69,74 @@ test("a JPEG product photo on a plain backdrop is cut out on the device and alig
   expect(apiCalls.slice(before)).toEqual([]);
 });
 
+test("the avatar's forearms and hands are drawn in front of an imported top and can be turned off", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await sampleStudio(page);
+  const original = await outputBytes(page);
+  const photo = await sharp(
+    Buffer.from(
+      '<svg width="500" height="520" xmlns="http://www.w3.org/2000/svg"><rect width="500" height="520" fill="#f4f3ef"/><path d="M160 60 L210 40 Q250 70 290 40 L340 60 L440 150 L390 200 L350 160 L350 480 L150 480 L150 160 L110 200 L60 150 Z" fill="#2e5c8a"/></svg>',
+    ),
+  )
+    .jpeg({ quality: 85 })
+    .toBuffer();
+  await page
+    .getByLabel("Import clothing layer")
+    .setInputFiles({ name: "Wide top.jpg", mimeType: "image/jpeg", buffer: photo });
+  await page.locator(".placement-options summary").click();
+  const arms = page.getByLabel(/Show forearms and hands in front of this top/);
+  await expect(arms).toBeChecked();
+  // Widen the top so its body covers both forearms.
+  await page.getByLabel("shirt Width").fill("150");
+  await page.getByLabel("shirt Left / right").fill("-15");
+  const raw = async (bytes) => sharp(bytes).ensureAlpha().raw().toBuffer();
+  const before = await raw(original);
+  // Render without arms until the widened top settles, then turn the arms on: the only
+  // difference between the two renders is the arms.
+  await arms.uncheck();
+  let without = before;
+  await expect
+    .poll(
+      async () => {
+        const previous = without;
+        without = await raw(await outputBytes(page));
+        return !without.equals(before) && without.equals(previous);
+      },
+      { intervals: [500], timeout: 30_000 },
+    )
+    .toBe(true);
+  await arms.check();
+  // The arms are cut out on the device within the render that follows.
+  let withArms;
+  await expect
+    .poll(
+      async () => {
+        withArms = await raw(await outputBytes(page));
+        return !withArms.equals(without);
+      },
+      { timeout: 45_000 },
+    )
+    .toBe(true);
+  // Pixels that differ between the two renders are the arms: they match the original avatar.
+  let changed = 0,
+    matching = 0;
+  for (let i = 0; i < before.length; i += 4) {
+    if (withArms[i] === without[i] && withArms[i + 2] === without[i + 2]) continue;
+    changed++;
+    if (
+      Math.abs(withArms[i] - before[i]) +
+        Math.abs(withArms[i + 1] - before[i + 1]) +
+        Math.abs(withArms[i + 2] - before[i + 2]) <
+      45
+    )
+      matching++;
+  }
+  expect(changed).toBeGreaterThan(1500);
+  expect(matching / changed).toBeGreaterThan(0.6);
+});
+
 test("outfits select independently, export displayed pixels without AI calls, and reset cleanly", async ({
   page,
 }) => {
