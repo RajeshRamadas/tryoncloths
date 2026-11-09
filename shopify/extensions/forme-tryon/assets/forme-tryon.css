@@ -1,1 +1,24 @@
-.forme-tryon{margin:16px 0}.forme-tryon__button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 20px;border:1px solid #215b4a;border-radius:6px;background:#215b4a;color:#fff;text-decoration:none;font:inherit}.forme-tryon__button:focus-visible{outline:3px solid currentColor;outline-offset:4px}.forme-tryon__note{font-size:.875em;line-height:1.5}
+.forme-tryon {
+  margin: 16px 0;
+}
+.forme-tryon__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 20px;
+  border: 1px solid #215b4a;
+  border-radius: 6px;
+  background: #215b4a;
+  color: #fff;
+  text-decoration: none;
+  font: inherit;
+}
+.forme-tryon__button:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 4px;
+}
+.forme-tryon__note {
+  font-size: 0.875em;
+  line-height: 1.5;
+}

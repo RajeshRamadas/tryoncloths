@@ -1,25 +1,33 @@
-import {MonthlyAnalytics,installAnalyticsUnsubscribe} from './analytics-mail.js';
-import {installAvatarViewRoutes} from './avatar-view-routes.js';
-import {installJewelleryRoutes} from './jewellery-routes.js';
-import {JEWELLERY_CONTRACT} from './jewellery-tryon.js';
-import {jewelleryTypes} from './jewellery-types.js';
-import {CatalogueSync} from './catalogue-sync.js';
-import {ShopifyShopper} from './shopify-shopper.js';
-import {installShopifyShopperPublic} from './shopify-shopper-routes.js';
-import {ShopperSessions} from './shopper-sessions.js';
-import {ShopperWorkflow} from './shopper-workflow.js';
-import {installShopperSessionRoutes,installShopperJsonErrors} from './shopper-session-routes.js';
-import {PhotoJobs} from './photo-jobs.js';
-import {record} from './events.js';
-import {validateSession,recordTryon} from './analytics-tracking.js';
-import {WhatsApp,installWhatsAppWebhook} from './whatsapp.js';
-import {PaymentStore,installPaymentWebhook} from './payments.js';
+import { MonthlyAnalytics, installAnalyticsUnsubscribe } from "./analytics-mail.js";
+import { installAvatarViewRoutes } from "./avatar-view-routes.js";
+import { installJewelleryRoutes } from "./jewellery-routes.js";
+import { JEWELLERY_CONTRACT } from "./jewellery-tryon.js";
+import { jewelleryTypes } from "./jewellery-types.js";
+import { CatalogueSync } from "./catalogue-sync.js";
+import { ShopifyShopper } from "./shopify-shopper.js";
+import { installShopifyShopperPublic } from "./shopify-shopper-routes.js";
+import { ShopperSessions } from "./shopper-sessions.js";
+import { ShopperWorkflow } from "./shopper-workflow.js";
+import { installShopperSessionRoutes, installShopperJsonErrors } from "./shopper-session-routes.js";
+import { PhotoJobs } from "./photo-jobs.js";
+import { record } from "./events.js";
+import { validateSession, recordTryon } from "./analytics-tracking.js";
+import { WhatsApp, installWhatsAppWebhook } from "./whatsapp.js";
+import { PaymentStore, installPaymentWebhook } from "./payments.js";
 import express from "express";
 import sharp from "sharp";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash, timingSafeEqual } from "node:crypto";
-import { profiles, recommendProfile, skinTones, avatarVariants, templateLibrary, validTemplateTone, DEFAULT_TEMPLATE_TONE } from "../src/profiles.js";
+import {
+  profiles,
+  recommendProfile,
+  skinTones,
+  avatarVariants,
+  templateLibrary,
+  validTemplateTone,
+  DEFAULT_TEMPLATE_TONE,
+} from "../src/profiles.js";
 import { providerErrorDetails } from "./provider-errors.js";
 import { openaiPersonalize } from "./openai.js";
 import { geminiPersonalize, GEMINI_REFERENCE_VERSION } from "./gemini.js";
@@ -38,8 +46,7 @@ const maxPhotoBytes = 5 * 1024 * 1024;
 export async function normalizePhoto(dataUrl, kind = "face") {
   if (typeof dataUrl !== "string" || dataUrl.length > maxPhotoBytes * 1.4)
     throw new Error(`Use a JPEG, PNG, or WebP ${kind} photo under 5 MB.`);
-  const match =
-    /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl);
+  const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl);
   if (!match) throw new Error(`Use a valid JPEG, PNG, or WebP ${kind} photo.`);
   const bytes = Buffer.from(match[2], "base64");
   if (!bytes.length || bytes.length > maxPhotoBytes)
@@ -73,7 +80,7 @@ export async function normalizePhoto(dataUrl, kind = "face") {
 export async function standardAvatar(profileId, templateTone = DEFAULT_TEMPLATE_TONE) {
   const profile = profiles.find((p) => p.id === profileId);
   if (!profile) throw new Error("Choose an available body profile.");
-  const source = sharp(path.join(root, 'public', templateLibrary(profile.body, templateTone)));
+  const source = sharp(path.join(root, "public", templateLibrary(profile.body, templateTone)));
   const metadata = await source.metadata();
   const panelWidth = Math.floor(metadata.width / 4);
   return source
@@ -109,8 +116,8 @@ export function createApp({
   shopifyShopperOptions = {},
   shopperSessionOptions = {},
   shopperWorkflowOptions = {},
-  shopperConfigurationSource = {status:'injected',code:'programmatic_configuration'},
-  jewelleryEnabled = process.env.TRYON_JEWELLERY === '1',
+  shopperConfigurationSource = { status: "injected", code: "programmatic_configuration" },
+  jewelleryEnabled = process.env.TRYON_JEWELLERY === "1",
   avatarViewOptions = {},
   jewelleryOptions = {},
   photoOptions = {},
@@ -132,47 +139,79 @@ export function createApp({
     throw new Error("Only the direct connection or one trusted reverse proxy is supported.");
   app.set("trust proxy", trustProxy);
   app.disable("x-powered-by");
-  app.locals.accountStore=accountStore;
-  const catalogueSync=accountStore?new CatalogueSync(accountStore,syncOptions):null;
-  app.locals.catalogueSync=catalogueSync;
-  const photoJobs=accountStore?new PhotoJobs(accountStore,{provider,apiKey,model,generate:tryOn,template:standardAvatar,femaleEnabled,...photoOptions}):null;
-  app.locals.photoJobs=photoJobs;
+  app.locals.accountStore = accountStore;
+  const catalogueSync = accountStore ? new CatalogueSync(accountStore, syncOptions) : null;
+  app.locals.catalogueSync = catalogueSync;
+  const photoJobs = accountStore
+    ? new PhotoJobs(accountStore, {
+        provider,
+        apiKey,
+        model,
+        generate: tryOn,
+        template: standardAvatar,
+        femaleEnabled,
+        ...photoOptions,
+      })
+    : null;
+  app.locals.photoJobs = photoJobs;
   app.use("/api", (_req, res, next) => {
     res.set("Cache-Control", "no-store");
     res.set("X-Content-Type-Options", "nosniff");
     next();
   });
-  const payments = accountStore ? new PaymentStore(accountStore,{...paymentOptions, ...(sendMail ? {sendMail} : {})}) : null;
-  app.locals.payments=payments;
-  installPaymentWebhook(app,payments);
-  const analyticsReports=accountStore?new MonthlyAnalytics(accountStore,{sendMail,publicUrl,jewelleryEnabled}):null;
-  app.locals.analyticsReports=analyticsReports;
-  installAnalyticsUnsubscribe(app,analyticsReports);
-  const whatsapp=accountStore?new WhatsApp(accountStore,{publicUrl,...whatsappOptions}):null;
-  app.locals.whatsapp=whatsapp;
-  installWhatsAppWebhook(app,whatsapp);
-  const shopifyShopper=accountStore?new ShopifyShopper(accountStore,{publicUrl,...shopifyShopperOptions}):null;
-  app.locals.shopifyShopper=shopifyShopper;
-  const shopperSessions=shopifyShopper?new ShopperSessions(shopifyShopper,{provider,trustProxy,...shopperSessionOptions}):null;
-  app.locals.shopperSessions=shopperSessions;
-  const shopperWorkflow=shopperSessions?new ShopperWorkflow(shopperSessions,{apiKey,model,quality,personalize,tryOn,template:standardAvatar,femaleEnabled,...shopperWorkflowOptions}):null;
-  if(shopperSessions)shopperSessions.workflow=shopperWorkflow;
-  app.locals.shopperWorkflow=shopperWorkflow;
-  if(shopifyShopper)shopifyShopper.workflow=shopperWorkflow;
-  if(shopifyShopper){shopifyShopper.configurationSource=shopperConfigurationSource;shopifyShopper.production=production;}
-  installShopperSessionRoutes(app,shopperSessions,{production});
-  installShopifyShopperPublic(app,shopifyShopper,{production,sessions:shopperSessions});
+  const payments = accountStore
+    ? new PaymentStore(accountStore, { ...paymentOptions, ...(sendMail ? { sendMail } : {}) })
+    : null;
+  app.locals.payments = payments;
+  installPaymentWebhook(app, payments);
+  const analyticsReports = accountStore
+    ? new MonthlyAnalytics(accountStore, { sendMail, publicUrl, jewelleryEnabled })
+    : null;
+  app.locals.analyticsReports = analyticsReports;
+  installAnalyticsUnsubscribe(app, analyticsReports);
+  const whatsapp = accountStore
+    ? new WhatsApp(accountStore, { publicUrl, ...whatsappOptions })
+    : null;
+  app.locals.whatsapp = whatsapp;
+  installWhatsAppWebhook(app, whatsapp);
+  const shopifyShopper = accountStore
+    ? new ShopifyShopper(accountStore, { publicUrl, ...shopifyShopperOptions })
+    : null;
+  app.locals.shopifyShopper = shopifyShopper;
+  const shopperSessions = shopifyShopper
+    ? new ShopperSessions(shopifyShopper, { provider, trustProxy, ...shopperSessionOptions })
+    : null;
+  app.locals.shopperSessions = shopperSessions;
+  const shopperWorkflow = shopperSessions
+    ? new ShopperWorkflow(shopperSessions, {
+        apiKey,
+        model,
+        quality,
+        personalize,
+        tryOn,
+        template: standardAvatar,
+        femaleEnabled,
+        ...shopperWorkflowOptions,
+      })
+    : null;
+  if (shopperSessions) shopperSessions.workflow = shopperWorkflow;
+  app.locals.shopperWorkflow = shopperWorkflow;
+  if (shopifyShopper) shopifyShopper.workflow = shopperWorkflow;
+  if (shopifyShopper) {
+    shopifyShopper.configurationSource = shopperConfigurationSource;
+    shopifyShopper.production = production;
+  }
+  installShopperSessionRoutes(app, shopperSessions, { production });
+  installShopifyShopperPublic(app, shopifyShopper, { production, sessions: shopperSessions });
   installShopperJsonErrors(app);
   const nativeOrigins = new Set(["capacitor://localhost", "https://localhost"]);
   app.use("/api", (req, res, next) => {
     const origin = req.get("origin");
     if (origin && nativeOrigins.has(origin)) {
       if (!mobileToken)
-        return res
-          .status(403)
-          .json({
-            error: "This studio is not configured for mobile connections.",
-          });
+        return res.status(403).json({
+          error: "This studio is not configured for mobile connections.",
+        });
       res.set("Access-Control-Allow-Origin", origin);
       res.vary("Origin");
       res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -185,37 +224,85 @@ export function createApp({
       const supplied = req.get("authorization") || "";
       const digest = (value) => createHash("sha256").update(value).digest();
       if (!timingSafeEqual(digest(supplied), digest(`Bearer ${mobileToken}`))) {
-        return res
-          .status(401)
-          .json({ error: "A valid store access code is required." });
+        return res.status(401).json({ error: "A valid store access code is required." });
       }
     }
     next();
   });
   // Two <=5 MB photos, base64-encoded, plus small metadata. Each is checked below.
   app.use("/api/account", express.json({ limit: "4kb" }));
-  app.use("/api/branding",express.json({limit:"750kb"}));
-  app.use("/api/shopper-settings",express.json({limit:"4kb"}));
-  app.use("/api/shopify-shopper",express.json({limit:"4kb"}));
+  app.use("/api/branding", express.json({ limit: "750kb" }));
+  app.use("/api/shopper-settings", express.json({ limit: "4kb" }));
+  app.use("/api/shopify-shopper", express.json({ limit: "4kb" }));
   app.use(express.json({ limit: "15mb" }));
-  const staffGenerate=(fn,input)=>accountStore?.imageSlots?accountStore.imageSlots.run({kind:'staff'},signal=>fn({...input,signal})):fn(input);
-  installAccountRoutes(app, accountStore, { production, allowSignup, sendMail, publicUrl, payments, whatsapp, catalogueOptions, analyticsReports, catalogueSync, photoJobs, shopifyShopper,jewelleryEnabled, campaignConfig:{provider,model,apiKey,tryOn:input=>staffGenerate(tryOn,input),femaleEnabled} });
-  const jewelleryAvailable=Boolean(jewelleryEnabled&&accountStore&&provider==='gemini'&&apiKey);
-  installGarmentRoutes(app, accountStore, { provider, model,jewelleryEnabled,jewelleryAvailable });
-  installAvatarViewRoutes(app,accountStore,{enabled:jewelleryEnabled,provider,apiKey,model,femaleEnabled,rateLimit,...avatarViewOptions});
-  installJewelleryRoutes(app,accountStore,{...jewelleryOptions,enabled:jewelleryEnabled,provider,apiKey,model,femaleEnabled,rateLimit});
+  const staffGenerate = (fn, input) =>
+    accountStore?.imageSlots
+      ? accountStore.imageSlots.run({ kind: "staff" }, (signal) => fn({ ...input, signal }))
+      : fn(input);
+  installAccountRoutes(app, accountStore, {
+    production,
+    allowSignup,
+    sendMail,
+    publicUrl,
+    payments,
+    whatsapp,
+    catalogueOptions,
+    analyticsReports,
+    catalogueSync,
+    photoJobs,
+    shopifyShopper,
+    jewelleryEnabled,
+    campaignConfig: {
+      provider,
+      model,
+      apiKey,
+      tryOn: (input) => staffGenerate(tryOn, input),
+      femaleEnabled,
+    },
+  });
+  const jewelleryAvailable = Boolean(
+    jewelleryEnabled && accountStore && provider === "gemini" && apiKey,
+  );
+  installGarmentRoutes(app, accountStore, {
+    provider,
+    model,
+    jewelleryEnabled,
+    jewelleryAvailable,
+  });
+  installAvatarViewRoutes(app, accountStore, {
+    enabled: jewelleryEnabled,
+    provider,
+    apiKey,
+    model,
+    femaleEnabled,
+    rateLimit,
+    ...avatarViewOptions,
+  });
+  installJewelleryRoutes(app, accountStore, {
+    ...jewelleryOptions,
+    enabled: jewelleryEnabled,
+    provider,
+    apiKey,
+    model,
+    femaleEnabled,
+    rateLimit,
+  });
   app.get("/api/health", (_req, res) =>
     res.json({
       status: "ok",
       jewelleryAvailable,
-      jewelleryOverlayAvailable:Boolean(jewelleryEnabled&&accountStore),
-      jewelleryContract:JEWELLERY_CONTRACT,
-      jewelleryTypes:Object.keys(jewelleryTypes),
-      jewelleryCatalogueAvailable:Boolean(jewelleryEnabled&&accountStore),
-      avatarViewsAvailable:Boolean(jewelleryEnabled&&accountStore),
-      customerHandsGenerationAvailable:Boolean(jewelleryEnabled&&accountStore&&provider==='gemini'&&apiKey),
-      customerHandsContract:'customer-hands-v1',
-      portraitGenerationAvailable:Boolean(jewelleryEnabled&&accountStore&&provider==='gemini'&&apiKey),
+      jewelleryOverlayAvailable: Boolean(jewelleryEnabled && accountStore),
+      jewelleryContract: JEWELLERY_CONTRACT,
+      jewelleryTypes: Object.keys(jewelleryTypes),
+      jewelleryCatalogueAvailable: Boolean(jewelleryEnabled && accountStore),
+      avatarViewsAvailable: Boolean(jewelleryEnabled && accountStore),
+      customerHandsGenerationAvailable: Boolean(
+        jewelleryEnabled && accountStore && provider === "gemini" && apiKey,
+      ),
+      customerHandsContract: "customer-hands-v1",
+      portraitGenerationAvailable: Boolean(
+        jewelleryEnabled && accountStore && provider === "gemini" && apiKey,
+      ),
       personalizationAvailable: Boolean(apiKey),
       provider,
       generationRevision: provider === "gemini" ? GEMINI_REFERENCE_VERSION : "template-first-v1",
@@ -224,7 +311,7 @@ export function createApp({
       accountsAvailable: Boolean(accountStore),
       garmentCatalogueAvailable: Boolean(accountStore),
       profileCount: femaleEnabled ? profiles.length : 4,
-      supportedBodies: femaleEnabled ? ["male","female"] : ["male"],
+      supportedBodies: femaleEnabled ? ["male", "female"] : ["male"],
       templateBodies: ["male", "female"],
       templateSkinTones: skinTones,
       templateVariantCount: avatarVariants.length,
@@ -234,12 +321,33 @@ export function createApp({
     }),
   );
 
-  const generationRequest = (req,res,account) => {
+  const generationRequest = (req, res, account) => {
     if (!validRequestId(req.body.requestId)) {
-      billingFailure(res,new BillingError("invalid_request_id","Update the app: each generation needs a UUID v4 requestId.",400));return false;
+      billingFailure(
+        res,
+        new BillingError(
+          "invalid_request_id",
+          "Update the app: each generation needs a UUID v4 requestId.",
+          400,
+        ),
+      );
+      return false;
     }
-    if (accountStore && account && accountStore.db.prepare("SELECT 1 FROM ledger WHERE org=? AND requestId=?").get(account.org,req.body.requestId.toLowerCase())) {
-      billingFailure(res,new BillingError("duplicate_request","This generation request was already submitted. Check the existing result before starting a new request."));return false;
+    if (
+      accountStore &&
+      account &&
+      accountStore.db
+        .prepare("SELECT 1 FROM ledger WHERE org=? AND requestId=?")
+        .get(account.org, req.body.requestId.toLowerCase())
+    ) {
+      billingFailure(
+        res,
+        new BillingError(
+          "duplicate_request",
+          "This generation request was already submitted. Check the existing result before starting a new request.",
+        ),
+      );
+      return false;
     }
     return true;
   };
@@ -249,37 +357,58 @@ export function createApp({
     req.body ||= {};
     const origin = req.get("origin");
     const owner = accountUser(accountStore, req);
-    req.account=owner;
-    if (accountStore && !owner) return res.status(401).json({ error: "Sign in to the store account before generating an avatar.", code: "account_required" });
-    if (!femaleEnabled && profiles.find(p=>p.id===req.body.profileId)?.body === "female") return res.status(400).json({error:"Female body profiles are not enabled on this studio."});
-    if (accountStore && req.body.accountStorageConsent !== true) return res.status(400).json({ error: "Confirm customer agreement to save the generated avatar in the store account." });
+    req.account = owner;
+    if (accountStore && !owner)
+      return res.status(401).json({
+        error: "Sign in to the store account before generating an avatar.",
+        code: "account_required",
+      });
+    if (!femaleEnabled && profiles.find((p) => p.id === req.body.profileId)?.body === "female")
+      return res
+        .status(400)
+        .json({ error: "Female body profiles are not enabled on this studio." });
+    if (accountStore && req.body.accountStorageConsent !== true)
+      return res.status(400).json({
+        error: "Confirm customer agreement to save the generated avatar in the store account.",
+      });
     try {
       if (
         !origin ||
-        (!(mobileToken && nativeOrigins.has(origin)) &&
-          new URL(origin).host !== req.get("host"))
+        (!(mobileToken && nativeOrigins.has(origin)) && new URL(origin).host !== req.get("host"))
       )
-        return res
-          .status(403)
-          .json({ error: "Open this workflow from the Avatar Studio app." });
+        return res.status(403).json({ error: "Open this workflow from the Avatar Studio app." });
     } catch {
       return res.status(403).json({ error: "Invalid request origin." });
     }
-    if (req.body?.consent !== true || req.body?.consentScope !== "face-and-body" || req.body?.consentProvider !== provider)
+    if (
+      req.body?.consent !== true ||
+      req.body?.consentScope !== "face-and-body" ||
+      req.body?.consentProvider !== provider
+    )
       return res.status(400).json({
         error: `Customer consent to send both photos and measurements to ${providerLabel} is required. Refresh or update the app before generating.`,
       });
-    try { accountStore?.customers.requireOptional(owner,req.body.customerId); }
-    catch (e) { return res.status(e.status || 500).json({error:e.message}); }
-    if (!generationRequest(req,res,owner)) return;
+    try {
+      accountStore?.customers.requireOptional(owner, req.body.customerId);
+    } catch (e) {
+      return res.status(e.status || 500).json({ error: e.message });
+    }
+    if (!generationRequest(req, res, owner)) return;
     if (!profiles.some((p) => p.id === req.body?.profileId))
+      return res.status(400).json({ error: "Choose an available body profile." });
+    const templateTone = req.body.templateTone ?? DEFAULT_TEMPLATE_TONE;
+    if (!validTemplateTone(templateTone))
+      return res.status(400).json({ error: "Choose an available template skin tone." });
+    if (
+      !recommendProfile(
+        req.body?.measurements?.heightCm,
+        req.body?.measurements?.weightKg,
+        profiles.find((p) => p.id === req.body.profileId)?.body,
+      )
+    )
       return res
         .status(400)
-        .json({ error: "Choose an available body profile." });
-    const templateTone = req.body.templateTone ?? DEFAULT_TEMPLATE_TONE;
-    if (!validTemplateTone(templateTone)) return res.status(400).json({ error: "Choose an available template skin tone." });
-    if (!recommendProfile(req.body?.measurements?.heightCm, req.body?.measurements?.weightKg, profiles.find(p=>p.id===req.body.profileId)?.body))
-      return res.status(400).json({ error: "Enter a height from 140–210 cm and weight from 35–200 kg." });
+        .json({ error: "Enter a height from 140–210 cm and weight from 35–200 kg." });
     if (!apiKey)
       return res.status(503).json({
         error:
@@ -287,21 +416,14 @@ export function createApp({
       });
     if (inFlight >= 2)
       return res.status(429).json({
-        error:
-          "The studio is processing another avatar. Please try again shortly.",
+        error: "The studio is processing another avatar. Please try again shortly.",
       });
     const now = Date.now();
-    for (const [key, entry] of attempts)
-      if (now - entry.started > 3600000) attempts.delete(key);
+    for (const [key, entry] of attempts) if (now - entry.started > 3600000) attempts.delete(key);
     const previous = attempts.get(req.ip);
-    if (
-      rateLimit &&
-      previous &&
-      (now - previous.last < 15000 || previous.count >= 20)
-    )
+    if (rateLimit && previous && (now - previous.last < 15000 || previous.count >= 20))
       return res.status(429).json({
-        error:
-          "Please wait before generating again. This pilot allows up to 20 attempts per hour.",
+        error: "Please wait before generating again. This pilot allows up to 20 attempts per hour.",
       });
     let face, body, avatar;
     try {
@@ -315,13 +437,9 @@ export function createApp({
     const latest = attempts.get(req.ip);
     if (
       inFlight >= 2 ||
-      (rateLimit &&
-        latest &&
-        (Date.now() - latest.last < 15000 || latest.count >= 20))
+      (rateLimit && latest && (Date.now() - latest.last < 15000 || latest.count >= 20))
     )
-      return res
-        .status(429)
-        .json({ error: "Please wait before generating again." });
+      return res.status(429).json({ error: "Please wait before generating again." });
     attempts.set(req.ip, {
       started: latest?.started || now,
       last: Date.now(),
@@ -329,28 +447,85 @@ export function createApp({
     });
     inFlight++;
     try {
-      try { accountStore?.customers.requireOptional(owner,req.body.customerId); }
-      catch (e) { return res.status(e.status || 500).json({error:e.message}); }
-      const image = await meter(req,{billing:accountStore?.billing,account:owner,action:"avatar"},()=>staffGenerate(personalize,{ face, body, avatar, profileId: req.body.profileId, measurements: req.body.measurements, apiKey, model, quality }));
+      try {
+        accountStore?.customers.requireOptional(owner, req.body.customerId);
+      } catch (e) {
+        return res.status(e.status || 500).json({ error: e.message });
+      }
+      const image = await meter(
+        req,
+        { billing: accountStore?.billing, account: owner, action: "avatar" },
+        () =>
+          staffGenerate(personalize, {
+            face,
+            body,
+            avatar,
+            profileId: req.body.profileId,
+            measurements: req.body.measurements,
+            apiKey,
+            model,
+            quality,
+          }),
+      );
       let accountSaved = false;
       let avatarId = null;
       if (accountStore) {
         try {
-          const saved = await accountStore.save(owner, { image, customerId:req.body.customerId, name: typeof req.body.avatarName === "string" && req.body.avatarName.trim() ? req.body.avatarName.trim().slice(0,60) : "Customer avatar", profileId: req.body.profileId, templateTone, heightCm: req.body.measurements.heightCm, weightKg: req.body.measurements.weightKg, source: "generated" });
+          const saved = await accountStore.save(owner, {
+            image,
+            customerId: req.body.customerId,
+            name:
+              typeof req.body.avatarName === "string" && req.body.avatarName.trim()
+                ? req.body.avatarName.trim().slice(0, 60)
+                : "Customer avatar",
+            profileId: req.body.profileId,
+            templateTone,
+            heightCm: req.body.measurements.heightCm,
+            weightKg: req.body.measurements.weightKg,
+            source: "generated",
+          });
           avatarId = saved.id;
           accountSaved = true;
         } catch {
           // Preserve the paid result for manual saving/download. Never retry AI
           // generation because a database write failed.
-          console.error(JSON.stringify({event:"avatar_account_save_failed"}));
+          console.error(JSON.stringify({ event: "avatar_account_save_failed" }));
         }
       }
-      record(req,'avatar_generated',{avatarId,requestId:req.body.requestId,source:'studio'});
-      res.json({ image, provider, profileId: req.body.profileId, templateTone, kind: "customer-avatar", needsReview: true, reviewChecks: ["face", "standard-body", "skin-tone"], ...(accountStore ? {accountSaved, avatarId, accountSaveError: accountSaved ? null : "Avatar created, but saving to your account failed. Download it now or review and save it again; do not regenerate."} : {}) });
+      record(req, "avatar_generated", {
+        avatarId,
+        requestId: req.body.requestId,
+        source: "studio",
+      });
+      res.json({
+        image,
+        provider,
+        profileId: req.body.profileId,
+        templateTone,
+        kind: "customer-avatar",
+        needsReview: true,
+        reviewChecks: ["face", "standard-body", "skin-tone"],
+        ...(accountStore
+          ? {
+              accountSaved,
+              avatarId,
+              accountSaveError: accountSaved
+                ? null
+                : "Avatar created, but saving to your account failed. Download it now or review and save it again; do not regenerate.",
+            }
+          : {}),
+      });
     } catch (error) {
-      if (billingFailure(res,error)) return;
+      if (billingFailure(res, error)) return;
       const failure = providerErrorDetails(error, provider);
-      console.error(JSON.stringify({ event: "avatar_provider_failure", provider, code: failure.code, providerStatus: failure.providerStatus }));
+      console.error(
+        JSON.stringify({
+          event: "avatar_provider_failure",
+          provider,
+          code: failure.code,
+          providerStatus: failure.providerStatus,
+        }),
+      );
       res.status(failure.code === "face_input" ? 400 : 502).json({
         error: failure.message,
         code: failure.code,
@@ -362,7 +537,10 @@ export function createApp({
   const sameStudio = (req) => {
     const origin = req.get("origin");
     try {
-      return Boolean(origin) && ((mobileToken && nativeOrigins.has(origin)) || new URL(origin).host === req.get("host"));
+      return (
+        Boolean(origin) &&
+        ((mobileToken && nativeOrigins.has(origin)) || new URL(origin).host === req.get("host"))
+      );
     } catch {
       return false;
     }
@@ -373,14 +551,23 @@ export function createApp({
   let linksInFlight = 0;
   app.post("/api/product-link", async (req, res) => {
     req.body ||= {};
-    if (accountStore && !accountUser(accountStore, req)) return res.status(401).json({ error: "Sign in to the store account before reading product links.", code: "account_required" });
-    if (!sameStudio(req)) return res.status(403).json({ error: "Open this workflow from the Avatar Studio app." });
+    if (accountStore && !accountUser(accountStore, req))
+      return res.status(401).json({
+        error: "Sign in to the store account before reading product links.",
+        code: "account_required",
+      });
+    if (!sameStudio(req))
+      return res.status(403).json({ error: "Open this workflow from the Avatar Studio app." });
     const now = Date.now();
-    for (const [key, entry] of linkAttempts) if (now - entry.started > 3600000) linkAttempts.delete(key);
+    for (const [key, entry] of linkAttempts)
+      if (now - entry.started > 3600000) linkAttempts.delete(key);
     const entry = linkAttempts.get(req.ip) || { started: now, last: 0, count: 0 };
     if (rateLimit && (now - entry.last < 2000 || entry.count >= 60))
       return res.status(429).json({ error: "Please wait a moment before reading another link." });
-    if (linksInFlight >= 4) return res.status(429).json({ error: "The studio is reading other links. Please try again shortly." });
+    if (linksInFlight >= 4)
+      return res
+        .status(429)
+        .json({ error: "The studio is reading other links. Please try again shortly." });
     linkAttempts.set(req.ip, { started: entry.started, last: now, count: entry.count + 1 });
     linksInFlight++;
     try {
@@ -388,7 +575,14 @@ export function createApp({
     } catch (error) {
       const failure = error instanceof LinkError ? error : new LinkError("unknown");
       console.error(JSON.stringify({ event: "product_link_failure", code: failure.code }));
-      res.status(["invalid_url", "blocked_address"].includes(failure.code) ? 400 : failure.code === "no_images" ? 422 : 502)
+      res
+        .status(
+          ["invalid_url", "blocked_address"].includes(failure.code)
+            ? 400
+            : failure.code === "no_images"
+              ? 422
+              : 502,
+        )
         .json({ error: failure.message, code: failure.code });
     } finally {
       linksInFlight--;
@@ -400,51 +594,122 @@ export function createApp({
   app.post("/api/tryon", async (req, res) => {
     req.body ||= {};
     const owner = accountUser(accountStore, req);
-    req.account=owner;
-    if (accountStore && !owner) return res.status(401).json({ error: "Sign in to the store account before trying on clothes.", code: "account_required" });
-    if (!sameStudio(req)) return res.status(403).json({ error: "Open this workflow from the Avatar Studio app." });
-    if (req.body.consent !== true || req.body.consentScope !== "avatar-and-garment" || req.body.consentProvider !== provider)
-      return res.status(400).json({ error: `Customer consent to send the avatar and garment image to ${providerLabel} is required.` });
-    if (!generationRequest(req,res,owner)) return;
+    req.account = owner;
+    if (accountStore && !owner)
+      return res.status(401).json({
+        error: "Sign in to the store account before trying on clothes.",
+        code: "account_required",
+      });
+    if (!sameStudio(req))
+      return res.status(403).json({ error: "Open this workflow from the Avatar Studio app." });
+    if (
+      req.body.consent !== true ||
+      req.body.consentScope !== "avatar-and-garment" ||
+      req.body.consentProvider !== provider
+    )
+      return res.status(400).json({
+        error: `Customer consent to send the avatar and garment image to ${providerLabel} is required.`,
+      });
+    if (!generationRequest(req, res, owner)) return;
     const bodyType = req.body.bodyType || "male";
-    if (!["male","female"].includes(bodyType) || (bodyType === "female" && !femaleEnabled)) return res.status(400).json({error:"Choose an enabled body library."});
-    if (!Object.hasOwn(garmentTypes, req.body.garmentType) || (["dress","skirt","saree","lehenga","blouse"].includes(req.body.garmentType) && bodyType !== "female"))
-      return res.status(400).json({ error: "Choose what to put on: shirt, T-shirt, trousers, jeans, shoes or another listed type." });
-    try { if(accountStore)validateSession(accountStore,owner,req.body); }catch(e){return res.status(e.status||500).json({error:e.status?e.message:'Fitting session could not be checked.'});}
+    if (!["male", "female"].includes(bodyType) || (bodyType === "female" && !femaleEnabled))
+      return res.status(400).json({ error: "Choose an enabled body library." });
+    if (
+      !Object.hasOwn(garmentTypes, req.body.garmentType) ||
+      (["dress", "skirt", "saree", "lehenga", "blouse"].includes(req.body.garmentType) &&
+        bodyType !== "female")
+    )
+      return res.status(400).json({
+        error:
+          "Choose what to put on: shirt, T-shirt, trousers, jeans, shoes or another listed type.",
+      });
+    try {
+      if (accountStore) validateSession(accountStore, owner, req.body);
+    } catch (e) {
+      return res
+        .status(e.status || 500)
+        .json({ error: e.status ? e.message : "Fitting session could not be checked." });
+    }
     let catalogueContext;
     if (req.body.garmentId) {
-      if (!owner) return res.status(401).json({ error: "Sign in to use your store clothes.", code: "account_required" });
+      if (!owner)
+        return res
+          .status(401)
+          .json({ error: "Sign in to use your store clothes.", code: "account_required" });
       try {
-        catalogueContext = await accountStore.garments.context(owner, req.body, { provider, model });
+        catalogueContext = await accountStore.garments.context(owner, req.body, {
+          provider,
+          model,
+        });
         const cached = accountStore.garments.cached(owner, catalogueContext);
-        if (cached) {recordTryon(accountStore,owner,{...req.body,avatarId:catalogueContext.avatarId,garmentId:catalogueContext.garmentId},{reused:true});return res.json({ image: cached.image, provider, kind: "garment-tryon", garmentType: req.body.garmentType, needsReview: true, reused: true, garmentId: catalogueContext.garmentId });}
+        if (cached) {
+          recordTryon(
+            accountStore,
+            owner,
+            {
+              ...req.body,
+              avatarId: catalogueContext.avatarId,
+              garmentId: catalogueContext.garmentId,
+            },
+            { reused: true },
+          );
+          return res.json({
+            image: cached.image,
+            provider,
+            kind: "garment-tryon",
+            garmentType: req.body.garmentType,
+            needsReview: true,
+            reused: true,
+            garmentId: catalogueContext.garmentId,
+          });
+        }
       } catch (error) {
-        return res.status(error.status || 500).json({ error: error.status ? error.message : "The saved garment could not be loaded. No generation was attempted." });
+        return res.status(error.status || 500).json({
+          error: error.status
+            ? error.message
+            : "The saved garment could not be loaded. No generation was attempted.",
+        });
       }
     }
     if (provider !== "gemini" || !apiKey)
-      return res.status(503).json({ error: "Clothing try-on from product images needs the Gemini provider to be configured on the studio." });
-    if (inFlight >= 2) return res.status(429).json({ error: "The studio is processing another image. Please try again shortly." });
+      return res.status(503).json({
+        error:
+          "Clothing try-on from product images needs the Gemini provider to be configured on the studio.",
+      });
+    if (inFlight >= 2)
+      return res
+        .status(429)
+        .json({ error: "The studio is processing another image. Please try again shortly." });
     const now = Date.now();
     for (const [key, entry] of attempts) if (now - entry.started > 3600000) attempts.delete(key);
     const previous = attempts.get(req.ip);
     if (rateLimit && previous && (now - previous.last < 15000 || previous.count >= 20))
-      return res.status(429).json({ error: "Please wait before generating again. This pilot allows up to 20 AI attempts per hour." });
+      return res.status(429).json({
+        error:
+          "Please wait before generating again. This pilot allows up to 20 AI attempts per hour.",
+      });
     let avatar, garment;
     try {
-      avatar = catalogueContext?.avatar || await normalizeAvatar(req.body.avatar);
+      avatar = catalogueContext?.avatar || (await normalizeAvatar(req.body.avatar));
     } catch (e) {
       return res.status(400).json({ error: e.message });
     }
     try {
-      if (catalogueContext) garment = await normalizeGarmentImage(Buffer.from(catalogueContext.garment.image));
+      if (catalogueContext)
+        garment = await normalizeGarmentImage(Buffer.from(catalogueContext.garment.image));
       else {
-        const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(typeof req.body.garment === "string" && req.body.garment.length < maxPhotoBytes * 1.4 ? req.body.garment : "");
+        const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(
+          typeof req.body.garment === "string" && req.body.garment.length < maxPhotoBytes * 1.4
+            ? req.body.garment
+            : "",
+        );
         if (!match) throw new Error();
         garment = await normalizeGarmentImage(Buffer.from(match[2], "base64"));
       }
     } catch {
-      return res.status(400).json({ error: "Use a JPEG, PNG or WebP garment image under 5 MB and at least 160 × 160 pixels." });
+      return res.status(400).json({
+        error: "Use a JPEG, PNG or WebP garment image under 5 MB and at least 160 × 160 pixels.",
+      });
     }
     if (catalogueContext) {
       try {
@@ -453,34 +718,118 @@ export function createApp({
         accountStore.requireAvatar(owner, catalogueContext.avatarId);
         accountStore.garments.row(owner, catalogueContext.garmentId);
         const cached = accountStore.garments.cached(owner, catalogueContext);
-        if (cached) {recordTryon(accountStore,owner,{...req.body,avatarId:catalogueContext.avatarId,garmentId:catalogueContext.garmentId},{reused:true});return res.json({ image: cached.image, provider, kind: "garment-tryon", garmentType: req.body.garmentType, needsReview: true, reused: true, garmentId: catalogueContext.garmentId });}
+        if (cached) {
+          recordTryon(
+            accountStore,
+            owner,
+            {
+              ...req.body,
+              avatarId: catalogueContext.avatarId,
+              garmentId: catalogueContext.garmentId,
+            },
+            { reused: true },
+          );
+          return res.json({
+            image: cached.image,
+            provider,
+            kind: "garment-tryon",
+            garmentType: req.body.garmentType,
+            needsReview: true,
+            reused: true,
+            garmentId: catalogueContext.garmentId,
+          });
+        }
       } catch (error) {
-        return res.status(error.status || 500).json({ error: error.status ? error.message : "The saved garment could not be checked. No generation was attempted." });
+        return res.status(error.status || 500).json({
+          error: error.status
+            ? error.message
+            : "The saved garment could not be checked. No generation was attempted.",
+        });
       }
     }
     const latest = attempts.get(req.ip);
-    if (inFlight >= 2 || (rateLimit && latest && (Date.now() - latest.last < 15000 || latest.count >= 20)))
+    if (
+      inFlight >= 2 ||
+      (rateLimit && latest && (Date.now() - latest.last < 15000 || latest.count >= 20))
+    )
       return res.status(429).json({ error: "Please wait before generating again." });
     const adaptationKey = catalogueContext ? `${owner.id}:${catalogueContext.id}` : null;
-    if (adaptationKey && adapting.has(adaptationKey)) return res.status(409).json({ error: "This garment is already being adapted to this outfit. Wait for the existing request; no second generation was started." });
+    if (adaptationKey && adapting.has(adaptationKey))
+      return res.status(409).json({
+        error:
+          "This garment is already being adapted to this outfit. Wait for the existing request; no second generation was started.",
+      });
     if (adaptationKey) adapting.add(adaptationKey);
-    attempts.set(req.ip, { started: latest?.started || now, last: Date.now(), count: (latest?.count || 0) + 1 });
+    attempts.set(req.ip, {
+      started: latest?.started || now,
+      last: Date.now(),
+      count: (latest?.count || 0) + 1,
+    });
     inFlight++;
     try {
-      const image = await meter(req,{billing:accountStore?.billing,account:owner,action:"tryon"},()=>staffGenerate(tryOn,{ avatar, garment, garmentType: req.body.garmentType, title: catalogueContext?.garment.name || req.body.title, apiKey, model }));
-      recordTryon(accountStore,owner,{requestId:req.body.requestId,sessionId:req.body.sessionId,avatarId:catalogueContext?.avatarId||req.body.avatarId,garmentId:catalogueContext?.garmentId});
+      const image = await meter(
+        req,
+        { billing: accountStore?.billing, account: owner, action: "tryon" },
+        () =>
+          staffGenerate(tryOn, {
+            avatar,
+            garment,
+            garmentType: req.body.garmentType,
+            title: catalogueContext?.garment.name || req.body.title,
+            apiKey,
+            model,
+          }),
+      );
+      recordTryon(accountStore, owner, {
+        requestId: req.body.requestId,
+        sessionId: req.body.sessionId,
+        avatarId: catalogueContext?.avatarId || req.body.avatarId,
+        garmentId: catalogueContext?.garmentId,
+      });
       // A storage/receipt failure must never discard a paid image or retry AI.
       let reuseReceipt;
-      if (catalogueContext) { try { reuseReceipt = await accountStore.garments.receipt(owner, catalogueContext, image); } catch {} }
-      res.json({ image, provider, kind: "garment-tryon", garmentType: req.body.garmentType, needsReview: true,
-        ...(catalogueContext ? { garmentId: catalogueContext.garmentId, reuseReceipt,
-          ...(!reuseReceipt ? { reuseWarning: "The image was created but cannot be saved for automatic reuse. Save it as a look instead; do not regenerate." } : {}) } : {}) });
+      if (catalogueContext) {
+        try {
+          reuseReceipt = await accountStore.garments.receipt(owner, catalogueContext, image);
+        } catch {}
+      }
+      res.json({
+        image,
+        provider,
+        kind: "garment-tryon",
+        garmentType: req.body.garmentType,
+        needsReview: true,
+        ...(catalogueContext
+          ? {
+              garmentId: catalogueContext.garmentId,
+              reuseReceipt,
+              ...(!reuseReceipt
+                ? {
+                    reuseWarning:
+                      "The image was created but cannot be saved for automatic reuse. Save it as a look instead; do not regenerate.",
+                  }
+                : {}),
+            }
+          : {}),
+      });
     } catch (error) {
-      if (billingFailure(res,error)) return;
+      if (billingFailure(res, error)) return;
       const failure = providerErrorDetails(error, provider);
-      console.error(JSON.stringify({ event: "tryon_provider_failure", provider, code: failure.code, providerStatus: failure.providerStatus }));
+      console.error(
+        JSON.stringify({
+          event: "tryon_provider_failure",
+          provider,
+          code: failure.code,
+          providerStatus: failure.providerStatus,
+        }),
+      );
       res.status(502).json({
-        error: failure.code === "missing_face" ? "The try-on image lost the customer's face and was rejected. A provider charge may still apply; no automatic retry was made." : failure.message.replace("Customer avatar generation", "Clothing try-on").replace("No customer avatar was created", "The avatar is unchanged"),
+        error:
+          failure.code === "missing_face"
+            ? "The try-on image lost the customer's face and was rejected. A provider charge may still apply; no automatic retry was made."
+            : failure.message
+                .replace("Customer avatar generation", "Clothing try-on")
+                .replace("No customer avatar was created", "The avatar is unchanged"),
         code: failure.code,
       });
     } finally {
@@ -489,14 +838,10 @@ export function createApp({
     }
   });
 
-  app.use("/api", (_req, res) =>
-    res.status(404).json({ error: "API route not found." }),
-  );
+  app.use("/api", (_req, res) => res.status(404).json({ error: "API route not found." }));
   if (production) {
     app.use(express.static(path.join(root, "dist")));
-    app.get("/{*path}", (_req, res) =>
-      res.sendFile(path.join(root, "dist/index.html")),
-    );
+    app.get("/{*path}", (_req, res) => res.sendFile(path.join(root, "dist/index.html")));
   }
   app.use((error, _req, res, _next) => {
     res.status(error.type === "entity.too.large" ? 413 : 400).json({

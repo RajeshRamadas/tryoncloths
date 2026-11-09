@@ -42,19 +42,27 @@ const consentLabel = "The customer agrees to use their photos for this avatar se
 const dataUrl = (buffer, format) => `data:image/${format};base64,${buffer.toString("base64")}`;
 
 for (const row of scenarios) {
-  test(`random Android session ${row.index + 1}: ${row.height} cm, ${row.weight} kg`, async ({ page }, testInfo) => {
+  test(`random Android session ${row.index + 1}: ${row.height} cm, ${row.weight} kg`, async ({
+    page,
+  }, testInfo) => {
     const photos = await photosFor(row);
-    await nativeBridge(page, [dataUrl(photos.face, photos.format), dataUrl(photos.body, photos.format)]);
-    const requests = [], errors = [];
-    page.on("request", request => {
+    await nativeBridge(page, [
+      dataUrl(photos.face, photos.format),
+      dataUrl(photos.body, photos.format),
+    ]);
+    const requests = [],
+      errors = [];
+    page.on("request", (request) => {
       if (request.url().includes("/api/")) requests.push(request.url());
     });
-    page.on("pageerror", error => errors.push(error.message));
+    page.on("pageerror", (error) => errors.push(error.message));
     await page.goto("/");
     await page.getByRole("spinbutton", { name: "Height in centimeters" }).fill(String(row.height));
     await page.getByRole("spinbutton", { name: "Weight in kilograms" }).fill(String(row.weight));
     if (row.expected) {
-      await expect(page.getByRole("button", { name: `Select ${row.expected} profile` })).toHaveAttribute("aria-pressed", "true");
+      await expect(
+        page.getByRole("button", { name: `Select ${row.expected} profile` }),
+      ).toHaveAttribute("aria-pressed", "true");
     }
     await page.getByRole("checkbox", { name: consentLabel }).check();
     await page.getByRole("button", { name: "Add face photo" }).click();
@@ -62,22 +70,39 @@ for (const row of scenarios) {
     await page.getByRole("button", { name: "Add full-body photo" }).click();
     const bodyImage = page.getByAltText("Customer full-body photo");
     await expect(bodyImage).toBeVisible();
-    const normalized = await bodyImage.evaluate(img => ({ width: img.naturalWidth, height: img.naturalHeight }));
+    const normalized = await bodyImage.evaluate((img) => ({
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+    }));
     expect(Math.max(normalized.width, normalized.height)).toBeLessThanOrEqual(1600);
     expect(normalized.height).toBeGreaterThan(normalized.width);
     if (row.index < 3) {
       await page.screenshot({ path: testInfo.outputPath("photos-entered.png"), fullPage: true });
-      await testInfo.attach("input-face", { body: photos.face, contentType: `image/${photos.format}` });
-      await testInfo.attach("input-body", { body: photos.body, contentType: `image/${photos.format}` });
+      await testInfo.attach("input-face", {
+        body: photos.face,
+        contentType: `image/${photos.format}`,
+      });
+      await testInfo.attach("input-body", {
+        body: photos.body,
+        contentType: `image/${photos.format}`,
+      });
     }
     // Manual corrections must select/export every profile, including Athletic.
     const selected = names[row.index % names.length];
     await page.getByRole("button", { name: `Select ${selected} profile` }).click();
     await page.getByRole("button", { name: "Continue to match" }).click();
-    await expect(page.getByRole("button", { name: "Generate customer avatar", exact: true })).toBeDisabled();
+    await expect(
+      page.getByRole("button", { name: "Generate customer avatar", exact: true }),
+    ).toBeDisabled();
     await expect(page.getByRole("button", { name: "Review avatar" })).toBeDisabled();
-    expect(await page.evaluate(() => window.__nativeCalls.some(c => c.method === "writeFile"))).toBe(false);
-    if (row.index < 3) await page.screenshot({ path: testInfo.outputPath("generation-required.png"), fullPage: true });
+    expect(
+      await page.evaluate(() => window.__nativeCalls.some((c) => c.method === "writeFile")),
+    ).toBe(false);
+    if (row.index < 3)
+      await page.screenshot({
+        path: testInfo.outputPath("generation-required.png"),
+        fullPage: true,
+      });
     // The customer session cannot export a sample as its result. Start a separate
     // empty demo session to exercise standard-library export without customer photos.
     await page.getByRole("button", { name: "New session", exact: true }).click();
@@ -90,10 +115,14 @@ for (const row of scenarios) {
     await expect(page.getByText("Sample face · no customer face applied")).toBeVisible();
     const share = page.getByRole("button", { name: "Save or share avatar" });
     await expect(share).toBeDisabled();
-    await page.getByRole("checkbox", { name: "I have reviewed this standard sample avatar." }).check();
+    await page
+      .getByRole("checkbox", { name: "I have reviewed this standard sample avatar." })
+      .check();
     await share.click();
     await expect(page.getByRole("status")).toContainText("Share sheet closed");
-    const written = await page.evaluate(() => window.__nativeCalls.find(c => c.method === "writeFile").options);
+    const written = await page.evaluate(
+      () => window.__nativeCalls.find((c) => c.method === "writeFile").options,
+    );
     expect(written.path).toContain(`${selected.toLowerCase()}-sample-avatar.png`);
     const png = Buffer.from(written.data, "base64");
     const meta = await sharp(png).metadata();
@@ -101,7 +130,9 @@ for (const row of scenarios) {
     const actual = await sharp(png).removeAlpha().raw().toBuffer();
     const expected = await sharp("public/avatar-library.png")
       .extract({ left: (row.index % 4) * 384, top: 0, width: 384, height: 942 })
-      .removeAlpha().raw().toBuffer();
+      .removeAlpha()
+      .raw()
+      .toBuffer();
     expect(actual.equals(expected)).toBe(true);
     if (row.index < 3) {
       await page.screenshot({ path: testInfo.outputPath("review-approved.png"), fullPage: true });
@@ -114,7 +145,20 @@ for (const row of scenarios) {
     await expect(page.getByRole("checkbox", { name: consentLabel })).not.toBeChecked();
     expect(requests).toEqual([]);
     expect(errors).toEqual([]);
-    await testInfo.attach("scenario", { body: JSON.stringify({ seed, ...row, customerId: customerPhotos[row.customer].id, format: photos.format, normalized, selected, customerExportBlockedWithoutGeneration: true, export: { scope: "separate-empty-demo-session", width: meta.width, height: meta.height }, apiRequests: requests.length }), contentType: "application/json" });
+    await testInfo.attach("scenario", {
+      body: JSON.stringify({
+        seed,
+        ...row,
+        customerId: customerPhotos[row.customer].id,
+        format: photos.format,
+        normalized,
+        selected,
+        customerExportBlockedWithoutGeneration: true,
+        export: { scope: "separate-empty-demo-session", width: meta.width, height: meta.height },
+        apiRequests: requests.length,
+      }),
+      contentType: "application/json",
+    });
   });
 }
 
@@ -123,7 +167,18 @@ test("invalid measurements block continuation and recover after correction", asy
   await page.goto("/");
   const height = page.getByRole("spinbutton", { name: "Height in centimeters" });
   const weight = page.getByRole("spinbutton", { name: "Weight in kilograms" });
-  for (const [h, w] of [["", "72"], ["175", ""], ["0", "72"], ["-1", "72"], ["139", "72"], ["211", "72"], ["175", "0"], ["175", "34"], ["175", "201"], ["9999", "9999"]]) {
+  for (const [h, w] of [
+    ["", "72"],
+    ["175", ""],
+    ["0", "72"],
+    ["-1", "72"],
+    ["139", "72"],
+    ["211", "72"],
+    ["175", "0"],
+    ["175", "34"],
+    ["175", "201"],
+    ["9999", "9999"],
+  ]) {
     await height.fill(h);
     await weight.fill(w);
     await expect(page.getByRole("button", { name: "Continue to match" })).toBeDisabled();
@@ -142,12 +197,34 @@ test("invalid photo files preserve an existing photo and allow recovery", async 
   const preview = page.getByAltText("Customer face photo");
   await expect(preview).toBeVisible();
   const original = await preview.getAttribute("src");
-  const tiny = await sharp({ create: { width: 64, height: 64, channels: 3, background: "red" } }).png().toBuffer();
+  const tiny = await sharp({ create: { width: 64, height: 64, channels: 3, background: "red" } })
+    .png()
+    .toBuffer();
   const files = [
-    { name: "not-photo.txt", mimeType: "text/plain", buffer: Buffer.from("test"), error: "Choose a JPEG, PNG, or WebP photo." },
-    { name: "corrupt.jpg", mimeType: "image/jpeg", buffer: Buffer.from("not a JPEG"), error: "This image could not be opened." },
-    { name: "tiny.png", mimeType: "image/png", buffer: tiny, error: "Use a photo at least 128 × 128 pixels." },
-    { name: "too-large.jpg", mimeType: "image/jpeg", buffer: Buffer.alloc(10 * 1024 * 1024 + 1), error: "Choose a photo smaller than 10 MB." },
+    {
+      name: "not-photo.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("test"),
+      error: "Choose a JPEG, PNG, or WebP photo.",
+    },
+    {
+      name: "corrupt.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from("not a JPEG"),
+      error: "This image could not be opened.",
+    },
+    {
+      name: "tiny.png",
+      mimeType: "image/png",
+      buffer: tiny,
+      error: "Use a photo at least 128 × 128 pixels.",
+    },
+    {
+      name: "too-large.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
+      error: "Choose a photo smaller than 10 MB.",
+    },
   ];
   for (const { error, ...file } of files) {
     await input.setInputFiles(file);
@@ -166,17 +243,33 @@ test("all eight WebP orientations match independently decoded photos", async ({ 
   await page.getByRole("checkbox", { name: consentLabel }).check();
   for (let orientation = 1; orientation <= 8; orientation++) {
     const buffer = await sharp(customerPhotos[2].body)
-      .resize({ height: 480 }).withMetadata({ orientation }).webp({ lossless: true }).toBuffer();
-    await page.getByLabel("Upload face photo").setInputFiles({ name: `orientation-${orientation}.webp`, mimeType: "image/webp", buffer });
+      .resize({ height: 480 })
+      .withMetadata({ orientation })
+      .webp({ lossless: true })
+      .toBuffer();
+    await page
+      .getByLabel("Upload face photo")
+      .setInputFiles({ name: `orientation-${orientation}.webp`, mimeType: "image/webp", buffer });
     const preview = page.getByAltText("Customer face photo");
     await expect(preview).toBeVisible();
     await expect(page.getByRole("button", { name: "Replace face photo" })).toBeEnabled();
     const src = await preview.getAttribute("src");
-    const actual = await sharp(Buffer.from(src.split(",")[1], "base64")).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-    const expected = await sharp(buffer).autoOrient().removeAlpha().raw().toBuffer({ resolveWithObject: true });
-    expect([actual.info.width, actual.info.height]).toEqual([expected.info.width, expected.info.height]);
+    const actual = await sharp(Buffer.from(src.split(",")[1], "base64"))
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const expected = await sharp(buffer)
+      .autoOrient()
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect([actual.info.width, actual.info.height]).toEqual([
+      expected.info.width,
+      expected.info.height,
+    ]);
     let difference = 0;
-    for (let pixel = 0; pixel < actual.data.length; pixel++) difference += Math.abs(actual.data[pixel] - expected.data[pixel]);
+    for (let pixel = 0; pixel < actual.data.length; pixel++)
+      difference += Math.abs(actual.data[pixel] - expected.data[pixel]);
     // JPEG normalization is lossy; compare decoded content, allowing compression noise.
     expect(difference / actual.data.length).toBeLessThan(5);
   }

@@ -1,35 +1,213 @@
-import {openStoreTools} from '../helpers/studio-navigation.js';
-import {test,expect} from '@playwright/test';
-import {mkdtemp,rm} from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import sharp from 'sharp';
-import {AccountStore} from '../helpers/pilot-accounts.js';
-import {createApp,standardAvatar} from '../../server/app.js';
-const logo='<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60"><rect width="120" height="60" fill="#ee3344"/><text x="10" y="40" font-size="26" fill="white">Brand</text></svg>';
-async function setup(page,run){
- const directory=await mkdtemp(path.join(os.tmpdir(),'forme-brand-browser-')),store=new AccountStore(directory),owner=await store.register({name:'Original store',email:'brand@example.test',password:'test-password-long'});
- const png=await standardAvatar('regular'),image=`data:image/png;base64,${png.toString('base64')}`,avatar=await store.save(owner,{image,name:'Customer avatar',profileId:'regular',heightCm:175,weightKg:72,source:'imported'}),look=await store.saveLook(owner,{image,avatarId:avatar.id,name:'Look',garments:['Blue shirt']});
- let ai=0;const app=createApp({accountStore:store,accessMode:'public',tryOn:async()=>{ai++;throw new Error('Unexpected generation');}}),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const api=`http://127.0.0.1:${server.address().port}`;
- const proxy=async route=>{const u=new URL(route.request().url()),result=await route.fetch({url:api+u.pathname+u.search,headers:{...route.request().headers(),host:new URL(api).host,origin:api}});await route.fulfill({response:result});};await page.route('**/api/**',proxy);await page.route('**/s/**',proxy);
- try{await page.goto('/');await page.getByLabel('Account email').fill('brand@example.test');await page.getByLabel('Account password').fill('test-password-long');await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.getByRole('button',{name:'Sign out',exact:true})).toBeVisible();await run({store,owner,png,image,look,ai:()=>ai});}finally{await page.unrouteAll({behavior:'wait'}).catch(()=>{});await new Promise(r=>server.close(r));store.close();await rm(directory,{recursive:true,force:true});}
+import { openStoreTools } from "../helpers/studio-navigation.js";
+import { test, expect } from "@playwright/test";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import sharp from "sharp";
+import { AccountStore } from "../helpers/pilot-accounts.js";
+import { createApp, standardAvatar } from "../../server/app.js";
+const logo =
+  '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60"><rect width="120" height="60" fill="#ee3344"/><text x="10" y="40" font-size="26" fill="white">Brand</text></svg>';
+async function setup(page, run) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "forme-brand-browser-")),
+    store = new AccountStore(directory),
+    owner = await store.register({
+      name: "Original store",
+      email: "brand@example.test",
+      password: "test-password-long",
+    });
+  const png = await standardAvatar("regular"),
+    image = `data:image/png;base64,${png.toString("base64")}`,
+    avatar = await store.save(owner, {
+      image,
+      name: "Customer avatar",
+      profileId: "regular",
+      heightCm: 175,
+      weightKg: 72,
+      source: "imported",
+    }),
+    look = await store.saveLook(owner, {
+      image,
+      avatarId: avatar.id,
+      name: "Look",
+      garments: ["Blue shirt"],
+    });
+  let ai = 0;
+  const app = createApp({
+      accountStore: store,
+      accessMode: "public",
+      tryOn: async () => {
+        ai++;
+        throw new Error("Unexpected generation");
+      },
+    }),
+    server = app.listen(0, "127.0.0.1");
+  await new Promise((r) => server.once("listening", r));
+  const api = `http://127.0.0.1:${server.address().port}`;
+  const proxy = async (route) => {
+    const u = new URL(route.request().url()),
+      result = await route.fetch({
+        url: api + u.pathname + u.search,
+        headers: { ...route.request().headers(), host: new URL(api).host, origin: api },
+      });
+    await route.fulfill({ response: result });
+  };
+  await page.route("**/api/**", proxy);
+  await page.route("**/s/**", proxy);
+  try {
+    await page.goto("/");
+    await page.getByLabel("Account email").fill("brand@example.test");
+    await page.getByLabel("Account password").fill("test-password-long");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+    await run({ store, owner, png, image, look, ai: () => ai });
+  } finally {
+    await page.unrouteAll({ behavior: "wait" }).catch(() => {});
+    await new Promise((r) => server.close(r));
+    store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
 }
-async function chooseAvatar(page){await page.getByRole('button',{name:'Saved avatars',exact:true}).click();await page.getByRole('button',{name:'Use Customer avatar',exact:true}).click();await page.getByLabel('The customer approves the face, body and skin tone of this avatar.').check();}
-async function downloaded(page,button){const pending=page.waitForEvent('download');await button.click();const file=await pending;let bytes=Buffer.alloc(0);for await(const chunk of await file.createReadStream())bytes=Buffer.concat([bytes,chunk]);return bytes;}
+async function chooseAvatar(page) {
+  await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
+  await page.getByRole("button", { name: "Use Customer avatar", exact: true }).click();
+  await page
+    .getByLabel("The customer approves the face, body and skin tone of this avatar.")
+    .check();
+}
+async function downloaded(page, button) {
+  const pending = page.waitForEvent("download");
+  await button.click();
+  const file = await pending;
+  let bytes = Buffer.alloc(0);
+  for await (const chunk of await file.createReadStream()) bytes = Buffer.concat([bytes, chunk]);
+  return bytes;
+}
 
-test('owner saves SVG branding on mobile, sees rasterized logo and public header/contacts; malicious replacement preserves the saved logo',async({page})=>setup(page,async({store,owner,look,ai})=>{
- await page.setViewportSize({width:390,height:844});await openStoreTools(page);await page.getByRole('link',{name:'Branding',exact:true}).click();await page.getByLabel('Public store name').fill('Brand & Co');await page.getByLabel('Primary colour').fill('#224466');await page.getByLabel('Store phone').fill('+91 80000 00000');await page.getByLabel('Store address').fill('Shop 4, Bengaluru');await page.getByLabel('Store map link').fill('https://maps.example.test/?q=Store');await page.getByLabel('Store logo',{exact:true}).setInputFiles({name:'logo.svg',mimeType:'image/svg+xml',buffer:Buffer.from(logo)});await page.getByLabel('Include the store footer by default on eligible exports and shared images').check();await page.getByRole('button',{name:'Save store branding',exact:true}).click();await expect(page.getByRole('status')).toContainText('Store branding saved.');await expect(page.getByAltText('Brand & Co logo')).toHaveJSProperty('naturalWidth',512);await page.screenshot({path:'test-results/branding-settings-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await page.getByLabel('Store logo',{exact:true}).setInputFiles({name:'bad.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg onload="alert(1)"><script>alert(1)</script></svg>')});await page.getByRole('button',{name:'Save store branding',exact:true}).click();await expect(page.getByRole('alert')).toContainText('static PNG');expect(store.branding.read(owner.id).hasLogo).toBe(true);
- const share=store.sharing.create(owner,look.id,{sharingConsent:true});await page.goto('/s/'+share.token);await expect(page.getByRole('heading',{name:'Brand & Co',exact:true})).toBeVisible();await expect(page.getByAltText('Brand & Co logo')).toBeVisible();await expect(page.getByRole('link',{name:'Call store',exact:true})).toHaveAttribute('href','tel:+918000000000');await expect(page.getByRole('link',{name:'Get directions',exact:true})).toHaveAttribute('href','https://maps.example.test/?q=Store');await page.screenshot({path:'test-results/branded-share-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);expect(ai()).toBe(0);
-}));
+test("owner saves SVG branding on mobile, sees rasterized logo and public header/contacts; malicious replacement preserves the saved logo", async ({
+  page,
+}) =>
+  setup(page, async ({ store, owner, look, ai }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openStoreTools(page);
+    await page.getByRole("link", { name: "Branding", exact: true }).click();
+    await page.getByLabel("Public store name").fill("Brand & Co");
+    await page.getByLabel("Primary colour").fill("#224466");
+    await page.getByLabel("Store phone").fill("+91 80000 00000");
+    await page.getByLabel("Store address").fill("Shop 4, Bengaluru");
+    await page.getByLabel("Store map link").fill("https://maps.example.test/?q=Store");
+    await page
+      .getByLabel("Store logo", { exact: true })
+      .setInputFiles({ name: "logo.svg", mimeType: "image/svg+xml", buffer: Buffer.from(logo) });
+    await page
+      .getByLabel("Include the store footer by default on eligible exports and shared images")
+      .check();
+    await page.getByRole("button", { name: "Save store branding", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Store branding saved.");
+    await expect(page.getByAltText("Brand & Co logo")).toHaveJSProperty("naturalWidth", 512);
+    await page.screenshot({ path: "test-results/branding-settings-mobile.png", fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.getByLabel("Store logo", { exact: true }).setInputFiles({
+      name: "bad.svg",
+      mimeType: "image/svg+xml",
+      buffer: Buffer.from('<svg onload="alert(1)"><script>alert(1)</script></svg>'),
+    });
+    await page.getByRole("button", { name: "Save store branding", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("static PNG");
+    expect(store.branding.read(owner.id).hasLogo).toBe(true);
+    const share = store.sharing.create(owner, look.id, { sharingConsent: true });
+    await page.goto("/s/" + share.token);
+    await expect(page.getByRole("heading", { name: "Brand & Co", exact: true })).toBeVisible();
+    await expect(page.getByAltText("Brand & Co logo")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Call store", exact: true })).toHaveAttribute(
+      "href",
+      "tel:+918000000000",
+    );
+    await expect(page.getByRole("link", { name: "Get directions", exact: true })).toHaveAttribute(
+      "href",
+      "https://maps.example.test/?q=Store",
+    );
+    await page.screenshot({ path: "test-results/branded-share-mobile.png", fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    expect(ai()).toBe(0);
+  }));
 
-test('paid avatar/outfit exports use optional footers while original saved avatar pixels remain unchanged',async({page})=>setup(page,async({store,owner,png,ai})=>{
- await store.branding.update(owner,{displayName:'Brand & Co',primaryColor:'#224466',exportFooter:true,logo:'data:image/svg+xml;base64,'+Buffer.from(logo).toString('base64')});await chooseAvatar(page);const original=await sharp(png).metadata();const avatar=await downloaded(page,page.getByRole('button',{name:'Download avatar',exact:true}));expect((await sharp(avatar).metadata()).height).toBeGreaterThan(original.height);
- await page.getByRole('checkbox',{name:'Include store footer on this export',exact:true}).uncheck();const plain=await downloaded(page,page.getByRole('button',{name:'Download avatar',exact:true}));expect((await sharp(plain).metadata()).height).toBe(original.height);
- await page.getByRole('button',{name:'Try clothes',exact:true}).click();await page.getByRole('button',{name:'Navy T-shirt Sample',exact:true}).click();await page.getByLabel('I have checked clothing placement and approve this outfit preview.').check();const outfit=await downloaded(page,page.getByRole('button',{name:'Download outfit',exact:true}));expect((await sharp(outfit).metadata()).height).toBeGreaterThan(original.height);expect(store.image(owner,store.list(owner)[0].id).equals(png)).toBe(true);expect(ai()).toBe(0);
-}));
+test("paid avatar/outfit exports use optional footers while original saved avatar pixels remain unchanged", async ({
+  page,
+}) =>
+  setup(page, async ({ store, owner, png, ai }) => {
+    await store.branding.update(owner, {
+      displayName: "Brand & Co",
+      primaryColor: "#224466",
+      exportFooter: true,
+      logo: "data:image/svg+xml;base64," + Buffer.from(logo).toString("base64"),
+    });
+    await chooseAvatar(page);
+    const original = await sharp(png).metadata();
+    const avatar = await downloaded(
+      page,
+      page.getByRole("button", { name: "Download avatar", exact: true }),
+    );
+    expect((await sharp(avatar).metadata()).height).toBeGreaterThan(original.height);
+    await page
+      .getByRole("checkbox", { name: "Include store footer on this export", exact: true })
+      .uncheck();
+    const plain = await downloaded(
+      page,
+      page.getByRole("button", { name: "Download avatar", exact: true }),
+    );
+    expect((await sharp(plain).metadata()).height).toBe(original.height);
+    await page.getByRole("button", { name: "Try clothes", exact: true }).click();
+    await page.getByRole("button", { name: "Navy T-shirt Sample", exact: true }).click();
+    await page
+      .getByLabel("I have checked clothing placement and approve this outfit preview.")
+      .check();
+    const outfit = await downloaded(
+      page,
+      page.getByRole("button", { name: "Download outfit", exact: true }),
+    );
+    expect((await sharp(outfit).metadata()).height).toBeGreaterThan(original.height);
+    expect(store.image(owner, store.list(owner)[0].id).equals(png)).toBe(true);
+    expect(ai()).toBe(0);
+  }));
 
-test('trial exports enforce the Forme mark; managers/staff can read settings but only the owner can edit',async({page})=>setup(page,async({store,owner,png})=>{
- store.db.prepare("UPDATE orgs SET status='trial' WHERE id=?").run(owner.org);await chooseAvatar(page);await expect(page.getByText('The Forme trial mark is required on exports.').first()).toBeVisible();await expect(page.getByRole('checkbox',{name:'Include store footer on this export',exact:true})).toHaveCount(0);const bytes=await downloaded(page,page.getByRole('button',{name:'Download avatar',exact:true}));const top=await sharp(png).metadata();expect((await sharp(bytes).metadata()).height).toBe(top.height);expect(await sharp(bytes).ensureAlpha().raw().toBuffer()).not.toEqual(await sharp(png).ensureAlpha().raw().toBuffer());
- for(const role of ['manager','staff']){store.db.prepare('UPDATE memberships SET role=? WHERE user=? AND store=?').run(role,owner.user.id,owner.id);await page.goto('/branding');await expect(page.getByText('Only the owner can change branding. Staff and managers use the saved store settings.')).toBeVisible();await expect(page.getByRole('button',{name:'Save store branding',exact:true})).toHaveCount(0);}
-}));
+test("trial exports enforce the Forme mark; managers/staff can read settings but only the owner can edit", async ({
+  page,
+}) =>
+  setup(page, async ({ store, owner, png }) => {
+    store.db.prepare("UPDATE orgs SET status='trial' WHERE id=?").run(owner.org);
+    await chooseAvatar(page);
+    await expect(
+      page.getByText("The Forme trial mark is required on exports.").first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("checkbox", { name: "Include store footer on this export", exact: true }),
+    ).toHaveCount(0);
+    const bytes = await downloaded(
+      page,
+      page.getByRole("button", { name: "Download avatar", exact: true }),
+    );
+    const top = await sharp(png).metadata();
+    expect((await sharp(bytes).metadata()).height).toBe(top.height);
+    expect(await sharp(bytes).ensureAlpha().raw().toBuffer()).not.toEqual(
+      await sharp(png).ensureAlpha().raw().toBuffer(),
+    );
+    for (const role of ["manager", "staff"]) {
+      store.db
+        .prepare("UPDATE memberships SET role=? WHERE user=? AND store=?")
+        .run(role, owner.user.id, owner.id);
+      await page.goto("/branding");
+      await expect(
+        page.getByText(
+          "Only the owner can change branding. Staff and managers use the saved store settings.",
+        ),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Save store branding", exact: true }),
+      ).toHaveCount(0);
+    }
+  }));

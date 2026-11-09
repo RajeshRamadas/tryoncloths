@@ -1,16 +1,25 @@
-import {randomBytes,randomUUID,createHash} from 'node:crypto';
-import {transaction} from './catalogue-fields.js';
-import {validRequestId,BillingError} from './billing.js';
-import {requireRole} from './tenancy.js';
-import {profiles,skinTones,validTemplateTone} from '../src/profiles.js';
-import {cataloguePoses,normalizeAvatar} from './gemini-tryon.js';
-import {normalizeGarmentImage} from './product-link.js';
-import {providerErrorDetails} from './provider-errors.js';
-import {safelyRecord} from './events.js';
-import {photoFormats,photoRenditions,photoPreview,photoFilename,writePhotoZip} from './photo-export.js';
-const fail=(message,status=400)=>Object.assign(new Error(message),{status,photoPublic:true});
-const id=()=>randomBytes(16).toString('hex');
-export function installPhotoSchema(db){transaction(db,()=>{db.exec(`
+import { randomBytes, randomUUID, createHash } from "node:crypto";
+import { transaction } from "./catalogue-fields.js";
+import { validRequestId, BillingError } from "./billing.js";
+import { requireRole } from "./tenancy.js";
+import { profiles, skinTones, validTemplateTone } from "../src/profiles.js";
+import { cataloguePoses, normalizeAvatar } from "./gemini-tryon.js";
+import { normalizeGarmentImage } from "./product-link.js";
+import { providerErrorDetails } from "./provider-errors.js";
+import { safelyRecord } from "./events.js";
+import {
+  photoFormats,
+  photoRenditions,
+  photoPreview,
+  photoFilename,
+  writePhotoZip,
+} from "./photo-export.js";
+const fail = (message, status = 400) =>
+  Object.assign(new Error(message), { status, photoPublic: true });
+const id = () => randomBytes(16).toString("hex");
+export function installPhotoSchema(db) {
+  transaction(db, () => {
+    db.exec(`
  CREATE TABLE IF NOT EXISTS photo_jobs(id TEXT PRIMARY KEY,org TEXT NOT NULL REFERENCES orgs(id),store TEXT NOT NULL,createdBy TEXT REFERENCES users(id) ON DELETE SET NULL,requestId TEXT NOT NULL,selectionHash TEXT NOT NULL,profileId TEXT NOT NULL,tone TEXT NOT NULL,formatsJson TEXT NOT NULL,providerModel TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'active' CHECK(state IN ('active','cancelled')),createdAt INTEGER NOT NULL,UNIQUE(store,requestId),FOREIGN KEY(store,org) REFERENCES stores(id,org) ON DELETE CASCADE);
  CREATE INDEX IF NOT EXISTS photo_jobs_store ON photo_jobs(store,createdAt);
  CREATE TABLE IF NOT EXISTS photo_items(id TEXT PRIMARY KEY,job TEXT NOT NULL REFERENCES photo_jobs(id) ON DELETE CASCADE,garmentId TEXT NOT NULL,name TEXT NOT NULL,sku TEXT NOT NULL,garmentType TEXT NOT NULL,garmentImage BLOB NOT NULL,pose TEXT NOT NULL,state TEXT NOT NULL,currentAttempt TEXT NOT NULL,baseHold TEXT NOT NULL REFERENCES ledger(id),freeUsed INTEGER NOT NULL DEFAULT 0 CHECK(freeUsed IN (0,1)),reviewUntil INTEGER NOT NULL);
@@ -19,88 +28,800 @@ export function installPhotoSchema(db){transaction(db,()=>{db.exec(`
  CREATE INDEX IF NOT EXISTS photo_attempts_queue ON photo_attempts(state,createdAt);
  CREATE TABLE IF NOT EXISTS photo_outputs(attempt TEXT NOT NULL REFERENCES photo_attempts(id) ON DELETE CASCADE,format TEXT NOT NULL,image BLOB NOT NULL,PRIMARY KEY(attempt,format));
  CREATE TABLE IF NOT EXISTS photo_worker_leases(slot INTEGER PRIMARY KEY CHECK(slot IN (0,1)),token TEXT NOT NULL UNIQUE,org TEXT NOT NULL UNIQUE REFERENCES orgs(id),attempt TEXT NOT NULL,expiresAt INTEGER NOT NULL);
- `);if(!db.prepare('PRAGMA table_info(photo_attempts)').all().some(c=>c.name==='extraDue'))db.exec('ALTER TABLE photo_attempts ADD COLUMN extraDue INTEGER NOT NULL DEFAULT 0');});}
-export class PhotoJobs {
- constructor(store,{provider='gemini',apiKey,model='gemini-2.5-flash-image',generate,template,femaleEnabled=false,render=photoRenditions,reviewMs=7*86400000}={}){this.store=store;this.db=store.db;this.billing=store.billing;this.provider=provider;this.apiKey=apiKey;this.model=model;this.generate=generate;this.template=template;this.femaleEnabled=femaleEnabled;this.render=render;this.reviewMs=reviewMs;this.active=new Map();this.started=false;}
- configured(){return this.provider==='gemini'&&Boolean(this.apiKey)&&typeof this.generate==='function';}
- access(account){const actor=account?.user&&this.store.identity(account.user.id,account.id);if(!actor||actor.org!==account.org||!['owner','manager'].includes(actor.user.role))throw fail('Your store role cannot manage catalogue photos.',403);if(this.db.prepare('SELECT status FROM orgs WHERE id=?').get(actor.org)?.status==='suspended')throw fail('This organisation is suspended.',403);return actor;}
- available(){if(!this.configured())throw fail('Configure Gemini on the studio before creating catalogue photos.',503);}
- reserve(account,requestId=randomUUID()){return this.billing.reserve({org:account.org,store:account.id,user:account.user.id,pool:'photo',action:'catalogue',requestId});}
- config(account){this.access(account);return {available:this.configured(),remaining:this.billing.balance(account.org,'photo'),role:account.user.role,profiles:profiles.filter(p=>p.body==='male'||this.femaleEnabled),tones:skinTones,poses:cataloguePoses,formats:photoFormats,maxItems:50,reviewDays:7};}
- selection(input){
-  const profile=profiles.find(p=>p.id===input.model?.profileId);if(!profile||profile.body==='female'&&!this.femaleEnabled||!validTemplateTone(input.model?.tone))throw fail('Choose an enabled adult model and complexion.');
-  const list=(value,allowed,max,label)=>{if(!Array.isArray(value)||!value.length||value.length>max||new Set(value).size!==value.length||value.some(v=>typeof v!=='string'||allowed&&!Object.hasOwn(allowed,v)))throw fail(`Choose distinct ${label}.`);return [...value].sort();};
-  const garmentIds=list(input.garmentIds,null,50,'catalogue garments'),poses=list(input.poses,cataloguePoses,2,'poses'),formats=list(input.formats,photoFormats,4,'export formats');if(garmentIds.length*poses.length>50)throw fail('Choose up to 50 garment/pose combinations per job.');
-  return {garmentIds,poses,formats,profileId:profile.id,tone:input.model.tone};
- }
- create(account,input={}){
-  this.access(account);this.available();if(!validRequestId(input.requestId))throw fail('Use a fresh UUID request ID.');const selected=this.selection(input),hash=createHash('sha256').update(JSON.stringify(selected)).digest('hex');
-  const previous=this.db.prepare('SELECT id,selectionHash FROM photo_jobs WHERE store=? AND requestId=?').get(account.id,input.requestId.toLowerCase());if(previous){if(previous.selectionHash!==hash)throw fail('This request ID belongs to a different selection.',409);return this.get(account,previous.id);}
-  const total=selected.garmentIds.length*selected.poses.length;if(input.generationConsent!==true||input.maxCredits!==total)throw fail('Confirm sending the selected products and standard models to Gemini and the displayed photo-credit reservation.');
-  const garments=selected.garmentIds.map(key=>{const row=this.store.garments.row(account,key);if(row.needsTypeReview)throw fail('Confirm each product’s clothing type in Catalogue first.');return row;});
-  const key=id();transaction(this.db,()=>{
-   if(this.db.prepare('SELECT count(*) n FROM photo_jobs WHERE store=?').get(account.id).n>=100)throw fail('Keep up to 100 catalogue jobs per store. Download and delete older jobs first.',409);
-   if(this.db.prepare("SELECT count(*) n FROM photo_items i JOIN photo_jobs j ON j.id=i.job WHERE j.org=? AND i.state IN ('pending','generating','processing','ready','rejected')").get(account.org).n+total>200)throw fail('Finish or cancel existing catalogue work before adding more than 200 open items.',409);
-   this.db.prepare('INSERT INTO photo_jobs(id,org,store,createdBy,requestId,selectionHash,profileId,tone,formatsJson,providerModel,createdAt) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(key,account.org,account.id,account.user.id,input.requestId.toLowerCase(),hash,selected.profileId,selected.tone,JSON.stringify(selected.formats),this.model,Date.now());
-   for(const garment of garments)for(const pose of selected.poses){const item=id(),attempt=id(),requestId=randomUUID(),hold=this.reserve(account,requestId);this.db.prepare("INSERT INTO photo_items(id,job,garmentId,name,sku,garmentType,garmentImage,pose,state,currentAttempt,baseHold,reviewUntil) VALUES(?,?,?,?,?,?,?,?,'pending',?,?,?)").run(item,key,garment.id,garment.name,garment.sku||garment.name,garment.garmentType,garment.image,pose,attempt,hold,Date.now()+this.reviewMs);this.db.prepare("INSERT INTO photo_attempts(id,item,store,createdBy,requestId,kind,state,createdAt) VALUES(?,?,?,?,?,'initial','pending',?)").run(attempt,item,account.id,account.user.id,requestId,Date.now());}
-  });this.wake();return this.get(account,key);
- }
- job(account,key){this.access(account);const job=this.db.prepare('SELECT * FROM photo_jobs WHERE id=? AND store=? AND org=?').get(key,account.id,account.org);if(!job)throw fail('Catalogue photo job not found.',404);return job;}
- list(account){this.access(account);return {jobs:this.db.prepare('SELECT id FROM photo_jobs WHERE store=? ORDER BY createdAt DESC,id DESC LIMIT 100').all(account.id).map(j=>{const job=this.get(account,j.id);return {...job,items:undefined};})};}
- terminal(hold){return this.db.prepare("SELECT kind FROM ledger WHERE ref=? AND kind IN ('commit','refund')").get(hold)?.kind;}
- retryPlan(item,attempt){const baseReserve=this.terminal(item.baseHold)==='refund'?1:0,reprocess=item.state==='failed'&&Boolean(attempt.rawImage),hadResult=Boolean(this.db.prepare("SELECT 1 FROM photo_attempts WHERE item=? AND preview IS NOT NULL").get(item.id));const kind=reprocess?'reprocess':!hadResult?'initial':!item.freeUsed?'free':'paid',extra=kind==='paid'||reprocess&&attempt.extraDue?1:0;return {kind,baseReserve,extra,total:baseReserve+extra};}
- get(account,key){const job=this.job(account,key);const items=this.db.prepare('SELECT i.id,i.garmentId,i.name,i.sku,i.pose,i.state,i.currentAttempt,i.baseHold,i.freeUsed,i.reviewUntil,a.error,a.kind,a.extraDue,a.preview IS NOT NULL AS hasPreview,a.rawImage IS NOT NULL AS hasRaw FROM photo_items i JOIN photo_attempts a ON a.id=i.currentAttempt WHERE i.job=? ORDER BY i.rowid').all(key).map(row=>({id:row.id,garmentId:row.garmentId,name:row.name,sku:row.sku,pose:row.pose,state:row.state,freeUsed:Boolean(row.freeUsed),reviewUntil:row.reviewUntil,error:row.error,hasPreview:Boolean(row.hasPreview),attempt:row.currentAttempt,baseCharged:this.terminal(row.baseHold)==='commit',...(['rejected','failed','unknown'].includes(row.state)?{retry:this.retryPlan(row,{rawImage:row.hasRaw,extraDue:row.extraDue})}:{})}));const counts={};for(const item of items)counts[item.state]=(counts[item.state]||0)+1;return {id:job.id,createdAt:job.createdAt,profileId:job.profileId,tone:job.tone,formats:JSON.parse(job.formatsJson),state:job.state==='cancelled'||items.every(i=>i.state==='cancelled')?'cancelled':items.every(i=>['approved','cancelled'].includes(i.state))?'completed':items.some(i=>['pending','generating','processing'].includes(i.state))?'processing':'review',counts,items};}
- refundItem(item){this.billing.refund(item.baseHold,'photo-not-approved');for(const a of this.db.prepare('SELECT extraHold FROM photo_attempts WHERE item=? AND extraHold IS NOT NULL').all(item.id))this.billing.refund(a.extraHold,'photo-failed');}
- review(account,key,itemId,input){const job=this.job(account,key);if(job.state!=='active')throw fail('This job was cancelled.',409);if(typeof input?.approved!=='boolean')throw fail('Choose approve or reject.');transaction(this.db,()=>{const item=this.db.prepare('SELECT * FROM photo_items WHERE job=? AND id=?').get(key,itemId);if(!item)throw fail('Catalogue item not found.',404);if(!['ready','approved','rejected'].includes(item.state))throw fail('A generated result is required for review.',409);if(Date.now()>=item.reviewUntil&&!(input.approved&&item.state==='approved'))throw fail('This review reservation expired. Create a new job.',409);if(input.approved)this.billing.commit(item.baseHold);const state=input.approved?'approved':'rejected';this.db.prepare('UPDATE photo_items SET state=? WHERE id=?').run(state,itemId);this.db.prepare('UPDATE photo_attempts SET state=? WHERE id=?').run(state,item.currentAttempt);});return this.get(account,key);}
- retry(account,key,itemId,input={}){
-  const job=this.job(account,key);this.available();if(job.state!=='active')throw fail('This job was cancelled.',409);if(!validRequestId(input.requestId))throw fail('Use a fresh UUID request ID.');
-  const previous=this.db.prepare('SELECT item FROM photo_attempts WHERE store=? AND requestId=?').get(account.id,input.requestId.toLowerCase());if(previous){if(previous.item!==itemId)throw fail('This request ID belongs to another item.',409);return this.get(account,key);}
-  transaction(this.db,()=>{const item=this.db.prepare('SELECT * FROM photo_items WHERE job=? AND id=?').get(key,itemId);if(!item)throw fail('Catalogue item not found.',404);if(!['rejected','failed','unknown'].includes(item.state))throw fail('Reject the current result before requesting another generation.',409);if(Date.now()>=item.reviewUntil)throw fail('This review reservation expired. Create a new job.',409);const old=this.db.prepare('SELECT * FROM photo_attempts WHERE id=?').get(item.currentAttempt),plan=this.retryPlan(item,old);if(input.generationConsent!==true||input.maxCredits!==plan.total)throw fail('Confirm the displayed photo-credit reservation before this manual retry.');
-   const attempt=id(),baseHold=plan.baseReserve?this.reserve(account):item.baseHold,extraHold=plan.extra?this.reserve(account,input.requestId):null;
-   this.db.prepare("INSERT INTO photo_attempts(id,item,store,createdBy,requestId,kind,extraHold,state,rawImage,createdAt,extraDue) VALUES(?,?,?,?,?,?,?,'pending',?,?,?)").run(attempt,itemId,account.id,account.user.id,input.requestId.toLowerCase(),plan.kind,extraHold,plan.kind==='reprocess'?old.rawImage:null,Date.now(),plan.extra);this.db.prepare("UPDATE photo_items SET state='pending',currentAttempt=?,baseHold=? WHERE id=?").run(attempt,baseHold,itemId);
-  });this.wake();return this.get(account,key);
- }
- cancel(account,key,remove=false){this.job(account,key);transaction(this.db,()=>{for(const item of this.db.prepare('SELECT id,baseHold FROM photo_items WHERE job=?').all(key))this.refundItem(item);this.db.prepare("UPDATE photo_jobs SET state='cancelled' WHERE id=?").run(key);this.db.prepare("UPDATE photo_items SET state='cancelled' WHERE job=? AND state<>'approved'").run(key);this.db.prepare("UPDATE photo_attempts SET state='cancelled' WHERE item IN (SELECT id FROM photo_items WHERE job=?) AND state IN ('pending','generating','processing')").run(key);if(remove)this.db.prepare('DELETE FROM photo_jobs WHERE id=?').run(key);});return {ok:true};}
- expire(now=Date.now()){transaction(this.db,()=>{for(const item of this.db.prepare("SELECT id,baseHold,currentAttempt FROM photo_items WHERE reviewUntil<=? AND state IN ('pending','generating','processing','ready','rejected','failed','unknown')").all(now)){this.refundItem(item);this.db.prepare("UPDATE photo_items SET state='cancelled' WHERE id=?").run(item.id);this.db.prepare("UPDATE photo_attempts SET state='cancelled',error='Review reservation expired.' WHERE id=?").run(item.currentAttempt);}});}
- recover(now=Date.now()){transaction(this.db,()=>{for(const lease of this.db.prepare('SELECT * FROM photo_worker_leases WHERE expiresAt<=?').all(now)){
-   const attempt=this.db.prepare("SELECT * FROM photo_attempts WHERE id=? AND lease=? AND state IN ('generating','processing')").get(lease.attempt,lease.token);if(attempt){const item=this.db.prepare('SELECT * FROM photo_items WHERE id=?').get(attempt.item);if(attempt.rawImage){this.db.prepare("UPDATE photo_attempts SET state='pending',lease=NULL WHERE id=?").run(attempt.id);this.db.prepare("UPDATE photo_items SET state='pending' WHERE id=?").run(item.id);}else{this.refundItem(item);this.db.prepare("UPDATE photo_attempts SET state='unknown',error='The provider request was interrupted. Photo credits were refunded; the provider may still charge. No automatic retry was sent.' WHERE id=?").run(attempt.id);this.db.prepare("UPDATE photo_items SET state='unknown' WHERE id=?").run(item.id);}}
-   this.db.prepare('DELETE FROM photo_worker_leases WHERE token=?').run(lease.token);this.store.imageSlots?.release(lease.token);
-  }});}
- claim(){return transaction(this.db,()=>{
-  const leases=this.db.prepare('SELECT slot FROM photo_worker_leases').all();if(leases.length>=2)return null;const slot=[0,1].find(n=>!leases.some(r=>r.slot===n));
-  const row=this.db.prepare("SELECT a.id,a.item,a.createdBy,j.id AS job,j.org,j.store FROM photo_attempts a JOIN photo_items i ON i.id=a.item AND i.currentAttempt=a.id JOIN photo_jobs j ON j.id=i.job WHERE a.state='pending' AND i.state='pending' AND j.state='active' AND i.reviewUntil>? AND NOT EXISTS(SELECT 1 FROM photo_worker_leases l WHERE l.org=j.org) ORDER BY a.createdAt,a.rowid LIMIT 1").get(Date.now());if(!row)return null;
-  const token=id();if(this.store.imageSlots&&!this.store.imageSlots.acquire({token,kind:'catalogue',leaseMs:5*60000}))return null;
-  this.db.prepare('INSERT INTO photo_worker_leases VALUES(?,?,?,?,?)').run(slot,token,row.org,row.id,Date.now()+5*60000);this.db.prepare("UPDATE photo_attempts SET state=CASE WHEN rawImage IS NULL THEN 'generating' ELSE 'processing' END,lease=? WHERE id=?").run(token,row.id);this.db.prepare("UPDATE photo_items SET state=(SELECT state FROM photo_attempts WHERE id=?) WHERE id=?").run(row.id,row.item);return {...row,token};
- });}
- guard(claim){const row=this.db.prepare("SELECT a.*,i.job,i.garmentId,i.name,i.garmentType,i.garmentImage,i.pose,i.reviewUntil,i.baseHold,j.profileId,j.tone,j.formatsJson,j.providerModel FROM photo_attempts a JOIN photo_items i ON i.id=a.item AND i.currentAttempt=a.id JOIN photo_jobs j ON j.id=i.job JOIN photo_worker_leases l ON l.token=a.lease WHERE a.id=? AND a.lease=? AND l.expiresAt>? AND j.state='active' AND i.state IN ('generating','processing')").get(claim.id,claim.token,Date.now());if(!row||row.reviewUntil<=Date.now())throw fail('This catalogue attempt is no longer active.',409);const account=this.store.identity(row.createdBy,claim.store);this.access(account);this.store.garments.row(account,row.garmentId);if(this.terminal(row.baseHold)==='refund'||row.extraHold&&this.terminal(row.extraHold)==='refund')throw fail('Photo reservation expired.',409);if(row.profileId.startsWith('f-')&&!this.femaleEnabled)throw fail('Female models are not enabled on this studio.',409);return {row,account};}
- async run(claim){try{
-  let {row,account}=this.guard(claim),bytes=row.rawImage?Buffer.from(row.rawImage):null;
-  if(!bytes){const avatar=await this.template(row.profileId,row.tone),garment=await normalizeGarmentImage(Buffer.from(row.garmentImage));this.guard(claim);const output=await this.generate({avatar,garment,garmentType:row.garmentType,title:row.name,apiKey:this.apiKey,model:row.providerModel,variant:'catalogue',pose:row.pose});bytes=await normalizeAvatar(output);this.guard(claim);transaction(this.db,()=>{this.db.prepare("UPDATE photo_attempts SET rawImage=?,state='processing' WHERE id=? AND lease=?").run(bytes,claim.id,claim.token);this.db.prepare("UPDATE photo_items SET state='processing',freeUsed=CASE WHEN ?='free' THEN 1 ELSE freeUsed END WHERE id=?").run(row.kind,row.item);});}
-  const trial=this.db.prepare('SELECT status FROM orgs WHERE id=?').get(account.org)?.status==='trial',outputs=await this.render(bytes,JSON.parse(row.formatsJson),{trial}),preview=await photoPreview(bytes);if(!Array.isArray(outputs)||outputs.length!==JSON.parse(row.formatsJson).length||new Set(outputs.map(o=>o.format)).size!==outputs.length||outputs.some(o=>!JSON.parse(row.formatsJson).includes(o.format)||!Buffer.isBuffer(o.image)))throw new Error('Catalogue exports could not be completed');this.guard(claim);
-  transaction(this.db,()=>{for(const output of outputs)this.db.prepare('INSERT INTO photo_outputs VALUES(?,?,?) ON CONFLICT(attempt,format) DO UPDATE SET image=excluded.image').run(claim.id,output.format,output.image);if(row.extraHold)this.billing.commit(row.extraHold);this.db.prepare("UPDATE photo_attempts SET state='ready',preview=?,error=NULL WHERE id=?").run(preview,claim.id);this.db.prepare("UPDATE photo_items SET state='ready',freeUsed=CASE WHEN ?='free' THEN 1 ELSE freeUsed END WHERE id=?").run(row.kind,row.item);});
-  safelyRecord(this.db,{org:account.org,store:account.id,user:account.user.id},'catalogue_photo',{requestId:row.requestId,garmentId:row.garmentId,template:row.profileId+':'+row.tone,source:'catalogue',pool:'photo'},{operationKey:row.requestId});
- }catch(error){transaction(this.db,()=>{const attempt=this.db.prepare("SELECT * FROM photo_attempts WHERE id=? AND lease=? AND state IN ('generating','processing')").get(claim.id,claim.token);if(!attempt)return;const item=this.db.prepare('SELECT * FROM photo_items WHERE id=?').get(attempt.item);this.refundItem(item);const details=providerErrorDetails(error,'gemini'),message=error instanceof BillingError||error.photoPublic===true?error.message:details.code==='unknown'?'Catalogue photo generation could not complete. Credits were refunded; a provider charge may still apply. No automatic retry was sent.':details.message.replaceAll('customer avatar','catalogue photo').replaceAll('Customer avatar','Catalogue photo');this.db.prepare("UPDATE photo_attempts SET state='failed',error=? WHERE id=?").run(message,claim.id);this.db.prepare("UPDATE photo_items SET state='failed' WHERE id=?").run(item.id);});
- }finally{this.db.prepare('DELETE FROM photo_worker_leases WHERE token=?').run(claim.token);this.store.imageSlots?.release(claim.token);}}
- async tick(){this.recover();this.expire();if(!this.configured())return [];const started=[];while(this.active.size<2){const claim=this.claim();if(!claim)break;const work=this.run(claim).catch(()=>console.error(JSON.stringify({event:'catalogue_photo_worker_failed'}))).finally(()=>{this.active.delete(claim.token);this.wake();});this.active.set(claim.token,work);started.push(work);}await Promise.allSettled(started);return started;}
- async drain(){for(let n=0;n<1000;n++){const work=await this.tick();if(!work.length&&!this.active.size)return;await Promise.allSettled([...this.active.values()]);}throw new Error('Photo queue did not drain');}
- wake(){if(this.started)queueMicrotask(()=>void this.tick().catch(()=>console.error(JSON.stringify({event:'catalogue_photo_worker_failed'}))));}
- start(){if(this.started)return;this.started=true;this.timer=setInterval(()=>this.wake(),2000);this.timer.unref();this.wake();}
- stop(){this.started=false;clearInterval(this.timer);}
- preview(account,key,itemId){this.job(account,key);const row=this.db.prepare('SELECT a.preview FROM photo_items i JOIN photo_attempts a ON a.id=i.currentAttempt WHERE i.job=? AND i.id=?').get(key,itemId);if(!row?.preview)throw fail('A generated preview is not available.',404);return Buffer.from(row.preview);}
- async file(account,key,itemId,format){this.job(account,key);const row=this.db.prepare("SELECT o.image,i.sku,i.currentAttempt FROM photo_items i JOIN photo_outputs o ON o.attempt=i.currentAttempt WHERE i.id=? AND i.job=? AND i.state='approved' AND o.format=?").get(itemId,key,format);if(!row)throw fail('Approve this image before downloading its exports.',409);const image=await this.store.branding.render(account.id,Buffer.from(row.image),{format:'jpeg',fixedSize:true});this.job(account,key);if(!this.db.prepare("SELECT 1 FROM photo_items WHERE id=? AND job=? AND state='approved' AND currentAttempt=?").get(itemId,key,row.currentAttempt))throw fail('The approved image changed before download.',409);return {image,name:photoFilename(row.sku,format)};}
- async *archive(account,key){const job=this.get(account,key);for(const item of job.items.filter(i=>i.state==='approved'))for(const format of job.formats){const file=await this.file(account,key,item.id,format);yield {name:`${item.id.slice(0,8)}/${item.pose}/${file.name}`,image:file.image};}}
+ `);
+    if (
+      !db
+        .prepare("PRAGMA table_info(photo_attempts)")
+        .all()
+        .some((c) => c.name === "extraDue")
+    )
+      db.exec("ALTER TABLE photo_attempts ADD COLUMN extraDue INTEGER NOT NULL DEFAULT 0");
+  });
 }
-export function installPhotoRoutes(app,store,service,{requireUser,sameOrigin,wrap}){
- const manager=requireRole('owner','manager');
- app.get('/api/photo-jobs/config',requireUser,manager,wrap((req,res)=>res.json(service.config(req.account))));
- app.get('/api/photo-jobs',requireUser,manager,wrap((req,res)=>res.json(service.list(req.account))));
- app.post('/api/photo-jobs',sameOrigin,requireUser,manager,wrap((req,res)=>res.status(201).json(service.create(req.account,req.body))));
- app.get('/api/photo-jobs/:id',requireUser,manager,wrap((req,res)=>res.json(service.get(req.account,req.params.id))));
- app.post('/api/photo-jobs/:id/cancel',sameOrigin,requireUser,manager,wrap((req,res)=>res.json(service.cancel(req.account,req.params.id))));
- app.delete('/api/photo-jobs/:id',sameOrigin,requireUser,manager,wrap((req,res)=>res.json(service.cancel(req.account,req.params.id,true))));
- app.post('/api/photo-jobs/:id/items/:item/review',sameOrigin,requireUser,manager,wrap((req,res)=>res.json(service.review(req.account,req.params.id,req.params.item,req.body))));
- app.post('/api/photo-jobs/:id/items/:item/retry',sameOrigin,requireUser,manager,wrap((req,res)=>res.json(service.retry(req.account,req.params.id,req.params.item,req.body))));
- app.get('/api/photo-jobs/:id/items/:item/preview',requireUser,manager,wrap((req,res)=>res.type('jpeg').send(service.preview(req.account,req.params.id,req.params.item))));
- app.get('/api/photo-jobs/:id/items/:item/files/:format',requireUser,manager,wrap(async(req,res)=>{const file=await service.file(req.account,req.params.id,req.params.item,req.params.format);res.type('jpeg').set('Content-Disposition',`attachment; filename="${file.name}"`).send(file.image);}));
- app.get('/api/photo-jobs/:id/download.zip',requireUser,manager,wrap(async(req,res)=>{const job=service.get(req.account,req.params.id);if(!job.items.some(i=>i.state==='approved'))throw fail('Approve at least one image before downloading.',409);res.type('application/zip').set('Content-Disposition','attachment; filename="catalogue-photos.zip"');try{await writePhotoZip(res,service.archive(req.account,req.params.id));}catch{res.destroy();}}));
+export class PhotoJobs {
+  constructor(
+    store,
+    {
+      provider = "gemini",
+      apiKey,
+      model = "gemini-2.5-flash-image",
+      generate,
+      template,
+      femaleEnabled = false,
+      render = photoRenditions,
+      reviewMs = 7 * 86400000,
+    } = {},
+  ) {
+    this.store = store;
+    this.db = store.db;
+    this.billing = store.billing;
+    this.provider = provider;
+    this.apiKey = apiKey;
+    this.model = model;
+    this.generate = generate;
+    this.template = template;
+    this.femaleEnabled = femaleEnabled;
+    this.render = render;
+    this.reviewMs = reviewMs;
+    this.active = new Map();
+    this.started = false;
+  }
+  configured() {
+    return (
+      this.provider === "gemini" && Boolean(this.apiKey) && typeof this.generate === "function"
+    );
+  }
+  access(account) {
+    const actor = account?.user && this.store.identity(account.user.id, account.id);
+    if (!actor || actor.org !== account.org || !["owner", "manager"].includes(actor.user.role))
+      throw fail("Your store role cannot manage catalogue photos.", 403);
+    if (
+      this.db.prepare("SELECT status FROM orgs WHERE id=?").get(actor.org)?.status === "suspended"
+    )
+      throw fail("This organisation is suspended.", 403);
+    return actor;
+  }
+  available() {
+    if (!this.configured())
+      throw fail("Configure Gemini on the studio before creating catalogue photos.", 503);
+  }
+  reserve(account, requestId = randomUUID()) {
+    return this.billing.reserve({
+      org: account.org,
+      store: account.id,
+      user: account.user.id,
+      pool: "photo",
+      action: "catalogue",
+      requestId,
+    });
+  }
+  config(account) {
+    this.access(account);
+    return {
+      available: this.configured(),
+      remaining: this.billing.balance(account.org, "photo"),
+      role: account.user.role,
+      profiles: profiles.filter((p) => p.body === "male" || this.femaleEnabled),
+      tones: skinTones,
+      poses: cataloguePoses,
+      formats: photoFormats,
+      maxItems: 50,
+      reviewDays: 7,
+    };
+  }
+  selection(input) {
+    const profile = profiles.find((p) => p.id === input.model?.profileId);
+    if (
+      !profile ||
+      (profile.body === "female" && !this.femaleEnabled) ||
+      !validTemplateTone(input.model?.tone)
+    )
+      throw fail("Choose an enabled adult model and complexion.");
+    const list = (value, allowed, max, label) => {
+      if (
+        !Array.isArray(value) ||
+        !value.length ||
+        value.length > max ||
+        new Set(value).size !== value.length ||
+        value.some((v) => typeof v !== "string" || (allowed && !Object.hasOwn(allowed, v)))
+      )
+        throw fail(`Choose distinct ${label}.`);
+      return [...value].sort();
+    };
+    const garmentIds = list(input.garmentIds, null, 50, "catalogue garments"),
+      poses = list(input.poses, cataloguePoses, 2, "poses"),
+      formats = list(input.formats, photoFormats, 4, "export formats");
+    if (garmentIds.length * poses.length > 50)
+      throw fail("Choose up to 50 garment/pose combinations per job.");
+    return { garmentIds, poses, formats, profileId: profile.id, tone: input.model.tone };
+  }
+  create(account, input = {}) {
+    this.access(account);
+    this.available();
+    if (!validRequestId(input.requestId)) throw fail("Use a fresh UUID request ID.");
+    const selected = this.selection(input),
+      hash = createHash("sha256").update(JSON.stringify(selected)).digest("hex");
+    const previous = this.db
+      .prepare("SELECT id,selectionHash FROM photo_jobs WHERE store=? AND requestId=?")
+      .get(account.id, input.requestId.toLowerCase());
+    if (previous) {
+      if (previous.selectionHash !== hash)
+        throw fail("This request ID belongs to a different selection.", 409);
+      return this.get(account, previous.id);
+    }
+    const total = selected.garmentIds.length * selected.poses.length;
+    if (input.generationConsent !== true || input.maxCredits !== total)
+      throw fail(
+        "Confirm sending the selected products and standard models to Gemini and the displayed photo-credit reservation.",
+      );
+    const garments = selected.garmentIds.map((key) => {
+      const row = this.store.garments.row(account, key);
+      if (row.needsTypeReview)
+        throw fail("Confirm each product’s clothing type in Catalogue first.");
+      return row;
+    });
+    const key = id();
+    transaction(this.db, () => {
+      if (
+        this.db.prepare("SELECT count(*) n FROM photo_jobs WHERE store=?").get(account.id).n >= 100
+      )
+        throw fail(
+          "Keep up to 100 catalogue jobs per store. Download and delete older jobs first.",
+          409,
+        );
+      if (
+        this.db
+          .prepare(
+            "SELECT count(*) n FROM photo_items i JOIN photo_jobs j ON j.id=i.job WHERE j.org=? AND i.state IN ('pending','generating','processing','ready','rejected')",
+          )
+          .get(account.org).n +
+          total >
+        200
+      )
+        throw fail(
+          "Finish or cancel existing catalogue work before adding more than 200 open items.",
+          409,
+        );
+      this.db
+        .prepare(
+          "INSERT INTO photo_jobs(id,org,store,createdBy,requestId,selectionHash,profileId,tone,formatsJson,providerModel,createdAt) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+        )
+        .run(
+          key,
+          account.org,
+          account.id,
+          account.user.id,
+          input.requestId.toLowerCase(),
+          hash,
+          selected.profileId,
+          selected.tone,
+          JSON.stringify(selected.formats),
+          this.model,
+          Date.now(),
+        );
+      for (const garment of garments)
+        for (const pose of selected.poses) {
+          const item = id(),
+            attempt = id(),
+            requestId = randomUUID(),
+            hold = this.reserve(account, requestId);
+          this.db
+            .prepare(
+              "INSERT INTO photo_items(id,job,garmentId,name,sku,garmentType,garmentImage,pose,state,currentAttempt,baseHold,reviewUntil) VALUES(?,?,?,?,?,?,?,?,'pending',?,?,?)",
+            )
+            .run(
+              item,
+              key,
+              garment.id,
+              garment.name,
+              garment.sku || garment.name,
+              garment.garmentType,
+              garment.image,
+              pose,
+              attempt,
+              hold,
+              Date.now() + this.reviewMs,
+            );
+          this.db
+            .prepare(
+              "INSERT INTO photo_attempts(id,item,store,createdBy,requestId,kind,state,createdAt) VALUES(?,?,?,?,?,'initial','pending',?)",
+            )
+            .run(attempt, item, account.id, account.user.id, requestId, Date.now());
+        }
+    });
+    this.wake();
+    return this.get(account, key);
+  }
+  job(account, key) {
+    this.access(account);
+    const job = this.db
+      .prepare("SELECT * FROM photo_jobs WHERE id=? AND store=? AND org=?")
+      .get(key, account.id, account.org);
+    if (!job) throw fail("Catalogue photo job not found.", 404);
+    return job;
+  }
+  list(account) {
+    this.access(account);
+    return {
+      jobs: this.db
+        .prepare(
+          "SELECT id FROM photo_jobs WHERE store=? ORDER BY createdAt DESC,id DESC LIMIT 100",
+        )
+        .all(account.id)
+        .map((j) => {
+          const job = this.get(account, j.id);
+          return { ...job, items: undefined };
+        }),
+    };
+  }
+  terminal(hold) {
+    return this.db
+      .prepare("SELECT kind FROM ledger WHERE ref=? AND kind IN ('commit','refund')")
+      .get(hold)?.kind;
+  }
+  retryPlan(item, attempt) {
+    const baseReserve = this.terminal(item.baseHold) === "refund" ? 1 : 0,
+      reprocess = item.state === "failed" && Boolean(attempt.rawImage),
+      hadResult = Boolean(
+        this.db
+          .prepare("SELECT 1 FROM photo_attempts WHERE item=? AND preview IS NOT NULL")
+          .get(item.id),
+      );
+    const kind = reprocess
+        ? "reprocess"
+        : !hadResult
+          ? "initial"
+          : !item.freeUsed
+            ? "free"
+            : "paid",
+      extra = kind === "paid" || (reprocess && attempt.extraDue) ? 1 : 0;
+    return { kind, baseReserve, extra, total: baseReserve + extra };
+  }
+  get(account, key) {
+    const job = this.job(account, key);
+    const items = this.db
+      .prepare(
+        "SELECT i.id,i.garmentId,i.name,i.sku,i.pose,i.state,i.currentAttempt,i.baseHold,i.freeUsed,i.reviewUntil,a.error,a.kind,a.extraDue,a.preview IS NOT NULL AS hasPreview,a.rawImage IS NOT NULL AS hasRaw FROM photo_items i JOIN photo_attempts a ON a.id=i.currentAttempt WHERE i.job=? ORDER BY i.rowid",
+      )
+      .all(key)
+      .map((row) => ({
+        id: row.id,
+        garmentId: row.garmentId,
+        name: row.name,
+        sku: row.sku,
+        pose: row.pose,
+        state: row.state,
+        freeUsed: Boolean(row.freeUsed),
+        reviewUntil: row.reviewUntil,
+        error: row.error,
+        hasPreview: Boolean(row.hasPreview),
+        attempt: row.currentAttempt,
+        baseCharged: this.terminal(row.baseHold) === "commit",
+        ...(["rejected", "failed", "unknown"].includes(row.state)
+          ? { retry: this.retryPlan(row, { rawImage: row.hasRaw, extraDue: row.extraDue }) }
+          : {}),
+      }));
+    const counts = {};
+    for (const item of items) counts[item.state] = (counts[item.state] || 0) + 1;
+    return {
+      id: job.id,
+      createdAt: job.createdAt,
+      profileId: job.profileId,
+      tone: job.tone,
+      formats: JSON.parse(job.formatsJson),
+      state:
+        job.state === "cancelled" || items.every((i) => i.state === "cancelled")
+          ? "cancelled"
+          : items.every((i) => ["approved", "cancelled"].includes(i.state))
+            ? "completed"
+            : items.some((i) => ["pending", "generating", "processing"].includes(i.state))
+              ? "processing"
+              : "review",
+      counts,
+      items,
+    };
+  }
+  refundItem(item) {
+    this.billing.refund(item.baseHold, "photo-not-approved");
+    for (const a of this.db
+      .prepare("SELECT extraHold FROM photo_attempts WHERE item=? AND extraHold IS NOT NULL")
+      .all(item.id))
+      this.billing.refund(a.extraHold, "photo-failed");
+  }
+  review(account, key, itemId, input) {
+    const job = this.job(account, key);
+    if (job.state !== "active") throw fail("This job was cancelled.", 409);
+    if (typeof input?.approved !== "boolean") throw fail("Choose approve or reject.");
+    transaction(this.db, () => {
+      const item = this.db
+        .prepare("SELECT * FROM photo_items WHERE job=? AND id=?")
+        .get(key, itemId);
+      if (!item) throw fail("Catalogue item not found.", 404);
+      if (!["ready", "approved", "rejected"].includes(item.state))
+        throw fail("A generated result is required for review.", 409);
+      if (Date.now() >= item.reviewUntil && !(input.approved && item.state === "approved"))
+        throw fail("This review reservation expired. Create a new job.", 409);
+      if (input.approved) this.billing.commit(item.baseHold);
+      const state = input.approved ? "approved" : "rejected";
+      this.db.prepare("UPDATE photo_items SET state=? WHERE id=?").run(state, itemId);
+      this.db
+        .prepare("UPDATE photo_attempts SET state=? WHERE id=?")
+        .run(state, item.currentAttempt);
+    });
+    return this.get(account, key);
+  }
+  retry(account, key, itemId, input = {}) {
+    const job = this.job(account, key);
+    this.available();
+    if (job.state !== "active") throw fail("This job was cancelled.", 409);
+    if (!validRequestId(input.requestId)) throw fail("Use a fresh UUID request ID.");
+    const previous = this.db
+      .prepare("SELECT item FROM photo_attempts WHERE store=? AND requestId=?")
+      .get(account.id, input.requestId.toLowerCase());
+    if (previous) {
+      if (previous.item !== itemId) throw fail("This request ID belongs to another item.", 409);
+      return this.get(account, key);
+    }
+    transaction(this.db, () => {
+      const item = this.db
+        .prepare("SELECT * FROM photo_items WHERE job=? AND id=?")
+        .get(key, itemId);
+      if (!item) throw fail("Catalogue item not found.", 404);
+      if (!["rejected", "failed", "unknown"].includes(item.state))
+        throw fail("Reject the current result before requesting another generation.", 409);
+      if (Date.now() >= item.reviewUntil)
+        throw fail("This review reservation expired. Create a new job.", 409);
+      const old = this.db
+          .prepare("SELECT * FROM photo_attempts WHERE id=?")
+          .get(item.currentAttempt),
+        plan = this.retryPlan(item, old);
+      if (input.generationConsent !== true || input.maxCredits !== plan.total)
+        throw fail("Confirm the displayed photo-credit reservation before this manual retry.");
+      const attempt = id(),
+        baseHold = plan.baseReserve ? this.reserve(account) : item.baseHold,
+        extraHold = plan.extra ? this.reserve(account, input.requestId) : null;
+      this.db
+        .prepare(
+          "INSERT INTO photo_attempts(id,item,store,createdBy,requestId,kind,extraHold,state,rawImage,createdAt,extraDue) VALUES(?,?,?,?,?,?,?,'pending',?,?,?)",
+        )
+        .run(
+          attempt,
+          itemId,
+          account.id,
+          account.user.id,
+          input.requestId.toLowerCase(),
+          plan.kind,
+          extraHold,
+          plan.kind === "reprocess" ? old.rawImage : null,
+          Date.now(),
+          plan.extra,
+        );
+      this.db
+        .prepare("UPDATE photo_items SET state='pending',currentAttempt=?,baseHold=? WHERE id=?")
+        .run(attempt, baseHold, itemId);
+    });
+    this.wake();
+    return this.get(account, key);
+  }
+  cancel(account, key, remove = false) {
+    this.job(account, key);
+    transaction(this.db, () => {
+      for (const item of this.db
+        .prepare("SELECT id,baseHold FROM photo_items WHERE job=?")
+        .all(key))
+        this.refundItem(item);
+      this.db.prepare("UPDATE photo_jobs SET state='cancelled' WHERE id=?").run(key);
+      this.db
+        .prepare("UPDATE photo_items SET state='cancelled' WHERE job=? AND state<>'approved'")
+        .run(key);
+      this.db
+        .prepare(
+          "UPDATE photo_attempts SET state='cancelled' WHERE item IN (SELECT id FROM photo_items WHERE job=?) AND state IN ('pending','generating','processing')",
+        )
+        .run(key);
+      if (remove) this.db.prepare("DELETE FROM photo_jobs WHERE id=?").run(key);
+    });
+    return { ok: true };
+  }
+  expire(now = Date.now()) {
+    transaction(this.db, () => {
+      for (const item of this.db
+        .prepare(
+          "SELECT id,baseHold,currentAttempt FROM photo_items WHERE reviewUntil<=? AND state IN ('pending','generating','processing','ready','rejected','failed','unknown')",
+        )
+        .all(now)) {
+        this.refundItem(item);
+        this.db.prepare("UPDATE photo_items SET state='cancelled' WHERE id=?").run(item.id);
+        this.db
+          .prepare(
+            "UPDATE photo_attempts SET state='cancelled',error='Review reservation expired.' WHERE id=?",
+          )
+          .run(item.currentAttempt);
+      }
+    });
+  }
+  recover(now = Date.now()) {
+    transaction(this.db, () => {
+      for (const lease of this.db
+        .prepare("SELECT * FROM photo_worker_leases WHERE expiresAt<=?")
+        .all(now)) {
+        const attempt = this.db
+          .prepare(
+            "SELECT * FROM photo_attempts WHERE id=? AND lease=? AND state IN ('generating','processing')",
+          )
+          .get(lease.attempt, lease.token);
+        if (attempt) {
+          const item = this.db.prepare("SELECT * FROM photo_items WHERE id=?").get(attempt.item);
+          if (attempt.rawImage) {
+            this.db
+              .prepare("UPDATE photo_attempts SET state='pending',lease=NULL WHERE id=?")
+              .run(attempt.id);
+            this.db.prepare("UPDATE photo_items SET state='pending' WHERE id=?").run(item.id);
+          } else {
+            this.refundItem(item);
+            this.db
+              .prepare(
+                "UPDATE photo_attempts SET state='unknown',error='The provider request was interrupted. Photo credits were refunded; the provider may still charge. No automatic retry was sent.' WHERE id=?",
+              )
+              .run(attempt.id);
+            this.db.prepare("UPDATE photo_items SET state='unknown' WHERE id=?").run(item.id);
+          }
+        }
+        this.db.prepare("DELETE FROM photo_worker_leases WHERE token=?").run(lease.token);
+        this.store.imageSlots?.release(lease.token);
+      }
+    });
+  }
+  claim() {
+    return transaction(this.db, () => {
+      const leases = this.db.prepare("SELECT slot FROM photo_worker_leases").all();
+      if (leases.length >= 2) return null;
+      const slot = [0, 1].find((n) => !leases.some((r) => r.slot === n));
+      const row = this.db
+        .prepare(
+          "SELECT a.id,a.item,a.createdBy,j.id AS job,j.org,j.store FROM photo_attempts a JOIN photo_items i ON i.id=a.item AND i.currentAttempt=a.id JOIN photo_jobs j ON j.id=i.job WHERE a.state='pending' AND i.state='pending' AND j.state='active' AND i.reviewUntil>? AND NOT EXISTS(SELECT 1 FROM photo_worker_leases l WHERE l.org=j.org) ORDER BY a.createdAt,a.rowid LIMIT 1",
+        )
+        .get(Date.now());
+      if (!row) return null;
+      const token = id();
+      if (
+        this.store.imageSlots &&
+        !this.store.imageSlots.acquire({ token, kind: "catalogue", leaseMs: 5 * 60000 })
+      )
+        return null;
+      this.db
+        .prepare("INSERT INTO photo_worker_leases VALUES(?,?,?,?,?)")
+        .run(slot, token, row.org, row.id, Date.now() + 5 * 60000);
+      this.db
+        .prepare(
+          "UPDATE photo_attempts SET state=CASE WHEN rawImage IS NULL THEN 'generating' ELSE 'processing' END,lease=? WHERE id=?",
+        )
+        .run(token, row.id);
+      this.db
+        .prepare(
+          "UPDATE photo_items SET state=(SELECT state FROM photo_attempts WHERE id=?) WHERE id=?",
+        )
+        .run(row.id, row.item);
+      return { ...row, token };
+    });
+  }
+  guard(claim) {
+    const row = this.db
+      .prepare(
+        "SELECT a.*,i.job,i.garmentId,i.name,i.garmentType,i.garmentImage,i.pose,i.reviewUntil,i.baseHold,j.profileId,j.tone,j.formatsJson,j.providerModel FROM photo_attempts a JOIN photo_items i ON i.id=a.item AND i.currentAttempt=a.id JOIN photo_jobs j ON j.id=i.job JOIN photo_worker_leases l ON l.token=a.lease WHERE a.id=? AND a.lease=? AND l.expiresAt>? AND j.state='active' AND i.state IN ('generating','processing')",
+      )
+      .get(claim.id, claim.token, Date.now());
+    if (!row || row.reviewUntil <= Date.now())
+      throw fail("This catalogue attempt is no longer active.", 409);
+    const account = this.store.identity(row.createdBy, claim.store);
+    this.access(account);
+    this.store.garments.row(account, row.garmentId);
+    if (
+      this.terminal(row.baseHold) === "refund" ||
+      (row.extraHold && this.terminal(row.extraHold) === "refund")
+    )
+      throw fail("Photo reservation expired.", 409);
+    if (row.profileId.startsWith("f-") && !this.femaleEnabled)
+      throw fail("Female models are not enabled on this studio.", 409);
+    return { row, account };
+  }
+  async run(claim) {
+    try {
+      let { row, account } = this.guard(claim),
+        bytes = row.rawImage ? Buffer.from(row.rawImage) : null;
+      if (!bytes) {
+        const avatar = await this.template(row.profileId, row.tone),
+          garment = await normalizeGarmentImage(Buffer.from(row.garmentImage));
+        this.guard(claim);
+        const output = await this.generate({
+          avatar,
+          garment,
+          garmentType: row.garmentType,
+          title: row.name,
+          apiKey: this.apiKey,
+          model: row.providerModel,
+          variant: "catalogue",
+          pose: row.pose,
+        });
+        bytes = await normalizeAvatar(output);
+        this.guard(claim);
+        transaction(this.db, () => {
+          this.db
+            .prepare(
+              "UPDATE photo_attempts SET rawImage=?,state='processing' WHERE id=? AND lease=?",
+            )
+            .run(bytes, claim.id, claim.token);
+          this.db
+            .prepare(
+              "UPDATE photo_items SET state='processing',freeUsed=CASE WHEN ?='free' THEN 1 ELSE freeUsed END WHERE id=?",
+            )
+            .run(row.kind, row.item);
+        });
+      }
+      const trial =
+          this.db.prepare("SELECT status FROM orgs WHERE id=?").get(account.org)?.status ===
+          "trial",
+        outputs = await this.render(bytes, JSON.parse(row.formatsJson), { trial }),
+        preview = await photoPreview(bytes);
+      if (
+        !Array.isArray(outputs) ||
+        outputs.length !== JSON.parse(row.formatsJson).length ||
+        new Set(outputs.map((o) => o.format)).size !== outputs.length ||
+        outputs.some(
+          (o) => !JSON.parse(row.formatsJson).includes(o.format) || !Buffer.isBuffer(o.image),
+        )
+      )
+        throw new Error("Catalogue exports could not be completed");
+      this.guard(claim);
+      transaction(this.db, () => {
+        for (const output of outputs)
+          this.db
+            .prepare(
+              "INSERT INTO photo_outputs VALUES(?,?,?) ON CONFLICT(attempt,format) DO UPDATE SET image=excluded.image",
+            )
+            .run(claim.id, output.format, output.image);
+        if (row.extraHold) this.billing.commit(row.extraHold);
+        this.db
+          .prepare("UPDATE photo_attempts SET state='ready',preview=?,error=NULL WHERE id=?")
+          .run(preview, claim.id);
+        this.db
+          .prepare(
+            "UPDATE photo_items SET state='ready',freeUsed=CASE WHEN ?='free' THEN 1 ELSE freeUsed END WHERE id=?",
+          )
+          .run(row.kind, row.item);
+      });
+      safelyRecord(
+        this.db,
+        { org: account.org, store: account.id, user: account.user.id },
+        "catalogue_photo",
+        {
+          requestId: row.requestId,
+          garmentId: row.garmentId,
+          template: row.profileId + ":" + row.tone,
+          source: "catalogue",
+          pool: "photo",
+        },
+        { operationKey: row.requestId },
+      );
+    } catch (error) {
+      transaction(this.db, () => {
+        const attempt = this.db
+          .prepare(
+            "SELECT * FROM photo_attempts WHERE id=? AND lease=? AND state IN ('generating','processing')",
+          )
+          .get(claim.id, claim.token);
+        if (!attempt) return;
+        const item = this.db.prepare("SELECT * FROM photo_items WHERE id=?").get(attempt.item);
+        this.refundItem(item);
+        const details = providerErrorDetails(error, "gemini"),
+          message =
+            error instanceof BillingError || error.photoPublic === true
+              ? error.message
+              : details.code === "unknown"
+                ? "Catalogue photo generation could not complete. Credits were refunded; a provider charge may still apply. No automatic retry was sent."
+                : details.message
+                    .replaceAll("customer avatar", "catalogue photo")
+                    .replaceAll("Customer avatar", "Catalogue photo");
+        this.db
+          .prepare("UPDATE photo_attempts SET state='failed',error=? WHERE id=?")
+          .run(message, claim.id);
+        this.db.prepare("UPDATE photo_items SET state='failed' WHERE id=?").run(item.id);
+      });
+    } finally {
+      this.db.prepare("DELETE FROM photo_worker_leases WHERE token=?").run(claim.token);
+      this.store.imageSlots?.release(claim.token);
+    }
+  }
+  async tick() {
+    this.recover();
+    this.expire();
+    if (!this.configured()) return [];
+    const started = [];
+    while (this.active.size < 2) {
+      const claim = this.claim();
+      if (!claim) break;
+      const work = this.run(claim)
+        .catch(() => console.error(JSON.stringify({ event: "catalogue_photo_worker_failed" })))
+        .finally(() => {
+          this.active.delete(claim.token);
+          this.wake();
+        });
+      this.active.set(claim.token, work);
+      started.push(work);
+    }
+    await Promise.allSettled(started);
+    return started;
+  }
+  async drain() {
+    for (let n = 0; n < 1000; n++) {
+      const work = await this.tick();
+      if (!work.length && !this.active.size) return;
+      await Promise.allSettled([...this.active.values()]);
+    }
+    throw new Error("Photo queue did not drain");
+  }
+  wake() {
+    if (this.started)
+      queueMicrotask(
+        () =>
+          void this.tick().catch(() =>
+            console.error(JSON.stringify({ event: "catalogue_photo_worker_failed" })),
+          ),
+      );
+  }
+  start() {
+    if (this.started) return;
+    this.started = true;
+    this.timer = setInterval(() => this.wake(), 2000);
+    this.timer.unref();
+    this.wake();
+  }
+  stop() {
+    this.started = false;
+    clearInterval(this.timer);
+  }
+  preview(account, key, itemId) {
+    this.job(account, key);
+    const row = this.db
+      .prepare(
+        "SELECT a.preview FROM photo_items i JOIN photo_attempts a ON a.id=i.currentAttempt WHERE i.job=? AND i.id=?",
+      )
+      .get(key, itemId);
+    if (!row?.preview) throw fail("A generated preview is not available.", 404);
+    return Buffer.from(row.preview);
+  }
+  async file(account, key, itemId, format) {
+    this.job(account, key);
+    const row = this.db
+      .prepare(
+        "SELECT o.image,i.sku,i.currentAttempt FROM photo_items i JOIN photo_outputs o ON o.attempt=i.currentAttempt WHERE i.id=? AND i.job=? AND i.state='approved' AND o.format=?",
+      )
+      .get(itemId, key, format);
+    if (!row) throw fail("Approve this image before downloading its exports.", 409);
+    const image = await this.store.branding.render(account.id, Buffer.from(row.image), {
+      format: "jpeg",
+      fixedSize: true,
+    });
+    this.job(account, key);
+    if (
+      !this.db
+        .prepare(
+          "SELECT 1 FROM photo_items WHERE id=? AND job=? AND state='approved' AND currentAttempt=?",
+        )
+        .get(itemId, key, row.currentAttempt)
+    )
+      throw fail("The approved image changed before download.", 409);
+    return { image, name: photoFilename(row.sku, format) };
+  }
+  async *archive(account, key) {
+    const job = this.get(account, key);
+    for (const item of job.items.filter((i) => i.state === "approved"))
+      for (const format of job.formats) {
+        const file = await this.file(account, key, item.id, format);
+        yield { name: `${item.id.slice(0, 8)}/${item.pose}/${file.name}`, image: file.image };
+      }
+  }
+}
+export function installPhotoRoutes(app, store, service, { requireUser, sameOrigin, wrap }) {
+  const manager = requireRole("owner", "manager");
+  app.get(
+    "/api/photo-jobs/config",
+    requireUser,
+    manager,
+    wrap((req, res) => res.json(service.config(req.account))),
+  );
+  app.get(
+    "/api/photo-jobs",
+    requireUser,
+    manager,
+    wrap((req, res) => res.json(service.list(req.account))),
+  );
+  app.post(
+    "/api/photo-jobs",
+    sameOrigin,
+    requireUser,
+    manager,
+    wrap((req, res) => res.status(201).json(service.create(req.account, req.body))),
+  );
+  app.get(
+    "/api/photo-jobs/:id",
+    requireUser,
+    manager,
+    wrap((req, res) => res.json(service.get(req.account, req.params.id))),
+  );
+  app.post(
+    "/api/photo-jobs/:id/cancel",
+    sameOrigin,
+    requireUser,
+    manager,
+    wrap((req, res) => res.json(service.cancel(req.account, req.params.id))),
+  );
+  app.delete(
+    "/api/photo-jobs/:id",
+    sameOrigin,
+    requireUser,
+    manager,
+    wrap((req, res) => res.json(service.cancel(req.account, req.params.id, true))),
+  );
+  app.post(
+    "/api/photo-jobs/:id/items/:item/review",
+    sameOrigin,
+    requireUser,
+    manager,
+    wrap((req, res) =>
+      res.json(service.review(req.account, req.params.id, req.params.item, req.body)),
+    ),
+  );
+  app.post(
+    "/api/photo-jobs/:id/items/:item/retry",
+    sameOrigin,
+    requireUser,
+    manager,
+    wrap((req, res) =>
+      res.json(service.retry(req.account, req.params.id, req.params.item, req.body)),
+    ),
+  );
+  app.get(
+    "/api/photo-jobs/:id/items/:item/preview",
+    requireUser,
+    manager,
+    wrap((req, res) =>
+      res.type("jpeg").send(service.preview(req.account, req.params.id, req.params.item)),
+    ),
+  );
+  app.get(
+    "/api/photo-jobs/:id/items/:item/files/:format",
+    requireUser,
+    manager,
+    wrap(async (req, res) => {
+      const file = await service.file(
+        req.account,
+        req.params.id,
+        req.params.item,
+        req.params.format,
+      );
+      res
+        .type("jpeg")
+        .set("Content-Disposition", `attachment; filename="${file.name}"`)
+        .send(file.image);
+    }),
+  );
+  app.get(
+    "/api/photo-jobs/:id/download.zip",
+    requireUser,
+    manager,
+    wrap(async (req, res) => {
+      const job = service.get(req.account, req.params.id);
+      if (!job.items.some((i) => i.state === "approved"))
+        throw fail("Approve at least one image before downloading.", 409);
+      res
+        .type("application/zip")
+        .set("Content-Disposition", 'attachment; filename="catalogue-photos.zip"');
+      try {
+        await writePhotoZip(res, service.archive(req.account, req.params.id));
+      } catch {
+        res.destroy();
+      }
+    }),
+  );
 }

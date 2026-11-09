@@ -1,40 +1,198 @@
-import {openStoreTools, useProductSource} from '../helpers/studio-navigation.js';
-import {test,expect} from '@playwright/test';
-import {mkdtemp,rm} from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import {AccountStore} from '../helpers/pilot-accounts.js';
-import {createApp,standardAvatar} from '../../server/app.js';
-async function setup(page,run){
- const directory=await mkdtemp(path.join(os.tmpdir(),'forme-size-browser-')),store=new AccountStore(directory),owner=await store.register({name:'Size store',email:'size@example.test',password:'test-password-long'});
- const customer=store.customers.save(owner,{name:'Asha',phoneE164:'9876543210',measurements:{heightCm:175,weightKg:72}});
- const image=`data:image/png;base64,${(await standardAvatar('regular')).toString('base64')}`;
- await store.save(owner,{image,customerId:customer.id,name:'Asha avatar',profileId:'regular',heightCm:175,weightKg:72,source:'imported'});
- const garment=(await store.garments.save(owner,{image,name:'Chart shirt',variant:'Blue',garmentType:'shirt'})).garment;store.db.prepare('UPDATE garments SET brand=? WHERE account=? AND id=?').run('Example',owner.id,garment.id);
- let calls=0;const server=createApp({accountStore:store,accessMode:'public',rateLimit:false,apiKey:'test',tryOn:async()=>{calls++;return image;}}).listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const api=`http://127.0.0.1:${server.address().port}`;
- await page.route('**/api/**',async route=>{const u=new URL(route.request().url()),response=await route.fetch({url:api+u.pathname+u.search,headers:{...route.request().headers(),host:new URL(api).host,origin:api}});await route.fulfill({response});});
- try{await page.goto('/');await page.getByLabel('Account email').fill('size@example.test');await page.getByLabel('Account password').fill('test-password-long');await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.getByRole('button',{name:'Sign out',exact:true})).toBeVisible();await run({store,owner,customer,garment,calls:()=>calls});}finally{await page.unrouteAll({behavior:'wait'});await new Promise(r=>server.close(r));store.close();await rm(directory,{recursive:true,force:true});}
+import { openStoreTools, useProductSource } from "../helpers/studio-navigation.js";
+import { test, expect } from "@playwright/test";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { AccountStore } from "../helpers/pilot-accounts.js";
+import { createApp, standardAvatar } from "../../server/app.js";
+async function setup(page, run) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "forme-size-browser-")),
+    store = new AccountStore(directory),
+    owner = await store.register({
+      name: "Size store",
+      email: "size@example.test",
+      password: "test-password-long",
+    });
+  const customer = store.customers.save(owner, {
+    name: "Asha",
+    phoneE164: "9876543210",
+    measurements: { heightCm: 175, weightKg: 72 },
+  });
+  const image = `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;
+  await store.save(owner, {
+    image,
+    customerId: customer.id,
+    name: "Asha avatar",
+    profileId: "regular",
+    heightCm: 175,
+    weightKg: 72,
+    source: "imported",
+  });
+  const garment = (
+    await store.garments.save(owner, {
+      image,
+      name: "Chart shirt",
+      variant: "Blue",
+      garmentType: "shirt",
+    })
+  ).garment;
+  store.db
+    .prepare("UPDATE garments SET brand=? WHERE account=? AND id=?")
+    .run("Example", owner.id, garment.id);
+  let calls = 0;
+  const server = createApp({
+    accountStore: store,
+    accessMode: "public",
+    rateLimit: false,
+    apiKey: "test",
+    tryOn: async () => {
+      calls++;
+      return image;
+    },
+  }).listen(0, "127.0.0.1");
+  await new Promise((r) => server.once("listening", r));
+  const api = `http://127.0.0.1:${server.address().port}`;
+  await page.route("**/api/**", async (route) => {
+    const u = new URL(route.request().url()),
+      response = await route.fetch({
+        url: api + u.pathname + u.search,
+        headers: { ...route.request().headers(), host: new URL(api).host, origin: api },
+      });
+    await route.fulfill({ response });
+  });
+  try {
+    await page.goto("/");
+    await page.getByLabel("Account email").fill("size@example.test");
+    await page.getByLabel("Account password").fill("test-password-long");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+    await run({ store, owner, customer, garment, calls: () => calls });
+  } finally {
+    await page.unrouteAll({ behavior: "wait" });
+    await new Promise((r) => server.close(r));
+    store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
 }
-async function dress(page){await page.getByRole('button',{name:'Saved avatars',exact:true}).click();await page.getByRole('button',{name:'Use Asha avatar',exact:true}).click();await page.getByLabel('The customer approves the face, body and skin tone of this avatar.').check();await page.getByRole('button',{name:'Try clothes',exact:true}).click();await useProductSource(page);await page.getByRole('button',{name:'My store clothes',exact:true}).click();await page.getByRole('button',{name:/Use Chart shirt · Blue/}).click();await page.getByLabel(/send their avatar and this product photo/).check();await page.getByRole('button',{name:'Put on avatar',exact:true}).click();await expect(page.getByText('Try-on created. Check the face, body and garment before keeping this look.')).toBeVisible();}
-async function save(page){await page.getByLabel('I have checked clothing placement and approve this outfit preview.').check();await page.getByLabel('The customer agrees to save this outfit to the store account.').check();await page.getByRole('button',{name:'Save look to account',exact:true}).click();await expect(page.getByRole('heading',{name:'Purchase status',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Back to avatar',exact:true})).toBeEnabled();}
+async function dress(page) {
+  await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
+  await page.getByRole("button", { name: "Use Asha avatar", exact: true }).click();
+  await page
+    .getByLabel("The customer approves the face, body and skin tone of this avatar.")
+    .check();
+  await page.getByRole("button", { name: "Try clothes", exact: true }).click();
+  await useProductSource(page);
+  await page.getByRole("button", { name: "My store clothes", exact: true }).click();
+  await page.getByRole("button", { name: /Use Chart shirt · Blue/ }).click();
+  await page.getByLabel(/send their avatar and this product photo/).check();
+  await page.getByRole("button", { name: "Put on avatar", exact: true }).click();
+  await expect(
+    page.getByText("Try-on created. Check the face, body and garment before keeping this look."),
+  ).toBeVisible();
+}
+async function save(page) {
+  await page
+    .getByLabel("I have checked clothing placement and approve this outfit preview.")
+    .check();
+  await page.getByLabel("The customer agrees to save this outfit to the store account.").check();
+  await page.getByRole("button", { name: "Save look to account", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Purchase status", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Back to avatar", exact: true })).toBeEnabled();
+}
 
-test('manager imports and edits chart CSV on mobile, and staff cannot manage charts',async({page})=>setup(page,async({store,owner})=>{
- await page.setViewportSize({width:390,height:844});await openStoreTools(page);await page.getByRole('link',{name:'Size charts',exact:true}).click();await expect(page.getByRole('heading',{name:'Size charts',exact:true})).toBeVisible();
- const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download size chart template'}).click();expect((await download).suggestedFilename()).toBe('size-chart-template.csv');
- const csv='brand,type,size,chest_cm,waist_cm,hip_cm,sort_order\nExample,shirt,M,98,84,,20\nExample,shirt,L,110,100,,30\nExample,shirt,BAD,4,4,,40\n';await page.getByLabel('Size chart CSV').setInputFiles({name:'charts.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});await page.getByRole('button',{name:'Import size charts',exact:true}).click();await expect(page.getByText('2 created · 0 updated · 1 skipped',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Edit Example M',exact:true}).click();await page.getByLabel('Chart chest (cm)').fill('99');await page.getByRole('button',{name:'Save chart row',exact:true}).click();await expect(page.getByText('Size chart row saved.')).toBeVisible();expect(store.sizes.list(owner).charts.find(c=>c.size==='M').measurements.chestCm).toBe(99);
- await page.screenshot({path:'test-results/size-charts-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- store.db.prepare("UPDATE memberships SET role='staff' WHERE user=? AND store=?").run(owner.user.id,owner.id);await page.reload();await expect(page.getByRole('alert')).toContainText('role');await expect(page.getByRole('button',{name:'Save chart row'})).toHaveCount(0);
-}));
+test("manager imports and edits chart CSV on mobile, and staff cannot manage charts", async ({
+  page,
+}) =>
+  setup(page, async ({ store, owner }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openStoreTools(page);
+    await page.getByRole("link", { name: "Size charts", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Size charts", exact: true })).toBeVisible();
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download size chart template" }).click();
+    expect((await download).suggestedFilename()).toBe("size-chart-template.csv");
+    const csv =
+      "brand,type,size,chest_cm,waist_cm,hip_cm,sort_order\nExample,shirt,M,98,84,,20\nExample,shirt,L,110,100,,30\nExample,shirt,BAD,4,4,,40\n";
+    await page
+      .getByLabel("Size chart CSV")
+      .setInputFiles({ name: "charts.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+    await page.getByRole("button", { name: "Import size charts", exact: true }).click();
+    await expect(
+      page.getByText("2 created · 0 updated · 1 skipped", { exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Edit Example M", exact: true }).click();
+    await page.getByLabel("Chart chest (cm)").fill("99");
+    await page.getByRole("button", { name: "Save chart row", exact: true }).click();
+    await expect(page.getByText("Size chart row saved.")).toBeVisible();
+    expect(store.sizes.list(owner).charts.find((c) => c.size === "M").measurements.chestCm).toBe(
+      99,
+    );
+    await page.screenshot({ path: "test-results/size-charts-mobile.png", fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    store.db
+      .prepare("UPDATE memberships SET role='staff' WHERE user=? AND store=?")
+      .run(owner.user.id, owner.id);
+    await page.reload();
+    await expect(page.getByRole("alert")).toContainText("role");
+    await expect(page.getByRole("button", { name: "Save chart row" })).toHaveCount(0);
+  }));
 
-test('measured suggestion appears under try-on with an explanation and purchases persist with the signed-in staff',async({page})=>setup(page,async({store,owner,customer,calls})=>{
- for(const [size,chestCm,waistCm] of [['M',98,84],['L',110,100]])store.sizes.save(owner,{brand:'Example',garmentType:'shirt',size,measurements:{chestCm,waistCm}});
- await page.getByLabel('Customer mobile number',{exact:true}).fill('987');await page.getByRole('button',{name:'Find customer',exact:true}).click();await page.getByRole('button',{name:'Asha · +919876543210',exact:true}).click();await page.getByRole('button',{name:'Edit customer',exact:true}).click();await page.getByLabel('Chest circumference (cm)').fill('98');await page.getByLabel('Waist circumference (cm)').fill('84');await page.getByRole('button',{name:'Save customer',exact:true}).click();await expect(page.getByLabel('Chest circumference (cm)')).toHaveCount(0);expect(store.customers.get(owner,customer.id).measurements.chestCm).toBe(98);
- await dress(page);const hint=page.getByRole('complementary',{name:'Size guidance'});await expect(hint.getByText('Suggested M · High',{exact:true})).toBeVisible();await hint.getByText('Suggested M · High',{exact:true}).click();await expect(hint.getByText(/chest 98 cm vs M target 98 cm/)).toBeVisible();await page.setViewportSize({width:390,height:844});await page.screenshot({path:'test-results/size-guidance-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await save(page);await page.getByLabel('Purchased size',{exact:true}).fill('M');await page.getByRole('button',{name:'Mark purchased',exact:true}).click();await expect(page.getByText(/Purchased · M ·/)).toBeVisible();expect(store.listLooks(owner)[0].staffUser).toBe(owner.user.id);expect(calls()).toBe(1);
- await page.reload();await page.getByRole('button',{name:'Saved avatars',exact:true}).click();await page.getByRole('button',{name:'View looks (1) for Asha avatar',exact:true}).click();await expect(page.getByText(/Purchased · M ·/)).toBeVisible();await page.getByRole('button',{name:'Undo purchase mark',exact:true}).click();await expect(page.getByLabel('Purchased size',{exact:true})).toBeVisible();expect(store.listLooks(owner)[0].purchasedAt).toBe(null);expect(calls()).toBe(1);
-}));
+test("measured suggestion appears under try-on with an explanation and purchases persist with the signed-in staff", async ({
+  page,
+}) =>
+  setup(page, async ({ store, owner, customer, calls }) => {
+    for (const [size, chestCm, waistCm] of [
+      ["M", 98, 84],
+      ["L", 110, 100],
+    ])
+      store.sizes.save(owner, {
+        brand: "Example",
+        garmentType: "shirt",
+        size,
+        measurements: { chestCm, waistCm },
+      });
+    await page.getByLabel("Customer mobile number", { exact: true }).fill("987");
+    await page.getByRole("button", { name: "Find customer", exact: true }).click();
+    await page.getByRole("button", { name: "Asha · +919876543210", exact: true }).click();
+    await page.getByRole("button", { name: "Edit customer", exact: true }).click();
+    await page.getByLabel("Chest circumference (cm)").fill("98");
+    await page.getByLabel("Waist circumference (cm)").fill("84");
+    await page.getByRole("button", { name: "Save customer", exact: true }).click();
+    await expect(page.getByLabel("Chest circumference (cm)")).toHaveCount(0);
+    expect(store.customers.get(owner, customer.id).measurements.chestCm).toBe(98);
+    await dress(page);
+    const hint = page.getByRole("complementary", { name: "Size guidance" });
+    await expect(hint.getByText("Suggested M · High", { exact: true })).toBeVisible();
+    await hint.getByText("Suggested M · High", { exact: true }).click();
+    await expect(hint.getByText(/chest 98 cm vs M target 98 cm/)).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: "test-results/size-guidance-mobile.png", fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await save(page);
+    await page.getByLabel("Purchased size", { exact: true }).fill("M");
+    await page.getByRole("button", { name: "Mark purchased", exact: true }).click();
+    await expect(page.getByText(/Purchased · M ·/)).toBeVisible();
+    expect(store.listLooks(owner)[0].staffUser).toBe(owner.user.id);
+    expect(calls()).toBe(1);
+    await page.reload();
+    await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
+    await page.getByRole("button", { name: "View looks (1) for Asha avatar", exact: true }).click();
+    await expect(page.getByText(/Purchased · M ·/)).toBeVisible();
+    await page.getByRole("button", { name: "Undo purchase mark", exact: true }).click();
+    await expect(page.getByLabel("Purchased size", { exact: true })).toBeVisible();
+    expect(store.listLooks(owner)[0].purchasedAt).toBe(null);
+    expect(calls()).toBe(1);
+  }));
 
-test('missing chart guidance never prevents generating or saving an outfit',async({page})=>setup(page,async({store,owner,calls})=>{
- await dress(page);await expect(page.getByText(/No matching size chart/)).toBeVisible();await save(page);expect(store.listLooks(owner)).toHaveLength(1);expect(calls()).toBe(1);
-}));
+test("missing chart guidance never prevents generating or saving an outfit", async ({ page }) =>
+  setup(page, async ({ store, owner, calls }) => {
+    await dress(page);
+    await expect(page.getByText(/No matching size chart/)).toBeVisible();
+    await save(page);
+    expect(store.listLooks(owner)).toHaveLength(1);
+    expect(calls()).toBe(1);
+  }));

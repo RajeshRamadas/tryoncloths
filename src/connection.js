@@ -9,9 +9,7 @@ export function normalizeStudioUrl(value) {
     url.hash ||
     url.pathname !== "/"
   ) {
-    throw new Error(
-      "Enter the HTTPS address of your studio, without a path or sign-in details.",
-    );
+    throw new Error("Enter the HTTPS address of your studio, without a path or sign-in details.");
   }
   return url.origin;
 }

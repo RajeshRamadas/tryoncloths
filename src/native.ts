@@ -1,10 +1,5 @@
 import { Capacitor } from "@capacitor/core";
-import {
-  Camera,
-  CameraResultType,
-  CameraSource,
-  CameraDirection,
-} from "@capacitor/camera";
+import { Camera, CameraResultType, CameraSource, CameraDirection } from "@capacitor/camera";
 import { Directory, Filesystem } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 
@@ -27,20 +22,13 @@ export async function capturePhoto(): Promise<File | null> {
       promptLabelPicture: "Take photo",
       promptLabelCancel: "Cancel",
     });
-    if (!photo.dataUrl)
-      throw new Error(
-        "The photo could not be opened. Please try another photo.",
-      );
+    if (!photo.dataUrl) throw new Error("The photo could not be opened. Please try another photo.");
     const blob = await (await fetch(photo.dataUrl)).blob();
     return new File([blob], "customer-photo.jpg", {
       type: blob.type || "image/jpeg",
     });
   } catch (error) {
-    if (
-      /cancelled|canceled|user cancelled|no image picked/i.test(
-        (error as Error).message,
-      )
-    )
+    if (/cancelled|canceled|user cancelled|no image picked/i.test((error as Error).message))
       return null;
     throw error;
   }
@@ -56,12 +44,7 @@ export async function clearNativeExports() {
     });
   } catch (error) {
     // A new install/session may have no export directory; other failures must remain visible.
-    if (
-      !/not exist|not found|ENOENT|does not exist/i.test(
-        (error as Error).message,
-      )
-    )
-      throw error;
+    if (!/not exist|not found|ENOENT|does not exist/i.test((error as Error).message)) throw error;
   }
 }
 

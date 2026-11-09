@@ -1,9 +1,17 @@
-export function installWhatsAppSchema(db){
- db.exec('BEGIN IMMEDIATE');try{
-  const columns=new Set(db.prepare('PRAGMA table_info(customers)').all().map(c=>c.name));
-  if(!columns.has('whatsappConsentAt'))db.exec('ALTER TABLE customers ADD COLUMN whatsappConsentAt INTEGER');
-  if(!columns.has('whatsappConsentSource'))db.exec('ALTER TABLE customers ADD COLUMN whatsappConsentSource TEXT');
-  db.exec(`CREATE TABLE IF NOT EXISTS whatsapp_integrations (
+export function installWhatsAppSchema(db) {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const columns = new Set(
+      db
+        .prepare("PRAGMA table_info(customers)")
+        .all()
+        .map((c) => c.name),
+    );
+    if (!columns.has("whatsappConsentAt"))
+      db.exec("ALTER TABLE customers ADD COLUMN whatsappConsentAt INTEGER");
+    if (!columns.has("whatsappConsentSource"))
+      db.exec("ALTER TABLE customers ADD COLUMN whatsappConsentSource TEXT");
+    db.exec(`CREATE TABLE IF NOT EXISTS whatsapp_integrations (
    store TEXT PRIMARY KEY REFERENCES stores(id) ON DELETE CASCADE, phoneId TEXT NOT NULL UNIQUE,
    wabaId TEXT NOT NULL, token TEXT NOT NULL, language TEXT NOT NULL, connectedAt INTEGER NOT NULL);
    CREATE TABLE IF NOT EXISTS whatsapp_books (
@@ -33,6 +41,9 @@ export function installWhatsAppSchema(db){
     FOREIGN KEY(store,avatar) REFERENCES avatars(account,id) ON DELETE CASCADE,
     FOREIGN KEY(store,garment) REFERENCES garments(account,id) ON DELETE CASCADE,
     FOREIGN KEY(store,look) REFERENCES looks(account,id) ON DELETE CASCADE);`);
-  db.exec('COMMIT');
- }catch(e){db.exec('ROLLBACK');throw e;}
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
 }

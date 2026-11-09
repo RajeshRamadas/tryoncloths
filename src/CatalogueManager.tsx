@@ -1,46 +1,491 @@
-import ShopConnections from './ShopConnections';
-import {useEffect,useState} from 'react';
-import {requestApi} from './api';
-import {browseCatalogue,catalogueApi,downloadText,reportCsv,spreadsheetCsv,type CataloguePage,type ImportReport} from './catalogue';
-import type {StoreGarment} from './store-garments';
-import {garmentChoices} from './garment-types';
-export function ProductFacts({item}:{item:StoreGarment}){const rupees=(value:number)=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(value);return <span className="product-facts">{item.priceInr!=null&&<strong>{rupees(item.priceInr)} </strong>}{item.mrpInr!=null&&item.mrpInr!==item.priceInr&&<span>MRP {rupees(item.mrpInr)} · </span>}{item.brand&&<span>{item.brand} · </span>}{item.colourLabel&&<span>{item.colourLabel} · </span>}{item.sizes?.length>0&&<span>Sizes: {item.sizes.join(', ')} · </span>}<span>{item.readOnly&&"Shared master · Read-only · "}{item.needsTypeReview&&"Clothing type needs confirmation · "}</span><span>{item.stock==='out'?'Out of stock':item.stock==='low'?'Low stock':'In stock'}</span>{item.sku&&<span> · SKU {item.sku}</span>}</span>;}
-function EditProduct({item,onSaved,onCancel,onBusy}:{item:StoreGarment;onSaved:()=>void|Promise<void>;onCancel:()=>void;onBusy:(busy:boolean)=>void}){
- const [sku,setSku]=useState(item.sku||''),[brand,setBrand]=useState(item.brand||''),[price,setPrice]=useState(item.priceInr==null?'':String(item.priceInr)),[mrp,setMrp]=useState(item.mrpInr==null?'':String(item.mrpInr)),[sizes,setSizes]=useState((item.sizes||[]).join('|')),[colour,setColour]=useState(item.colourLabel||''),[stock,setStock]=useState<string>(item.stock||'in'),[busy,setBusy]=useState(false),[error,setError]=useState('');
- return <form aria-label={`Edit ${item.name}`} onSubmit={e=>{e.preventDefault();setBusy(true);onBusy(true);setError('');void catalogueApi('/api/catalogue/'+item.id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({sku,brand,priceInr:price,mrpInr:mrp,sizes,colourLabel:colour,stock})}).then(onSaved).catch(e=>setError(e.message)).finally(()=>{setBusy(false);onBusy(false);});}}>
-  <label>Product SKU<input value={sku} maxLength={64} readOnly={item.source==='csv'} disabled={busy} onChange={e=>setSku(e.target.value)}/></label><label>Brand<input value={brand} maxLength={80} disabled={busy} onChange={e=>setBrand(e.target.value)}/></label>
-  <div className="measurement-grid"><label>Price (INR)<input inputMode="decimal" value={price} disabled={busy} onChange={e=>setPrice(e.target.value)}/></label><label>MRP (INR)<input inputMode="decimal" value={mrp} disabled={busy} onChange={e=>setMrp(e.target.value)}/></label></div>
-  <label>Sizes (separate with |)<input value={sizes} disabled={busy} onChange={e=>setSizes(e.target.value)}/></label><label>Product colour<input value={colour} maxLength={80} disabled={busy} onChange={e=>setColour(e.target.value)}/></label><label>Product stock<select value={stock} disabled={busy} onChange={e=>setStock(e.target.value)}><option value="in">In stock</option><option value="low">Low stock</option><option value="out">Out of stock</option></select></label>
-  <button className="button primary" disabled={busy}>Save product details</button><button type="button" className="button secondary" disabled={busy} onClick={onCancel}>Cancel product edit</button>{error&&<p role="alert">{error}</p>}
- </form>;
+import ShopConnections from "./ShopConnections";
+import { useEffect, useState } from "react";
+import { requestApi } from "./api";
+import {
+  browseCatalogue,
+  catalogueApi,
+  downloadText,
+  reportCsv,
+  spreadsheetCsv,
+  type CataloguePage,
+  type ImportReport,
+} from "./catalogue";
+import type { StoreGarment } from "./store-garments";
+import { garmentChoices } from "./garment-types";
+export function ProductFacts({ item }: { item: StoreGarment }) {
+  const rupees = (value: number) =>
+    new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 2,
+    }).format(value);
+  return (
+    <span className="product-facts">
+      {item.priceInr != null && <strong>{rupees(item.priceInr)} </strong>}
+      {item.mrpInr != null && item.mrpInr !== item.priceInr && (
+        <span>MRP {rupees(item.mrpInr)} · </span>
+      )}
+      {item.brand && <span>{item.brand} · </span>}
+      {item.colourLabel && <span>{item.colourLabel} · </span>}
+      {item.sizes?.length > 0 && <span>Sizes: {item.sizes.join(", ")} · </span>}
+      <span>
+        {item.readOnly && "Shared master · Read-only · "}
+        {item.needsTypeReview && "Clothing type needs confirmation · "}
+      </span>
+      <span>
+        {item.stock === "out" ? "Out of stock" : item.stock === "low" ? "Low stock" : "In stock"}
+      </span>
+      {item.sku && <span> · SKU {item.sku}</span>}
+    </span>
+  );
 }
-export default function CatalogueManager(){
- const [role,setRole]=useState(''),[data,setData]=useState<CataloguePage|null>(null),[file,setFile]=useState<File|null>(null),[report,setReport]=useState<ImportReport|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[edit,setEdit]=useState<StoreGarment|null>(null);
- const [search,setSearch]=useState(''),[type,setType]=useState('all'),[stock,setStock]=useState('available');
- const [applied,setApplied]=useState({search:'',type:'all',stock:'available'});
- const [importing,setImporting]=useState(false);
- const [reviewTypes,setReviewTypes]=useState<Record<string,string>>({});
- const [jewelleryEnabled,setJewelleryEnabled]=useState(false);
- const manager=role==='owner'||role==='manager';
- async function load(offset=0,filters={search,type,stock}){setBusy(true);setError('');try{setData(await browseCatalogue({...filters,offset,limit:50}));setApplied(filters);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
- useEffect(()=>{let alive=true;void catalogueApi('/api/account').then(r=>{if(alive)setRole(r.account?.user?.role||'');}).catch(()=>{});void catalogueApi('/api/health').then(r=>{if(alive)setJewelleryEnabled(r.jewelleryCatalogueAvailable===true);}).catch(()=>{});void load();return()=>{alive=false;};},[]);
- async function upload(){if(!file||busy)return;setBusy(true);setImporting(true);setError('');setNotice('');setReport(null);try{
-  const csv=await spreadsheetCsv(file),form=new FormData();form.append('file',csv);
-  const response=await requestApi('/api/catalogue/import',{method:'POST',body:form},330000),result=await response.json();
-  if(typeof result.created==='number'){setReport(result);if(!response.ok)setError('The import could not save every row. Review the counts and error report.');setData(await browseCatalogue({search,type,stock,offset:0,limit:50}));}
-  else throw new Error(result.error||'Import failed.');
- }catch(e){setError(e instanceof Error&&(e.name==='AbortError'||e.name==='TimeoutError')?'The import response was interrupted. Some products may have been saved. Refresh the catalogue before reimporting the same SKUs.':(e as Error).message);}finally{setBusy(false);setImporting(false);}}
- return <main className="billing-page catalogue-manager"><a href="/">Back to Forme</a><h1>Store catalogue</h1>{jewelleryEnabled&&<p><a href="/jewellery-catalogue">Jewellery catalogue</a></p>}{manager&&<a href="/catalogue-photos">Create AI catalogue photos</a>}<p>Products for your active store. Importing and editing product details uses no AI credits.</p>
-  {error&&<p role="alert" className="error-banner">{error}</p>}{notice&&<p role="status">{notice}</p>}
-  {manager&&<ShopConnections owner={role==='owner'} onBusy={setBusy} onChanged={()=>load(data?.offset||0,applied)}/>}
-  {manager&&<section><h2>Import products</h2><p>CSV, XLSX or XLS, up to 5 MB. Excel uses the first worksheet and converts to CSV in your browser. Up to 10,000 rows per file; photos download three at a time. Repeat a SKU to update its product. Missing products are never deleted.</p><button className="button secondary" disabled={busy} onClick={async()=>{try{const r=await requestApi('/api/catalogue/template.csv');if(!r.ok)throw new Error('Template could not be downloaded.');downloadText('catalogue-template.csv',await r.text());}catch(e){setError((e as Error).message);}}}>Download import template</button><label>Product spreadsheet<input type="file" accept=".csv,.xlsx,.xls" disabled={busy} onChange={e=>{setFile(e.target.files?.[0]||null);setReport(null);}}/></label><button className="button primary" disabled={busy||!file} onClick={()=>void upload()}>Import selected spreadsheet</button>{importing&&<p role="status">Importing products… This may take several minutes. Keep this page open.</p>}
-   {report&&<div role="status"><p>{report.created} created · {report.updated} updated · {report.skipped} skipped</p>{report.errors.length>0&&<><button className="button secondary" onClick={()=>downloadText('catalogue-import-errors.csv',reportCsv(report))}>Download import errors</button><ul>{report.errors.slice(0,20).map((e,i)=><li key={i}>CSV line {e.row||'—'}: {e.message}</li>)}</ul>{report.errors.length>20&&<p>Showing the first 20 errors. Download the full report.</p>}</>}</div>}
-  </section>}
-  <section><h2>Browse products</h2>{data&&<p>{data.stored.toLocaleString('en-IN')} of {data.capacity.toLocaleString('en-IN')} catalogue items · {data.total} match these filters.</p>}
-   <form className="catalogue-filters" onSubmit={e=>{e.preventDefault();void load();}}><label>Search catalogue<input value={search} maxLength={120} disabled={busy} placeholder="Name, SKU, brand or colour" onChange={e=>setSearch(e.target.value)}/></label><label>Catalogue category<select value={type} disabled={busy} onChange={e=>setType(e.target.value)}><option value="all">All categories</option>{garmentChoices.map(([id,name])=><option key={id} value={id}>{name}</option>)}</select></label><label>Stock filter<select value={stock} disabled={busy} onChange={e=>setStock(e.target.value)}><option value="available">Available products</option><option value="all">All stock statuses</option><option value="in">In stock</option><option value="low">Low stock</option><option value="out">Out of stock</option></select></label><button className="button secondary" disabled={busy}>Apply catalogue filters</button></form>
-   {busy&&!importing&&<p role="status">Updating catalogue…</p>}{!busy&&data&&!data.garments.length&&<p>No matching products. Out-of-stock products are hidden by default.</p>}
-   <div className="catalogue-grid">{data?.garments.map(item=><article className="catalogue-item" key={item.id}><img className="inventory-photo" src={item.thumbnail} alt={item.name}/><h3>{item.name}</h3><ProductFacts item={item}/>{manager&&!item.readOnly&&<button className="button secondary" disabled={busy} onClick={()=>{setEdit(item);setNotice('');}}>Edit {item.name}</button>}{manager&&!item.readOnly&&item.needsTypeReview&&<form onSubmit={e=>{e.preventDefault();setBusy(true);void catalogueApi('/api/catalogue/'+item.id+'/type',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({garmentType:reviewTypes[item.id]})}).then(async()=>{setNotice('Clothing type confirmed.');setReviewTypes(types=>({...types,[item.id]:''}));await load(data.offset,applied);}).catch(e=>setError(e.message)).finally(()=>setBusy(false));}}><label>Clothing type for {item.name}<select aria-label={'Clothing type for '+item.name} required value={reviewTypes[item.id]||''} disabled={busy} onChange={e=>setReviewTypes(types=>({...types,[item.id]:e.target.value}))}><option value="">Choose clothing type</option>{garmentChoices.map(([id,name])=><option key={id} value={id}>{name}</option>)}</select></label><button className="button primary" disabled={busy||!reviewTypes[item.id]}>Confirm type for {item.name}</button></form>}{edit?.id===item.id&&<EditProduct key={item.id} item={item} onBusy={setBusy} onCancel={()=>setEdit(null)} onSaved={async()=>{setEdit(null);setNotice('Product details saved.');await load(data.offset,applied);}}/>}</article>)}</div>
-   {data&&<div className="customer-actions"><button className="button secondary" disabled={busy||data.offset===0} onClick={()=>void load(Math.max(0,data.offset-data.limit),applied)}>Previous products</button><button className="button secondary" disabled={busy||data.offset+data.limit>=data.total} onClick={()=>void load(data.offset+data.limit,applied)}>Next products</button></div>}
-  </section>
- </main>;
+function EditProduct({
+  item,
+  onSaved,
+  onCancel,
+  onBusy,
+}: {
+  item: StoreGarment;
+  onSaved: () => void | Promise<void>;
+  onCancel: () => void;
+  onBusy: (busy: boolean) => void;
+}) {
+  const [sku, setSku] = useState(item.sku || ""),
+    [brand, setBrand] = useState(item.brand || ""),
+    [price, setPrice] = useState(item.priceInr == null ? "" : String(item.priceInr)),
+    [mrp, setMrp] = useState(item.mrpInr == null ? "" : String(item.mrpInr)),
+    [sizes, setSizes] = useState((item.sizes || []).join("|")),
+    [colour, setColour] = useState(item.colourLabel || ""),
+    [stock, setStock] = useState<string>(item.stock || "in"),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  return (
+    <form
+      aria-label={`Edit ${item.name}`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        setBusy(true);
+        onBusy(true);
+        setError("");
+        void catalogueApi("/api/catalogue/" + item.id, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sku,
+            brand,
+            priceInr: price,
+            mrpInr: mrp,
+            sizes,
+            colourLabel: colour,
+            stock,
+          }),
+        })
+          .then(onSaved)
+          .catch((e) => setError(e.message))
+          .finally(() => {
+            setBusy(false);
+            onBusy(false);
+          });
+      }}
+    >
+      <label>
+        Product SKU
+        <input
+          value={sku}
+          maxLength={64}
+          readOnly={item.source === "csv"}
+          disabled={busy}
+          onChange={(e) => setSku(e.target.value)}
+        />
+      </label>
+      <label>
+        Brand
+        <input
+          value={brand}
+          maxLength={80}
+          disabled={busy}
+          onChange={(e) => setBrand(e.target.value)}
+        />
+      </label>
+      <div className="measurement-grid">
+        <label>
+          Price (INR)
+          <input
+            inputMode="decimal"
+            value={price}
+            disabled={busy}
+            onChange={(e) => setPrice(e.target.value)}
+          />
+        </label>
+        <label>
+          MRP (INR)
+          <input
+            inputMode="decimal"
+            value={mrp}
+            disabled={busy}
+            onChange={(e) => setMrp(e.target.value)}
+          />
+        </label>
+      </div>
+      <label>
+        Sizes (separate with |)
+        <input value={sizes} disabled={busy} onChange={(e) => setSizes(e.target.value)} />
+      </label>
+      <label>
+        Product colour
+        <input
+          value={colour}
+          maxLength={80}
+          disabled={busy}
+          onChange={(e) => setColour(e.target.value)}
+        />
+      </label>
+      <label>
+        Product stock
+        <select value={stock} disabled={busy} onChange={(e) => setStock(e.target.value)}>
+          <option value="in">In stock</option>
+          <option value="low">Low stock</option>
+          <option value="out">Out of stock</option>
+        </select>
+      </label>
+      <button className="button primary" disabled={busy}>
+        Save product details
+      </button>
+      <button type="button" className="button secondary" disabled={busy} onClick={onCancel}>
+        Cancel product edit
+      </button>
+      {error && <p role="alert">{error}</p>}
+    </form>
+  );
+}
+export default function CatalogueManager() {
+  const [role, setRole] = useState(""),
+    [data, setData] = useState<CataloguePage | null>(null),
+    [file, setFile] = useState<File | null>(null),
+    [report, setReport] = useState<ImportReport | null>(null),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [edit, setEdit] = useState<StoreGarment | null>(null);
+  const [search, setSearch] = useState(""),
+    [type, setType] = useState("all"),
+    [stock, setStock] = useState("available");
+  const [applied, setApplied] = useState({ search: "", type: "all", stock: "available" });
+  const [importing, setImporting] = useState(false);
+  const [reviewTypes, setReviewTypes] = useState<Record<string, string>>({});
+  const [jewelleryEnabled, setJewelleryEnabled] = useState(false);
+  const manager = role === "owner" || role === "manager";
+  async function load(offset = 0, filters = { search, type, stock }) {
+    setBusy(true);
+    setError("");
+    try {
+      setData(await browseCatalogue({ ...filters, offset, limit: 50 }));
+      setApplied(filters);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    let alive = true;
+    void catalogueApi("/api/account")
+      .then((r) => {
+        if (alive) setRole(r.account?.user?.role || "");
+      })
+      .catch(() => {});
+    void catalogueApi("/api/health")
+      .then((r) => {
+        if (alive) setJewelleryEnabled(r.jewelleryCatalogueAvailable === true);
+      })
+      .catch(() => {});
+    void load();
+    return () => {
+      alive = false;
+    };
+  }, []);
+  async function upload() {
+    if (!file || busy) return;
+    setBusy(true);
+    setImporting(true);
+    setError("");
+    setNotice("");
+    setReport(null);
+    try {
+      const csv = await spreadsheetCsv(file),
+        form = new FormData();
+      form.append("file", csv);
+      const response = await requestApi(
+          "/api/catalogue/import",
+          { method: "POST", body: form },
+          330000,
+        ),
+        result = await response.json();
+      if (typeof result.created === "number") {
+        setReport(result);
+        if (!response.ok)
+          setError("The import could not save every row. Review the counts and error report.");
+        setData(await browseCatalogue({ search, type, stock, offset: 0, limit: 50 }));
+      } else throw new Error(result.error || "Import failed.");
+    } catch (e) {
+      setError(
+        e instanceof Error && (e.name === "AbortError" || e.name === "TimeoutError")
+          ? "The import response was interrupted. Some products may have been saved. Refresh the catalogue before reimporting the same SKUs."
+          : (e as Error).message,
+      );
+    } finally {
+      setBusy(false);
+      setImporting(false);
+    }
+  }
+  return (
+    <main className="billing-page catalogue-manager">
+      <a href="/">Back to Forme</a>
+      <h1>Store catalogue</h1>
+      {jewelleryEnabled && (
+        <p>
+          <a href="/jewellery-catalogue">Jewellery catalogue</a>
+        </p>
+      )}
+      {manager && <a href="/catalogue-photos">Create AI catalogue photos</a>}
+      <p>
+        Products for your active store. Importing and editing product details uses no AI credits.
+      </p>
+      {error && (
+        <p role="alert" className="error-banner">
+          {error}
+        </p>
+      )}
+      {notice && <p role="status">{notice}</p>}
+      {manager && (
+        <ShopConnections
+          owner={role === "owner"}
+          onBusy={setBusy}
+          onChanged={() => load(data?.offset || 0, applied)}
+        />
+      )}
+      {manager && (
+        <section>
+          <h2>Import products</h2>
+          <p>
+            CSV, XLSX or XLS, up to 5 MB. Excel uses the first worksheet and converts to CSV in your
+            browser. Up to 10,000 rows per file; photos download three at a time. Repeat a SKU to
+            update its product. Missing products are never deleted.
+          </p>
+          <button
+            className="button secondary"
+            disabled={busy}
+            onClick={async () => {
+              try {
+                const r = await requestApi("/api/catalogue/template.csv");
+                if (!r.ok) throw new Error("Template could not be downloaded.");
+                downloadText("catalogue-template.csv", await r.text());
+              } catch (e) {
+                setError((e as Error).message);
+              }
+            }}
+          >
+            Download import template
+          </button>
+          <label>
+            Product spreadsheet
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              disabled={busy}
+              onChange={(e) => {
+                setFile(e.target.files?.[0] || null);
+                setReport(null);
+              }}
+            />
+          </label>
+          <button className="button primary" disabled={busy || !file} onClick={() => void upload()}>
+            Import selected spreadsheet
+          </button>
+          {importing && (
+            <p role="status">
+              Importing products… This may take several minutes. Keep this page open.
+            </p>
+          )}
+          {report && (
+            <div role="status">
+              <p>
+                {report.created} created · {report.updated} updated · {report.skipped} skipped
+              </p>
+              {report.errors.length > 0 && (
+                <>
+                  <button
+                    className="button secondary"
+                    onClick={() => downloadText("catalogue-import-errors.csv", reportCsv(report))}
+                  >
+                    Download import errors
+                  </button>
+                  <ul>
+                    {report.errors.slice(0, 20).map((e, i) => (
+                      <li key={i}>
+                        CSV line {e.row || "—"}: {e.message}
+                      </li>
+                    ))}
+                  </ul>
+                  {report.errors.length > 20 && (
+                    <p>Showing the first 20 errors. Download the full report.</p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+      <section>
+        <h2>Browse products</h2>
+        {data && (
+          <p>
+            {data.stored.toLocaleString("en-IN")} of {data.capacity.toLocaleString("en-IN")}{" "}
+            catalogue items · {data.total} match these filters.
+          </p>
+        )}
+        <form
+          className="catalogue-filters"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void load();
+          }}
+        >
+          <label>
+            Search catalogue
+            <input
+              value={search}
+              maxLength={120}
+              disabled={busy}
+              placeholder="Name, SKU, brand or colour"
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+          <label>
+            Catalogue category
+            <select value={type} disabled={busy} onChange={(e) => setType(e.target.value)}>
+              <option value="all">All categories</option>
+              {garmentChoices.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Stock filter
+            <select value={stock} disabled={busy} onChange={(e) => setStock(e.target.value)}>
+              <option value="available">Available products</option>
+              <option value="all">All stock statuses</option>
+              <option value="in">In stock</option>
+              <option value="low">Low stock</option>
+              <option value="out">Out of stock</option>
+            </select>
+          </label>
+          <button className="button secondary" disabled={busy}>
+            Apply catalogue filters
+          </button>
+        </form>
+        {busy && !importing && <p role="status">Updating catalogue…</p>}
+        {!busy && data && !data.garments.length && (
+          <p>No matching products. Out-of-stock products are hidden by default.</p>
+        )}
+        <div className="catalogue-grid">
+          {data?.garments.map((item) => (
+            <article className="catalogue-item" key={item.id}>
+              <img className="inventory-photo" src={item.thumbnail} alt={item.name} />
+              <h3>{item.name}</h3>
+              <ProductFacts item={item} />
+              {manager && !item.readOnly && (
+                <button
+                  className="button secondary"
+                  disabled={busy}
+                  onClick={() => {
+                    setEdit(item);
+                    setNotice("");
+                  }}
+                >
+                  Edit {item.name}
+                </button>
+              )}
+              {manager && !item.readOnly && item.needsTypeReview && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setBusy(true);
+                    void catalogueApi("/api/catalogue/" + item.id + "/type", {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ garmentType: reviewTypes[item.id] }),
+                    })
+                      .then(async () => {
+                        setNotice("Clothing type confirmed.");
+                        setReviewTypes((types) => ({ ...types, [item.id]: "" }));
+                        await load(data.offset, applied);
+                      })
+                      .catch((e) => setError(e.message))
+                      .finally(() => setBusy(false));
+                  }}
+                >
+                  <label>
+                    Clothing type for {item.name}
+                    <select
+                      aria-label={"Clothing type for " + item.name}
+                      required
+                      value={reviewTypes[item.id] || ""}
+                      disabled={busy}
+                      onChange={(e) =>
+                        setReviewTypes((types) => ({ ...types, [item.id]: e.target.value }))
+                      }
+                    >
+                      <option value="">Choose clothing type</option>
+                      {garmentChoices.map(([id, name]) => (
+                        <option key={id} value={id}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button className="button primary" disabled={busy || !reviewTypes[item.id]}>
+                    Confirm type for {item.name}
+                  </button>
+                </form>
+              )}
+              {edit?.id === item.id && (
+                <EditProduct
+                  key={item.id}
+                  item={item}
+                  onBusy={setBusy}
+                  onCancel={() => setEdit(null)}
+                  onSaved={async () => {
+                    setEdit(null);
+                    setNotice("Product details saved.");
+                    await load(data.offset, applied);
+                  }}
+                />
+              )}
+            </article>
+          ))}
+        </div>
+        {data && (
+          <div className="customer-actions">
+            <button
+              className="button secondary"
+              disabled={busy || data.offset === 0}
+              onClick={() => void load(Math.max(0, data.offset - data.limit), applied)}
+            >
+              Previous products
+            </button>
+            <button
+              className="button secondary"
+              disabled={busy || data.offset + data.limit >= data.total}
+              onClick={() => void load(data.offset + data.limit, applied)}
+            >
+              Next products
+            </button>
+          </div>
+        )}
+      </section>
+    </main>
+  );
 }

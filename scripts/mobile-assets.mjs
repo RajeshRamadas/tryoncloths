@@ -14,10 +14,7 @@ for (const [density, size] of Object.entries({
 })) {
   const folder = path.join(root, `android/app/src/main/res/mipmap-${density}`);
   for (const filename of ["ic_launcher.png", "ic_launcher_round.png"])
-    await sharp(source)
-      .resize(size, size)
-      .png()
-      .toFile(path.join(folder, filename));
+    await sharp(source).resize(size, size).png().toFile(path.join(folder, filename));
   await sharp(source)
     .resize(Math.round(size * 2.25), Math.round(size * 2.25))
     .png()
@@ -38,13 +35,8 @@ for (const name of await readdir(androidRes)) {
   if (!(await readdir(folder)).includes("splash.png")) continue;
   const filename = path.join(folder, "splash.png");
   const { width, height } = await sharp(filename).metadata();
-  await sharp(splashSvg)
-    .resize(width, height, { fit: "cover" })
-    .png()
-    .toFile(`${filename}.new`);
+  await sharp(splashSvg).resize(width, height, { fit: "cover" }).png().toFile(`${filename}.new`);
   const { rename } = await import("node:fs/promises");
   await rename(`${filename}.new`, filename);
 }
-console.log(
-  "Generated Android app icons and splash assets from mobile-resources/icon.svg.",
-);
+console.log("Generated Android app icons and splash assets from mobile-resources/icon.svg.");
