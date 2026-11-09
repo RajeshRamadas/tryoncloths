@@ -109,6 +109,7 @@ export default function OutfitStudio({
     catalogue.length ? "samples" : "products",
   );
   const [base, setBase] = useState("");
+  const [template, setTemplate] = useState("");
   // AI try-on results stack on the avatar; each one becomes the next base.
   const [dressed, setDressed] = useState<Dressed[]>(
     openedLook
@@ -160,6 +161,11 @@ export default function OutfitStudio({
       .then((value) => {
         if (!cancelled) setBase(value);
       })
+      .then(() => (personalized ? baseAvatar(profile.index, null, templateTone) : ""))
+      .then((value) => {
+        // The standard template the placements were made against, for fitting to the pose.
+        if (!cancelled) setTemplate(value);
+      })
       .catch((e) => {
         if (!cancelled) {
           setError(e.message);
@@ -175,7 +181,7 @@ export default function OutfitStudio({
     let cancelled = false;
     setRendering(true);
     setResult("");
-    renderOutfit(current, layers)
+    renderOutfit(current, layers, template ? { template, personalized: !!personalized } : undefined)
       .then((canvas) => {
         if (!cancelled) {
           setResult(canvas.toDataURL("image/png"));
@@ -191,7 +197,7 @@ export default function OutfitStudio({
     return () => {
       cancelled = true;
     };
-  }, [current, layers]);
+  }, [current, layers, template]);
   function dress(image: string, label: string, adaptation?: Adaptation) {
     // Sample layers were included in the AI input, so they are now part of the image.
     setDressed((items) => [...items, { image, label, previousLayers: layers, adaptation }]);
@@ -227,6 +233,7 @@ export default function OutfitStudio({
         placement: { ...garment.placement },
         // Imported tops are flat product shapes, so the arms go in front by default.
         armsInFront: !!garment.imported && garment.category === "shirt",
+        fitToPose: !!garment.imported,
       },
     ]);
   }
@@ -790,6 +797,26 @@ export default function OutfitStudio({
               >
                 Reset placement
               </button>
+              {personalized && selected.garment.imported && (
+                <label className="consent">
+                  <input
+                    type="checkbox"
+                    checked={!!selected.fitToPose}
+                    disabled={busy}
+                    onChange={(e) =>
+                      update(
+                        layers.map((l) =>
+                          l === selected ? { ...l, fitToPose: e.target.checked } : l,
+                        ),
+                      )
+                    }
+                  />
+                  <span>
+                    Fit to this avatar’s pose. The layer follows where the generated body’s
+                    shoulders, hips and ankles actually are.
+                  </span>
+                </label>
+              )}
               {category === "shirt" && (
                 <label className="consent">
                   <input

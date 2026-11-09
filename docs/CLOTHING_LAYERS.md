@@ -61,9 +61,28 @@ The arm mask is made on the device from the same MediaPipe pose model as the
 
 Turn the option off for long sleeves that already cover the forearms.
 
+## Fit to the avatar's pose
+
+Layers are placed against the standard template, but a generated customer avatar can
+drift: the body may sit a little left or right, be larger or smaller, or lean. For
+imported layers on a generated avatar, **Fit to this avatar's pose** (under **Adjust
+placement**, on by default) warps the layer from the template's body to where the avatar's
+body actually is:
+
+- The same on-device pose model finds the shoulders, hips and ankles on both the template
+  (moved into the padded 692 × 1038 generation frame) and the generated avatar.
+- Tops follow the shoulder–hip quad, trousers the hip–ankle quad, and shoes the ankle line
+  (`src/pose-fit.js`). Each layer is drawn through an 8 × 8 mesh of triangles, so a body
+  that is wider at the hips or tilted is followed smoothly.
+- The placement sliders still work: they move the layer before it is fitted.
+- Sample avatars match the template exactly, so nothing changes there. If a pose is not
+  found, a landmark is hidden, or the change is implausible (under 0.6× or over 1.6×),
+  the layer is drawn at its plain placement.
+
 ## Limits
 
-- Garments keep their own shape; they are not warped to the avatar's pose.
+- Fitting follows the shoulders, hips and ankles only. Elbows and knees are not followed,
+  so a raised arm or bent leg is not matched, and the garment's own folds stay as photographed.
 - Only forearms and hands come forward (see below); upper arms stay under the sleeves, and
   a hand in front of trousers is not separated from them.
 - Colour-based removal needs a plain backdrop that contrasts with the garment; white

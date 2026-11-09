@@ -137,6 +137,104 @@ test("the avatar's forearms and hands are drawn in front of an imported top and 
   expect(matching / changed).toBeGreaterThan(0.6);
 });
 
+test("imported clothes follow a generated avatar whose body drifted from the template", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const avatar = await standardAvatar("regular");
+  // The generated body is 8% larger and sits about 40 px right of the padded template.
+  const generated = await sharp({
+    create: { width: 692, height: 1038, channels: 4, background: "#c6c6c6" },
+  })
+    .composite([{ input: await sharp(avatar).resize(415, 1017).toBuffer(), left: 179, top: 10 }])
+    .png()
+    .toBuffer();
+  await page.route("**/api/health", (route) =>
+    route.fulfill({
+      json: {
+        personalizationAvailable: true,
+        personalizationContract: "customer-avatar-v4",
+        provider: "gemini",
+      },
+    }),
+  );
+  await page.route("**/api/personalize", (route) =>
+    route.fulfill({
+      json: {
+        image: `data:image/png;base64,${generated.toString("base64")}`,
+        kind: "customer-avatar",
+        provider: "gemini",
+        profileId: "regular",
+      },
+    }),
+  );
+  await page.goto("/");
+  await page.getByLabel("The customer agrees to use their photos for this avatar session.").check();
+  await page.getByLabel("Upload face photo").setInputFiles(customerPhotos[0].face);
+  await page.getByLabel("Upload full-body photo").setInputFiles(customerPhotos[0].body);
+  await page.getByRole("button", { name: "Continue to match" }).click();
+  await page
+    .getByRole("checkbox", { name: /The customer agrees to send their face photo/ })
+    .check();
+  await page.getByRole("button", { name: "Generate customer avatar", exact: true }).click();
+  await page.getByRole("button", { name: "Review avatar", exact: true }).click();
+  await page
+    .getByLabel("The customer approves the face, body and skin tone of this avatar.")
+    .check();
+  await page.getByRole("button", { name: "Try clothes" }).click();
+  const tee = await sharp(
+    Buffer.from(
+      '<svg width="500" height="520" xmlns="http://www.w3.org/2000/svg"><rect width="500" height="520" fill="#f4f3ef"/><path d="M160 60 L210 40 Q250 70 290 40 L340 60 L440 150 L390 200 L350 160 L350 480 L150 480 L150 160 L110 200 L60 150 Z" fill="#2e5c8a"/></svg>',
+    ),
+  )
+    .jpeg({ quality: 90 })
+    .toBuffer();
+  await page
+    .getByLabel("Import clothing layer")
+    .setInputFiles({ name: "Fitted tee.jpg", mimeType: "image/jpeg", buffer: tee });
+  await page.locator(".placement-options summary").click();
+  const fit = page.getByLabel(/Fit to this avatar’s pose/);
+  await expect(fit).toBeChecked();
+  // Horizontal centre of the tee's blue pixels in the rendered outfit.
+  const teeCentre = async () => {
+    const { data, info } = await sharp(await outputBytes(page))
+      .removeAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    let sum = 0,
+      count = 0;
+    for (let i = 0; i < data.length; i += 3)
+      if (Math.abs(data[i] - 46) + Math.abs(data[i + 1] - 92) + Math.abs(data[i + 2] - 138) < 40) {
+        sum += (i / 3) % info.width;
+        count++;
+      }
+    return count > 5000 ? sum / count : NaN;
+  };
+  let fitted = NaN;
+  await expect
+    .poll(
+      async () => {
+        const previous = fitted;
+        fitted = await teeCentre();
+        return Number.isFinite(fitted) && Math.abs(fitted - previous) < 0.5;
+      },
+      { intervals: [1000], timeout: 60_000 },
+    )
+    .toBe(true);
+  await fit.uncheck();
+  let plain = fitted;
+  await expect
+    .poll(
+      async () => {
+        plain = await teeCentre();
+        return fitted - plain;
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(25);
+  expect(fitted - plain).toBeLessThan(60);
+});
+
 test("outfits select independently, export displayed pixels without AI calls, and reset cleanly", async ({
   page,
 }) => {
