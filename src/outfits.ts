@@ -114,7 +114,9 @@ export async function renderOutfit(
       height: p.height * canvas.height,
     };
     const map =
-      layer.fitToPose && fitting ? poseMapping(category, fitting.reference, fitting.actual) : null;
+      layer.fitToPose && fitting
+        ? poseMapping(category, fitting.reference, fitting.actual, canvas.width / canvas.height)
+        : null;
     if (map) drawWarped(ctx, image, rect, map);
     else ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height);
   }

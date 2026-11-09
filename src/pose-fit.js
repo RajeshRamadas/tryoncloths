@@ -1,14 +1,61 @@
 // Fit placed clothing layers to the avatar's actual pose. A layer is placed against the
 // standard template (its expected body position); when a generated avatar's body has drifted,
 // shrunk, grown or tilted, the layer is warped from the template's body landmarks to the
-// avatar's own landmarks (MediaPipe BlazePose indices). Pure geometry: no DOM, no network.
+// avatar's own landmarks (MediaPipe BlazePose indices). Sleeves and trouser legs then bend
+// further to follow the elbows, wrists and knees. Pure geometry: no DOM, no network.
+//
+// The warp is the best affine fit of the body quad plus smooth corrections that pull each body
+// point and joint exactly onto the avatar's. Away from the body the corrections fade to an
+// average, so the warp never folds over the way extrapolating a bilinear quad does.
 
 const L_SHOULDER = 11,
   R_SHOULDER = 12,
+  L_ELBOW = 13,
+  R_ELBOW = 14,
+  L_WRIST = 15,
+  R_WRIST = 16,
   L_HIP = 23,
   R_HIP = 24,
+  L_KNEE = 25,
+  R_KNEE = 26,
   L_ANKLE = 27,
   R_ANKLE = 28;
+
+// Points of the body quad (u, v) that land exactly on the avatar's body: the corners and the
+// centre line, so a moving elbow or knee does not drag the middle of the garment.
+const CORNERS = [
+  [0, 0],
+  [1, 0],
+  [1, 1],
+  [0, 1],
+];
+const BODY_POINTS = {
+  shirt: [...CORNERS, [0.5, 0], [0.5, 0.5], [0.5, 1]],
+  trousers: [...CORNERS, [0.5, 0], [0.5, 1]],
+  shoes: CORNERS,
+};
+// Bones that bend a layer beyond its body quad: [from joint, to joint]. Each bone carries
+// the garment around it the way the avatar's limb moved.
+const BONES = {
+  shirt: [
+    [L_SHOULDER, L_ELBOW],
+    [L_ELBOW, L_WRIST],
+    [R_SHOULDER, R_ELBOW],
+    [R_ELBOW, R_WRIST],
+  ],
+  trousers: [
+    [L_HIP, L_KNEE],
+    [L_KNEE, L_ANKLE],
+    [R_HIP, R_KNEE],
+    [R_KNEE, R_ANKLE],
+  ],
+  shoes: [],
+};
+// A joint further than this share of the body quad's width from where the body fit puts it
+// is a misread landmark.
+const MAX_JOINT_SHIFT = 0.5;
+// How softly a bone hands over to its neighbours, as a share of the body quad's width.
+const BLEND = 0.05;
 
 const visible = (l) => (l?.visibility ?? 1) >= 0.5;
 
@@ -36,47 +83,170 @@ function bilinear(q, u, v) {
   };
 }
 
-/** Inverse bilinear (Newton's method); works outside the quad by extrapolation. */
-function inverseBilinear(q, p) {
-  let u = 0.5,
-    v = 0.5;
-  const [a, b, c, d] = q;
-  for (let k = 0; k < 20; k++) {
-    const f = bilinear(q, u, v);
-    const ex = f.x - p.x,
-      ey = f.y - p.y;
-    if (Math.abs(ex) + Math.abs(ey) < 1e-9) break;
-    // Partial derivatives.
-    const dux = (1 - v) * (b.x - a.x) + v * (c.x - d.x),
-      duy = (1 - v) * (b.y - a.y) + v * (c.y - d.y),
-      dvx = (1 - u) * (d.x - a.x) + u * (c.x - b.x),
-      dvy = (1 - u) * (d.y - a.y) + u * (c.y - b.y);
-    const det = dux * dvy - dvx * duy;
-    if (!det) break;
-    u -= (ex * dvy - ey * dvx) / det;
-    v -= (dux * ey - duy * ex) / det;
+/** Least-squares affine map taking points `from` onto points `to`, or null if degenerate. */
+function affineFit(from, to) {
+  // Normal equations for [x y 1]·[a c e]ᵀ ≈ x′ (and likewise for y′).
+  const m = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+  ];
+  const bx = [0, 0, 0],
+    by = [0, 0, 0];
+  from.forEach((p, k) => {
+    const row = [p.x, p.y, 1];
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) m[i][j] += row[i] * row[j];
+      bx[i] += row[i] * to[k].x;
+      by[i] += row[i] * to[k].y;
+    }
+  });
+  const det3 = (r) =>
+    r[0][0] * (r[1][1] * r[2][2] - r[1][2] * r[2][1]) -
+    r[0][1] * (r[1][0] * r[2][2] - r[1][2] * r[2][0]) +
+    r[0][2] * (r[1][0] * r[2][1] - r[1][1] * r[2][0]);
+  const det = det3(m);
+  if (!(Math.abs(det) > 1e-18)) return null;
+  // Cramer's rule.
+  const solve = (b) =>
+    [0, 1, 2].map((k) => det3(m.map((row, i) => row.map((v, j) => (j === k ? b[i] : v)))) / det);
+  const [a, c, e] = solve(bx),
+    [b, d, f] = solve(by);
+  return (p) => ({ x: a * p.x + c * p.y + e, y: b * p.x + d * p.y + f });
+}
+
+/**
+ * Smooth blend of the anchors' shifts at p, weighted by inverse distance to the fourth power
+ * so each anchor moves exactly by its own shift. `aspect` is width / height of the image.
+ */
+function blendShift(anchors, p, aspect) {
+  let wx = 0,
+    wy = 0,
+    total = 0;
+  for (const { at, shift } of anchors) {
+    const d2 = ((p.x - at.x) * aspect) ** 2 + (p.y - at.y) ** 2;
+    if (d2 < 1e-14) return shift;
+    const w = 1 / (d2 * d2);
+    total += w;
+    wx += w * shift.x;
+    wy += w * shift.y;
   }
-  return { u, v };
+  return { x: wx / total, y: wy / total };
 }
 
 const span = (q) => Math.hypot(q[1].x - q[0].x, q[1].y - q[0].y);
 const height = (q) =>
   Math.hypot((q[3].x + q[2].x - q[0].x - q[1].x) / 2, (q[3].y + q[2].y - q[0].y - q[1].y) / 2);
 
+/** Distance from p to segment a–b. */
+function segmentDistance(p, a, b) {
+  const dx = b.x - a.x,
+    dy = b.y - a.y,
+    length = dx * dx + dy * dy;
+  const t = length ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / length)) : 0;
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+
+/** Distance from p to a convex quad (0 inside). */
+function quadDistance(p, q) {
+  const side = (a, b) => (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+  const sides = q.map((a, i) => side(a, q[(i + 1) % 4]));
+  if (sides.every((s) => s >= 0) || sides.every((s) => s <= 0)) return 0;
+  return Math.min(...q.map((a, i) => segmentDistance(p, a, q[(i + 1) % 4])));
+}
+
+/**
+ * Rotation, scale and shift carrying segment r0–r1 onto a0–a1, in square (aspect-corrected)
+ * coordinates.
+ */
+function boneTransform(r0, r1, a0, a1) {
+  const rx = r1.x - r0.x,
+    ry = r1.y - r0.y,
+    ax = a1.x - a0.x,
+    ay = a1.y - a0.y,
+    rr = rx * rx + ry * ry;
+  // (a / r) as complex numbers: rotation and scale.
+  const c = (ax * rx + ay * ry) / rr,
+    s = (ay * rx - ax * ry) / rr;
+  return (p) => {
+    const x = p.x - r0.x,
+      y = p.y - r0.y;
+    return { x: a0.x + c * x - s * y, y: a0.y + s * x + c * y };
+  };
+}
+
 /**
  * Point mapping from the template's body to the avatar's body for one category, in
  * normalised image coordinates, or null when the pose is missing or the change is implausible
- * (then the layer is drawn at its plain placement).
+ * (then the layer is drawn at its plain placement). Sleeves follow the elbows and wrists and
+ * trouser legs the knees when those are visible; `aspect` (image width / height) keeps that
+ * bend round rather than stretched.
  */
-export function poseMapping(category, reference, actual) {
+export function poseMapping(category, reference, actual, aspect = 1) {
   const from = bodyQuad(category, reference),
     to = bodyQuad(category, actual);
   if (!from || !to) return null;
   const ratios = [span(to) / span(from), height(to) / height(from)];
   if (!ratios.every((r) => Number.isFinite(r) && r > 0.6 && r < 1.6)) return null;
+  const affine = affineFit(from, to);
+  if (!affine) return null;
+  const anchors = BODY_POINTS[category].map(([u, v]) => {
+    const at = bilinear(from, u, v),
+      target = bilinear(to, u, v),
+      q = affine(at);
+    return { at, shift: { x: target.x - q.x, y: target.y - q.y } };
+  });
+  const body = (p) => {
+    const q = affine(p),
+      shift = blendShift(anchors, p, aspect);
+    return { x: q.x + shift.x, y: q.y + shift.y };
+  };
+  // Limb bones work in square coordinates so a rotation stays a rotation on screen.
+  const square = (p) => ({ x: p.x * aspect, y: p.y });
+  const limit = span(to) * MAX_JOINT_SHIFT;
+  const joint = (i) => {
+    const r = reference[i],
+      a = actual[i];
+    if (!r || !a || !visible(r) || !visible(a)) return null;
+    const expected = body(r);
+    return Math.hypot(a.x - expected.x, a.y - expected.y) <= limit ? { r, a } : null;
+  };
+  const bones = [];
+  for (const [i, k] of BONES[category]) {
+    const j0 = joint(i),
+      j1 = joint(k);
+    if (!j0 || !j1) continue;
+    const r0 = square(j0.r),
+      r1 = square(j1.r),
+      a0 = square(j0.a),
+      a1 = square(j1.a);
+    const stretch = Math.hypot(a1.x - a0.x, a1.y - a0.y) / Math.hypot(r1.x - r0.x, r1.y - r0.y);
+    if (!(stretch > 0.6 && stretch < 1.6)) continue;
+    bones.push({ r0, r1, move: boneTransform(r0, r1, a0, a1) });
+  }
+  if (!bones.length) return body;
+  // The body fit owns the torso (shirt) or the waistband (trousers); limbs take over outside.
+  const core =
+    category === "shirt" ? from.map(square) : [square(reference[L_HIP]), square(reference[R_HIP])];
+  const coreDistance = (p) =>
+    core.length === 4 ? quadDistance(p, core) : segmentDistance(p, core[0], core[1]);
+  const soft = (BLEND * Math.hypot((from[1].x - from[0].x) * aspect, from[1].y - from[0].y)) ** 2;
+  const weight = (d) => 1 / (d * d + soft) ** 2;
   return (p) => {
-    const { u, v } = inverseBilinear(from, p);
-    return bilinear(to, u, v);
+    const ps = square(p);
+    const w0 = weight(coreDistance(ps)),
+      q0 = body(p);
+    let x = w0 * q0.x * aspect,
+      y = w0 * q0.y,
+      total = w0;
+    for (const bone of bones) {
+      const w = weight(segmentDistance(ps, bone.r0, bone.r1)),
+        q = bone.move(ps);
+      x += w * q.x;
+      y += w * q.y;
+      total += w;
+    }
+    return { x: x / total / aspect, y: y / total };
   };
 }
 
@@ -91,7 +261,7 @@ export function warpTriangles(
   map,
   canvasWidth,
   canvasHeight,
-  n = 8,
+  n = 16,
 ) {
   const grid = [];
   for (let j = 0; j <= n; j++)

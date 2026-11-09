@@ -28,6 +28,9 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
   and shoes are warped from the template to where the avatar's shoulders, hips and ankles
   are, on the device and with no credit. See
   [clothing layers](docs/CLOTHING_LAYERS.md#fit-to-the-avatars-pose).
+- Fitted clothes now also follow the elbows, wrists and knees: sleeves turn with the
+  avatar's arms and trouser legs with its legs, while the torso and waistband stay with the
+  body. The fit no longer distorts parts of a layer far from the body.
 
 ## 0.21.0-rc.3
 

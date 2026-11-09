@@ -72,8 +72,15 @@ body actually is:
 - The same on-device pose model finds the shoulders, hips and ankles on both the template
   (moved into the padded 692 × 1038 generation frame) and the generated avatar.
 - Tops follow the shoulder–hip quad, trousers the hip–ankle quad, and shoes the ankle line
-  (`src/pose-fit.js`). Each layer is drawn through an 8 × 8 mesh of triangles, so a body
-  that is wider at the hips or tilted is followed smoothly.
+  (`src/pose-fit.js`). The quad sets the best-fitting move, scale and tilt, and small
+  corrections pull the corners and centre line exactly onto the avatar's body.
+- Sleeves and trouser legs then follow the limbs: each upper arm, forearm, thigh and shin
+  is a bone from joint to joint (shoulder → elbow → wrist, hip → knee → ankle). The
+  garment around a bone turns and stretches with it, the torso or waistband stays with the
+  body fit, and the two blend smoothly where they meet. A hidden or misread elbow, wrist or
+  knee (more than half the body width from where the body fit expects it, or a bone
+  stretched under 0.6× or over 1.6×) is skipped, and that part follows the body fit.
+- Each layer is drawn through a 16 × 16 mesh of triangles, so bends are followed smoothly.
 - The placement sliders still work: they move the layer before it is fitted.
 - Sample avatars match the template exactly, so nothing changes there. If a pose is not
   found, a landmark is hidden, or the change is implausible (under 0.6× or over 1.6×),
@@ -81,8 +88,10 @@ body actually is:
 
 ## Limits
 
-- Fitting follows the shoulders, hips and ankles only. Elbows and knees are not followed,
-  so a raised arm or bent leg is not matched, and the garment's own folds stay as photographed.
+- Fitting follows the shoulders, elbows, wrists, hips, knees and ankles. Hands, feet and
+  the garment's own folds stay as photographed, and a sharply bent elbow or knee can pinch
+  the cloth on the inside of the bend. Very different poses, such as arms raised above the
+  head, need a new photo rather than a warp.
 - Only forearms and hands come forward (see below); upper arms stay under the sleeves, and
   a hand in front of trousers is not separated from them.
 - Colour-based removal needs a plain backdrop that contrasts with the garment; white
