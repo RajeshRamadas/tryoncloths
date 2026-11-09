@@ -1,6 +1,6 @@
 # Forme Studio Android test build
 
-[Download the APK](https://github.com/RajeshRamadas/tryoncloths/raw/refs/heads/main/downloads/forme-android-debug.apk)
+[Download the APK](https://github.com/RajeshRamadas/tryoncloths/raw/6a13c5fd60e27668e6a21f04c62e2bb8f9d67187/downloads/forme-android-debug.apk)
 
 Version 0.7.0 (version code 7), app ID `com.rajeshramadas.tryoncloths`. Android 7+ with Android System WebView/Chrome 108+ is required. This APK uses a development signing certificate and is for testing.
 
@@ -8,4 +8,6 @@ Version 0.7.0 adds a local saved-avatar library and downloaded-PNG import, so cu
 
 Open the download on your phone and allow installation from your browser/file manager if prompted. Sample avatars work offline. See [the Android guide](../docs/ANDROID.md) for the photo, approval, sharing, optional AI connection, and source-build workflow.
 
-The checksum is in [SHA256SUMS](SHA256SUMS). From the repository root, run `sha256sum -c downloads/SHA256SUMS` to verify the file.
+SHA-256: `5580b02929be07742224d835747e9c662f7232596f1822c14c7c8fa8aa31f109`. Verify a downloaded copy with `sha256sum forme-android-debug.apk`.
+
+The APK is no longer stored on `main` to keep the repository small; the link above points to the last commit that contained it. Hosted APK builds are disabled, so no newer build is published.

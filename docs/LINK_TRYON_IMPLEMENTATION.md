@@ -6,6 +6,8 @@ As of 2026-10-29 · Rajesh Ramadas
 
 Give a coding LLM (Claude Code or similar) one task at a time, in order; each task lists the goal, files, steps and acceptance checks, and the prompt template below wraps them. Tasks 1–9 match what [PR #1](https://github.com/RajeshRamadas/tryoncloths/pull/1) built and can be used to rebuild or extend it; task 10 is now implemented; task 11 is implemented behind a pilot flag; task 12 is implemented as an optional isolated service, disabled by default. Tasks 13–14 add the release benchmark and private quality-review tools; live results and a candidate-provider choice remain outstanding. Requirements and design: [`LINK_TRYON_DESIGN.md`](LINK_TRYON_DESIGN.md).
 
+**Status (2026-11-09):** automated acceptance checks are ticked; they are covered by the current unit and browser suites, which CI runs on every PR. Unticked items are live checks (real retailer links, live try-on and female reviews, provider choice) and are tracked in [pending implementation](PENDING_IMPLEMENTATION.md).
+
 ### Repo context to give the LLM first
 
 | Item | Value |
@@ -94,10 +96,10 @@ These three tasks let the server turn a product URL into usable garment photos w
 
 **Acceptance.**
 
-- [ ] Private, loopback, link-local, CGNAT, multicast and mapped addresses are rejected; 8.8.8.8 and public IPv6 are accepted.
-- [ ] `http://127.0.0.1:<port>`, `http://localhost`, `http://169.254.169.254`, `ftp:`, `file:`, `:8443` and credential URLs are rejected.
-- [ ] A hostname whose DNS answer includes 169.254.169.254 fails with `blocked_address` (test by stubbing `dns.lookup`).
-- [ ] No new dependencies.
+- [x] Private, loopback, link-local, CGNAT, multicast and mapped addresses are rejected; 8.8.8.8 and public IPv6 are accepted.
+- [x] `http://127.0.0.1:<port>`, `http://localhost`, `http://169.254.169.254`, `ftp:`, `file:`, `:8443` and credential URLs are rejected.
+- [x] A hostname whose DNS answer includes 169.254.169.254 fails with `blocked_address` (test by stubbing `dns.lookup`).
+- [x] No new dependencies.
 
 ### Task 2 — product extraction and image normalization
 
@@ -116,9 +118,9 @@ These three tasks let the server turn a product URL into usable garment photos w
 
 **Acceptance.**
 
-- [ ] Test HTML with JSON-LD `@graph`, ImageObject, OG, Twitter, image_src and a broken JSON block gives the expected ordered, de-duplicated list and product name.
-- [ ] Images under 160 px are skipped; a page with no images throws `no_images`.
-- [ ] `fetchImpl` is injectable so tests make no network calls.
+- [x] Test HTML with JSON-LD `@graph`, ImageObject, OG, Twitter, image_src and a broken JSON block gives the expected ordered, de-duplicated list and product name.
+- [x] Images under 160 px are skipped; a page with no images throws `no_images`.
+- [x] `fetchImpl` is injectable so tests make no network calls.
 
 ### Task 3 — `POST /api/product-link`
 
@@ -137,9 +139,9 @@ These three tasks let the server turn a product URL into usable garment photos w
 
 **Acceptance.**
 
-- [ ] Cross-origin request → 403 and the reader is not called.
-- [ ] Success returns images; `site_refused` → 502 with its code; an unexpected error → `unknown` with no internal text.
-- [ ] Existing 37 tests still pass.
+- [x] Cross-origin request → 403 and the reader is not called.
+- [x] Success returns images; `site_refused` → 502 with its code; an unexpected error → `unknown` with no internal text.
+- [x] Existing 37 tests still pass.
 
 ## Tasks 4–5: try-on server
 
@@ -163,9 +165,9 @@ These two tasks add the paid step: one Gemini edit that puts the chosen garment 
 
 **Acceptance.**
 
-- [ ] Stubbed fetch sees avatar first (PNG) and garment second (JPEG), the right region text and the sanitized title.
-- [ ] A `<script>` in the title never reaches the prompt.
-- [ ] A faceless returned image throws `missing_face`.
+- [x] Stubbed fetch sees avatar first (PNG) and garment second (JPEG), the right region text and the sanitized title.
+- [x] A `<script>` in the title never reaches the prompt.
+- [x] A faceless returned image throws `missing_face`.
 
 ### Task 5 — `POST /api/tryon` and health
 
@@ -185,10 +187,10 @@ These two tasks add the paid step: one Gemini edit that puts the chosen garment 
 
 **Acceptance.**
 
-- [ ] Each bad field (consent, scope, provider, type, avatar, garment) → 400 with no provider call.
-- [ ] OpenAI provider or missing key → 503; health shows `tryOnAvailable: false`.
-- [ ] A second try-on within 15 s → 429 (shared limit).
-- [ ] Existing `/api/personalize` tests unchanged and passing.
+- [x] Each bad field (consent, scope, provider, type, avatar, garment) → 400 with no provider call.
+- [x] OpenAI provider or missing key → 503; health shows `tryOnAvailable: false`.
+- [x] A second try-on within 15 s → 429 (shared limit).
+- [x] Existing `/api/personalize` tests unchanged and passing.
 
 ## Tasks 6–8: staff UI
 
@@ -214,8 +216,8 @@ These tasks put the flow in front of staff inside the existing **Try clothes** s
 
 **Acceptance.**
 
-- [ ] `npm run build` passes type checks.
-- [ ] Put on avatar stays disabled until photo, type and consent are set, and when try-on is unavailable.
+- [x] `npm run build` passes type checks.
+- [x] Put on avatar stays disabled until photo, type and consent are set, and when try-on is unavailable.
 
 ### Task 7 — stacking in `OutfitStudio` and App wiring
 
@@ -236,8 +238,8 @@ These tasks put the flow in front of staff inside the existing **Try clothes** s
 
 **Acceptance.**
 
-- [ ] Existing outfit e2e test still passes (sample layers, export, reset, no AI calls).
-- [ ] After undo of all garments, the preview equals the original avatar.
+- [x] Existing outfit e2e test still passes (sample layers, export, reset, no AI calls).
+- [x] After undo of all garments, the preview equals the original avatar.
 
 ### Task 8 — styles and mobile layout
 
@@ -255,8 +257,8 @@ These tasks put the flow in front of staff inside the existing **Try clothes** s
 
 **Acceptance.**
 
-- [ ] No horizontal scroll at 390 px with a long product name.
-- [ ] Keyboard: every control reachable; pressed state announced via `aria-pressed`.
+- [x] No horizontal scroll at 390 px with a long product name.
+- [x] Keyboard: every control reachable; pressed state announced via `aria-pressed`.
 
 ## Task 9: tests, docs and release
 
@@ -289,10 +291,10 @@ npm run test:e2e
 
 **Acceptance.**
 
-- [ ] `npm test` all green (46 at the time of PR #1).
-- [ ] `npm run build` green.
-- [ ] `npm run test:e2e` green, including existing outfit and studio specs.
-- [ ] No test makes a real network or paid call.
+- [x] `npm test` all green (46 at the time of PR #1).
+- [x] `npm run build` green.
+- [x] `npm run test:e2e` green, including existing outfit and studio specs.
+- [x] No test makes a real network or paid call.
 - [ ] Manual check on a deployed studio: 3–4 real product links and 10+ live try-ons reviewed.
 
 ## Implemented extensions: tasks 10–12
@@ -319,9 +321,9 @@ Implemented in web 0.10 on `feature/account-saved-looks`.
 
 **Acceptance.**
 
-- [ ] Another account cannot list, read or delete a look (404).
-- [ ] Deleting an account removes its looks.
-- [ ] Reopening a look makes no AI request.
+- [x] Another account cannot list, read or delete a look (404).
+- [x] Deleting an account removes its looks.
+- [x] Reopening a look makes no AI request.
 
 ### Task 11 — female standard bodies
 
@@ -345,8 +347,8 @@ Implemented in web 0.11 on `feature/female-body-profiles`; disabled by default p
 
 **Acceptance.**
 
-- [ ] All existing male tests unchanged.
-- [ ] Each female panel has exactly one detectable face and passes `geminiBodyReference`.
+- [x] All existing male tests unchanged.
+- [x] Each female panel has exactly one detectable face and passes `geminiBodyReference`.
 - [ ] Live review of 10+ female avatars and try-ons before release.
 
 ### Task 12 — headless reader for script-rendered pages (optional)
@@ -369,8 +371,8 @@ Implemented in web 0.12 on `feature/isolated-browser-link-reader`. See [setup an
 
 **Acceptance.**
 
-- [ ] With the flag off, behaviour is identical to tasks 1–3.
-- [ ] A page that redirects or loads a resource to a private address gets no response from it.
+- [x] With the flag off, behaviour is identical to tasks 1–3.
+- [x] A page that redirects or loads a resource to a private address gets no response from it.
 - [ ] Measured success rate on a fixed list of 20 product links is recorded before enabling in production.
 
 

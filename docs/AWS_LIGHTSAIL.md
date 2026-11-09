@@ -111,7 +111,7 @@ The script checks authentication, Android CORS, and configured generation capabi
 
 ## 8. Connect the Android app
 
-Install the [current Android test APK](https://github.com/RajeshRamadas/tryoncloths/raw/refs/heads/main/downloads/forme-android-debug.apk). Open **Studio connection** (cloud icon), enter:
+Install the [current Android test APK](https://github.com/RajeshRamadas/tryoncloths/raw/6a13c5fd60e27668e6a21f04c62e2bb8f9d67187/downloads/forme-android-debug.apk). Open **Studio connection** (cloud icon), enter:
 
 - **Backend URL:** `https://api.yourdomain.com`
 - **Store access code:** the value you saved as `TRYON_MOBILE_TOKEN`.

@@ -53,7 +53,7 @@ remains, grouped by what they need.
 
 ## 5. Repository housekeeping
 
-- [ ] Move `downloads/forme-android-debug.apk` (11 MB, app 0.7.0) out of git, e.g. to GitHub Releases.
+- [x] Move `downloads/forme-android-debug.apk` (11 MB, app 0.7.0) off `main`; download links now point to the last commit that contained it. Optional: publish it as a GitHub Release (needs to be done by the repository owner).
 - [ ] Hosted mobile builds are disabled (Android workflow removed; no iOS project); local Android builds still work. Rebuild and publish the APK if mobile work resumes; it lags the web app (0.7.0 vs 0.21.0-rc.3).
-- [ ] Tick or archive the stale acceptance checkboxes in `docs/LINK_TRYON_IMPLEMENTATION.md`; that work shipped in PR #1.
+- [x] Tick the shipped acceptance checkboxes in `docs/LINK_TRYON_IMPLEMENTATION.md`; live checks stay open above.
 - [x] Address the 8 `npm audit` advisories (6 moderate, 2 high) reported by `npm ci` (sharp 0.35.5, body-parser 2.4.0 and `npm audit fix`; PR #9).

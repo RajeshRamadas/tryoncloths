@@ -209,7 +209,7 @@ Unit tests and the build pass (46 of 46, 9 new); browser tests and live Gemini q
 
 ### Before merge
 
-- [ ] Run `npm run test:e2e` locally or in CI.
+- [x] Run `npm run test:e2e` locally or in CI.
 - [ ] Deploy to Lightsail and test 3–4 real links (Myntra, Ajio, Amazon, a small brand site).
 - [ ] Review 10+ live try-ons for face, skin tone, garment fidelity and framing.
 - [ ] Confirm `TRYON_TRUST_PROXY_HOPS=1` behind Caddy so per-IP limits work.
