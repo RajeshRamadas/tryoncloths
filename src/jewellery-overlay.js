@@ -5,8 +5,10 @@ export const overlayAnchors = {
   jhumka: "earlobe",
   nose_pin: "nostril",
   nose_ring: "nostril",
+  nath_chain: "nostril",
   maang_tikka: "hairParting",
   matha_patti: "hairParting",
+  hair_accessory: "hairSide",
   choker: "neckBase",
   necklace: "neckBase",
   pendant: "neckBase",
@@ -19,6 +21,16 @@ export const overlayAnchors = {
   waist_belt: "waist",
   anklets: "ankle",
 };
+// Above the temple on one side: between the hair parting and that side's earlobe.
+function hairSide(portrait, imageSide) {
+  const parting = portrait.hairParting,
+    ear = portrait[imageSide + "Earlobe"];
+  if (!parting || !ear) return undefined;
+  return {
+    x: ear.x + (parting.x - ear.x) * 0.2,
+    y: parting.y + (ear.y - parting.y) * 0.3,
+  };
+}
 export const previewLabel = (mode) =>
   mode === "overlay"
     ? "Overlay preview"
@@ -74,7 +86,9 @@ export function defaultOverlayPlacements({
           ? portrait[imageSide + "Earlobe"]
           : anchor === "nostril"
             ? portrait[imageSide + "Nostril"]
-            : portrait[anchor];
+            : anchor === "hairSide"
+              ? hairSide(portrait, imageSide)
+              : portrait[anchor];
     else
       point = {
         x: w * (anchor === "ankle" ? (s === "left" ? 0.62 : 0.38) : 0.5),
@@ -88,8 +102,16 @@ export function defaultOverlayPlacements({
     } else if (type === "stud_earrings") {
       pw = (a.dropMm || 8) * px;
       ph = (pw * ah) / aw;
+    } else if (type === "nath_chain") {
+      // The cut-out runs from the ring (left edge) to the chain's end at the hair by the ear.
+      const ear = portrait[imageSide + "Earlobe"];
+      pw = ear ? Math.max(20 * px, Math.abs(ear.x - point.x) * 1.05) : 110 * px;
+      ph = (pw * ah) / aw;
     } else if (anchor === "nostril") {
       pw = (type === "nose_pin" ? 4 : 16) * px;
+      ph = (pw * ah) / aw;
+    } else if (anchor === "hairSide") {
+      pw = (a.pendantMm || 40) * px;
       ph = (pw * ah) / aw;
     } else if (anchor === "hairParting") {
       ph = (a.pendantMm || 30) * px;
@@ -120,8 +142,9 @@ export function defaultOverlayPlacements({
         width: pw,
         height: ph,
         angle: band?.angle || 0,
-        mirror: s === "right" && anchor === "earlobe",
-        pivotX: 0.5,
+        mirror:
+          s === "right" && (anchor === "earlobe" || anchor === "hairSide" || type === "nath_chain"),
+        pivotX: type === "nath_chain" ? 0 : 0.5,
         pivotY:
           (anchor === "earlobe" && type !== "stud_earrings") || anchor === "neckBase" ? 0 : 0.5,
       });

@@ -42,6 +42,12 @@ export const jewelleryTypes = {
     "Place one ring at the selected nostril; include a chain only if part of the product.",
     { sides: ["left", "right"] },
   ),
+  nath_chain: item(
+    "Nath with chain",
+    "portrait",
+    "Place the ring at the selected nostril and run its chain across the cheek to the hair above the same-side ear, hanging in a gentle curve.",
+    { sides: ["left", "right"] },
+  ),
   maang_tikka: item(
     "Maang tikka",
     "portrait",
@@ -51,6 +57,12 @@ export const jewelleryTypes = {
     "Matha patti",
     "portrait",
     "Place the headpiece along the hairline and forehead without changing the hairstyle.",
+  ),
+  hair_accessory: item(
+    "Hair accessory / passa",
+    "portrait",
+    "Place the hair accessory in the hair on the selected side of the head, above the temple and ear, resting on the hair without changing the hairstyle.",
+    { sides: ["left", "right"] },
   ),
   choker: item("Choker", "portrait", "Place the choker close to the base of the neck."),
   necklace: item(

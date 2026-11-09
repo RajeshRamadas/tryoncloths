@@ -662,3 +662,55 @@ test("overlay application records one free jewellery fitting per request, while 
     assert.equal(report.totals.creditsUsed, 0);
     assert.equal(calls(), 0);
   }));
+
+test("a nath chain runs from the nostril towards the same-side ear and hair accessories sit above the temple", () => {
+  const common = {
+    view: "portrait",
+    anchors,
+    width: 1152,
+    height: 1536,
+    assetWidth: 300,
+    assetHeight: 120,
+  };
+  // Wearer's left is the image's right side: no mirroring, the chain runs right.
+  const [left] = defaultOverlayPlacements({
+    ...common,
+    type: "nath_chain",
+    attributes: {},
+    side: "left",
+  });
+  assert.deepEqual([left.x, left.y], [605, 600]);
+  assert.equal(left.mirror, false);
+  assert.equal(left.pivotX, 0);
+  assert.ok(Math.abs(left.width - (815 - 605) * 1.05) < 1e-9, "spans nostril to ear");
+  assert.ok(Math.abs(left.width / left.height - 300 / 120) < 1e-9, "keeps proportions");
+  const [right] = defaultOverlayPlacements({
+    ...common,
+    type: "nath_chain",
+    attributes: {},
+    side: "right",
+  });
+  assert.deepEqual([right.x, right.y, right.mirror], [550, 600, true]);
+  assert.ok(Math.abs(right.width - (550 - 335) * 1.05) < 1e-9);
+
+  const [hair] = defaultOverlayPlacements({
+    ...common,
+    type: "hair_accessory",
+    attributes: { pendantMm: 50 },
+    side: "left",
+  });
+  assert.ok(Math.abs(hair.x - (815 + (575 - 815) * 0.2)) < 1e-9);
+  assert.ok(Math.abs(hair.y - (250 + (645 - 250) * 0.3)) < 1e-9);
+  assert.ok(hair.y < 600 && hair.x > 575, "above the nose line, on the wearer's left");
+  assert.equal(hair.width, 50 * 3);
+  assert.equal(hair.mirror, false);
+  const [hairRight] = defaultOverlayPlacements({
+    ...common,
+    type: "hair_accessory",
+    attributes: {},
+    side: "right",
+  });
+  assert.equal(hairRight.mirror, true);
+  assert.equal(hairRight.width, 40 * 3, "40 mm when no size is recorded");
+  assert.ok(hairRight.x < 575);
+});

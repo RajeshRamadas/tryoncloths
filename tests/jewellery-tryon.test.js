@@ -106,7 +106,7 @@ test("five reviewed prompt snapshots preserve placement, physical scale, exclusi
     assert.equal(jewelleryPrompt(options), expected[name]);
 });
 
-test("all eighteen types select only allowed views; sides, pairs and replacement affect only the selected region", () => {
+test("all twenty types select only allowed views; sides, pairs and replacement affect only the selected region", () => {
   for (const [type, item] of Object.entries(jewelleryTypes)) {
     const options = { type, attributes: attrs, view: chooseView(type) };
     if (item.needsFinger) Object.assign(options, { hand: "right", finger: "ring" });
@@ -782,4 +782,40 @@ test("adapter adds no persistence or logs; J7 exposes it through the guarded rou
   );
   const app = await readFile(new URL("../server/app.js", import.meta.url), "utf8");
   assert.match(app, /installJewelleryRoutes\(\s*app,\s*accountStore/);
+});
+
+test("nath chains and hair accessories name the side and protect the hair", () => {
+  const nath = jewelleryPrompt({
+    type: "nath_chain",
+    attributes: attrs,
+    view: "portrait",
+    side: "right",
+  });
+  assert.match(nath, /ring at the wearer's right nostril only/);
+  assert.match(nath, /chain across the right cheek to the hair above the right ear/);
+  assert.match(nath, /hair \(only where the chain tucks into it\)/);
+  assert.throws(
+    () =>
+      jewelleryPrompt({ type: "nath_chain", attributes: attrs, view: "portrait", side: "both" }),
+    code("jewellery_input"),
+  );
+  const hair = jewelleryPrompt({
+    type: "hair_accessory",
+    attributes: { ...attrs, pendantMm: 45 },
+    view: "portrait",
+    side: "left",
+  });
+  assert.match(hair, /hair on the wearer's left side of the head, above the temple and ear/);
+  assert.match(hair, /Accessory size about 45 mm/);
+  assert.match(hair, /hair \(only where the accessory rests on it\)/);
+  assert.match(
+    jewelleryPrompt({
+      type: "hair_accessory",
+      attributes: attrs,
+      view: "portrait",
+      side: "left",
+      replaceExisting: "hair",
+    }),
+    /existing jewellery in this region: hair/,
+  );
 });

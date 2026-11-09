@@ -16,7 +16,7 @@ No deployment, flag change, APK or live provider request is made by this release
 `GET /api/health` exposes:
 
 - `jewelleryAvailable`: flag + account storage + Gemini + configured image key.
-- `jewelleryContract: 'jewellery-tryon-v1'` and the eighteen `jewelleryTypes`.
+- `jewelleryContract: 'jewellery-tryon-v1'` and the twenty `jewelleryTypes`.
 - Existing catalogue/view availability fields, unchanged in meaning.
 
 These report server configuration, not verified provider quota or visual quality.

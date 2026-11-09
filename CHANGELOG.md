@@ -20,6 +20,10 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
 - Imported tops no longer hide the avatar's arms: the forearms and hands are found on the
   device and drawn in front of the top, with a per-top switch for long sleeves. See
   [clothing layers](docs/CLOTHING_LAYERS.md#arms-in-front-of-tops).
+- Two new jewellery types: **Nath with chain** (nose ring with a chain to the same-side
+  ear) and **Hair accessory / passa** (passa, jhoomar, hair pins, clips). Both work with
+  AI try-on and transparent cut-out overlays, and title hints recognise them. See the
+  [jewellery catalogue](docs/JEWELLERY_CATALOGUE.md).
 
 ## 0.21.0-rc.3
 

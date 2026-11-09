@@ -15,7 +15,7 @@ remains, grouped by what they need.
 | ~~Local pose/silhouette analysis to assist the full-body photo review~~ | Done: on-device pose hints for framing, stance and arms ([body photo check](BODY_PHOTO_CHECK.md)). Still open: calibrating the thresholds on pilot photos, and using the landmarks for occlusion masks or profile matching | [LEVEL_1](LEVEL_1.md) |
 | ~~Aligned transparent garment layers and masks for the clothing compositor~~ | Done: product photos become cleaned, mask-aligned layers on the device ([clothing layers](CLOTHING_LAYERS.md)). Forearms and hands are drawn in front of imported tops. Still open: warping garments to the pose | [LEVEL_1](LEVEL_1.md) |
 | ~~Automatic background removal for jewellery product photos~~ | Done: local, on-device cut-out from plain-backdrop photos ([overlay guide](JEWELLERY_OVERLAY.md#automatic-background-removal)) | [jewellery requirements](jewellery/REQUIREMENTS.md) §9 |
-| Extra jewellery types (nose-ring chains to ear, hair accessories) | Open decision | [jewellery requirements](jewellery/REQUIREMENTS.md) §10 |
+| ~~Extra jewellery types (nose-ring chains to ear, hair accessories)~~ | Done: **Nath with chain** and **Hair accessory / passa** types, confirmed by Rajesh on 2026-11-09 ([catalogue](JEWELLERY_CATALOGUE.md)). Back-of-head juda and choti ornaments remain out of scope | [jewellery requirements](jewellery/REQUIREMENTS.md) §10 |
 | Portrait capture as part of the default avatar flow for jewellery stores (+1 credit per customer) | Open decision | [jewellery requirements](jewellery/REQUIREMENTS.md) §10 |
 | 3D / AR live-camera try-on | Out of scope today; possible later with a separate engine | [jewellery requirements](jewellery/REQUIREMENTS.md) §9 |
 

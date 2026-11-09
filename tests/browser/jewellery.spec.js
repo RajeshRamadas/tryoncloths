@@ -74,6 +74,15 @@ test("mobile jewellery inventory guesses Indian types, saves photos and dimensio
     await expect(
       page.getByRole("heading", { name: "Jewellery catalogue", exact: true }),
     ).toBeVisible();
+    for (const [name, type] of [
+      ["Bridal nath with chain", "nath_chain"],
+      ["Kundan passa", "hair_accessory"],
+    ]) {
+      await page.getByLabel("Item name", { exact: true }).fill(name);
+      await expect(page.getByRole("combobox", { name: "Jewellery type", exact: true })).toHaveValue(
+        type,
+      );
+    }
     await page.getByLabel("Item name", { exact: true }).fill("Gold jhumka");
     await expect(page.getByRole("combobox", { name: "Jewellery type", exact: true })).toHaveValue(
       "jhumka",

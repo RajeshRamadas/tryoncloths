@@ -260,7 +260,7 @@ test("one paid request stores nothing until review; exact approved reuse costs n
       const health = await (await request("/api/health", "GET")).json();
       assert.equal(health.jewelleryAvailable, true);
       assert.equal(health.jewelleryContract, "jewellery-tryon-v1");
-      assert.equal(health.jewelleryTypes.length, 18);
+      assert.equal(health.jewelleryTypes.length, 20);
       assert.equal(app.locals.jewellery instanceof JewelleryStore, true);
     },
   ));
