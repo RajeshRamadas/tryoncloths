@@ -316,7 +316,7 @@ export default function App() {
   }, [notice]);
 
   function accountChanged(next: AccountState) {
-    if (accountIdentity.current !== (next.account?.id || null)) reset();
+    if (accountIdentity.current !== (next.account?.id || null)) { reset(); setNotice(""); }
     accountIdentity.current = next.account?.id || null;
     setAccountState(next);
   }
@@ -550,10 +550,10 @@ export default function App() {
       <main>
         <section className="page-heading">
           <div>
-            <div className="eyebrow">A MORE PERSONAL TRY-ON</div>
-            <h1>Every great fit starts with you.</h1>
+            <div className="eyebrow">YOUR FITTING STUDIO</div>
+            <h1>A great look starts here.</h1>
             <p>
-              Create a customer avatar. Make every visit a little more personal.
+              {jewelleryAvailable ? "Open a saved avatar or create one, then try clothes and jewellery." : "Open a saved avatar or create one, then try clothes."}
             </p>
           </div>
           <button
@@ -564,7 +564,7 @@ export default function App() {
             <Plus size={16} /> New session
           </button>
         </section>
-        {!isNative && <StoreAccount available={accountState.enabled} disabled={generating || exporting} onChange={accountChanged}/>}
+        {!isNative && <StoreAccount available={accountState.enabled} jewelleryEnabled={jewelleryAvailable} disabled={generating || exporting} onChange={accountChanged}/>}
         <div className="saved-avatars-entry"><SavedAvatars key={accountState.account?.id || "local"} cloud={accountState.enabled} disabled={generating || exporting || (accountState.enabled && !accountState.account)} onUse={useSavedAvatar}/><span>Already have an avatar? Reopen it here without generating again.</span></div>
         <nav className="steps" aria-label="Avatar creation steps">
           {["Customer details", "Match & personalize", "Review & save"].map(

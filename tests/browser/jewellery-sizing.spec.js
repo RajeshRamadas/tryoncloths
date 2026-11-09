@@ -16,7 +16,7 @@ async function fixture(page,run,{enabled=true}={}){
   await page.route('**/api/**',async route=>{const u=new URL(route.request().url());try{const response=await route.fetch({url:api+u.pathname+u.search,headers:{...route.request().headers(),host:new URL(api).host,origin:api}});await route.fulfill({response});}catch{await route.abort().catch(()=>{});}});
   try{await page.setViewportSize({width:390,height:844});await page.goto('/');await page.getByLabel('Account email').fill('j11@example.test');await page.getByLabel('Account password').fill('test-password-long');await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page.getByRole('button',{name:'Sign out',exact:true})).toBeVisible();await run({store,account,customer,avatar,calls:()=>calls,setAnchor:value=>{anchor=value;}});}finally{await page.unrouteAll({behavior:'wait'}).catch(()=>{});await new Promise(r=>server.close(r));store.close();await rm(directory,{recursive:true,force:true});}
 }
-async function studio(page,avatar){await page.goto('/jewellery?avatar='+avatar.id);await expect(page.getByRole('heading',{name:'A little detail. A complete feeling.',exact:true})).toBeVisible();}
+async function studio(page,avatar){await page.goto('/jewellery?avatar='+avatar.id);await expect(page.getByRole('heading',{name:'Try jewellery.',exact:true})).toBeVisible();}
 const review=page=>page.getByLabel('I have checked the customer, complexion, proportions and jewellery placement in this preview.',{exact:true});
 const consent=page=>page.getByLabel('The customer agrees to send this avatar view and jewellery product photo to Google Gemini. A new preview uses 1 AI credit; an approved exact match is reused free.',{exact:true});
 

@@ -31,6 +31,13 @@ In the Codex cloud environment, use the existing `/workspace/tryoncloths` checko
 
 ## What works
 
+The [simplified web interface](docs/STUDIO_INTERFACE.md) keeps customer work in
+view: open saved avatars from the start screen, use **Store tools** for management,
+choose **Sample clothes** or **Your products** in the fitting room, and choose one
+source at a time in jewellery. Optional placement/import tools stay collapsed.
+See the [current review and screenshots](docs/testing/simpler-studio/README.md).
+This interface update does not rebuild the Android APK.
+
 - Consented face/full-body photo input, with camera capture offered on supported mobile browsers. JPEG, PNG, and WebP validation; 10 MB browser upload limit, client resizing, and removal controls.
 - Approximate standard-profile suggestion from height/weight, with staff correction. Athletic build is never inferred from weight alone.
 - Male/female template selection with four body profiles and six skin tones each; saved avatars retain the chosen template tone.

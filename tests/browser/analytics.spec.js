@@ -1,3 +1,4 @@
+import {openStoreTools} from '../helpers/studio-navigation.js';
 import {test,expect} from '@playwright/test';
 import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
@@ -22,7 +23,7 @@ async function setup(page,run,{jewelleryEnabled=false}={}){
 }
 
 test('owner filters analytics, downloads displayed data and opts out on mobile; manager and staff controls stay scoped',async({page})=>setup(page,async({store,owner,branch})=>{
- await page.setViewportSize({width:390,height:844});await page.getByRole('link',{name:'Analytics',exact:true}).click();await expect(page.getByRole('heading',{name:'Store analytics',exact:true})).toBeVisible();
+ await page.setViewportSize({width:390,height:844});await openStoreTools(page);await page.getByRole('link',{name:'Analytics',exact:true}).click();await expect(page.getByRole('heading',{name:'Store analytics',exact:true})).toBeVisible();
  const card=label=>page.locator('.analytics-cards article').filter({has:page.getByText(label,{exact:true})}).locator('strong');
  await expect(card('Generated try-ons')).toHaveText('1');await expect(card('Reused try-ons')).toHaveText('1');await expect(card('Sessions with try-ons')).toHaveText('1');await expect(card('Purchase / session')).toHaveText('100%');
  await page.getByLabel('Report store').selectOption('all');await page.getByRole('button',{name:'Apply analytics filters'}).click();await expect(card('Generated try-ons')).toHaveText('2');await expect(card('Purchase / session')).toHaveText('50%');
@@ -46,7 +47,7 @@ test('jewellery analytics filter by the displayed stores, export separate counts
  add(owner,'tryon_generated',{...j,garmentId:'fixture-jewel'});add(owner,'tryon_reused',{...j,garmentId:'fixture-jewel'});add(owner,'jewellery_overlay_applied',{...j,garmentId:'fixture-jewel'});
  add(branch,'jewellery_overlay_applied',{...j,garmentId:'fixture-jewel'});
  add(owner,'look_saved',{...j,lookId:'fixture-set',itemCount:2});add(owner,'jewellery_compared',{...j,outcome:'complete'});add(owner,'jewellery_compared',{...j,outcome:'partial'});add(owner,'look_shared',{...j,lookId:'fixture-set'});add(owner,'purchase_marked',{...j,lookId:'fixture-set',jewelleryItemIds:['fixture-jewel']});
- await page.setViewportSize({width:390,height:844});await page.getByRole('link',{name:'Analytics',exact:true}).click();
+ await page.setViewportSize({width:390,height:844});await openStoreTools(page);await page.getByRole('link',{name:'Analytics',exact:true}).click();
  const section=page.getByRole('region',{name:'Jewellery activity'}),card=label=>section.locator('.analytics-cards article').filter({has:page.getByText(label,{exact:true})}).locator('strong');
  await expect(card('Jewellery AI generated')).toHaveText('1');await expect(card('Jewellery AI reused')).toHaveText('1');await expect(card('Free jewellery overlays')).toHaveText('1');await expect(card('Jewellery sets saved')).toHaveText('1');await expect(card('Completed jewellery comparisons')).toHaveText('1');await expect(card('Partial jewellery comparisons')).toHaveText('1');await expect(card('Jewellery purchased looks')).toHaveText('1');
  await page.getByLabel('Report store').selectOption('all');await page.getByRole('button',{name:'Apply analytics filters'}).click();await expect(card('Free jewellery overlays')).toHaveText('2');await expect(card('Jewellery fitting sessions')).toHaveText('2');

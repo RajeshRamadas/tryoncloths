@@ -1,3 +1,4 @@
+import {openStoreTools} from '../helpers/studio-navigation.js';
 import {test,expect} from '@playwright/test';
 import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
@@ -12,7 +13,7 @@ async function setup(page,run,enabled=true){
  const server=createApp({accountStore:store,accessMode:'public',jewelleryEnabled:enabled,apiKey:'test',tryOn:async()=>{ai++;throw new Error('No AI expected');}}).listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const api='http://127.0.0.1:'+server.address().port;
  await page.route('**/api/**',async route=>{const u=new URL(route.request().url()),response=await route.fetch({url:api+u.pathname+u.search,headers:{...route.request().headers(),host:new URL(api).host,origin:api}});await route.fulfill({response});});
  try{
-  await page.goto('/');await page.getByLabel('Account email').fill('jewels@example.test');await page.getByLabel('Account password').fill('test-password-long');await page.getByRole('button',{name:'Sign in',exact:true}).click();await page.getByRole('link',{name:'Catalogue',exact:true}).click();await expect(page.getByRole('heading',{name:'Store catalogue',exact:true})).toBeVisible();
+  await page.goto('/');await page.getByLabel('Account email').fill('jewels@example.test');await page.getByLabel('Account password').fill('test-password-long');await page.getByRole('button',{name:'Sign in',exact:true}).click();await openStoreTools(page);await page.getByRole('link',{name:'Catalogue',exact:true}).click();await expect(page.getByRole('heading',{name:'Store catalogue',exact:true})).toBeVisible();
   await run({store,owner,photo,ai:()=>ai});
  }finally{await page.unrouteAll({behavior:'wait'});await new Promise(r=>server.close(r));store.close();await rm(dir,{recursive:true,force:true});}
 }

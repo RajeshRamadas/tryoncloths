@@ -1,3 +1,4 @@
+import {useProductSource} from '../helpers/studio-navigation.js';
 import {test,expect} from '@playwright/test';
 import {standardAvatar} from '../../server/app.js';
 import sharp from 'sharp';
@@ -14,7 +15,7 @@ test('female library renders, exports and sends the selected garment without sho
  await page.getByLabel('I have reviewed this standard sample avatar.').check();await page.getByRole('button',{name:'Try clothes',exact:true}).click();
  await expect(page.getByRole('button',{name:'Navy T-shirt Sample',exact:true})).toHaveCount(0);
  const photo=await sharp({create:{width:300,height:400,channels:3,background:'#3f6980'}}).jpeg().toBuffer();
- await page.getByLabel('Upload product photo',{exact:true}).setInputFiles({name:'blue-dress.jpg',mimeType:'image/jpeg',buffer:photo});
+ await useProductSource(page);await page.getByLabel('Upload product photo',{exact:true}).setInputFiles({name:'blue-dress.jpg',mimeType:'image/jpeg',buffer:photo});
  await expect(page.getByRole('group',{name:'Garment type'}).getByRole('button',{name:'Dress',exact:true})).toHaveAttribute('aria-pressed','true');
  await page.getByLabel(/send their avatar and this product photo/).check();await page.getByRole('button',{name:'Put on avatar',exact:true}).click();
  await expect(page.getByText('Dress · blue-dress',{exact:true})).toBeVisible();expect(request.bodyType).toBe('female');expect(request.garmentType).toBe('dress');

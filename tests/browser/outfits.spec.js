@@ -42,6 +42,7 @@ test("outfits select independently, export displayed pixels without AI calls, an
   expect(file.suggestedFilename()).toBe("forme-regular-outfit-avatar.png");
   expect((await sharp(await file.path()).raw().toBuffer()).equals(await sharp(composed).raw().toBuffer())).toBe(true);
   await page.getByRole("button", { name: "Trousers", exact: true }).click();
+  await page.locator(".placement-options summary").click();
   await page.getByLabel("trousers Left / right").fill("25");
   await expect(page.getByRole("button", { name: "Download outfit" })).toBeDisabled();
   await page.getByRole("button", { name: "Back to avatar" }).click();
@@ -63,6 +64,7 @@ test("transparent layers import locally; opaque photos fail and profile changes 
   await page.getByLabel("Import clothing layer").setInputFiles({ name: "Store top.png", mimeType: "image/png", buffer: transparent });
   await expect(page.getByRole("button", { name: "Store top Your layer" })).toHaveAttribute("aria-pressed", "true");
   await approve(page);
+  await page.locator(".placement-options summary").click();
   await page.getByRole("button", { name: "Remove imported layer" }).click();
   await expect(page.getByRole("button", { name: "Store top Your layer" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Download outfit" })).toBeDisabled();
@@ -145,6 +147,7 @@ test("expanded wardrobe searches all categories, renders real colour variants an
   page.on('response', response => { if (response.url().includes('/garments/') && !response.ok()) missing.push(response.url()); });
   await sampleStudio(page);
   const original = await outputBytes(page);
+  await page.locator('.sample-outfits summary').click();
   await expect(page.getByText(/44 sample items · 2,860 possible combinations/)).toBeVisible();
   await expect(page.locator('.garment-grid button')).toHaveCount(21);
   await page.getByLabel('Search sample clothes').fill('red');
@@ -181,6 +184,7 @@ test("complete sample outfits replace all three layers, reset review, and keep i
   const aiRequests = [];
   page.on('request', request => { if (/\/api\/(personalize|tryon)(\?|$)/.test(request.url())) aiRequests.push(request.url()); });
   await sampleStudio(page);
+  await page.locator('.sample-outfits summary').click();
   const outfits = page.getByRole('group', { name: 'Complete sample outfits' });
   for (const name of ['Weekend casual', 'Office classic', 'Earth tones', 'Monochrome', 'Summer light', 'Evening smart', 'Colour pop', 'Soft pastels']) {
     const choice = outfits.getByRole('button', { name: new RegExp('^' + name) });
@@ -213,6 +217,7 @@ test("sample search keeps imported clothing usable and the enlarged catalogue fi
   await expect(page.getByRole('button', { name: 'Store top Your layer', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Clear sample search', exact: true }).click();
   await expect(page.locator('.garment-grid button')).toHaveCount(22);
+  await page.locator('.sample-outfits summary').click();
   await page.getByRole('group', { name: 'Complete sample outfits' }).getByRole('button', { name: /^Earth tones/ }).click();
   await approve(page);
   await page.setViewportSize({ width: 1440, height: 1200 });

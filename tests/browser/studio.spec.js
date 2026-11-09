@@ -9,7 +9,7 @@ test("sample workflow matches, allows correction, reviews and exports the select
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Every great fit starts with you." }),
+    page.getByRole("heading", { name: "A great look starts here." }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: /Select Regular profile/ }),

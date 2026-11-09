@@ -1,3 +1,4 @@
+import {useProductSource, useSampleSource} from '../helpers/studio-navigation.js';
 import { test, expect } from '@playwright/test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -53,7 +54,7 @@ async function fixture(page, work) {
 }
 
 test('saved store clothes and reviewed adaptations reopen without another product read or AI call',async({page})=>fixture(page,async({openAvatar,calls,store,owner})=>{
-  await page.getByLabel('Product link',{exact:true}).fill('https://shop.example/p/42?colour=blue&utm_source=first');
+  await useProductSource(page);await page.getByLabel('Product link',{exact:true}).fill('https://shop.example/p/42?colour=blue&utm_source=first');
   await page.getByRole('button',{name:'Find',exact:true}).click();
   await page.getByLabel('Colour / size / SKU variant').fill('Blue / M');
   await page.getByRole('button',{name:'Save garment to store',exact:true}).click();
@@ -75,12 +76,12 @@ test('saved store clothes and reviewed adaptations reopen without another produc
   await expect(page.getByRole('button',{name:'Download outfit',exact:true})).toBeDisabled();
   // A local clothing layer changes the input pixels: the old cached result must disappear.
   await page.getByRole('button',{name:'Reset outfit',exact:true}).click();
-  await page.getByRole('button',{name:'Navy T-shirt Sample',exact:true}).click();
-  await expect(useSaved).toHaveCount(0);
+  await useSampleSource(page);await page.getByRole('button',{name:'Navy T-shirt Sample',exact:true}).click();
+  await useProductSource(page);await expect(useSaved).toHaveCount(0);
   await expect(page.getByRole('button',{name:'Put on avatar',exact:true})).toBeDisabled();
   await page.getByRole('button',{name:'Reset outfit',exact:true}).click();await expect(useSaved).toBeVisible();
   await page.reload();await openAvatar();
-  await page.getByRole('button',{name:'My store clothes',exact:true}).click();
+  await useProductSource(page);await page.getByRole('button',{name:'My store clothes',exact:true}).click();
   await page.getByLabel('Search clothes').fill('Oxford');
   await page.getByLabel('Filter clothes').selectOption('shirt');
   await expect(page.getByRole('button',{name:/Use Blue Oxford Shirt · Blue \/ M/})).toBeVisible();
@@ -90,7 +91,7 @@ test('saved store clothes and reviewed adaptations reopen without another produc
   await page.getByRole('button',{name:/Use Blue Oxford Shirt · Blue \/ M/}).click();
   await expect(useSaved).toBeVisible();
   // Canonicalized link lookup selects the stored item without a retailer fetch.
-  await page.getByLabel('Product link',{exact:true}).fill('https://shop.example/p/42?utm_source=second&colour=blue');
+  await useProductSource(page);await page.getByLabel('Product link',{exact:true}).fill('https://shop.example/p/42?utm_source=second&colour=blue');
   await page.getByRole('button',{name:'Find',exact:true}).click();
   await expect(page.getByText('Saved garment selected. No website read or AI request was made.')).toBeVisible();
   await expect(useSaved).toBeVisible();expect(calls()).toEqual({links:1,generations:1});
@@ -106,11 +107,11 @@ test('saved store clothes and reviewed adaptations reopen without another produc
 
 test('uploading the same garment again offers the saved photo instead of creating a second catalogue item',async({page})=>fixture(page,async({photo,store,owner,calls})=>{
   const input={name:'oxford-shirt.jpg',mimeType:'image/jpeg',buffer:photo};
-  await page.getByLabel('Upload product photo',{exact:true}).setInputFiles(input);
+  await useProductSource(page);await page.getByLabel('Upload product photo',{exact:true}).setInputFiles(input);
   await page.getByLabel('Garment name',{exact:true}).fill('Photo shirt');
   await page.getByRole('button',{name:'Save garment to store',exact:true}).click();
   await expect(page.getByText('Garment saved to your store. It can be selected for any customer.')).toBeVisible();
-  await page.getByLabel('Upload product photo',{exact:true}).setInputFiles(input);
+  await useProductSource(page);await page.getByLabel('Upload product photo',{exact:true}).setInputFiles(input);
   await expect(page.getByRole('region',{name:'Already saved from this photo'})).toBeVisible();
   await page.getByRole('button',{name:/Use saved garment Photo shirt/}).click();
   await expect(page.getByText('Saved garment selected. No website read or AI request was made.')).toBeVisible();

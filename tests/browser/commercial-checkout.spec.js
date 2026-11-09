@@ -1,3 +1,4 @@
+import {openStoreTools} from '../helpers/studio-navigation.js';
 import {test,expect} from '@playwright/test';import {mkdtemp,rm} from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import {createHmac} from 'node:crypto';
 import {AccountStore} from '../../server/accounts.js';import {createApp} from '../../server/app.js';
 const config={keyId:'rzp_test_mock',keySecret:'test-secret',webhookSecret:'test-hook',supplier:{name:'Forme Test',address:'Bengaluru',billingEmail:'invoice@example.test',stateCode:'29',gstin:'29ABCDE1234F1Z5'},planIds:{'starter:monthly':'plan_starter'}};
@@ -14,7 +15,7 @@ async function details(page){await page.getByLabel('Legal / business name').fill
 test('real trial signup, mocked Checkout, verified pack credit, PDF download, usage and role gates work on mobile',async({page})=>setup(page,async({store,orders})=>{
  const checkoutUrls=[];await page.route('https://checkout.razorpay.com/v1/checkout.js',async route=>{checkoutUrls.push(route.request().url());const signature=createHmac('sha256',config.keySecret).update('order_one|pay_one').digest('hex');await route.fulfill({contentType:'text/javascript',body:`window.Razorpay=class{constructor(options){this.options=options;}open(){this.options.handler({razorpay_order_id:'order_one',razorpay_payment_id:'pay_one',razorpay_signature:'${signature}'});}on(){}};`});});
  await signup(page);expect(checkoutUrls).toHaveLength(0);
- await page.getByRole('link',{name:'Billing',exact:true}).click();await expect(page.getByRole('heading',{name:'30 AI credits available'})).toBeVisible();expect(checkoutUrls).toHaveLength(0);
+ await openStoreTools(page);await page.getByRole('link',{name:'Billing',exact:true}).click();await expect(page.getByRole('heading',{name:'30 AI credits available'})).toBeVisible();expect(checkoutUrls).toHaveLength(0);
  await expect(page.getByRole('button',{name:'Buy 100 credits',exact:true})).toBeDisabled();await details(page);
  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:'test-results/billing-checkout-mobile.png',fullPage:true});

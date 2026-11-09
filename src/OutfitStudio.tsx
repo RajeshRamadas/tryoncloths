@@ -39,6 +39,7 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
   const [layers, setLayers] = useState<Layer[]>([]);
   const [category, setCategory] = useState<Category>("shirt");
   const [search, setSearch] = useState("");
+  const [source, setSource] = useState<"samples" | "products">(catalogue.length ? "samples" : "products");
   const [base, setBase] = useState("");
   // AI try-on results stack on the avatar; each one becomes the next base.
   const [dressed, setDressed] = useState<Dressed[]>(openedLook ? [{image:openedLook.image,label:openedLook.name,previousLayers:[],fromSavedLook:true}] : []);
@@ -80,7 +81,7 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
     update([]);
     setNotice(adaptation?.reuseWarning || (adaptation?.reused ? "Saved adaptation reused without an AI request. Review it before keeping this look." : "Try-on created. Check the face, body and garment before keeping this look."));
   }
-  function undoDress() { const previous = dressed.at(-1); if (!previous) return; setDressed(items => items.slice(0, -1)); update(previous.previousLayers); }
+  function undoDress() { const previous = dressed.at(-1); if (!previous) return; setDressed(items => items.slice(0, -1)); update(previous.previousLayers); if (previous.previousLayers.length) setSource("samples"); }
   function update(next: Layer[]) { setSavedLook(null); setStorageConsent(false); setLayers(next); setReviewed(false); setError(""); setNotice(""); setRendering(true); }
   function select(garment: Garment) { update([...layers.filter(l => l.garment.category !== category), { garment, placement: { ...garment.placement } }]); }
   function selectOutfit(ids: readonly string[]) {
@@ -136,45 +137,8 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
     catch (e) { setError((e as Error).message); }
     finally { setBusy(false); onBusy(false); }
   }
-  return <section className="outfit-studio" hidden={!active} aria-label="Clothing try-on">
-    <header className="outfit-header"><button className="button secondary" disabled={busy} onClick={onBack}><ArrowLeft size={17}/> Back to avatar</button><span className="outfit-free">Sample layers: no AI · Product links: one AI request per garment</span></header>
-    <div className="outfit-intro"><span className="eyebrow">YOUR FITTING ROOM</span><h1 ref={heading} tabIndex={-1}>Find an outfit that feels right.</h1><p>Keep your avatar. Paste a product link from any clothing website, or choose a sample top, trousers and shoes, then check the look together.</p></div>
-    <div className="outfit-layout">
-      <div className="outfit-preview-card"><div className="outfit-preview-title"><strong>{profile.name} · {personalized ? "Customer avatar" : "Sample avatar"}</strong><span>Outfit preview</span></div>
-        <div className="outfit-preview" aria-busy={rendering}>{result && <img src={result} alt="Avatar wearing the selected outfit"/>}{rendering && <span className="outfit-rendering" role="status">Updating preview…</span>}</div>
-        {active && customerId && !layers.length && lastAdaptation?.adaptation?.garmentId && <SizeSuggestion key={`${customerId}-${lastAdaptation.adaptation.garmentId}`} customerId={customerId} garmentId={lastAdaptation.adaptation.garmentId}/>}
-        <p className="outfit-caption">Approximate visual styling. This preview does not predict size, fit or fabric drape.</p>
-      </div>
-      <div className="outfit-controls">
-        {catalogue.length > 0 && <section className="outfit-panel sample-outfits"><h2>Complete outfit combinations</h2>
-          <p>{catalogue.length} sample items · {combinations.toLocaleString("en-IN")} possible combinations. Try a complete look, or mix individual pieces below. No AI credits used.</p>
-          <div className="sample-outfit-grid" role="group" aria-label="Complete sample outfits">{SAMPLE_OUTFITS.map(outfit => <button key={outfit.id} disabled={busy} aria-pressed={layers.length === 3 && outfit.garments.every(id => layers.some(l => l.garment.id === id))} onClick={() => selectOutfit(outfit.garments)}>
-            <span className="outfit-swatches" aria-hidden="true">{outfit.garments.map(id => { const g = catalogue.find(item => item.id === id)!; return <GarmentThumbnail key={id} garment={g}/>; })}</span>
-            <strong>{outfit.name}</strong><small>{outfit.garments.map(id => catalogue.find(item => item.id === id)!.name).join(" · ")}</small>
-          </button>)}</div>
-        </section>}
-        <LinkTryOn sessionId={sessionId} catalogueEnabled={catalogueEnabled} avatarId={avatarId} bodyType={profile.id.startsWith("f-") ? "female" : "male"} base={result} disabled={busy || rendering} available={tryOn.available} providerLabel={tryOn.providerLabel} onBusy={value => { setBusy(value); onBusy(value); }} onResult={dress}/>
-        {dressed.length > 0 && <section className="outfit-panel"><h2>Wearing from product links</h2>
-          <ol className="dressed-list">{dressed.map((item, index) => <li key={index}>{item.label}</li>)}</ol>
-          <button className="button secondary" disabled={busy} onClick={undoDress}><Undo2 size={16}/> Undo last garment</button>
-        </section>}
-        <section className="outfit-panel"><h2><Shirt size={20}/> Choose your clothes</h2><p>{profile.id.startsWith("f-") ? "Use product-photo try-on or import prepared layers. Female sample garments are being prepared." : "Realistic AI-created samples are included. Import prepared layers to preview your store’s garments."}</p>
-          <div className="outfit-tabs" role="group" aria-label="Clothing category">{(["shirt", "trousers", "shoes"] as Category[]).map(c => <button key={c} disabled={busy} aria-pressed={category === c} onClick={() => setCategory(c)}>{categoryNames[c]}</button>)}</div>
-          {catalogue.length > 0 && <label className="outfit-search">Search sample clothes<input type="search" placeholder="Try navy, jeans or sneakers" value={search} disabled={busy} onChange={e => setSearch(e.target.value)}/></label>}
-          {catalogue.length > 0 && <p className="sample-match-count" role="status">{sampleMatches.length} sample {layerNames[category]} options{search.trim() ? ` matching “${search.trim()}”` : ""}. Imported layers stay available below.</p>}
-          <div className="garment-grid"><button className="garment-tile" disabled={busy} aria-pressed={!selected} onClick={() => update(layers.filter(l => l.garment.category !== category))}><span className="garment-original"><RotateCcw/></span><strong>{originalNames[category]}</strong></button>
-            {[...sampleMatches, ...imports.filter(g => g.category === category)].map(g => <button key={g.id} className="garment-tile" disabled={busy} aria-pressed={selected?.garment.id === g.id} onClick={() => select(g)}><GarmentThumbnail garment={g}/><strong>{g.name}</strong><small>{g.imported ? "Your layer" : "Sample"}</small></button>)}</div>
-          {catalogue.length > 0 && sampleMatches.length === 0 && <p>No sample clothes match this search in {categoryNames[category].toLowerCase()}. Try another colour or category, or <button className="text-button" onClick={() => setSearch("")} disabled={busy}>Clear sample search</button>.</p>}
-          <input ref={input} type="file" accept="image/png,image/webp" aria-label="Import clothing layer" className="outfit-file" disabled={busy} onChange={e => { void upload(e.target.files?.[0]); e.target.value = ""; }}/>
-          <button className="button secondary full-width" disabled={busy} onClick={() => input.current?.click()}><Upload size={16}/> Import {layerNames[category]} layer</button>
-          <p className="small-footnote">Transparent PNG or WebP; import footwear as a pair. Front view in the avatar’s pose. Layers stay in this session. Importing does not remove backgrounds or reshape garments.</p>
-        </section>
-        {selected && <section className="outfit-panel"><h2>Adjust placement</h2><p>Line up the neckline, waistband or shoes. Check that the original clothes are covered.</p>
-          {([['x', 'Left / right', -30, 100], ['y', 'Up / down', -30, 100], ['width', 'Width', 5, 150], ['height', 'Length', 5, 150]] as const).map(([key, label, min, max]) => <label className="outfit-slider" key={key}><span>{label}<output>{Math.round(selected.placement[key] * 100)}%</output></span><input aria-label={`${category} ${label}`} type="range" min={min} max={max} step="0.5" value={selected.placement[key] * 100} disabled={busy} onChange={e => adjust(key, Number(e.target.value))}/></label>)}
-          <button className="button secondary" disabled={busy} onClick={() => select(selected.garment)}>Reset placement</button>
-          {selected.garment.imported && <button className="button back-button" disabled={busy} onClick={() => { setImports(items => items.filter(g => g.id !== selected.garment.id)); update(layers.filter(l => l !== selected)); }}>Remove imported layer</button>}
-        </section>}
-        <section className="outfit-panel"><h2>Keep this look</h2><label className="consent"><input type="checkbox" checked={reviewed} disabled={busy || rendering || !result || (!layers.length && !dressed.length)} onChange={e => setReviewed(e.target.checked)}/><span>I have checked clothing placement and approve this outfit preview.</span></label>
+  const exportPanel = (
+        <section className="outfit-panel outfit-export-panel"><h2>Keep this look</h2><label className="consent"><input type="checkbox" checked={reviewed} disabled={busy || rendering || !result || (!layers.length && !dressed.length)} onChange={e => setReviewed(e.target.checked)}/><span>I have checked clothing placement and approve this outfit preview.</span></label>
           {catalogueEnabled&&<ExportBrandingChoice onChange={setExportFooter}/>}
           <button className="button primary full-width" disabled={!reviewed || !result || rendering || busy || (!layers.length && !dressed.length)} onClick={() => void save()}><Download size={17}/>{busy ? "Preparing…" : isNative ? "Save or share outfit" : "Download outfit"}</button>
           {avatarId && <div className="save-avatar-box">
@@ -189,6 +153,56 @@ export default function OutfitStudio({ active, templateTone='medium', catalogueE
           {savedLook && <ShareLook key={savedLook} lookId={savedLook} disabled={busy || rendering}/>}
           {error && <p role="alert" className="error-banner">{error}</p>}{notice && <p role="status">{notice}</p>}
         </section>
+  );
+  return <section className="outfit-studio" hidden={!active} aria-label="Clothing try-on">
+    <header className="outfit-header"><button className="button secondary" disabled={busy} onClick={onBack}><ArrowLeft size={17}/> Back to avatar</button><span className="outfit-free">Sample clothes: free · Product try-on: AI credits</span></header>
+    <div className="outfit-intro"><span className="eyebrow">YOUR FITTING ROOM</span><h1 ref={heading} tabIndex={-1}>Try a new look.</h1><p>Choose clothes, check the preview, then save your favourite look.</p></div>
+    <nav className="fitting-mobile-nav" aria-label="Fitting room shortcuts"><a href="#outfit-choices">Choose clothes</a><a href="#outfit-result">View avatar & save</a></nav>
+    <div className="outfit-layout">
+      <div className="outfit-preview-card" id="outfit-result"><div className="outfit-preview-title"><strong>{profile.name} · {personalized ? "Customer avatar" : "Sample avatar"}</strong><span>Outfit preview</span></div>
+        <div className="outfit-preview" aria-busy={rendering}>{result && <img src={result} alt="Avatar wearing the selected outfit"/>}{rendering && <span className="outfit-rendering" role="status">Updating preview…</span>}</div>
+        {active && customerId && !layers.length && lastAdaptation?.adaptation?.garmentId && <SizeSuggestion key={`${customerId}-${lastAdaptation.adaptation.garmentId}`} customerId={customerId} garmentId={lastAdaptation.adaptation.garmentId}/>}
+        <p className="outfit-selected-items">{layers.length ? layers.map(l => l.garment.name).join(" · ") : dressed.length ? "Your look is ready to review." : "Choose your first item to begin."}</p>
+        <p className="outfit-caption">Approximate visual styling. This preview does not predict size, fit or fabric drape.</p>
+        {exportPanel}
+      </div>
+      <div className="outfit-controls" id="outfit-choices">
+        <div className="fitting-source" role="group" aria-label="Clothing source"><button aria-label={catalogue.length ? "Sample clothes" : "Prepared layers"} aria-pressed={source === "samples"} disabled={busy} onClick={() => setSource("samples")}><strong>{catalogue.length ? "Sample clothes" : "Prepared layers"}</strong><span aria-hidden="true">{catalogue.length ? `Free · ${catalogue.length} styles` : "Import transparent clothes · free"}</span></button><button aria-label="Your products" aria-pressed={source === "products"} disabled={busy} onClick={() => setSource("products")}><strong>Your products</strong><span aria-hidden="true">Photo, link or saved catalogue</span></button></div>
+        <div hidden={source !== "samples"} className="fitting-source-panel">
+        {catalogue.length > 0 && <details className="outfit-panel sample-outfits"><summary><h2>Complete outfit combinations</h2><span>8 ready-made looks</span></summary>
+          <p>{catalogue.length} sample items · {combinations.toLocaleString("en-IN")} possible combinations. Try a complete look, or mix individual pieces below. No AI credits used.</p>
+          <div className="sample-outfit-grid" role="group" aria-label="Complete sample outfits">{SAMPLE_OUTFITS.map(outfit => <button key={outfit.id} disabled={busy} aria-pressed={layers.length === 3 && outfit.garments.every(id => layers.some(l => l.garment.id === id))} onClick={() => selectOutfit(outfit.garments)}>
+            <span className="outfit-swatches" aria-hidden="true">{outfit.garments.map(id => { const g = catalogue.find(item => item.id === id)!; return <GarmentThumbnail key={id} garment={g}/>; })}</span>
+            <strong>{outfit.name}</strong><small>{outfit.garments.map(id => catalogue.find(item => item.id === id)!.name).join(" · ")}</small>
+          </button>)}</div>
+        </details>}
+        <section className="outfit-panel"><h2><Shirt size={20}/> Choose your clothes</h2><p>{profile.id.startsWith("f-") ? "Use product-photo try-on or import prepared layers. Female sample garments are being prepared." : "Pick a top, trousers and shoes. Switch colours as often as you like — no AI credits used."}</p>
+          <div className="outfit-tabs" role="group" aria-label="Clothing category">{(["shirt", "trousers", "shoes"] as Category[]).map(c => <button key={c} disabled={busy} aria-pressed={category === c} onClick={() => setCategory(c)}>{categoryNames[c]}</button>)}</div>
+          {catalogue.length > 0 && <label className="outfit-search">Search sample clothes<input type="search" placeholder="Try navy, jeans or sneakers" value={search} disabled={busy} onChange={e => setSearch(e.target.value)}/></label>}
+          {catalogue.length > 0 && <p className="sample-match-count" role="status">{sampleMatches.length} sample {layerNames[category]} options{search.trim() ? ` matching “${search.trim()}”` : ""}.{sampleMatches.length > 6 ? " Scroll to see more colours." : ""} Imported layers stay available below.</p>}
+          <div className="garment-grid" tabIndex={0} role="group" aria-label="Clothing options"><button className="garment-tile" disabled={busy} aria-pressed={!selected} onClick={() => update(layers.filter(l => l.garment.category !== category))}><span className="garment-original"><RotateCcw/></span><strong>{originalNames[category]}</strong></button>
+            {[...sampleMatches, ...imports.filter(g => g.category === category)].map(g => <button key={g.id} className="garment-tile" disabled={busy} aria-pressed={selected?.garment.id === g.id} onClick={() => select(g)}><GarmentThumbnail garment={g}/><strong>{g.name}</strong><small>{g.imported ? "Your layer" : "Sample"}</small></button>)}</div>
+          {catalogue.length > 0 && sampleMatches.length === 0 && <p>No sample clothes match this search in {categoryNames[category].toLowerCase()}. Try another colour or category, or <button className="text-button" onClick={() => setSearch("")} disabled={busy}>Clear sample search</button>.</p>}
+          <details className="import-clothing"><summary>Import a prepared clothing layer</summary>
+          <input ref={input} type="file" accept="image/png,image/webp" aria-label="Import clothing layer" className="outfit-file" disabled={busy} onChange={e => { void upload(e.target.files?.[0]); e.target.value = ""; }}/>
+          <button className="button secondary full-width" disabled={busy} onClick={() => input.current?.click()}><Upload size={16}/> Import {layerNames[category]} layer</button>
+          <p className="small-footnote">Transparent PNG or WebP; import footwear as a pair. Front view in the avatar’s pose. Layers stay in this session. Importing does not remove backgrounds or reshape garments.</p></details>
+        </section>
+        </div>
+        <div hidden={source !== "products"} className="fitting-source-panel">
+        <LinkTryOn sessionId={sessionId} catalogueEnabled={catalogueEnabled} avatarId={avatarId} bodyType={profile.id.startsWith("f-") ? "female" : "male"} base={result} disabled={busy || rendering} available={tryOn.available} providerLabel={tryOn.providerLabel} onBusy={value => { setBusy(value); onBusy(value); }} onResult={dress}/>
+
+        </div>
+        {dressed.length > 0 && <section className="outfit-panel"><h2>Current look</h2>
+          <ol className="dressed-list">{dressed.map((item, index) => <li key={index}>{item.label}</li>)}</ol>
+          <button className="button secondary" disabled={busy} onClick={undoDress}><Undo2 size={16}/> Undo last garment</button>
+        </section>}
+        {selected && <details className="outfit-panel placement-options"><summary><h2>Adjust placement</h2><span>Only if the fit needs a nudge</span></summary><p>Line up the neckline, waistband or shoes. Check that the original clothes are covered.</p>
+          {([['x', 'Left / right', -30, 100], ['y', 'Up / down', -30, 100], ['width', 'Width', 5, 150], ['height', 'Length', 5, 150]] as const).map(([key, label, min, max]) => <label className="outfit-slider" key={key}><span>{label}<output>{Math.round(selected.placement[key] * 100)}%</output></span><input aria-label={`${category} ${label}`} type="range" min={min} max={max} step="0.5" value={selected.placement[key] * 100} disabled={busy} onChange={e => adjust(key, Number(e.target.value))}/></label>)}
+          <button className="button secondary" disabled={busy} onClick={() => select(selected.garment)}>Reset placement</button>
+          {selected.garment.imported && <button className="button back-button" disabled={busy} onClick={() => { setImports(items => items.filter(g => g.id !== selected.garment.id)); update(layers.filter(l => l !== selected)); }}>Remove imported layer</button>}
+        </details>}
+
       </div>
     </div>
   </section>;
