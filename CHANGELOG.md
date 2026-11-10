@@ -52,6 +52,16 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
   use them, marked as photo estimates and capped at Medium confidence. Editing the
   girths after taping marks them as taped. See
   [measurements in cm](docs/BODY_PHOTO_CHECK.md#measurements-in-cm).
+- Sarees for women and blazers and suits for men (and women) across the studio. AI
+  try-on has new **Blazer** and **Suit** types layered over the customer's shirt, and the
+  saree prompt now describes the drape (front pleats, pallu over the left shoulder). The
+  outfit studio has **Sarees** (female profiles) and **Blazers & suits** layer tabs: a
+  blazer is measured across its open front and drawn over the top, a saree hangs from the
+  shoulders to the floor over the top and bottoms. Size charts accept blazer and suit
+  rows: blazers are sized by chest, suits flag a jacket/trouser size split, and a saree
+  with no chart is suggested as free size with the blouse measured. Product names such as
+  "navy blazer", "two-piece suit" and "salwar suit" are sorted correctly. See
+  [sarees, blazers and suits](docs/SAREES_AND_SUITS.md).
 
 ## 0.21.0-rc.3
 

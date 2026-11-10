@@ -27,10 +27,29 @@ const FEET_Y = 919;
 export const TORSO_WIDTH = 0.53 * 310;
 export const WAIST_WIDTH = 0.71 * 230;
 export const SHOES_WIDTH = 230;
+// A blazer or suit jacket sits over a shirt, so its body is a little wider than a top's.
+export const OUTER_EASE = 1.08;
+// Top of a saree layer (blouse shoulders). A saree is placed by its length from here to the
+// floor, with its front pleats centred on the body.
+const DRAPE_TOP_Y = TOP_Y - 6;
 
 /** Default category box in standard-pose pixels. */
 export function garmentBox(category, profile) {
   const broad = profileBreadth(profile);
+  if (category === "outer")
+    return {
+      x: CENTRE_X - 155 * OUTER_EASE * broad,
+      y: TOP_Y - 4,
+      width: 310 * OUTER_EASE * broad,
+      height: 350,
+    };
+  if (category === "drape")
+    return {
+      x: CENTRE_X - 125 * broad,
+      y: DRAPE_TOP_Y,
+      width: 250 * broad,
+      height: FEET_Y - DRAPE_TOP_Y,
+    };
   return category === "shirt"
     ? { x: CENTRE_X - 155 * broad, y: TOP_Y, width: 310 * broad, height: 316 }
     : category === "trousers"
@@ -138,8 +157,10 @@ const median = (values) => {
 /**
  * Measure the opaque run that contains the layer's centre on each row of a band, so
  * sleeves separated from the body by a gap are left out. Returns medians in pixels.
+ * With `bridge`, a gap at the centre line narrower than that share of the width (the open
+ * front of a blazer) is spanned, so both front panels are measured.
  */
-function centralRun(rgba, width, height, from, to) {
+function centralRun(rgba, width, height, from, to, bridge = 0) {
   const widths = [],
     centres = [],
     mid = width >> 1;
@@ -156,6 +177,22 @@ function centralRun(rgba, width, height, from, to) {
       r = seed;
     while (l > 0 && solid(l - 1)) l--;
     while (r < width - 1 && solid(r + 1)) r++;
+    if (bridge && !solid(mid)) {
+      // The seed is one front panel; look across the gap for the other.
+      const step = seed < mid ? 1 : -1;
+      let other = step > 0 ? r + 1 : l - 1;
+      while (other >= 0 && other < width && !solid(other)) other += step;
+      const gap = step > 0 ? other - r - 1 : l - other - 1;
+      if (other >= 0 && other < width && gap <= width * bridge) {
+        if (step > 0) {
+          r = other;
+          while (r < width - 1 && solid(r + 1)) r++;
+        } else {
+          l = other;
+          while (l > 0 && solid(l - 1)) l--;
+        }
+      }
+    }
     widths.push(r - l + 1);
     centres.push((l + r + 1) / 2);
   }
@@ -164,20 +201,29 @@ function centralRun(rgba, width, height, from, to) {
 
 /**
  * Anchor measurements from a trimmed layer's mask, in layer pixels.
- * Tops: the torso below the sleeves (60–85% of the height).
+ * Tops: the torso below the sleeves (60–85% of the height). Blazers and suit jackets: the
+ * torso at 55–80%, across an open front. Sarees: the centre of the pleats (65–85%).
  * Trousers: the waistband (top 1–6%). Shoes: the whole pair.
  */
 export function layerAnchors(rgba, width, height, category) {
   if (category === "shoes") return { width, centre: width / 2 };
-  const band = category === "shirt" ? [0.6, 0.85] : [0.01, 0.06];
-  const run = centralRun(rgba, width, height, band[0], band[1]);
+  // Sarees are placed by length; only the centre of the pleats is measured, below the knees
+  // where a pallu hanging at the side has usually ended.
+  if (category === "drape") {
+    const run = centralRun(rgba, width, height, 0.65, 0.85);
+    return { width, centre: run.width >= width * 0.15 ? run.centre : width / 2 };
+  }
+  const band =
+    category === "shirt" ? [0.6, 0.85] : category === "outer" ? [0.55, 0.8] : [0.01, 0.06];
+  const run = centralRun(rgba, width, height, band[0], band[1], category === "outer" ? 0.25 : 0);
   // A layer without a usable body measurement falls back to its full width.
   if (!(run.width >= width * 0.15)) return { width, centre: width / 2 };
   return run;
 }
 
 /**
- * Placement that lines the measured torso, waistband or shoe pair up with the body.
+ * Placement that lines the measured torso, waistband or shoe pair up with the body. Sarees
+ * are scaled to hang from the shoulders to the floor, centred on the pleats.
  * The layer keeps its aspect ratio, except that long trousers are shortened to end above the
  * feet, as the sample trousers do.
  */
@@ -185,14 +231,25 @@ export function alignedPlacement(category, profile, personalized, layer, anchors
   const broad = profileBreadth(profile),
     frame = poseFrame(personalized);
   const target =
-    (category === "shirt" ? TORSO_WIDTH : category === "trousers" ? WAIST_WIDTH : SHOES_WIDTH) *
-    broad;
-  const scale = target / anchors.width;
-  const width = layer.width * scale;
+    (category === "shirt"
+      ? TORSO_WIDTH
+      : category === "outer"
+        ? TORSO_WIDTH * OUTER_EASE
+        : category === "trousers"
+          ? WAIST_WIDTH
+          : SHOES_WIDTH) * broad;
+  // A saree hangs from the shoulders to the floor, whatever its width in the photo.
+  const scale =
+    category === "drape" ? (FEET_Y - DRAPE_TOP_Y) / layer.height : target / anchors.width;
+  // Sarees keep their length and widen with the body profile.
+  const across = category === "drape" ? scale * broad : scale;
+  const width = layer.width * across;
   let height = layer.height * scale;
-  const x = CENTRE_X - anchors.centre * scale;
+  const x = CENTRE_X - anchors.centre * across;
   let y;
   if (category === "shirt") y = TOP_Y;
+  else if (category === "outer") y = TOP_Y - 4;
+  else if (category === "drape") y = DRAPE_TOP_Y;
   else if (category === "trousers") {
     y = WAIST_Y;
     height = Math.min(height, HEM_LIMIT_Y - WAIST_Y);

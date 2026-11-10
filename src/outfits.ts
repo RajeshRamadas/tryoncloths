@@ -7,7 +7,13 @@ import { poseMapping, referenceLandmarks, triangleAffine, warpTriangles } from "
 import type { PoseSegmentation } from "./body-pose";
 import { CUTOUT_DEFAULT_TOLERANCE, removeBackground, transparentShare } from "./jewellery-cutout";
 
-export type Category = "shirt" | "trousers" | "shoes";
+/** shirt: tops; outer: blazers and suit jackets over a top; drape: sarees. */
+export type Category = "shirt" | "outer" | "drape" | "trousers" | "shoes";
+/** Drawing order: shoes under trouser cuffs, the top over the waistband, a saree over the
+ * blouse and bottoms, and a blazer or suit jacket over everything. */
+export const LAYER_ORDER: Category[] = ["shoes", "trousers", "shirt", "drape", "outer"];
+/** Layers drawn over the arms, so the forearms and hands can come back in front. */
+export const ARM_LAYERS: Category[] = ["shirt", "outer", "drape"];
 export type Placement = { x: number; y: number; width: number; height: number };
 export type Garment = {
   id: string;
@@ -23,7 +29,7 @@ export type Garment = {
 export type Layer = {
   garment: Garment;
   placement: Placement;
-  /** Draw the avatar's forearms and hands over this top (imported tops default to on). */
+  /** Draw the avatar's forearms and hands over this top, blazer or saree (imported ones default to on). */
   armsInFront?: boolean;
   /** Warp the layer from the template's body to the avatar's detected pose. */
   fitToPose?: boolean;
@@ -101,8 +107,7 @@ export async function renderOutfit(
     reference && reference.template !== base && layers.some((l) => l.fitToPose)
       ? await poseLandmarkPair(base, reference)
       : null;
-  // Shoes beneath trouser cuffs; the shirt hem sits over the waistband.
-  for (const category of ["shoes", "trousers", "shirt"] as Category[]) {
+  for (const category of LAYER_ORDER) {
     const layer = layers.find((item) => item.garment.category === category);
     if (!layer) continue;
     const image = await loadImage(await garmentSource(layer.garment));
@@ -120,7 +125,7 @@ export async function renderOutfit(
     if (map) drawWarped(ctx, image, rect, map);
     else ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height);
   }
-  if (layers.some((l) => l.garment.category === "shirt" && l.armsInFront)) {
+  if (layers.some((l) => ARM_LAYERS.includes(l.garment.category) && l.armsInFront)) {
     const arms = await armOverlay(base);
     if (arms) ctx.drawImage(arms, 0, 0, canvas.width, canvas.height);
   }
