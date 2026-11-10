@@ -1,3 +1,4 @@
+import TryOnTabs from "./TryOnTabs";
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, Undo2, Download, Search, Gem } from "lucide-react";
 import JewellerySizeHelp from "./JewellerySizeHelp";
@@ -870,7 +871,10 @@ export default function JewelleryStudio() {
   return (
     <main className="billing-page jewellery-studio">
       <nav className="jewellery-navigation">
-        <a href="/">← Back to studio</a>
+        <a className="button secondary" href="/">
+          ← Back to studio
+        </a>
+        {avatar && <TryOnTabs current="jewellery" avatarId={avatar} disabled={!!busy} />}
         <details>
           <summary>More options</summary>
           <div>

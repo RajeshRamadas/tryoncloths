@@ -122,6 +122,7 @@ test("Android sends both photos once with consent; failures block export; approv
     .toBuffer();
   const providerPixels = await sharp(output).removeAlpha().raw().toBuffer();
   expect(exportedPixels.equals(providerPixels)).toBe(true);
+  await page.getByRole("button", { name: "Change frame", exact: true }).click();
   await page.getByRole("button", { name: "Select Slim profile" }).click();
   await expect(share).toBeDisabled();
   expect(requests).toHaveLength(2);

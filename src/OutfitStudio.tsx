@@ -1,3 +1,4 @@
+import TryOnTabs from "./TryOnTabs";
 import { ExportBrandingChoice } from "./branding";
 import SizeSuggestion from "./SizeSuggestion";
 import PurchaseLook from "./PurchaseLook";
@@ -501,6 +502,9 @@ export default function OutfitStudio({
         <button className="button secondary" disabled={busy} onClick={onBack}>
           <ArrowLeft size={17} /> Back to avatar
         </button>
+        {jewelleryEnabled && avatarId && (
+          <TryOnTabs current="clothes" avatarId={avatarId} disabled={busy} />
+        )}
         <span className="outfit-free">Sample clothes: free · Product try-on: AI credits</span>
       </header>
       <div className="outfit-intro">

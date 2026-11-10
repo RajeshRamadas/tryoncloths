@@ -29,11 +29,16 @@ async function setup(page, run) {
   const api = `http://127.0.0.1:${server.address().port}`;
   await page.route("**/api/**", async (r) => {
     const u = new URL(r.request().url());
-    const response = await r.fetch({
-      url: api + u.pathname + u.search,
-      headers: { ...r.request().headers(), host: new URL(api).host, origin: api },
-    });
-    await r.fulfill({ response });
+    try {
+      const response = await r.fetch({
+        url: api + u.pathname + u.search,
+        headers: { ...r.request().headers(), host: new URL(api).host, origin: api },
+      });
+      await r.fulfill({ response });
+    } catch {
+      // A test can finish while background requests are still in flight.
+      await r.abort().catch(() => {});
+    }
   });
   try {
     await page.goto("/");
@@ -43,6 +48,8 @@ async function setup(page, run) {
     await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
     await run({ store, owner, calls: () => calls });
   } finally {
+    // Let in-flight proxied requests finish before the API server closes.
+    await page.unrouteAll({ behavior: "wait" });
     await new Promise((r) => server.close(r));
     store.close();
     await rm(directory, { recursive: true, force: true });
@@ -168,4 +175,48 @@ test("switching customer clears photos and duplicate numbers show a useful error
     await page.getByRole("button", { name: "Save customer", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("already has a customer");
     expect(store.customers.list(owner)).toHaveLength(2);
+  }));
+
+test("finding a returning customer lists their saved avatars and opens one without generating again", async ({
+  page,
+}) =>
+  setup(page, async ({ store, owner, calls }) => {
+    await createCustomer(page);
+    const customer = store.customers.list(owner)[0];
+    await store.save(owner, {
+      image: `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`,
+      customerId: customer.id,
+      name: "Asha festive",
+      profileId: "regular",
+      heightCm: 164,
+      weightKg: 62,
+      source: "generated",
+    });
+    await page.getByRole("button", { name: "Clear customer selection", exact: true }).click();
+    await page.getByLabel("Customer mobile number").fill("98765");
+    await page.getByRole("button", { name: "Find customer", exact: true }).click();
+    await page.getByRole("button", { name: "Asha Rao · +919876543210", exact: true }).click();
+    const saved = page.getByRole("region", { name: "Saved avatars for Asha Rao" });
+    await expect(saved.getByText("Asha festive", { exact: true })).toBeVisible();
+    await saved.getByRole("button", { name: "Open Asha festive for try-on", exact: true }).click();
+    await expect(page.getByText(/Avatar opened without an AI request/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Try clothes" })).toBeVisible();
+    expect(calls()).toBe(0);
+  }));
+
+test("a link with a saved avatar id reopens it for try-on after sign-in", async ({ page }) =>
+  setup(page, async ({ store, owner, calls }) => {
+    const saved = await store.save(owner, {
+      image: `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`,
+      name: "Linked avatar",
+      profileId: "regular",
+      heightCm: 170,
+      weightKg: 68,
+      source: "generated",
+    });
+    await page.goto("/?avatar=" + encodeURIComponent(saved.id));
+    await expect(page.getByText(/Avatar opened without an AI request/)).toBeVisible();
+    await expect(page.getByText("170 cm / 68 kg", { exact: true })).toBeVisible();
+    expect(new URL(page.url()).search).toBe("");
+    expect(calls()).toBe(0);
   }));

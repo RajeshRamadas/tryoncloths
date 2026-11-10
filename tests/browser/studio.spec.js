@@ -44,6 +44,7 @@ test("sample workflow matches, allows correction, reviews and exports the select
   const metadata = await sharp(imagePath).metadata();
   expect(metadata.width).toBe(384);
   expect(metadata.height).toBe(942);
+  await page.getByRole("button", { name: "Change frame", exact: true }).click();
   await page.getByRole("button", { name: /Select Slim profile/ }).click();
   await expect(downloadButton).toBeDisabled();
   expect(errors).toEqual([]);
@@ -165,6 +166,7 @@ test("personalization is explicit, generates only on request, and approval reset
       name: "The customer approves the face, body and skin tone of this avatar.",
     })
     .check();
+  await page.getByRole("button", { name: "Change frame", exact: true }).click();
   await page.getByRole("button", { name: /Select Slim profile/ }).click();
   await expect(
     page.getByText("Generate again with the current photos and selected body."),
