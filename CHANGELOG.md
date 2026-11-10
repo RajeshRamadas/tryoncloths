@@ -4,6 +4,11 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
 
 ## Unreleased
 
+- Store-tool pages (catalogue, billing, usage, analytics, branding, shop page editor,
+  WhatsApp and others) and the try-on studios share the Forme header with **Back to
+  studio**, neutral card borders and styled links. The public shop page uses the same
+  calm palette with the store's colour on **Try it on** buttons, image tiles and a
+  contact card with **Call store** and **Get directions** buttons.
 - New look for the store studio: one shared set of colours, type sizes, corners and
   shadows across every screen (see [design system](docs/DESIGN_SYSTEM.md)). Text is
   larger and higher-contrast (nothing below 11px, hints at 12–13px), buttons and inputs
