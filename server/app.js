@@ -34,7 +34,13 @@ import { geminiPersonalize, GEMINI_REFERENCE_VERSION } from "./gemini.js";
 import { providerConfig } from "./provider-config.js";
 import { installAccountRoutes, accountUser } from "./accounts.js";
 import { meter, validRequestId, BillingError, billingFailure } from "./billing.js";
-import { geminiTryOn, garmentTypes, normalizeAvatar, TRYON_CONTRACT } from "./gemini-tryon.js";
+import {
+  geminiTryOn,
+  femaleOnlyGarments,
+  garmentTypes,
+  normalizeAvatar,
+  TRYON_CONTRACT,
+} from "./gemini-tryon.js";
 import { normalizeGarmentImage, LinkError } from "./product-link.js";
 
 import { readProductLinkWithFallback } from "./browser-reader.js";
@@ -616,12 +622,11 @@ export function createApp({
       return res.status(400).json({ error: "Choose an enabled body library." });
     if (
       !Object.hasOwn(garmentTypes, req.body.garmentType) ||
-      (["dress", "skirt", "saree", "lehenga", "blouse"].includes(req.body.garmentType) &&
-        bodyType !== "female")
+      (femaleOnlyGarments.includes(req.body.garmentType) && bodyType !== "female")
     )
       return res.status(400).json({
         error:
-          "Choose what to put on: shirt, T-shirt, trousers, jeans, shoes or another listed type.",
+          "Choose what to put on: shirt, T-shirt, trousers, blazer, suit, shoes or another listed type. Sarees, dresses, skirts, lehengas and blouses need the female body library.",
       });
     try {
       if (accountStore) validateSession(accountStore, owner, req.body);

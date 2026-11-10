@@ -20,6 +20,8 @@ APK was rebuilt.
 3. Enter nominal chart targets in cm and a label such as S, M, L or 32. Use the
    same measurement fields throughout a range. The chart type must match the
    product's stored type: shirt and tshirt, for example, are different lookups.
+   Blazers, suits and sarees have their own rules; see
+   [sarees, blazers and suits](SAREES_AND_SUITS.md#size-charts-and-suggestions).
 4. Reopen a customer-associated avatar, select a saved catalogue product, and try
    it on. Under the result, **Suggested M · High** expands to explain the dimensions,
    ease allowance and alternatives. Guidance appears for the most recent stored

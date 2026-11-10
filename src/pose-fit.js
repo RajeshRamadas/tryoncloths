@@ -31,18 +31,25 @@ const CORNERS = [
 ];
 const BODY_POINTS = {
   shirt: [...CORNERS, [0.5, 0], [0.5, 0.5], [0.5, 1]],
+  outer: [...CORNERS, [0.5, 0], [0.5, 0.5], [0.5, 1]],
+  drape: [...CORNERS, [0.5, 0], [0.5, 1]],
   trousers: [...CORNERS, [0.5, 0], [0.5, 1]],
   shoes: CORNERS,
 };
 // Bones that bend a layer beyond its body quad: [from joint, to joint]. Each bone carries
 // the garment around it the way the avatar's limb moved.
+const SLEEVES = [
+  [L_SHOULDER, L_ELBOW],
+  [L_ELBOW, L_WRIST],
+  [R_SHOULDER, R_ELBOW],
+  [R_ELBOW, R_WRIST],
+];
 const BONES = {
-  shirt: [
-    [L_SHOULDER, L_ELBOW],
-    [L_ELBOW, L_WRIST],
-    [R_SHOULDER, R_ELBOW],
-    [R_ELBOW, R_WRIST],
-  ],
+  shirt: SLEEVES,
+  // Blazer and suit-jacket sleeves follow the arms like a shirt's.
+  outer: SLEEVES,
+  // A saree hangs from the shoulders: its pleats and pallu do not follow the knees.
+  drape: [],
   trousers: [
     [L_HIP, L_KNEE],
     [L_KNEE, L_ANKLE],
@@ -63,7 +70,10 @@ const visible = (l) => (l?.visibility ?? 1) >= 0.5;
 function bodyQuad(category, lm) {
   const pick = (...indices) =>
     indices.every((i) => lm?.[i] && visible(lm[i])) ? indices.map((i) => lm[i]) : null;
-  if (category === "shirt") return pick(L_SHOULDER, R_SHOULDER, R_HIP, L_HIP);
+  if (category === "shirt" || category === "outer")
+    return pick(L_SHOULDER, R_SHOULDER, R_HIP, L_HIP);
+  // Sarees: shoulders to ankles, so the drape moves and lengthens with the whole body.
+  if (category === "drape") return pick(L_SHOULDER, R_SHOULDER, R_ANKLE, L_ANKLE);
   if (category === "trousers") return pick(L_HIP, R_HIP, R_ANKLE, L_ANKLE);
   // Shoes: a square standing on the ankle line, so the pair moves and scales with the feet.
   const ankles = pick(L_ANKLE, R_ANKLE);
@@ -227,7 +237,9 @@ export function poseMapping(category, reference, actual, aspect = 1) {
   if (!bones.length) return body;
   // The body fit owns the torso (shirt) or the waistband (trousers); limbs take over outside.
   const core =
-    category === "shirt" ? from.map(square) : [square(reference[L_HIP]), square(reference[R_HIP])];
+    category === "shirt" || category === "outer"
+      ? from.map(square)
+      : [square(reference[L_HIP]), square(reference[R_HIP])];
   const coreDistance = (p) =>
     core.length === 4 ? quadDistance(p, core) : segmentDistance(p, core[0], core[1]);
   const soft = (BLEND * Math.hypot((from[1].x - from[0].x) * aspect, from[1].y - from[0].y)) ** 2;

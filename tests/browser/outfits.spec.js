@@ -603,3 +603,43 @@ test("sample search keeps imported clothing usable and the enlarged catalogue fi
     .toBe(true);
   await page.screenshot({ path: "test-results/colour-wardrobe-mobile.png" });
 });
+
+test("a blazer layer is drawn over the chosen top, and sarees are offered only to female profiles", async ({
+  page,
+}) => {
+  await sampleStudio(page);
+  await expect(page.getByRole("button", { name: "Sarees", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Navy T-shirt Sample" }).click();
+  await page.getByRole("button", { name: "Blazers & suits", exact: true }).click();
+  await expect(page.getByRole("button", { name: "No blazer" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  const withTop = await outputBytes(page);
+  // An open-front blazer: two panels with a gap down the centre.
+  const photo = await sharp(
+    Buffer.from(
+      '<svg width="500" height="560" xmlns="http://www.w3.org/2000/svg"><rect width="500" height="560" fill="#f4f3ef"/><path d="M150 60 L235 40 L235 520 L150 520 Z M265 40 L350 60 L350 520 L265 520 Z M150 60 L60 150 L80 470 L130 470 L150 200 Z M350 60 L440 150 L420 470 L370 470 L350 200 Z" fill="#1f2a44"/></svg>',
+    ),
+  )
+    .jpeg({ quality: 85 })
+    .toBuffer();
+  await page
+    .getByLabel("Import clothing layer")
+    .setInputFiles({ name: "Navy blazer.jpg", mimeType: "image/jpeg", buffer: photo });
+  await expect(page.getByRole("button", { name: "Navy blazer Your layer" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect.poll(async () => (await outputBytes(page)).equals(withTop)).toBe(false);
+  await page.locator(".placement-options summary").click();
+  await expect(
+    page.getByLabel(/Show forearms and hands in front of this blazer or suit jacket/),
+  ).toBeChecked();
+  // The top stays selected underneath the blazer.
+  await page.getByRole("button", { name: "Shirts & tops", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Navy T-shirt Sample" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});

@@ -50,7 +50,35 @@ export function estimateSizeMeasurements({ heightCm, weightKg, bodyProfileId } =
     ),
   };
 }
-export function recommendSize(charts, measurements, { estimated = false, photo = false } = {}) {
+// How much each field counts for a clothing type (default 1). Blazers are bought by chest:
+// the front can sit open, so the waist counts for half. Saree charts describe the stitched
+// blouse (bust) and petticoat (waist); the drape itself is free size.
+export const fieldWeights = {
+  blazer: { chestCm: 1, waistCm: 0.5, hipCm: 0.25 },
+  suit: { chestCm: 1, waistCm: 1, hipCm: 0.5 },
+  saree: { chestCm: 1, waistCm: 1, hipCm: 0.25 },
+};
+const typeNotes = {
+  blazer:
+    "Blazers are sized by chest; the waist counts for half because the front can sit open. Check sleeve length on the customer.",
+  suit: "A suit pairs the jacket chest with the trouser waist.",
+  saree:
+    "Saree rows compare the blouse bust and petticoat waist; the saree drape itself is free size.",
+};
+/** Saree with no chart: the drape fits everyone; only the blouse is sized. */
+export const freeSizeSaree = {
+  size: "Free size",
+  confidence: "Medium",
+  reason:
+    "Sarees are usually free size: about 5.5 m of fabric, with 0.8 m more if a blouse piece is included. The blouse is stitched to the customer's bust and waist, so record those for the tailor. Add a saree chart for this brand to compare ready-made blouse sizes.",
+  alternatives: [],
+  source: "rule",
+};
+export function recommendSize(
+  charts,
+  measurements,
+  { estimated = false, photo = false, garmentType } = {},
+) {
   const fields = fitFields.filter(
     (field) =>
       Number.isFinite(measurements?.[field]) &&
@@ -65,23 +93,18 @@ export function recommendSize(charts, measurements, { estimated = false, photo =
       alternatives: [],
       source: "unavailable",
     };
+  const weight = (field) => fieldWeights[garmentType]?.[field] ?? 1;
+  const miss = (row, field) =>
+    Math.max(0, Math.abs(measurements[field] - row.measurements[field]) - ease[field]) /
+    row.measurements[field];
+  const order = (a, b) =>
+    a.score - b.score || (a.sortOrder || 0) - (b.sortOrder || 0) || a.size.localeCompare(b.size);
   const scored = charts
     .map((row) => ({
       ...row,
-      score: fields.reduce(
-        (sum, field) =>
-          sum +
-          Math.max(0, Math.abs(measurements[field] - row.measurements[field]) - ease[field]) /
-            row.measurements[field],
-        0,
-      ),
+      score: fields.reduce((sum, field) => sum + weight(field) * miss(row, field), 0),
     }))
-    .sort(
-      (a, b) =>
-        a.score - b.score ||
-        (a.sortOrder || 0) - (b.sortOrder || 0) ||
-        a.size.localeCompare(b.size),
-    );
+    .sort(order);
   const best = scored[0],
     next = scored[1];
   let confidence = "Low";
@@ -97,6 +120,19 @@ export function recommendSize(charts, measurements, { estimated = false, photo =
     // Girths estimated from a photo are never better than a taped single measurement.
     if (photo && confidence === "High") confidence = "Medium";
   }
+  // A suit sold as one size can fit the jacket and the trousers differently.
+  let split = "";
+  if (garmentType === "suit" && fields.includes("chestCm") && fields.includes("waistCm")) {
+    const by = (field) =>
+      charts.map((row) => ({ ...row, score: miss(row, field) })).sort(order)[0].size;
+    const jacket = by("chestCm"),
+      trousers = by("waistCm");
+    if (jacket !== trousers) {
+      split = ` The jacket fits ${jacket} by chest but the trousers fit ${trousers} by waist: ask whether this suit is sold as separates, or plan a trouser alteration.`;
+      if (confidence === "High") confidence = "Medium";
+    }
+  }
+  const note = typeNotes[garmentType] ? ` ${typeNotes[garmentType]}` : "";
   const comparison = fields
     .map(
       (field) =>
@@ -109,7 +145,7 @@ export function recommendSize(charts, measurements, { estimated = false, photo =
   return {
     size: best.size,
     confidence,
-    reason,
+    reason: reason + note + split,
     alternatives: scored
       .slice(1, 4)
       .map((r) => ({ size: r.size, score: Number(r.score.toFixed(6)) })),
@@ -167,7 +203,7 @@ const chart = (row) =>
       }
     : null;
 export const sizeChartTemplate =
-  "brand,type,size,chest_cm,waist_cm,hip_cm,sort_order\nExample,shirt,S,92,76,,10\nExample,shirt,M,98,84,,20\nExample,shirt,L,104,92,,30\n";
+  "brand,type,size,chest_cm,waist_cm,hip_cm,sort_order\nExample,shirt,S,92,76,,10\nExample,shirt,M,98,84,,20\nExample,shirt,L,104,92,,30\nExample,blazer,38,96,84,,10\nExample,blazer,40,101,89,,20\nExample,suit,38R,96,82,,10\nExample,suit,40R,101,87,,20\nExample,saree,Blouse 36,91,76,,10\n";
 export class SizeStore {
   constructor(store) {
     this.store = store;
@@ -371,6 +407,7 @@ export class SizeStore {
           .all(account.id, brandKey(garment.brand.trim().replace(/\s+/g, " ")), garment.garmentType)
           .map(chart)
       : [];
+    if (!charts.length && garment.garmentType === "saree") return { ...freeSizeSaree };
     if (!charts.length)
       throw fail(
         "No size chart matches this product’s brand and clothing type. Add the brand and chart in Catalogue / Size charts.",
@@ -379,7 +416,10 @@ export class SizeStore {
       );
     const input = customer.measurements || {};
     if (fitFields.some((f) => Number.isFinite(input[f])))
-      return recommendSize(charts, input, { photo: input.fitSource === "photo" });
+      return recommendSize(charts, input, {
+        photo: input.fitSource === "photo",
+        garmentType: garment.garmentType,
+      });
     const avatar = this.db
       .prepare(
         "SELECT profileId,heightCm,weightKg FROM avatars WHERE account=? AND customer=? ORDER BY savedAt DESC,id LIMIT 1",
@@ -391,7 +431,7 @@ export class SizeStore {
       ...source,
       bodyProfileId: input.bodyProfileId || avatar?.profileId,
     });
-    return recommendSize(charts, estimate, { estimated: true });
+    return recommendSize(charts, estimate, { estimated: true, garmentType: garment.garmentType });
   }
   purchase(account, id, input) {
     const size = text(input?.size, "the purchased size", 30);

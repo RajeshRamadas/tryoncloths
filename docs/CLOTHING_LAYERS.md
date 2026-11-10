@@ -1,7 +1,8 @@
 # Clothing layers
 
 The outfit studio composites clothing layers over the avatar in the browser: shoes first,
-then trousers, then the top. Nothing is sent to an AI provider, and no credit is used.
+then trousers, the top, a saree, and a blazer or suit jacket last. See
+[sarees, blazers and suits](SAREES_AND_SUITS.md) for those categories. Nothing is sent to an AI provider, and no credit is used.
 
 ## Importing a layer
 
@@ -36,6 +37,8 @@ Layers are placed by measuring the mask instead of using its outline:
 | Top      | The opaque run through the centre at 60–85% of the height, below the sleeves | The torso width and body centre line; top edge at the shoulders |
 | Trousers | The opaque run through the centre at the top 1–6% (waistband) | The waist width and centre line; long trousers are shortened to end above the feet |
 | Shoes    | The whole pair | The feet, with the soles on the ground line |
+| Blazer or suit jacket | The torso at 55–80% of the height, across an open front | The torso width plus 8% and the centre line; top edge at the shoulders |
+| Saree    | The front pleats at 65–85% of the height | Hangs from the shoulders to the floor; widened for fuller profiles |
 
 Target widths come from the shipped sample layers (torso 53% of the top box, waistband
 71% of the trouser box) and scale with the selected body profile. The unit tests check

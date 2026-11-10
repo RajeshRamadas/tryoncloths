@@ -12,6 +12,7 @@ import {
   importGarment,
   renderOutfit,
   sampleCatalogue,
+  ARM_LAYERS,
   type Category,
   type CutoutSettings,
   type Garment,
@@ -28,9 +29,33 @@ import { saveLook } from "./account-avatars";
 import { type OpenedLook } from "./saved-avatars";
 import { saveAdaptation, type Adaptation } from "./store-garments";
 
-const categoryNames = { shirt: "Shirts & tops", trousers: "Trousers", shoes: "Shoes" };
-const layerNames = { shirt: "top", trousers: "trousers", shoes: "shoes" };
-const originalNames = { shirt: "Original top", trousers: "Original bottoms", shoes: "Bare feet" };
+const categoryNames = {
+  shirt: "Shirts & tops",
+  outer: "Blazers & suits",
+  drape: "Sarees",
+  trousers: "Trousers",
+  shoes: "Shoes",
+};
+const layerNames = {
+  shirt: "top",
+  outer: "blazer or suit jacket",
+  drape: "saree",
+  trousers: "trousers",
+  shoes: "shoes",
+};
+const originalNames = {
+  shirt: "Original top",
+  outer: "No blazer",
+  drape: "No saree",
+  trousers: "Original bottoms",
+  shoes: "Bare feet",
+};
+const importHints: Partial<Record<Category, string>> = {
+  outer:
+    "A blazer or suit jacket goes over the top you picked. For a suit, import the jacket here and the suit trousers under Trousers.",
+  drape:
+    "Use a photo of the saree draped on a model or mannequin, front view, shoulders to floor. It is placed by its length and covers the top and bottoms; a flat or folded saree cannot be draped here, so use product-photo try-on for that.",
+};
 
 function GarmentThumbnail({ garment }: { garment: Garment }) {
   const [source, setSource] = useState("");
@@ -137,6 +162,14 @@ export default function OutfitStudio({
   const [notice, setNotice] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const female = profile.id.startsWith("f-");
+  // Sarees are for the female body library; blazers and suits suit both.
+  const categories: Category[] = female
+    ? ["shirt", "drape", "outer", "trousers", "shoes"]
+    : ["shirt", "outer", "trousers", "shoes"];
+  useEffect(() => {
+    if (!categories.includes(category)) setCategory("shirt");
+  }, [female, category]);
   const selected = layers.find((item) => item.garment.category === category);
   const sampleMatches = catalogue.filter(
     (g) => g.category === category && g.name.toLowerCase().includes(search.trim().toLowerCase()),
@@ -232,8 +265,8 @@ export default function OutfitStudio({
       {
         garment,
         placement: { ...garment.placement },
-        // Imported tops are flat product shapes, so the arms go in front by default.
-        armsInFront: !!garment.imported && garment.category === "shirt",
+        // Imported tops, blazers and sarees are flat product shapes, so the arms go in front.
+        armsInFront: !!garment.imported && ARM_LAYERS.includes(garment.category),
         fitToPose: !!garment.imported,
       },
     ]);
@@ -632,7 +665,7 @@ export default function OutfitStudio({
                   : "Pick a top, trousers and shoes. Switch colours as often as you like — no AI credits used."}
               </p>
               <div className="outfit-tabs" role="group" aria-label="Clothing category">
-                {(["shirt", "trousers", "shoes"] as Category[]).map((c) => (
+                {categories.map((c) => (
                   <button
                     key={c}
                     disabled={busy}
@@ -724,8 +757,9 @@ export default function OutfitStudio({
                   A transparent PNG or WebP layer, or a front-view product photo on a plain backdrop
                   (JPEG, PNG or WebP), whose background is removed on this device. Import footwear
                   as a pair. Layers line up with the neckline, waistband or feet and stay in this
-                  session. Garments are not reshaped to the pose.
+                  session.
                 </p>
+                {importHints[category] && <p className="small-footnote">{importHints[category]}</p>}
               </details>
             </section>
           </div>
@@ -821,7 +855,7 @@ export default function OutfitStudio({
                   </span>
                 </label>
               )}
-              {category === "shirt" && (
+              {ARM_LAYERS.includes(category) && (
                 <label className="consent">
                   <input
                     type="checkbox"
@@ -836,8 +870,8 @@ export default function OutfitStudio({
                     }
                   />
                   <span>
-                    Show forearms and hands in front of this top. Turn off for long sleeves that
-                    already cover the arms.
+                    Show forearms and hands in front of this {layerNames[category]}. Turn off for
+                    long sleeves that already cover the arms.
                   </span>
                 </label>
               )}

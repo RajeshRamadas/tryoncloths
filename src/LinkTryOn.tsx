@@ -5,7 +5,12 @@ import { requestApi } from "./api";
 import { readPhoto } from "./images";
 import { readProductPhotos } from "./product-photos";
 
-import { garmentChoices, guessGarmentType, type GarmentType } from "./garment-types";
+import {
+  femaleOnlyGarments,
+  garmentChoices,
+  guessGarmentType,
+  type GarmentType,
+} from "./garment-types";
 import GarmentCatalogue, { MatchSuggestions } from "./GarmentCatalogue";
 import {
   getGarment,
@@ -139,11 +144,7 @@ export default function LinkTryOn({
     setGarmentName(nextTitle.slice(0, 100));
     setMatches(emptyMatches());
     const guess = guessGarmentType(nextTitle);
-    setGarmentType(
-      bodyType === "male" && ["dress", "skirt", "saree", "lehenga", "blouse"].includes(guess || "")
-        ? null
-        : guess,
-    );
+    setGarmentType(bodyType === "male" && femaleOnlyGarments.includes(guess || "") ? null : guess);
     setConsent(false);
   }
 
@@ -157,9 +158,7 @@ export default function LinkTryOn({
     applyProduct(g.name, [{ source: "catalogue", image: g.image }], g.sourceUrl);
     setVariant(g.variant);
     setSaved(g);
-    const supported =
-      bodyType === "female" ||
-      !["dress", "skirt", "saree", "lehenga", "blouse"].includes(g.garmentType);
+    const supported = bodyType === "female" || !femaleOnlyGarments.includes(g.garmentType);
     setGarmentType(supported ? g.garmentType : null);
     if (!supported) setSaved(null);
     setNotice(
@@ -498,11 +497,7 @@ export default function LinkTryOn({
           <h3 className="link-question">What should the avatar wear from this?</h3>
           <div className="garment-chips" role="group" aria-label="Garment type">
             {garmentChoices
-              .filter(
-                ([id]) =>
-                  bodyType === "female" ||
-                  !["dress", "skirt", "saree", "lehenga", "blouse"].includes(id),
-              )
+              .filter(([id]) => bodyType === "female" || !femaleOnlyGarments.includes(id))
               .map(([id, label]) => (
                 <button
                   key={id}
