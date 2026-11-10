@@ -43,8 +43,8 @@ import OutfitStudio from "./OutfitStudio";
 import AvatarViews from "./AvatarViews";
 import SavedAvatars from "./SavedAvatars";
 import StoreAccount, { type AccountState } from "./StoreAccount";
-import { saveAccountAvatar } from "./account-avatars";
-import { saveAvatar, type AvatarDetails, type OpenedLook } from "./saved-avatars";
+import { accountAvatarImage, listAccountAvatars, saveAccountAvatar } from "./account-avatars";
+import { avatarDataUrl, saveAvatar, type AvatarDetails, type OpenedLook } from "./saved-avatars";
 import { App as NativeApp } from "@capacitor/app";
 
 type PhotoKind = "face" | "body";
@@ -397,6 +397,27 @@ export default function App() {
     setManual(true);
   }
   useEffect(() => setEditFrame(false), [step]);
+  // The jewellery studio's Clothes tab links back here with ?avatar=<id>; open that saved
+  // avatar for the signed-in store without generating again.
+  const linkedAvatar = useRef<string | null>(new URLSearchParams(location.search).get("avatar"));
+  useEffect(() => {
+    const id = linkedAvatar.current;
+    if (!id || !accountState.account) return;
+    linkedAvatar.current = null;
+    history.replaceState(null, "", location.pathname);
+    void (async () => {
+      try {
+        const item = (await listAccountAvatars()).find((a) => a.id === id);
+        if (!item) throw new Error("That saved avatar is no longer available.");
+        useSavedAvatar(await avatarDataUrl(await accountAvatarImage(id)), {
+          ...item,
+          avatarId: id,
+        });
+      } catch (e) {
+        setError((e as Error).message);
+      }
+    })();
+  }, [accountState.account]);
   function goTo(next: number) {
     if (next === 3 && needsCustomerGeneration) {
       setError("Generate the customer avatar before review. No personalized result is ready yet.");
