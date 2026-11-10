@@ -169,3 +169,30 @@ test("switching customer clears photos and duplicate numbers show a useful error
     await expect(page.getByRole("alert")).toContainText("already has a customer");
     expect(store.customers.list(owner)).toHaveLength(2);
   }));
+
+test("finding a returning customer lists their saved avatars and opens one without generating again", async ({
+  page,
+}) =>
+  setup(page, async ({ store, owner, calls }) => {
+    await createCustomer(page);
+    const customer = store.customers.list(owner)[0];
+    await store.save(owner, {
+      image: `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`,
+      customerId: customer.id,
+      name: "Asha festive",
+      profileId: "regular",
+      heightCm: 164,
+      weightKg: 62,
+      source: "generated",
+    });
+    await page.getByRole("button", { name: "Clear customer selection", exact: true }).click();
+    await page.getByLabel("Customer mobile number").fill("98765");
+    await page.getByRole("button", { name: "Find customer", exact: true }).click();
+    await page.getByRole("button", { name: "Asha Rao · +919876543210", exact: true }).click();
+    const saved = page.getByRole("region", { name: "Saved avatars for Asha Rao" });
+    await expect(saved.getByText("Asha festive", { exact: true })).toBeVisible();
+    await saved.getByRole("button", { name: "Open Asha festive for try-on", exact: true }).click();
+    await expect(page.getByText(/Avatar opened without an AI request/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Try clothes" })).toBeVisible();
+    expect(calls()).toBe(0);
+  }));

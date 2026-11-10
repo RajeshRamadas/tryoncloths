@@ -3200,6 +3200,45 @@ dialog::backdrop {
   min-height: 80px;
   resize: vertical;
 }
+.customer-avatars {
+  margin: 12px 0;
+}
+.customer-avatars h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-700);
+}
+.customer-avatars ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.customer-avatars li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+}
+.customer-avatars li > span {
+  display: grid;
+  min-width: 0;
+}
+.customer-avatars li small {
+  color: var(--gray-500);
+  font-size: 12px;
+}
+.customer-avatars-status {
+  font-size: 13px;
+  color: var(--gray-600);
+  margin: 12px 0;
+}
 .customer-actions {
   display: flex;
   flex-wrap: wrap;

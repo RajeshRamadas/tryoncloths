@@ -1,3 +1,5 @@
+import CustomerAvatars from "./CustomerAvatars";
+import type { AvatarDetails } from "./saved-avatars";
 import JewelleryMeasurementFields from "./JewelleryMeasurementFields";
 import { jewelleryMeasurementsForm, jewelleryMeasurementsInput } from "./jewellery-sizing";
 import { profiles } from "./profiles";
@@ -10,6 +12,7 @@ type Props = {
   jewelleryEnabled?: boolean;
   onSelect: (customer: CustomerRef | null, measurements?: Customer["measurements"]) => void;
   onUpdate: (customer: CustomerRef) => void;
+  onUseAvatar?: (image: string, details: AvatarDetails) => void;
 };
 export default function CustomerPicker({
   selected,
@@ -17,6 +20,7 @@ export default function CustomerPicker({
   jewelleryEnabled = false,
   onSelect,
   onUpdate,
+  onUseAvatar,
 }: Props) {
   const mounted = useRef(true);
   useEffect(() => {
@@ -204,6 +208,15 @@ export default function CustomerPicker({
             </button>
           </div>
         </div>
+      )}
+      {selected && onUseAvatar && (
+        <CustomerAvatars
+          key={selected.id}
+          customerId={selected.id}
+          customerName={selected.name}
+          disabled={locked}
+          onUse={onUseAvatar}
+        />
       )}
       {confirmErase && (
         <div className="saved-delete">

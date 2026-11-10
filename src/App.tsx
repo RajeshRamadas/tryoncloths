@@ -811,6 +811,7 @@ export default function App() {
                           disabled={generating || exporting}
                           onSelect={selectCustomer}
                           onUpdate={setCustomer}
+                          onUseAvatar={useSavedAvatar}
                         />
                       )}
                       <div className="field-label-row">
