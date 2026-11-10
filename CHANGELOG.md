@@ -4,6 +4,12 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
 
 ## Unreleased
 
+- New look for the store studio: one shared set of colours, type sizes, corners and
+  shadows across every screen (see [design system](docs/DESIGN_SYSTEM.md)). Text is
+  larger and higher-contrast (nothing below 11px, hints at 12–13px), buttons and inputs
+  share one size, the header is compact and stays at the top, store tools have icons,
+  and on phones the header and step bar fit on one line. The out-of-date "clothing
+  try-on · next phase" card is gone.
 - Every store now has its own public shop page at `/shop/<address>` with its branding,
   shop photos, about text, opening hours and in-stock catalogue. Each product has a
   **Try it on** button that opens WhatsApp (or calls the store) to book a try-on. Owners

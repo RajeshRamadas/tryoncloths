@@ -1,6 +1,21 @@
 import CreditBadge from "./CreditBadge";
 import { useEffect, useRef, useState } from "react";
-import { Settings2, X } from "lucide-react";
+import {
+  BarChart3,
+  CreditCard,
+  Gauge,
+  Gem,
+  Images,
+  MessageCircle,
+  Palette,
+  Ruler,
+  Settings2,
+  Shirt,
+  Store,
+  Users,
+  Wallet,
+  X,
+} from "lucide-react";
 import { requestApi } from "./api";
 import StaffManagement from "./StaffManagement";
 export type StoreUser = {
@@ -249,14 +264,23 @@ export default function StoreAccount({
                 <h3>Products & sharing</h3>
                 <div className="store-tool-links">
                   <a href="/catalogue">
+                    <span className="tool-icon" aria-hidden="true">
+                      <Shirt size={18} />
+                    </span>
                     Catalogue<span aria-hidden="true">Clothing, stock and prices</span>
                   </a>
                   {jewelleryEnabled && (
                     <a href="/jewellery-catalogue">
+                      <span className="tool-icon" aria-hidden="true">
+                        <Gem size={18} />
+                      </span>
                       Jewellery catalogue<span aria-hidden="true">Saved pieces and metals</span>
                     </a>
                   )}
                   <a href="/whatsapp">
+                    <span className="tool-icon" aria-hidden="true">
+                      <MessageCircle size={18} />
+                    </span>
                     WhatsApp<span aria-hidden="true">Share looks with customers</span>
                   </a>
                 </div>
@@ -266,21 +290,39 @@ export default function StoreAccount({
                   <h3>Daily management</h3>
                   <div className="store-tool-links">
                     <a href="/shop-page">
+                      <span className="tool-icon" aria-hidden="true">
+                        <Store size={18} />
+                      </span>
                       Shop page<span aria-hidden="true">Public page, photos and opening hours</span>
                     </a>
                     <a href="/catalogue-photos">
+                      <span className="tool-icon" aria-hidden="true">
+                        <Images size={18} />
+                      </span>
                       Catalogue photos<span aria-hidden="true">Prepare product images</span>
                     </a>
                     <a href="/size-charts">
+                      <span className="tool-icon" aria-hidden="true">
+                        <Ruler size={18} />
+                      </span>
                       Size charts<span aria-hidden="true">Measurements and size advice</span>
                     </a>
                     <a href="/analytics">
+                      <span className="tool-icon" aria-hidden="true">
+                        <BarChart3 size={18} />
+                      </span>
                       Analytics<span aria-hidden="true">Store activity and results</span>
                     </a>
                     <a href="/usage">
+                      <span className="tool-icon" aria-hidden="true">
+                        <Gauge size={18} />
+                      </span>
                       Usage<span aria-hidden="true">Review credit usage</span>
                     </a>
                     <a href="/shopper-spending">
+                      <span className="tool-icon" aria-hidden="true">
+                        <Wallet size={18} />
+                      </span>
                       Shopper spending<span aria-hidden="true">Set customer spending limits</span>
                     </a>
                   </div>
@@ -291,9 +333,15 @@ export default function StoreAccount({
                   <h3>Store settings</h3>
                   <div className="store-tool-links">
                     <a href="/billing">
+                      <span className="tool-icon" aria-hidden="true">
+                        <CreditCard size={18} />
+                      </span>
                       Billing<span aria-hidden="true">Plan, credits and invoices</span>
                     </a>
                     <a href="/branding">
+                      <span className="tool-icon" aria-hidden="true">
+                        <Palette size={18} />
+                      </span>
                       Branding<span aria-hidden="true">Logo, colours and contact details</span>
                     </a>
                   </div>
@@ -308,7 +356,7 @@ export default function StoreAccount({
                   aria-expanded={staffOpen}
                   onClick={() => setStaffOpen(!staffOpen)}
                 >
-                  {staffOpen ? "Close staff" : "Staff"}
+                  <Users size={16} /> {staffOpen ? "Close staff" : "Staff"}
                 </button>
                 {staffOpen && (
                   <StaffManagement

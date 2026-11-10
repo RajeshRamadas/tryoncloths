@@ -13,7 +13,6 @@ import {
   ChevronDown,
   CircleHelp,
   Expand,
-  ImagePlus,
   Leaf,
   LoaderCircle,
   LockKeyhole,
@@ -1599,20 +1598,6 @@ export default function App() {
                     Illustrative profiles, not calibrated sizing. Height and weight never suggest
                     Athletic; the photo estimate or staff can.
                   </p>
-                </section>
-                <section className="next-card">
-                  <span className="next-label">MADE FOR WHAT’S NEXT</span>
-                  <div className="next-card-icon">
-                    <ImagePlus size={22} />
-                  </div>
-                  <h3>
-                    One avatar.
-                    <br /> More possibilities.
-                  </h3>
-                  <p>An approved avatar becomes the starting point for future outfit previews.</p>
-                  <span className="coming-soon">
-                    Clothing try-on · Next phase <ArrowRight size={13} />
-                  </span>
                 </section>
               </aside>
             </div>
