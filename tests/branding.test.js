@@ -215,6 +215,7 @@ test("owner branding persists, leaves account identity unchanged, removes logos,
       { primaryColor: { toString: "invalid" } },
       { phone: "javascript:1234567890" },
       { exportFooter: "false" },
+      { portraitWithAvatar: "true" },
       { displayName: "" },
       { watermark: false },
     ])
@@ -230,6 +231,11 @@ test("owner branding persists, leaves account identity unchanged, removes logos,
       .run(a.user.id, a.id);
     await store.branding.update(a, { logo: null });
     assert.equal(store.branding.read(a.id).hasLogo, false);
+    // Portrait with every avatar is off until the owner turns it on, and survives other edits.
+    assert.equal(store.branding.read(a.id).portraitWithAvatar, false);
+    await store.branding.update(a, { portraitWithAvatar: true });
+    await store.branding.update(a, { displayName: "Brand & Co" });
+    assert.equal(store.branding.read(a.id).portraitWithAvatar, true);
   }));
 test("branding/export routes enforce active-store roles, ownership, origins and server-controlled watermark flags", async () =>
   fixture(async ({ store, a, b, request, set, image, ca, cb, cm }) => {

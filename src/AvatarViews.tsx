@@ -47,11 +47,14 @@ export default function AvatarViews({
   embedded = false,
   avatarId: fixedAvatar,
   initialKind = "portrait",
+  initialFace = "",
   onApproved,
 }: {
   embedded?: boolean;
   avatarId?: string;
   initialKind?: Kind;
+  /** A consented face photo already in this session, used until staff choose another. */
+  initialFace?: string;
   onApproved?: (kind: Kind, image: string) => void;
 } = {}) {
   const [available, setAvailable] = useState<boolean | null>(null),
@@ -63,7 +66,7 @@ export default function AvatarViews({
   const [saved, setSaved] = useState<Saved[]>([]),
     [savedImage, setSavedImage] = useState(""),
     [preview, setPreview] = useState<Preview | null>(null),
-    [face, setFace] = useState(""),
+    [face, setFace] = useState(initialFace),
     [tone, setTone] = useState("medium");
   const [consent, setConsent] = useState(false),
     [avatarReviewed, setAvatarReviewed] = useState(false),
@@ -580,6 +583,12 @@ export default function AvatarViews({
                     src={face}
                     alt="Fresh customer face reference"
                   />
+                )}
+                {face && face === initialFace && (
+                  <p className="small-footnote">
+                    Using the face photo from this avatar session. Choose another photo above if the
+                    ears or neck are hidden.
+                  </p>
                 )}
                 <label className="consent">
                   <input

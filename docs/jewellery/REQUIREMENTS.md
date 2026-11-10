@@ -154,6 +154,6 @@ Priority: **P0** first jewellery release · **P1** soon after · **P2** later.
 ## 10. Dependencies and open decisions
 
 - Depends on commercial **C1–C8** (stores, staff, credits, customers, share links). The jewellery release can ship earlier with the current per-IP limits if needed, but billing should come first.
-- Decide whether portrait capture becomes part of the default avatar flow for jewellery stores (one extra credit per customer).
+- ~~Decide whether portrait capture becomes part of the default avatar flow for jewellery stores (one extra credit per customer).~~ Decided on 2026-11-10: it is a per-store setting, off by default. When the owner turns it on, portrait creation opens after every saved avatar and reuses the session's face photo. The credit is used only when staff generate it with the customer's consent ([avatar views](../AVATAR_VIEWS.md#portrait-right-after-saving-an-avatar)).
 - Validate the face-descriptor threshold on 50+ pilot portraits before enforcing rejections.
 - ~~Confirm whether nose-ring chains (nath to ear) and hair accessories need their own types.~~ Confirmed on 2026-11-09: added as **Nath with chain** and **Hair accessory / passa** (front-visible pieces only).
