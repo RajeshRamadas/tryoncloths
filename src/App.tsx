@@ -244,6 +244,8 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [help, setHelp] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  // On the review step the frame picker folds into a summary so the result stays the focus.
+  const [editFrame, setEditFrame] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [session, setSession] = useState(0);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -394,6 +396,7 @@ export default function App() {
     setSelected(id);
     setManual(true);
   }
+  useEffect(() => setEditFrame(false), [step]);
   function goTo(next: number) {
     if (next === 3 && needsCustomerGeneration) {
       setError("Generate the customer avatar before review. No personalized result is ready yet.");
@@ -1181,7 +1184,13 @@ export default function App() {
                             : "I have reviewed this standard sample avatar."}
                         </span>
                       </label>
-                      {personalized && (
+                      {personalized && accountState.enabled && avatarId && (
+                        <p className="saved-status">
+                          <Check size={15} /> Saved to the store account. Reopen it any time from
+                          Saved avatars.
+                        </p>
+                      )}
+                      {personalized && !(accountState.enabled && avatarId) && (
                         <div className="save-avatar-box">
                           <label>
                             Avatar name
@@ -1430,176 +1439,202 @@ export default function App() {
                     </span>
                     <h2>Find their frame</h2>
                   </div>
-                  <p className="section-copy">
-                    Start with a close match.
-                    <br /> Adjust it together.
-                  </p>
-                  <fieldset className="template-tones" disabled={generating || exporting}>
-                    <legend>Template skin tone</legend>
-                    <div className="tone-options" role="group" aria-label="Template skin tone">
-                      {skinTones.map((tone) => (
+                  {step === 3 && !editFrame ? (
+                    <div className="frame-summary">
+                      <p>
+                        <strong>{profile.name}</strong> frame ·{" "}
+                        {skinTones.find((t) => t.id === templateTone)?.name} template tone
+                      </p>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        disabled={generating || exporting}
+                        onClick={() => setEditFrame(true)}
+                      >
+                        Change frame
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="section-copy">
+                        Start with a close match.
+                        <br /> Adjust it together.
+                      </p>
+                      <fieldset className="template-tones" disabled={generating || exporting}>
+                        <legend>Template skin tone</legend>
+                        <div className="tone-options" role="group" aria-label="Template skin tone">
+                          {skinTones.map((tone) => (
+                            <button
+                              key={tone.id}
+                              type="button"
+                              aria-pressed={templateTone === tone.id}
+                              aria-label={`Template tone: ${tone.name}`}
+                              onClick={() => {
+                                if (templateTone !== tone.id) {
+                                  invalidate();
+                                  setTemplateTone(tone.id);
+                                }
+                              }}
+                            >
+                              <span
+                                className="tone-swatch"
+                                style={{ backgroundColor: tone.swatch }}
+                                aria-hidden="true"
+                              />
+                              <span>{tone.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <p>
+                          Six sample complexion ranges for each body. Personalization matches the
+                          customer’s photos automatically, not the template colour.
+                        </p>
+                      </fieldset>
+                      <div className="profile-grid">
+                        {profiles
+                          .filter((p) => p.body === bodyType)
+                          .map((p) => (
+                            <button
+                              key={p.id}
+                              className={`profile-option ${selected === p.id ? "selected" : ""}`}
+                              disabled={generating || exporting}
+                              aria-label={`Select ${p.name} profile`}
+                              aria-pressed={selected === p.id}
+                              onClick={() => changeProfile(p.id)}
+                            >
+                              <div className="profile-thumbnail">
+                                <AvatarImage index={p.index} templateTone={templateTone} />
+                                {selected === p.id && (
+                                  <span className="selection-check">
+                                    <Check size={12} />
+                                  </span>
+                                )}
+                              </div>
+                              <div className="profile-option-label">
+                                <strong>{p.name}</strong>
+                                {p.id === recommendation && (
+                                  <span
+                                    className="recommended-mark"
+                                    title="Suggested from height and weight"
+                                  >
+                                    ✦
+                                  </span>
+                                )}
+                              </div>
+                              <span className="profile-description">{p.description}</span>
+                            </button>
+                          ))}
+                      </div>
+                      {approximation && (
+                        <p
+                          className="approximation-bands"
+                          aria-label="Approximate measurement bands"
+                        >
+                          Entered measurements: height {approximation.heightBand.min}–
+                          {approximation.heightBand.max} cm band · weight{" "}
+                          {approximation.weightBand.min}–{approximation.weightBand.max} kg band. The
+                          suggested frame is approximate; compare it with the customer.
+                        </p>
+                      )}
+                      <div className="recommendation">
+                        <Sparkles size={16} />
+                        <p>
+                          {recommendation ? (
+                            <>
+                              <strong>{profiles.find((p) => p.id === recommendation)?.name}</strong>{" "}
+                              is a starting suggestion from height and weight.
+                            </>
+                          ) : (
+                            "Enter valid measurements to see a suggestion."
+                          )}
+                        </p>
+                      </div>
+                      {buildSuggestion && (
+                        <div
+                          className="recommendation photo-build"
+                          aria-label="Build from the photo"
+                        >
+                          <ScanFace size={16} />
+                          <p>
+                            The full-body photo looks closest to{" "}
+                            <strong>{profileName(buildSuggestion.profileId)}</strong>
+                            {buildSuggestion.closeTo && (
+                              <>
+                                {" "}
+                                (or <strong>{profileName(buildSuggestion.closeTo)}</strong>)
+                              </>
+                            )}
+                            , from shoulder, waist and hip proportions. Loose clothing can make the
+                            body look fuller.
+                          </p>
+                        </div>
+                      )}
+                      {photoGirths && (
+                        <div
+                          className="recommendation photo-build"
+                          aria-label="Measurements from the photo"
+                        >
+                          <Ruler size={16} />
+                          <p>
+                            At {Number(height)} cm tall, the photo suggests chest{" "}
+                            <strong>{photoGirths.chestCm} cm</strong>, waist{" "}
+                            <strong>{photoGirths.waistCm} cm</strong> and hip{" "}
+                            <strong>{photoGirths.hipCm} cm</strong>. Clothing adds a few
+                            centimetres; a tape measure is more reliable.
+                          </p>
+                        </div>
+                      )}
+                      {photoGirths &&
+                        customer &&
+                        accountState.account &&
+                        (tapedFit ? (
+                          <p className="profile-footnote">
+                            This customer has taped measurements, so size suggestions keep using
+                            them.
+                          </p>
+                        ) : customerFit?.chestCm !== photoGirths.chestCm ||
+                          customerFit?.waistCm !== photoGirths.waistCm ||
+                          customerFit?.hipCm !== photoGirths.hipCm ? (
+                          <button
+                            className="text-button"
+                            disabled={generating || exporting}
+                            onClick={() => void saveGirths()}
+                          >
+                            <Ruler size={12} /> Save to {customer.name} for size suggestions
+                          </button>
+                        ) : null)}
+                      {buildSuggestion && selected !== buildSuggestion.profileId && (
                         <button
-                          key={tone.id}
-                          type="button"
-                          aria-pressed={templateTone === tone.id}
-                          aria-label={`Template tone: ${tone.name}`}
+                          className="text-button"
+                          disabled={generating || exporting}
                           onClick={() => {
-                            if (templateTone !== tone.id) {
-                              invalidate();
-                              setTemplateTone(tone.id);
-                            }
+                            invalidate();
+                            setSelected(buildSuggestion.profileId);
+                            setManual(true);
                           }}
                         >
-                          <span
-                            className="tone-swatch"
-                            style={{ backgroundColor: tone.swatch }}
-                            aria-hidden="true"
-                          />
-                          <span>{tone.name}</span>
+                          <ScanFace size={12} /> Use the photo’s build
                         </button>
-                      ))}
-                    </div>
-                    <p>
-                      Six sample complexion ranges for each body. Personalization matches the
-                      customer’s photos automatically, not the template colour.
-                    </p>
-                  </fieldset>
-                  <div className="profile-grid">
-                    {profiles
-                      .filter((p) => p.body === bodyType)
-                      .map((p) => (
-                        <button
-                          key={p.id}
-                          className={`profile-option ${selected === p.id ? "selected" : ""}`}
-                          disabled={generating || exporting}
-                          aria-label={`Select ${p.name} profile`}
-                          aria-pressed={selected === p.id}
-                          onClick={() => changeProfile(p.id)}
-                        >
-                          <div className="profile-thumbnail">
-                            <AvatarImage index={p.index} templateTone={templateTone} />
-                            {selected === p.id && (
-                              <span className="selection-check">
-                                <Check size={12} />
-                              </span>
-                            )}
-                          </div>
-                          <div className="profile-option-label">
-                            <strong>{p.name}</strong>
-                            {p.id === recommendation && (
-                              <span
-                                className="recommended-mark"
-                                title="Suggested from height and weight"
-                              >
-                                ✦
-                              </span>
-                            )}
-                          </div>
-                          <span className="profile-description">{p.description}</span>
-                        </button>
-                      ))}
-                  </div>
-                  {approximation && (
-                    <p className="approximation-bands" aria-label="Approximate measurement bands">
-                      Entered measurements: height {approximation.heightBand.min}–
-                      {approximation.heightBand.max} cm band · weight {approximation.weightBand.min}
-                      –{approximation.weightBand.max} kg band. The suggested frame is approximate;
-                      compare it with the customer.
-                    </p>
-                  )}
-                  <div className="recommendation">
-                    <Sparkles size={16} />
-                    <p>
-                      {recommendation ? (
-                        <>
-                          <strong>{profiles.find((p) => p.id === recommendation)?.name}</strong> is
-                          a starting suggestion from height and weight.
-                        </>
-                      ) : (
-                        "Enter valid measurements to see a suggestion."
                       )}
-                    </p>
-                  </div>
-                  {buildSuggestion && (
-                    <div className="recommendation photo-build" aria-label="Build from the photo">
-                      <ScanFace size={16} />
-                      <p>
-                        The full-body photo looks closest to{" "}
-                        <strong>{profileName(buildSuggestion.profileId)}</strong>
-                        {buildSuggestion.closeTo && (
-                          <>
-                            {" "}
-                            (or <strong>{profileName(buildSuggestion.closeTo)}</strong>)
-                          </>
-                        )}
-                        , from shoulder, waist and hip proportions. Loose clothing can make the body
-                        look fuller.
-                      </p>
-                    </div>
-                  )}
-                  {photoGirths && (
-                    <div
-                      className="recommendation photo-build"
-                      aria-label="Measurements from the photo"
-                    >
-                      <Ruler size={16} />
-                      <p>
-                        At {Number(height)} cm tall, the photo suggests chest{" "}
-                        <strong>{photoGirths.chestCm} cm</strong>, waist{" "}
-                        <strong>{photoGirths.waistCm} cm</strong> and hip{" "}
-                        <strong>{photoGirths.hipCm} cm</strong>. Clothing adds a few centimetres; a
-                        tape measure is more reliable.
-                      </p>
-                    </div>
-                  )}
-                  {photoGirths &&
-                    customer &&
-                    accountState.account &&
-                    (tapedFit ? (
+                      {manual && recommendation && selected !== recommendation && (
+                        <button
+                          className="text-button"
+                          disabled={generating || exporting}
+                          onClick={() => {
+                            invalidate();
+                            setSelected(recommendation);
+                            setManual(false);
+                          }}
+                        >
+                          <RotateCcw size={12} /> Use suggested profile
+                        </button>
+                      )}
                       <p className="profile-footnote">
-                        This customer has taped measurements, so size suggestions keep using them.
+                        Illustrative profiles, not calibrated sizing. Height and weight never
+                        suggest Athletic; the photo estimate or staff can.
                       </p>
-                    ) : customerFit?.chestCm !== photoGirths.chestCm ||
-                      customerFit?.waistCm !== photoGirths.waistCm ||
-                      customerFit?.hipCm !== photoGirths.hipCm ? (
-                      <button
-                        className="text-button"
-                        disabled={generating || exporting}
-                        onClick={() => void saveGirths()}
-                      >
-                        <Ruler size={12} /> Save to {customer.name} for size suggestions
-                      </button>
-                    ) : null)}
-                  {buildSuggestion && selected !== buildSuggestion.profileId && (
-                    <button
-                      className="text-button"
-                      disabled={generating || exporting}
-                      onClick={() => {
-                        invalidate();
-                        setSelected(buildSuggestion.profileId);
-                        setManual(true);
-                      }}
-                    >
-                      <ScanFace size={12} /> Use the photo’s build
-                    </button>
+                    </>
                   )}
-                  {manual && recommendation && selected !== recommendation && (
-                    <button
-                      className="text-button"
-                      disabled={generating || exporting}
-                      onClick={() => {
-                        invalidate();
-                        setSelected(recommendation);
-                        setManual(false);
-                      }}
-                    >
-                      <RotateCcw size={12} /> Use suggested profile
-                    </button>
-                  )}
-                  <p className="profile-footnote">
-                    Illustrative profiles, not calibrated sizing. Height and weight never suggest
-                    Athletic; the photo estimate or staff can.
-                  </p>
                 </section>
               </aside>
             </div>

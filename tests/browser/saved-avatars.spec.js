@@ -162,6 +162,7 @@ test("an existing downloaded PNG can be reused offline with selected body detail
   await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
   await page.getByRole("button", { name: "Use Imported customer", exact: true }).click();
   await expect(page.getByText("180 cm / 95 kg", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Change frame", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Template tone: Deep", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");

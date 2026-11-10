@@ -321,6 +321,7 @@ test("transparent layers import locally; photos with no garment fail and profile
   await expect(page.getByRole("button", { name: "Store top Your layer" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Download outfit" })).toBeDisabled();
   await page.getByRole("button", { name: "Back to avatar" }).click();
+  await page.getByRole("button", { name: "Change frame", exact: true }).click();
   await page.getByRole("button", { name: "Select Broad profile" }).click();
   await expect(page.getByRole("button", { name: "Try clothes" })).toBeDisabled();
   await page.getByLabel("I have reviewed this standard sample avatar.").check();
