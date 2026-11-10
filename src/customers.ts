@@ -6,6 +6,8 @@ export type CustomerMeasurements = {
   chestCm?: number;
   waistCm?: number;
   hipCm?: number;
+  /** Where chest, waist and hip came from: taped, or estimated from the full-body photo. */
+  fitSource?: "tape" | "photo";
   bodyProfileId?: string;
   fingerCircumferenceMm?: number;
   ringInnerDiameterMm?: number;

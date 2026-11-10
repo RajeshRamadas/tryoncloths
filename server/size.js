@@ -50,7 +50,7 @@ export function estimateSizeMeasurements({ heightCm, weightKg, bodyProfileId } =
     ),
   };
 }
-export function recommendSize(charts, measurements, { estimated = false } = {}) {
+export function recommendSize(charts, measurements, { estimated = false, photo = false } = {}) {
   const fields = fitFields.filter(
     (field) =>
       Number.isFinite(measurements?.[field]) &&
@@ -94,6 +94,8 @@ export function recommendSize(charts, measurements, { estimated = false } = {}) 
     )
       confidence = "High";
     else if (fields.length === 1 || next) confidence = "Medium";
+    // Girths estimated from a photo are never better than a taped single measurement.
+    if (photo && confidence === "High") confidence = "Medium";
   }
   const comparison = fields
     .map(
@@ -103,7 +105,7 @@ export function recommendSize(charts, measurements, { estimated = false } = {}) 
     .join("; ");
   const reason = estimated
     ? `Low-confidence estimate from height, weight and body profile; not measured body dimensions. ${comparison}. Confirm actual measurements and try the garment.`
-    : `${comparison}. ${confidence === "High" ? "At least two measured fields agree and the next size scores at least twice as badly." : fields.length === 1 ? "Only one measured field can be compared." : next ? "The next size is close or tied." : "There is no second size to compare."} This is a styling aid, not a guarantee of fit.`;
+    : `${photo ? "Chest, waist and hip were estimated from the full-body photo, not taped. " : ""}${comparison}. ${confidence === "High" ? "At least two measured fields agree and the next size scores at least twice as badly." : fields.length === 1 ? "Only one measured field can be compared." : next ? "The next size is close or tied." : "There is no second size to compare."} This is a styling aid, not a guarantee of fit.`;
   return {
     size: best.size,
     confidence,
@@ -111,7 +113,7 @@ export function recommendSize(charts, measurements, { estimated = false } = {}) 
     alternatives: scored
       .slice(1, 4)
       .map((r) => ({ size: r.size, score: Number(r.score.toFixed(6)) })),
-    source: estimated ? "estimated" : "measured",
+    source: estimated ? "estimated" : photo ? "photo" : "measured",
     score: Number(best.score.toFixed(6)),
   };
 }
@@ -376,7 +378,8 @@ export class SizeStore {
         "no_chart",
       );
     const input = customer.measurements || {};
-    if (fitFields.some((f) => Number.isFinite(input[f]))) return recommendSize(charts, input);
+    if (fitFields.some((f) => Number.isFinite(input[f])))
+      return recommendSize(charts, input, { photo: input.fitSource === "photo" });
     const avatar = this.db
       .prepare(
         "SELECT profileId,heightCm,weightKg FROM avatars WHERE account=? AND customer=? ORDER BY savedAt DESC,id LIMIT 1",

@@ -79,7 +79,10 @@ six decimal places; selection/confidence use the full precision.
 
 - **High:** at least two measured comparable fields and a strictly worse next size
   scoring at least twice as badly. Two zero scores are tied, so never High.
-- **Medium:** one measured field, or a close/tied second size.
+- **Medium:** one measured field, or a close/tied second size. Girths estimated from
+  the full-body photo (`fitSource: "photo"`) are capped at Medium, and the reason
+  starts with "Chest, waist and hip were estimated from the full-body photo, not
+  taped." The `source` is `photo`.
 - **Low:** insufficient comparison (such as only one row with two measured fields),
   missing comparable dimensions, or any height/weight/profile estimate.
 
@@ -109,6 +112,16 @@ empirically validated fit model. It never infers hip, never writes guessed value
 back to the customer, never analyzes photos and always reports **Low** confidence,
 even if its predicted dimensions exactly match a chart row. Confirm real
 measurements before relying on it.
+
+### Girths from the full-body photo
+
+The studio can also estimate chest, waist and hip girths from the full-body photo on
+the staff device ([measurements in cm](BODY_PHOTO_CHECK.md#measurements-in-cm)).
+Staff choose **Save to [customer] for size suggestions** to store them with
+`fitSource: "photo"`. They are then used like measured girths, but capped at Medium
+confidence. The button is not offered when the customer already has taped girths.
+When staff edit any of the three girths in **Edit customer**, `fitSource` becomes
+`tape`.
 
 ## Charts and purchase API
 

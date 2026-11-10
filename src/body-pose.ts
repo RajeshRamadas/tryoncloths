@@ -5,7 +5,7 @@ import wasmLoaderPath from "@mediapipe/tasks-vision/vision_wasm_internal.js?url"
 import wasmBinaryPath from "@mediapipe/tasks-vision/vision_wasm_internal.wasm?url";
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 import { assessBodyPose } from "./body-pose-check";
-import { measureBuild } from "./body-build";
+import { measureBodyCm, measureBuild } from "./body-build";
 import { loadImage } from "./images";
 
 export type PoseHint = { code: string; message: string };
@@ -78,13 +78,29 @@ export async function segmentPose(image: HTMLImageElement): Promise<PoseSegmenta
 }
 
 export type BodyBuild = { shoulders: number; waist: number; hips: number };
+export type BodyGirths = { chestCm: number; waistCm: number; hipCm: number };
+export type BodyPhotoAnalysis = {
+  build: BodyBuild | null;
+  /** Girths for a given height, or null when the photo cannot be measured. */
+  girths: (heightCm: number, body: "male" | "female") => BodyGirths | null;
+};
+
+/** Build proportions and girth estimates from a full-body photo, measured on the device. */
+export async function analyseBodyPhoto(photo: string): Promise<BodyPhotoAnalysis> {
+  try {
+    const pose = await segmentPose(await loadImage(photo));
+    if (!pose) return { build: null, girths: () => null };
+    const { landmarks, person, width, height } = pose;
+    return {
+      build: measureBuild(landmarks, person, width, height),
+      girths: (heightCm, body) => measureBodyCm(landmarks, person, width, height, heightCm, body),
+    };
+  } catch {
+    return { build: null, girths: () => null };
+  }
+}
 
 /** Shoulder, waist and hip proportions from a full-body photo, or null if not measurable. */
 export async function measureBodyBuild(photo: string): Promise<BodyBuild | null> {
-  try {
-    const pose = await segmentPose(await loadImage(photo));
-    return pose && measureBuild(pose.landmarks, pose.person, pose.width, pose.height);
-  } catch {
-    return null;
-  }
+  return (await analyseBodyPhoto(photo)).build;
 }

@@ -45,30 +45,30 @@ function segmentDistance(px, py, a, b) {
 }
 
 /**
- * Widths of the body relative to the torso length (shoulder centre to hip centre), or null when
- * the photo cannot be measured (person missing, joints hidden, arms not by the sides).
- * @param {{x:number,y:number,visibility?:number}[]} landmarks normalised to the image
- * @param {Uint8Array|Uint8ClampedArray} person person confidence 0–255 per pixel
- * @returns {{shoulders:number, waist:number, hips:number}|null}
+ * The body outline at torso rows, with arms and hands left out, or null when the photo cannot be
+ * measured (person missing, joints hidden, turned side-on).
  */
-export function measureBuild(landmarks, person, width, height) {
+function bodyOutline(landmarks, person, width, height) {
   if (!landmarks || landmarks.length < 33 || !person || person.length !== width * height)
     return null;
   const p = landmarks.map((l) => ({ x: l.x * width, y: l.y * height, v: l.visibility ?? 1 }));
   if ([L_SHOULDER, R_SHOULDER, L_HIP, R_HIP].some((i) => p[i].v < 0.5)) return null;
   const mid = (a, b) => ({ x: (p[a].x + p[b].x) / 2, y: (p[a].y + p[b].y) / 2 });
   const shoulders = mid(L_SHOULDER, R_SHOULDER),
-    hips = mid(L_HIP, R_HIP);
-  const torso = Math.hypot(shoulders.x - hips.x, shoulders.y - hips.y);
+    pelvis = mid(L_HIP, R_HIP);
+  const torso = Math.hypot(shoulders.x - pelvis.x, shoulders.y - pelvis.y);
   if (!(torso > 20)) return null;
+  const shoulderSpan = Math.abs(p[L_SHOULDER].x - p[R_SHOULDER].x) / torso;
+  // Turned side-on (the photo check's "turned" hint): widths say nothing about the build.
+  if (shoulderSpan < 0.45) return null;
   // Arms are about 12% of the torso length across; pixels this close to an arm belong to it.
   const armRadius = torso * 0.07;
   const arms = ARM_SEGMENTS.filter(([a, b]) => p[a].v >= 0.5 && p[b].v >= 0.5);
-  /** Outline width across the body at a share of the way from shoulders (0) to hips (1). */
+  /** Outline width in pixels at a share of the way from shoulders (0) to hips (1). */
   const widthAt = (share) => {
-    const y = Math.round(shoulders.y + (hips.y - shoulders.y) * share);
+    const y = Math.round(shoulders.y + (pelvis.y - shoulders.y) * share);
     if (y < 0 || y >= height) return null;
-    const centre = Math.round(shoulders.x + (hips.x - shoulders.x) * share);
+    const centre = Math.round(shoulders.x + (pelvis.x - shoulders.x) * share);
     const inside = (x) =>
       x >= 0 &&
       x < width &&
@@ -83,17 +83,83 @@ export function measureBuild(landmarks, person, width, height) {
     if (left === 0 || right === width - 1) return null;
     return right - left + 1;
   };
+  const widths = (shares, pick, needed) => {
+    const found = shares.map(widthAt).filter((w) => w);
+    return found.length >= needed ? pick(...found) : null;
+  };
   // The narrowest point between the lower ribs and the hips, and the widest around the hips.
-  const waists = [0.6, 0.65, 0.7, 0.75, 0.8].map(widthAt).filter((w) => w),
-    hipWidths = [0.95, 1, 1.05, 1.1].map(widthAt).filter((w) => w);
-  if (waists.length < 3 || hipWidths.length < 2) return null;
-  const shoulderSpan = Math.abs(p[L_SHOULDER].x - p[R_SHOULDER].x) / torso;
-  // Turned side-on (the photo check's "turned" hint): widths say nothing about the build.
-  if (shoulderSpan < 0.45) return null;
+  const waist = widths([0.6, 0.65, 0.7, 0.75, 0.8], Math.min, 3),
+    hips = widths([0.95, 1, 1.05, 1.1], Math.max, 2);
+  if (!waist || !hips) return null;
+  return { p, torso, shoulderSpan, widthAt, widths, waist, hips };
+}
+
+/**
+ * Widths of the body relative to the torso length (shoulder centre to hip centre), or null when
+ * the photo cannot be measured (person missing, joints hidden, turned side-on).
+ * @param {{x:number,y:number,visibility?:number}[]} landmarks normalised to the image
+ * @param {Uint8Array|Uint8ClampedArray} person person confidence 0–255 per pixel
+ * @returns {{shoulders:number, waist:number, hips:number}|null}
+ */
+export function measureBuild(landmarks, person, width, height) {
+  const body = bodyOutline(landmarks, person, width, height);
+  if (!body) return null;
   return {
-    shoulders: shoulderSpan,
-    waist: Math.min(...waists) / torso,
-    hips: Math.max(...hipWidths) / torso,
+    shoulders: body.shoulderSpan,
+    waist: body.waist / body.torso,
+    hips: body.hips / body.torso,
+  };
+}
+
+// Front breadth (as measured here) to girth. Chest and waist factors make the standard templates,
+// at the reference heights of the size-estimate table in server/size.js, measure that table's
+// illustrative chest and waist within a few centimetres. Hip factors put the Regular templates at
+// typical hip girths (100 cm male, 98 cm female). None is calibrated on taped pilot customers yet.
+export const GIRTH_FACTORS = {
+  male: { chest: 2.75, waist: 2.54, hip: 2.4 },
+  female: { chest: 2.9, waist: 2.6, hip: 2.45 },
+};
+
+/**
+ * Chest, waist and hip girths in centimetres from the photo, scaled by the customer's height,
+ * or null when the head, feet or torso cannot be measured.
+ * @param {{x:number,y:number,visibility?:number}[]} landmarks normalised to the image
+ * @param {Uint8Array|Uint8ClampedArray} person person confidence 0–255 per pixel
+ * @param {number} heightCm the customer's height
+ * @param {"male"|"female"} [body] which body library's girth factors to use
+ * @returns {{chestCm:number, waistCm:number, hipCm:number}|null}
+ */
+export function measureBodyCm(landmarks, person, width, height, heightCm, body = "male") {
+  const factors = GIRTH_FACTORS[body];
+  if (!factors || !(heightCm >= 140 && heightCm <= 210)) return null;
+  const outline = bodyOutline(landmarks, person, width, height);
+  if (!outline) return null;
+  const { p, torso } = outline;
+  // Head-to-toe height of the outline: the first and last person rows near the body's centre.
+  const row = (y, x0, x1) => {
+    for (let x = Math.max(0, Math.round(x0)); x <= Math.min(width - 1, Math.round(x1)); x++)
+      if (person[y * width + x] >= 128) return true;
+    return false;
+  };
+  const head = p[0].x,
+    feet = (p[27].x + p[28].x) / 2;
+  let top = 0,
+    bottom = height - 1;
+  while (top < height && !row(top, head - torso * 0.3, head + torso * 0.3)) top++;
+  while (bottom > top && !row(bottom, feet - torso * 0.7, feet + torso * 0.7)) bottom--;
+  // Cut off at the frame edge: the height cannot be read from the photo.
+  if (top <= 0 || bottom >= height - 1) return null;
+  const pixels = bottom - top + 1;
+  // Standing people are about 3.4 torso lengths tall; much less means sitting, bent or cropped.
+  if (pixels < torso * 2.8) return null;
+  const cm = heightCm / pixels;
+  // Chest across the armpits, a fifth to a third of the way down the torso.
+  const chest = outline.widths([0.2, 0.25, 0.3, 0.35], Math.max, 2);
+  if (!chest) return null;
+  return {
+    chestCm: Math.round(chest * cm * factors.chest),
+    waistCm: Math.round(outline.waist * cm * factors.waist),
+    hipCm: Math.round(outline.hips * cm * factors.hip),
   };
 }
 

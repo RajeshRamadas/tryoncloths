@@ -1,16 +1,31 @@
 # Pending implementation — tryoncloths (Forme)
 
-_Last reviewed: 2026-11-09, against `main` after PR #7. Version 0.21.0-rc.3._
+_Last reviewed: 2026-11-10. Version 0.21.0-rc.3._
 
 All planned feature tasks are implemented: commercial **C1–C16** (including
 C16.5.1 and C16.5.2 tooling) and jewellery **J1–J14**. The items below are what
 remains, grouped by what they need.
 
+## At a glance
+
+- **Code still to write:** body measurements in cm from the photo and size
+  prediction from them (in progress: chest, waist and hip are now estimated and feed
+  size suggestions; calibration on taped customers is still open).
+- **Needs pilot data:** calibrate the standard avatars, the photo thresholds and the
+  photo girth factors against real customers. The jewellery face check needs 50+
+  pilot portraits. Test on a physical Android phone.
+- **Decisions only Rajesh can make:** final prices after the pilot store interviews,
+  whether trials need a phone OTP, the data retention and deletion policy, and a
+  shared WhatsApp number or one per store.
+- **Shopper "Try it on me" launch:** choose the CAPTCHA and moderation services, and
+  get a legal review.
+- **Later:** 3D / AR live try-on is out of scope for now.
+
 ## 1. Code to write (not yet planned as tasks)
 
 | Item | Current state | Source |
 | --- | --- | --- |
-| Automatic body measurements and fit prediction from customer photos | Partly done: the full-body photo suggests the closest body profile from shoulder, waist and hip proportions on the device ([build from the photo](BODY_PHOTO_CHECK.md#build-from-the-photo)), next to the height/weight rule. Still open: real measurements in cm, garment size prediction, and calibration on pilot customers | [README](../README.md), [LEVEL_1](LEVEL_1.md) |
+| Automatic body measurements and fit prediction from customer photos | Mostly done: the full-body photo suggests the closest body profile ([build from the photo](BODY_PHOTO_CHECK.md#build-from-the-photo)) and estimates chest, waist and hip in cm from the entered height ([measurements in cm](BODY_PHOTO_CHECK.md#measurements-in-cm)). Staff can save them to the customer, and size suggestions use them, capped at Medium confidence. Still open: calibrating the girth factors on taped pilot customers | [README](../README.md), [LEVEL_1](LEVEL_1.md) |
 | Calibrate standard avatars against real body measurements; define height/build bands | Sample profiles have no calibrated measurements | [LEVEL_1](LEVEL_1.md) |
 | ~~Local pose/silhouette analysis to assist the full-body photo review~~ | Done: on-device pose hints for framing, stance and arms ([body photo check](BODY_PHOTO_CHECK.md)). Still open: calibrating the thresholds on pilot photos, and using the landmarks for occlusion masks or profile matching | [LEVEL_1](LEVEL_1.md) |
 | ~~Aligned transparent garment layers and masks for the clothing compositor~~ | Done: product photos become cleaned, mask-aligned layers on the device ([clothing layers](CLOTHING_LAYERS.md)). Forearms and hands are drawn in front of imported tops, and imported layers are fitted to the generated avatar's pose (shoulders, elbows, wrists, hips, knees, ankles) | [LEVEL_1](LEVEL_1.md) |
@@ -32,6 +47,7 @@ remains, grouped by what they need.
 - [ ] SMTP delivery for staff invitations, invoices and monthly analytics emails.
 - [ ] Shopify and WooCommerce: live shop connectivity and nightly sync after deployment ([catalogue sync](CATALOGUE_SYNC.md)).
 - [ ] WhatsApp Business: Meta template approval, live delivery, STOP opt-out and charges on a real account ([WhatsApp](WHATSAPP.md)).
+- [ ] Calibrate the photo checks on pilot customers: the pose-hint thresholds, the build suggestion and the photo girth factors (`GIRTH_FACTORS`), against taped chest, waist and hip measurements.
 - [ ] Jewellery: calibrate the face-descriptor threshold on 50+ pilot portraits before enforcing rejections.
 - [ ] Jewellery: measure the pilot targets ([jewellery requirements](jewellery/REQUIREMENTS.md) §8) before general release (`npm run evaluate:jewellery`).
 - [ ] Customer hand photos: live photo-quality review in the pilot.

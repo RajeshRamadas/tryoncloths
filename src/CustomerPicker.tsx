@@ -96,6 +96,17 @@ export default function CustomerPicker({
       setBusy(false);
     }
   }
+  /** Photo estimates stay marked as such until staff change one of the girths. */
+  function fitSource() {
+    if (!chest && !waist && !hip) return null;
+    const m = editing?.measurements;
+    const unchanged = [
+      [m?.chestCm, chest],
+      [m?.waistCm, waist],
+      [m?.hipCm, hip],
+    ].every(([before, now]) => (before == null ? "" : String(before)) === now);
+    return unchanged ? (m?.fitSource ?? null) : "tape";
+  }
   async function save() {
     setBusy(true);
     setError("");
@@ -119,6 +130,7 @@ export default function CustomerPicker({
             chestCm: chest ? Number(chest) : null,
             waistCm: waist ? Number(waist) : null,
             hipCm: hip ? Number(hip) : null,
+            fitSource: fitSource(),
             bodyProfileId: bodyProfile || null,
           },
         })
@@ -381,6 +393,12 @@ export default function CustomerPicker({
               />
             </label>
           </div>
+          {editing?.measurements?.fitSource === "photo" && fitSource() === "photo" && (
+            <p className="small-footnote">
+              Chest, waist and hip were estimated from the full-body photo. Replace them with taped
+              measurements for more reliable size suggestions.
+            </p>
+          )}
           {jewelleryEnabled && (
             <details>
               <summary>Optional jewellery measurements</summary>
