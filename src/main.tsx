@@ -1,4 +1,5 @@
 import Branding from "./branding";
+import ShopPageAdmin from "./ShopPageAdmin";
 import AvatarViews from "./AvatarViews";
 import JewelleryCatalogue from "./JewelleryCatalogue";
 import ShopperSettings from "./ShopperSettings";
@@ -42,6 +43,8 @@ createRoot(document.getElementById("root")!).render(
       <ShopperSettings />
     ) : window.location.pathname === "/branding" ? (
       <Branding />
+    ) : window.location.pathname === "/shop-page" ? (
+      <ShopPageAdmin />
     ) : window.location.pathname === "/catalogue-photos" ? (
       <CataloguePhotos />
     ) : window.location.pathname === "/analytics" ? (

@@ -265,6 +265,9 @@ export default function StoreAccount({
                 <section>
                   <h3>Daily management</h3>
                   <div className="store-tool-links">
+                    <a href="/shop-page">
+                      Shop page<span aria-hidden="true">Public page, photos and opening hours</span>
+                    </a>
                     <a href="/catalogue-photos">
                       Catalogue photos<span aria-hidden="true">Prepare product images</span>
                     </a>

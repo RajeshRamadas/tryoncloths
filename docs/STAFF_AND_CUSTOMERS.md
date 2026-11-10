@@ -10,6 +10,7 @@
 - [Shop catalogue sync](CATALOGUE_SYNC.md): owner connections, manual/nightly sync, type confirmation and read-only shared master products.
 - [AI catalogue photos](CATALOGUE_PHOTOS.md): standard models, batch/review workflow, approved marketing exports and photo-only credits.
 - [Store branding](STORE_BRANDING.md): owner settings, safe logos, shared-page identity and export/footer rules.
+- [Shop pages](SHOP_PAGES.md): each store's public page with photos, hours, catalogue and try-on booking.
 - [Billing and usage](BILLING.md): trials, credits, checkout, invoices and operator commands.
 
 For a returning customer, find them by mobile number, reopen their avatar in Saved
