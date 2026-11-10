@@ -31,6 +31,10 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
 - Fitted clothes now also follow the elbows, wrists and knees: sleeves turn with the
   avatar's arms and trouser legs with its legs, while the torso and waistband stay with the
   body. The fit no longer distorts parts of a layer far from the body.
+- The full-body photo now suggests a body profile. Shoulder, waist and hip proportions are
+  measured on the device and compared with the standard templates, so a muscular or fuller
+  build can be suggested where height and weight alone cannot tell. Staff choose whether
+  to use it. See [build from the photo](docs/BODY_PHOTO_CHECK.md#build-from-the-photo).
 
 ## 0.21.0-rc.3
 

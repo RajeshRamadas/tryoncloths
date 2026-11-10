@@ -10,7 +10,7 @@ remains, grouped by what they need.
 
 | Item | Current state | Source |
 | --- | --- | --- |
-| Automatic body measurements and fit prediction from customer photos | Profile is chosen from an illustrative height/weight rule plus staff correction | [README](../README.md), [LEVEL_1](LEVEL_1.md) |
+| Automatic body measurements and fit prediction from customer photos | Partly done: the full-body photo suggests the closest body profile from shoulder, waist and hip proportions on the device ([build from the photo](BODY_PHOTO_CHECK.md#build-from-the-photo)), next to the height/weight rule. Still open: real measurements in cm, garment size prediction, and calibration on pilot customers | [README](../README.md), [LEVEL_1](LEVEL_1.md) |
 | Calibrate standard avatars against real body measurements; define height/build bands | Sample profiles have no calibrated measurements | [LEVEL_1](LEVEL_1.md) |
 | ~~Local pose/silhouette analysis to assist the full-body photo review~~ | Done: on-device pose hints for framing, stance and arms ([body photo check](BODY_PHOTO_CHECK.md)). Still open: calibrating the thresholds on pilot photos, and using the landmarks for occlusion masks or profile matching | [LEVEL_1](LEVEL_1.md) |
 | ~~Aligned transparent garment layers and masks for the clothing compositor~~ | Done: product photos become cleaned, mask-aligned layers on the device ([clothing layers](CLOTHING_LAYERS.md)). Forearms and hands are drawn in front of imported tops, and imported layers are fitted to the generated avatar's pose (shoulders, elbows, wrists, hips, knees, ankles) | [LEVEL_1](LEVEL_1.md) |

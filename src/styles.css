@@ -838,6 +838,10 @@ h1 {
 .recommendation svg {
   flex-shrink: 0;
 }
+.recommendation.photo-build {
+  margin-top: 10px;
+  padding-top: 10px;
+}
 .recommendation p {
   font-size: 9px;
   line-height: 1.7;

@@ -36,14 +36,44 @@ photo and decide, and nothing blocks generation.
 The three synthetic customer photos in `tests/fixtures/customers` pass with no hints. Their
 landmarks are stored in `body-poses.json` for the unit tests.
 
+## Build from the photo
+
+The same model also suggests a body profile. On the device, it measures three
+proportions from the pose landmarks and the person outline, each divided by the torso
+length (shoulder centre to hip centre):
+
+- **Shoulders**: the distance between the shoulder joints.
+- **Waist**: the narrowest outline width between 60% and 80% of the way down the torso.
+- **Hips**: the widest outline width around the hip joints.
+
+Pixels near the arms and hands are left out, so arms resting against the body do not
+widen the waist or hips. The proportions are compared with the same measurements of the
+standard templates (`BUILD_REFERENCES` in `src/body-build.js`, averaged over the six
+template skin tones). The closest profile in the selected body library is shown under
+the height and weight suggestion. When the next profile is almost as close, it is named
+too. Hips count half, because trousers and skirts change the outline there more than a
+top does.
+
+Staff can press **Use the photo’s build** to select it. Nothing is chosen
+automatically, and no photo is uploaded. The estimate is skipped when the customer is
+turned side-on, or when the hips or shoulders are hidden.
+
+If the template images change, re-measure them. The browser test
+`tests/browser/body-build.spec.js` checks that each template still suggests its own profile.
+
 ## Limits
 
 - The thresholds are first estimates from synthetic photos. Calibrate them on consented
   pilot photos before relying on them.
 - Loose clothing such as sarees, long kurtas or coats can hide the hips and ankles, so the
   landmarks there are less reliable.
-- The landmarks are not yet used to choose the body profile. The outfit studio uses the
-  same model for [arms in front of tops](CLOTHING_LAYERS.md#arms-in-front-of-tops).
+- The build estimate compares proportions, not measurements. It cannot tell height,
+  weight or garment size. Loose clothing makes the body look fuller, and tight
+  clothing makes it look slimmer. It is calibrated only against the templates, not
+  against pilot customers.
+- The outfit studio uses the same model for
+  [arms in front of tops](CLOTHING_LAYERS.md#arms-in-front-of-tops) and
+  [fitting clothes to the pose](CLOTHING_LAYERS.md#fit-to-the-avatars-pose).
 
 ## Updating the model
 

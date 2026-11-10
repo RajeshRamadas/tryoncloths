@@ -34,6 +34,8 @@ import {
 } from "./profiles";
 import { downloadAvatar, libraryForIndex, readPhoto } from "./images";
 import BodyPhotoHints from "./BodyPhotoHints";
+import { measureBodyBuild, type BodyBuild } from "./body-pose";
+import { suggestBuild } from "./body-build";
 import { isNative, capturePhoto, clearNativeExports } from "./native";
 import { requestApi } from "./api";
 import StudioConnection from "./StudioConnection";
@@ -247,6 +249,12 @@ export default function App() {
   const bodyType = selected.startsWith("f-") ? "female" : "male";
   const recommendation = recommendProfile(Number(height), Number(weight), bodyType);
   const approximation = approximateSelection(Number(height), Number(weight), bodyType);
+  const [photoBuild, setPhotoBuild] = useState<{ photo: string; build: BodyBuild | null } | null>(
+    null,
+  );
+  const buildSuggestion =
+    body && photoBuild?.photo === body ? suggestBuild(photoBuild.build, bodyType) : null;
+  const profileName = (id: string) => profiles.find((p) => p.id === id)?.name;
   const bodyGenerationAllowed = bodyType === "male" || femaleEnabled;
   const profile = profiles.find((p) => p.id === selected)!;
   const validMeasurements = recommendation !== null;
@@ -283,6 +291,17 @@ export default function App() {
       })
       .catch(() => setService("unavailable"));
   }
+  // Estimate the build from the full-body photo on the device, for staff to compare.
+  useEffect(() => {
+    if (!body) return;
+    let current = true;
+    void measureBodyBuild(body).then((build) => {
+      if (current) setPhotoBuild({ photo: body, build });
+    });
+    return () => {
+      current = false;
+    };
+  }, [body]);
   useEffect(() => {
     checkService();
     void clearNativeExports().catch(() =>
@@ -1425,6 +1444,36 @@ export default function App() {
                       )}
                     </p>
                   </div>
+                  {buildSuggestion && (
+                    <div className="recommendation photo-build" aria-label="Build from the photo">
+                      <ScanFace size={16} />
+                      <p>
+                        The full-body photo looks closest to{" "}
+                        <strong>{profileName(buildSuggestion.profileId)}</strong>
+                        {buildSuggestion.closeTo && (
+                          <>
+                            {" "}
+                            (or <strong>{profileName(buildSuggestion.closeTo)}</strong>)
+                          </>
+                        )}
+                        , from shoulder, waist and hip proportions. Loose clothing can make the body
+                        look fuller.
+                      </p>
+                    </div>
+                  )}
+                  {buildSuggestion && selected !== buildSuggestion.profileId && (
+                    <button
+                      className="text-button"
+                      disabled={generating || exporting}
+                      onClick={() => {
+                        invalidate();
+                        setSelected(buildSuggestion.profileId);
+                        setManual(true);
+                      }}
+                    >
+                      <ScanFace size={12} /> Use the photo’s build
+                    </button>
+                  )}
                   {manual && recommendation && selected !== recommendation && (
                     <button
                       className="text-button"
@@ -1439,8 +1488,8 @@ export default function App() {
                     </button>
                   )}
                   <p className="profile-footnote">
-                    Illustrative profiles, not calibrated sizing. Athletic build is selected by
-                    staff.
+                    Illustrative profiles, not calibrated sizing. Height and weight never suggest
+                    Athletic; the photo estimate or staff can.
                   </p>
                 </section>
                 <section className="next-card">
@@ -1522,9 +1571,9 @@ export default function App() {
                   <li>
                     <strong>Choose a close body profile.</strong>
                     <p>
-                      The suggestion uses a basic height/weight rule. Staff review the full-body
-                      photo and adjust the profile. Automated photo-based measurements are not
-                      included.
+                      The suggestion uses a basic height/weight rule, and the full-body photo gives
+                      a second, on-device estimate of the build. Staff compare both with the
+                      customer and adjust the profile.
                     </p>
                   </li>
                   <li>
