@@ -325,6 +325,8 @@ export class BrandingStore {
       address: fallback((v) => text(v, 300, "an address"), saved.address || "", ""),
       mapUrl: fallback(mapUrl, saved.mapUrl || "", ""),
       exportFooter: saved.exportFooter === true,
+      // Jewellery stores: open portrait creation right after an avatar is saved (1 credit each).
+      portraitWithAvatar: saved.portraitWithAvatar === true,
       revision: typeof saved.revision === "string" ? saved.revision : "",
       hasLogo: Boolean(this.db.prepare("SELECT 1 FROM branding_logos WHERE store=?").get(storeId)),
       trial: row.status === "trial",
@@ -351,12 +353,15 @@ export class BrandingStore {
             "address",
             "mapUrl",
             "exportFooter",
+            "portraitWithAvatar",
             "logo",
             "revision",
           ].includes(k),
       )
     )
-      throw fail("Use store name, colour, contacts, export footer and an optional logo.");
+      throw fail(
+        "Use store name, colour, contacts, export footer, portrait preference and an optional logo.",
+      );
     const previous = this.read(account.id);
     if (input.revision !== undefined && input.revision !== previous.revision)
       throw fail("Branding changed in another tab. Refresh before saving.", 409);
@@ -366,9 +371,12 @@ export class BrandingStore {
       !displayName ||
       typeof value.primaryColor !== "string" ||
       !/^#[a-f0-9]{6}$/i.test(value.primaryColor) ||
-      typeof value.exportFooter !== "boolean"
+      typeof value.exportFooter !== "boolean" ||
+      typeof value.portraitWithAvatar !== "boolean"
     )
-      throw fail("Enter a display name, six-digit hex colour and export-footer preference.");
+      throw fail(
+        "Enter a display name, six-digit hex colour, export-footer and portrait preferences.",
+      );
     const branding = {
       displayName,
       primaryColor: value.primaryColor.toLowerCase(),
@@ -376,6 +384,7 @@ export class BrandingStore {
       address: text(value.address, 300, "an address"),
       mapUrl: mapUrl(value.mapUrl),
       exportFooter: value.exportFooter,
+      portraitWithAvatar: value.portraitWithAvatar,
       revision: randomUUID(),
     };
     const logo =

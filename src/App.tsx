@@ -40,6 +40,7 @@ import { isNative, capturePhoto, clearNativeExports } from "./native";
 import { requestApi } from "./api";
 import StudioConnection from "./StudioConnection";
 import OutfitStudio from "./OutfitStudio";
+import AvatarViews from "./AvatarViews";
 import SavedAvatars from "./SavedAvatars";
 import StoreAccount, { type AccountState } from "./StoreAccount";
 import { saveAccountAvatar } from "./account-avatars";
@@ -222,6 +223,9 @@ export default function App() {
   const [templateTone, setTemplateTone] = useState(DEFAULT_TEMPLATE_TONE);
   const [manual, setManual] = useState(false);
   const [face, setFace] = useState<string | null>(null);
+  // Jewellery portrait for a just-saved avatar: open for, and approved for, which avatar id.
+  const [portraitFor, setPortraitFor] = useState<string | null>(null);
+  const [portraitDoneFor, setPortraitDoneFor] = useState<string | null>(null);
   const [body, setBody] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [aiConsent, setAiConsent] = useState(false);
@@ -571,6 +575,14 @@ export default function App() {
         source: avatarSource,
       });
       if (saved?.id) setAvatarId(saved.id);
+      // Stores that make a portrait with every avatar go straight on to it, reusing the face
+      // photo still in this session. Staff confirm consent before any credit is used.
+      if (accountState.enabled && jewelleryAvailable && face && saved?.id) {
+        const branding = await requestApi("/api/branding")
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null);
+        if (branding?.portraitWithAvatar === true) setPortraitFor(saved.id);
+      }
       setNotice(
         accountState.enabled
           ? "Avatar saved to your store account. Sign in to this account on another browser to reopen it."
@@ -1227,6 +1239,43 @@ export default function App() {
                           </button>
                         )}
                       </div>
+                      {jewelleryAvailable &&
+                        accountState.account &&
+                        avatarId &&
+                        face &&
+                        portraitDoneFor !== avatarId &&
+                        (portraitFor === avatarId ? (
+                          <section
+                            className="portrait-after-save"
+                            aria-label="Jewellery portrait for this avatar"
+                          >
+                            <AvatarViews
+                              key={avatarId}
+                              embedded
+                              avatarId={avatarId}
+                              initialKind="portrait"
+                              initialFace={face}
+                              onApproved={() => {
+                                setPortraitDoneFor(avatarId);
+                                setPortraitFor(null);
+                                setNotice(
+                                  "Portrait saved with this avatar. Choose Jewellery to try pieces on it.",
+                                );
+                              }}
+                            />
+                            <button className="text-button" onClick={() => setPortraitFor(null)}>
+                              Not now
+                            </button>
+                          </section>
+                        ) : (
+                          <button
+                            className="text-button"
+                            disabled={!approved || exporting}
+                            onClick={() => setPortraitFor(avatarId)}
+                          >
+                            <ScanFace size={12} /> Create a jewellery portrait from this face photo
+                          </button>
+                        ))}
                       <p className="small-footnote">
                         Approve the avatar to try separate tops, trousers and shoes. Outfit changes
                         use no AI calls.

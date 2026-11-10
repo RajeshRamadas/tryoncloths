@@ -37,6 +37,22 @@ expires or changes. Changing the avatar/view clears the active inputs and review
 state. Re-entering or refreshing does not submit a generation. A failed approval
 keeps the preview downloadable; do not generate another portrait just to save it.
 
+### Portrait right after saving an avatar
+
+When a customer avatar is saved to the store account in the main studio, and the
+customer's face photo from that session is still open, staff can choose **Create a
+jewellery portrait from this face photo** below the fitting-room actions. The portrait
+form opens in place, already filled in with that face photo. Staff can replace the
+photo if the ears or neck are hidden. The avatar-approval and Gemini consent
+checkboxes still start unticked, and nothing is sent or charged until staff choose
+**Generate portrait — 1 AI credit**.
+
+Owners can turn on **Jewellery: open portrait creation after every saved avatar** in
+store branding. This setting is off by default. When it is on, the portrait form opens
+by itself after each save, so jewellery stores make the portrait in the same visit.
+Staff can still close it with **Not now**, and no credit is used unless a portrait is
+generated. The setting is stored with the store branding (`portraitWithAvatar`).
+
 Portrait creation requires Gemini with a configured image key. The existing
 `TRYON_FEMALE_PROFILES=true` pilot flag also applies to paid female portraits;
 female sample hands remain free regardless of that paid-generation flag.

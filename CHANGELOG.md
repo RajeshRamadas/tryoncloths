@@ -35,6 +35,11 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
   measured on the device and compared with the standard templates, so a muscular or fuller
   build can be suggested where height and weight alone cannot tell. Staff choose whether
   to use it. See [build from the photo](docs/BODY_PHOTO_CHECK.md#build-from-the-photo).
+- Jewellery stores can make the customer's portrait in the same visit. After an avatar
+  is saved, staff can create the portrait from the face photo already in the session.
+  Owners can turn on a store setting (off by default) that opens this step after every
+  saved avatar. A portrait still needs the customer's consent and uses 1 AI credit. See
+  [avatar views](docs/AVATAR_VIEWS.md#portrait-right-after-saving-an-avatar).
 
 ## 0.21.0-rc.3
 

@@ -8,6 +8,7 @@ export type StoreBranding = {
   address: string;
   mapUrl: string;
   exportFooter: boolean;
+  portraitWithAvatar: boolean;
   revision: string;
   hasLogo: boolean;
   trial: boolean;
@@ -92,6 +93,7 @@ export default function Branding() {
       address: "",
       mapUrl: "",
       exportFooter: false,
+      portraitWithAvatar: false,
     }),
     [logo, setLogo] = useState<File | null>(null),
     [remove, setRemove] = useState(false),
@@ -145,6 +147,7 @@ export default function Branding() {
           address: values.address,
           mapUrl: values.mapUrl,
           exportFooter: values.exportFooter,
+          portraitWithAvatar: values.portraitWithAvatar,
           revision: saved?.revision,
           ...(image ? { logo: image } : remove ? { logo: null } : {}),
         }),
@@ -306,6 +309,18 @@ export default function Branding() {
                   />
                   <span>
                     Include the store footer by default on eligible exports and shared images
+                  </span>
+                </label>
+                <label className="consent">
+                  <input
+                    type="checkbox"
+                    checked={values.portraitWithAvatar}
+                    disabled={busy}
+                    onChange={(e) => update("portraitWithAvatar", e.target.checked)}
+                  />
+                  <span>
+                    Jewellery: open portrait creation after every saved avatar, reusing the
+                    customer’s face photo (1 more AI credit per customer, with their consent)
                   </span>
                 </label>
                 {saved.trial && (
