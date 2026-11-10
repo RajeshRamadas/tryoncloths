@@ -1,6 +1,6 @@
 import { ExportBrandingChoice } from "./branding";
 import CustomerPicker from "./CustomerPicker";
-import { type CustomerRef, type Customer } from "./customers";
+import { type CustomerRef, type Customer, customerRequest } from "./customers";
 import { CreditHelp } from "./Billing";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -19,6 +19,7 @@ import {
   LockKeyhole,
   Plus,
   RotateCcw,
+  Ruler,
   ScanFace,
   ShieldCheck,
   Sparkles,
@@ -34,7 +35,7 @@ import {
 } from "./profiles";
 import { downloadAvatar, libraryForIndex, readPhoto } from "./images";
 import BodyPhotoHints from "./BodyPhotoHints";
-import { measureBodyBuild, type BodyBuild } from "./body-pose";
+import { analyseBodyPhoto, type BodyPhotoAnalysis } from "./body-pose";
 import { suggestBuild } from "./body-build";
 import { isNative, capturePhoto, clearNativeExports } from "./native";
 import { requestApi } from "./api";
@@ -253,11 +254,18 @@ export default function App() {
   const bodyType = selected.startsWith("f-") ? "female" : "male";
   const recommendation = recommendProfile(Number(height), Number(weight), bodyType);
   const approximation = approximateSelection(Number(height), Number(weight), bodyType);
-  const [photoBuild, setPhotoBuild] = useState<{ photo: string; build: BodyBuild | null } | null>(
-    null,
-  );
-  const buildSuggestion =
-    body && photoBuild?.photo === body ? suggestBuild(photoBuild.build, bodyType) : null;
+  const [photoAnalysis, setPhotoAnalysis] = useState<
+    ({ photo: string } & BodyPhotoAnalysis) | null
+  >(null);
+  const analysis = body && photoAnalysis?.photo === body ? photoAnalysis : null;
+  const buildSuggestion = analysis ? suggestBuild(analysis.build, bodyType) : null;
+  const photoGirths = analysis ? analysis.girths(Number(height), bodyType) : null;
+  // The selected customer's saved measurements, to avoid replacing taped girths.
+  const [customerFit, setCustomerFit] = useState<Customer["measurements"]>(null);
+  const tapedFit =
+    customerFit != null &&
+    customerFit.fitSource !== "photo" &&
+    [customerFit.chestCm, customerFit.waistCm, customerFit.hipCm].some((v) => v != null);
   const profileName = (id: string) => profiles.find((p) => p.id === id)?.name;
   const bodyGenerationAllowed = bodyType === "male" || femaleEnabled;
   const profile = profiles.find((p) => p.id === selected)!;
@@ -299,8 +307,8 @@ export default function App() {
   useEffect(() => {
     if (!body) return;
     let current = true;
-    void measureBodyBuild(body).then((build) => {
-      if (current) setPhotoBuild({ photo: body, build });
+    void analyseBodyPhoto(body).then((result) => {
+      if (current) setPhotoAnalysis({ photo: body, ...result });
     });
     return () => {
       current = false;
@@ -518,6 +526,7 @@ export default function App() {
     if (next?.id === customer?.id) return;
     reset();
     setCustomer(next);
+    setCustomerFit(measurements ?? null);
     if (next) setAvatarName(next.name.slice(0, 60));
     if (measurements) {
       if (measurements.heightCm != null) setHeight(String(measurements.heightCm));
@@ -558,6 +567,23 @@ export default function App() {
     setStep(3);
     setNotice("Avatar opened without an AI request. Review it, then choose Try clothes.");
     requestAnimationFrame(() => titleRef.current?.focus());
+  }
+  async function saveGirths() {
+    if (!customer || !photoGirths || exporting) return;
+    setError("");
+    try {
+      const saved: Customer = (
+        await customerRequest(`/${customer.id}`, "PATCH", {
+          measurements: { ...photoGirths, fitSource: "photo" },
+        })
+      ).customer;
+      setCustomerFit(saved.measurements);
+      setNotice(
+        "Photo measurements saved to the customer. Size suggestions use them, marked as estimated, until taped measurements replace them.",
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    }
   }
   async function keepAvatar() {
     if (!personalized || !approved || !saveConsent || exporting || needsCustomerGeneration) return;
@@ -1510,6 +1536,39 @@ export default function App() {
                       </p>
                     </div>
                   )}
+                  {photoGirths && (
+                    <div
+                      className="recommendation photo-build"
+                      aria-label="Measurements from the photo"
+                    >
+                      <Ruler size={16} />
+                      <p>
+                        At {Number(height)} cm tall, the photo suggests chest{" "}
+                        <strong>{photoGirths.chestCm} cm</strong>, waist{" "}
+                        <strong>{photoGirths.waistCm} cm</strong> and hip{" "}
+                        <strong>{photoGirths.hipCm} cm</strong>. Clothing adds a few centimetres; a
+                        tape measure is more reliable.
+                      </p>
+                    </div>
+                  )}
+                  {photoGirths &&
+                    customer &&
+                    accountState.account &&
+                    (tapedFit ? (
+                      <p className="profile-footnote">
+                        This customer has taped measurements, so size suggestions keep using them.
+                      </p>
+                    ) : customerFit?.chestCm !== photoGirths.chestCm ||
+                      customerFit?.waistCm !== photoGirths.waistCm ||
+                      customerFit?.hipCm !== photoGirths.hipCm ? (
+                      <button
+                        className="text-button"
+                        disabled={generating || exporting}
+                        onClick={() => void saveGirths()}
+                      >
+                        <Ruler size={12} /> Save to {customer.name} for size suggestions
+                      </button>
+                    ) : null)}
                   {buildSuggestion && selected !== buildSuggestion.profileId && (
                     <button
                       className="text-button"

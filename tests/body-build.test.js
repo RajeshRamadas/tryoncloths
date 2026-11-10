@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BUILD_REFERENCES, measureBuild, suggestBuild } from "../src/body-build.js";
+import {
+  BUILD_REFERENCES,
+  GIRTH_FACTORS,
+  measureBodyCm,
+  measureBuild,
+  suggestBuild,
+} from "../src/body-build.js";
 
 const W = 400,
   H = 800;
@@ -27,8 +33,11 @@ function figure({ waistHalf = 60, hipHalf = 80, armX = 75, armRadius = 12 } = {}
   const fill = (x, y) => {
     if (x >= 0 && y >= 0 && x < W && y < H) person[y * W + x] = 255;
   };
-  // Torso: shoulders to waist narrows, waist to hips widens, then the legs.
-  for (let y = 190; y <= 700; y++) {
+  // Head from y = 40, then the torso: shoulders to waist narrows, waist to hips widens, then the
+  // legs down to the soles at y = 780.
+  for (let y = 40; y < 190; y++)
+    for (let x = 140; x <= 260; x++) if ((x - 200) ** 2 + (y - 110) ** 2 <= 70 * 70) fill(x, y);
+  for (let y = 190; y <= 780; y++) {
     const half =
       y < 368
         ? 90 + ((waistHalf - 90) * (y - 190)) / 178
@@ -115,4 +124,38 @@ test("suggestions stay within the chosen body library and name a close runner-up
   assert.deepEqual([s.profileId, s.closeTo].sort(), ["athletic", "regular"]);
   assert.equal(suggestBuild(BUILD_REFERENCES[0], "male").closeTo, null);
   assert.equal(suggestBuild(null, "male"), null);
+});
+
+test("girths in centimetres scale the outline by the customer's height", () => {
+  const { lm, person } = figure();
+  const girths = measureBodyCm(lm, person, W, H, 175, "male");
+  // 741 px from crown to sole.
+  const cm = 175 / 741,
+    f = GIRTH_FACTORS.male;
+  close(girths.waistCm, 121 * cm * f.waist, 1, "waist");
+  close(girths.hipCm, 161 * cm * f.hip, 1, "hip");
+  // The chest is measured just below the armpits. The upper arms overlap the outline there, so
+  // about 151 px of the 165 px torso counts.
+  close(girths.chestCm, 151 * cm * f.chest, 2, "chest");
+  assert.ok(girths.chestCm > girths.waistCm);
+  // A taller customer with the same photo has proportionally larger girths.
+  const taller = measureBodyCm(lm, person, W, H, 192.5, "male");
+  close(taller.waistCm, girths.waistCm * 1.1, 1, "scales with height");
+  const female = measureBodyCm(lm, person, W, H, 175, "female");
+  assert.ok(female.chestCm > girths.chestCm, "female chest factor is larger");
+});
+
+test("girths need a valid height and the whole body in the frame", () => {
+  const { lm, person } = figure();
+  assert.equal(measureBodyCm(lm, person, W, H, 0, "male"), null);
+  assert.equal(measureBodyCm(lm, person, W, H, 175, "other"), null);
+  // The head touches the top of the frame.
+  const cropped = person.slice();
+  for (let x = 180; x < 220; x++) for (let y = 0; y < 40; y++) cropped[y * W + x] = 255;
+  assert.equal(measureBodyCm(lm, cropped, W, H, 175, "male"), null);
+  // Only the torso is visible: far too short for a standing body.
+  const torsoOnly = person.slice();
+  torsoOnly.fill(0, 0, 150 * W);
+  torsoOnly.fill(0, 520 * W);
+  assert.equal(measureBodyCm(lm, torsoOnly, W, H, 175, "male"), null);
 });

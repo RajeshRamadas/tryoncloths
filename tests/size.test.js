@@ -6,6 +6,7 @@ import path from "node:path";
 import { AccountStore } from "./helpers/pilot-accounts.js";
 import { createApp, standardAvatar } from "../server/app.js";
 import { recommendSize, estimateSizeMeasurements, sizeChartTemplate } from "../server/size.js";
+import { validateMeasurements } from "../server/measurements.js";
 const chart = (size, chestCm, waistCm, sortOrder = 0) => ({
   size,
   measurements: { chestCm, waistCm },
@@ -36,6 +37,22 @@ test("exact ease-adjusted scoring picks the lowest sum and High confidence requi
   );
   assert.equal(hips.score, 0, "hip ease is 3 cm");
   assert.equal(hips.confidence, "Medium");
+});
+
+test("photo-estimated girths are named and never reach High confidence", () => {
+  const photo = recommendSize(rows, { chestCm: 98, waistCm: 84 }, { photo: true });
+  assert.equal(photo.size, "M");
+  assert.equal(photo.confidence, "Medium");
+  assert.equal(photo.source, "photo");
+  assert.match(photo.reason, /^Chest, waist and hip were estimated from the full-body photo/);
+  assert.deepEqual(validateMeasurements({ chestCm: 98, fitSource: "photo" }), {
+    chestCm: 98,
+    fitSource: "photo",
+  });
+  assert.throws(() => validateMeasurements({ fitSource: "guess" }), { status: 400 });
+  assert.throws(() => validateMeasurements({ chestCm: 98, fitSource: "photo" }, { chart: true }), {
+    status: 400,
+  });
 });
 
 test("one measured field and tied or close second sizes are Medium, with stable chart order", () => {

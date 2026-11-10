@@ -40,6 +40,11 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
   Owners can turn on a store setting (off by default) that opens this step after every
   saved avatar. A portrait still needs the customer's consent and uses 1 AI credit. See
   [avatar views](docs/AVATAR_VIEWS.md#portrait-right-after-saving-an-avatar).
+- The full-body photo now estimates chest, waist and hip in centimetres, scaled by the
+  customer's height. Staff can save them to a store customer, and size suggestions then
+  use them, marked as photo estimates and capped at Medium confidence. Editing the
+  girths after taping marks them as taped. See
+  [measurements in cm](docs/BODY_PHOTO_CHECK.md#measurements-in-cm).
 
 ## 0.21.0-rc.3
 

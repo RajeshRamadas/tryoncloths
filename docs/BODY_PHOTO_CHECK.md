@@ -61,12 +61,42 @@ turned side-on, or when the hips or shoulders are hidden.
 If the template images change, re-measure them. The browser test
 `tests/browser/body-build.spec.js` checks that each template still suggests its own profile.
 
+## Measurements in cm
+
+The same outline also gives chest, waist and hip girths, scaled by the height staff
+enter for the customer:
+
+1. The person outline is measured from the top of the head to the soles, near the
+   body's centre. The entered height divided by that pixel height gives centimetres
+   per pixel. The estimate is skipped if the head or feet touch the frame edge, or
+   the body is much shorter than a standing body (under 2.8 torso lengths).
+2. Front breadths are measured as for the build, with arms and hands left out. The
+   chest is the widest point 20–35% of the way down the torso, the waist is the
+   narrowest at 60–80%, and the hips are the widest around the hip joints.
+3. Each breadth is multiplied by a girth factor (`GIRTH_FACTORS` in
+   `src/body-build.js`). For each body library, the chest and waist factors make the
+   standard templates measure the illustrative chest and waist of the
+   [size-estimate table](SIZE_RECOMMENDATIONS.md) at that table's reference heights.
+   The hip factors put the Regular templates at typical hip girths (100 cm male, 98 cm
+   female).
+
+The numbers appear under the build suggestion as soon as the photo and height are
+entered. When a store customer is selected, staff can save them to the customer, and
+size suggestions then use them, capped at Medium confidence. Only the three numbers
+are saved. The photo is not uploaded for this. The browser test
+`tests/browser/body-build.spec.js` checks the templates still measure within 6 cm of the
+table.
+
 ## Limits
 
 - The thresholds are first estimates from synthetic photos. Calibrate them on consented
   pilot photos before relying on them.
 - Loose clothing such as sarees, long kurtas or coats can hide the hips and ankles, so the
   landmarks there are less reliable.
+- Girths in cm depend on the entered height, so a wrong height scales every girth.
+  The girth factors are fitted to the templates, not to taped customers. Expect
+  several centimetres of error, more with loose clothing, until they are calibrated
+  on pilot customers measured with a tape.
 - The build estimate compares proportions, not measurements. It cannot tell height,
   weight or garment size. Loose clothing makes the body look fuller, and tight
   clothing makes it look slimmer. It is calibrated only against the templates, not

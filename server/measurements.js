@@ -9,6 +9,8 @@ export const measurementRanges = {
   hipCm: [50, 240],
 };
 export const fitFields = ["chestCm", "waistCm", "hipCm"];
+// Where chest, waist and hip came from: a tape measure, or the on-device photo estimate.
+export const fitSources = ["tape", "photo"];
 export function validateMeasurements(value, { chart = false } = {}) {
   if (value == null) return null;
   if (typeof value !== "object" || Array.isArray(value))
@@ -18,6 +20,7 @@ export function validateMeasurements(value, { chart = false } = {}) {
     : [
         ...Object.keys(measurementRanges),
         "bodyProfileId",
+        "fitSource",
         ...jewelleryMeasurementFields.map((f) => f.key),
       ];
   if (Object.keys(value).some((key) => !allowed.includes(key)))
@@ -25,6 +28,12 @@ export function validateMeasurements(value, { chart = false } = {}) {
   const result = {};
   for (const [field, item] of Object.entries(value)) {
     if (item == null) continue;
+    if (field === "fitSource") {
+      if (!fitSources.includes(item))
+        throw fail("Record chest, waist and hip as taped or estimated from the photo.");
+      result[field] = item;
+      continue;
+    }
     if (field === "bodyProfileId") {
       if (!profiles.some((p) => p.id === item)) throw fail("Choose an available body profile.");
       result[field] = item;
