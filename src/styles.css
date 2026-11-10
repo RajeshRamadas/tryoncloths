@@ -1792,18 +1792,18 @@ dialog::backdrop {
   font-size: 13px;
 }
 .outfit-intro {
-  margin: 38px 0 28px;
+  margin: 28px 0 24px;
 }
 .outfit-intro h1 {
-  font-size: clamp(28px, 4vw, 42px);
-  margin: 12px 0;
-  color: var(--brand-800);
-  letter-spacing: -1px;
+  font-size: clamp(26px, 3vw, 32px);
+  margin: 6px 0;
+  color: var(--gray-900);
+  letter-spacing: -0.02em;
 }
 .outfit-intro p,
 .outfit-panel > p {
-  color: var(--gray-500);
-  line-height: 1.65;
+  color: var(--gray-600);
+  line-height: 1.6;
 }
 .outfit-layout {
   display: grid;
@@ -1816,6 +1816,7 @@ dialog::backdrop {
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
   background: var(--white);
+  box-shadow: var(--shadow-xs);
   overflow: hidden;
 }
 .outfit-preview-card {
@@ -1826,9 +1827,10 @@ dialog::backdrop {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  padding: 18px;
-  font-size: 13px;
+  padding: 14px 18px;
+  font-size: 14px;
   flex-wrap: wrap;
+  border-bottom: 1px solid var(--gray-200);
 }
 .outfit-preview-title span {
   color: var(--gray-500);
@@ -1869,33 +1871,45 @@ dialog::backdrop {
   padding: 24px;
 }
 .outfit-panel h2 {
-  font-size: 20px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 0 10px;
+  margin: 0 0 8px;
+  color: var(--gray-900);
 }
 .outfit-panel > p {
   font-size: 13px;
 }
 .outfit-tabs {
   display: flex;
-  gap: 8px;
+  gap: 4px;
+  padding: 4px;
   margin: 20px 0;
+  background: var(--gray-100);
+  border-radius: var(--radius-md);
 }
 .outfit-tabs button {
   flex: 1;
-  padding: 12px;
-  border: 1px solid var(--gray-200);
-  border-radius: var(--radius-md);
-  background: var(--gray-50);
-  color: var(--gray-700);
+  min-height: var(--control-height);
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--gray-600);
+  font-weight: 500;
   cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 .outfit-tabs button[aria-pressed="true"] {
-  background: var(--brand-700);
-  color: var(--white);
-  border-color: var(--brand-700);
+  background: var(--white);
+  color: var(--gray-900);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
 }
 .garment-grid {
   display: grid;
@@ -1907,19 +1921,29 @@ dialog::backdrop {
   min-width: 0;
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
-  background: var(--gray-50);
+  background: var(--white);
   padding: 10px 6px;
   display: flex;
   align-items: center;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
   cursor: pointer;
-  color: var(--brand-800);
+  color: var(--gray-900);
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.garment-tile:not([aria-pressed="true"]):hover {
+  border-color: var(--gray-300);
+  box-shadow: var(--shadow-sm);
+}
+.jewellery-studio h3 {
+  text-transform: none;
 }
 .garment-tile[aria-pressed="true"] {
-  border: 2px solid var(--brand-700);
+  border: 2px solid var(--brand-600);
   padding: 9px 5px;
-  background: var(--gray-100);
+  background: var(--brand-50);
 }
 .garment-tile img,
 .garment-original {
@@ -2376,36 +2400,44 @@ dialog::backdrop {
 .fitting-source {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 4px;
+  padding: 4px;
+  background: var(--gray-100);
+  border-radius: var(--radius-md);
 }
 .fitting-source button {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
-  padding: 14px 12px;
-  border: 1px solid var(--gray-300);
-  border-radius: var(--radius-md);
-  background: var(--white);
+  gap: 2px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--gray-700);
   min-width: 0;
-  min-height: 52px;
+  min-height: 48px;
   cursor: pointer;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 600;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 .fitting-source button span {
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 400;
   line-height: 1.4;
   color: var(--gray-500);
 }
 .fitting-source button[aria-pressed="true"] {
-  background: var(--brand-700);
-  color: var(--white);
-  border-color: var(--brand-700);
+  background: var(--white);
+  color: var(--gray-900);
+  box-shadow: var(--shadow-sm);
 }
 .fitting-source button[aria-pressed="true"] span {
-  color: var(--gray-500);
+  color: var(--gray-600);
 }
 .fitting-source-panel {
   display: grid;
@@ -2416,7 +2448,7 @@ dialog::backdrop {
   margin: 24px 0;
 }
 .outfit-intro h1 {
-  font-size: clamp(28px, 4vw, 36px);
+  font-size: clamp(26px, 3vw, 32px);
 }
 .outfit-preview {
   height: min(48vh, 500px);
@@ -2914,15 +2946,20 @@ dialog::backdrop {
   max-width: 1000px;
   margin: 0 auto;
   padding: 28px 20px 60px;
-  color: var(--brand-800);
+  color: var(--gray-900);
 }
 .billing-page h1 {
-  margin: 24px 0;
-  font-size: 34px;
+  margin: 20px 0 8px;
+  font-family: var(--font-display);
+  font-size: clamp(26px, 3vw, 32px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 .billing-page h2 {
-  margin: 20px 0 14px;
-  font-size: 22px;
+  margin: 20px 0 12px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
 }
 .billing-page h3 {
   text-transform: capitalize;
@@ -2935,7 +2972,8 @@ dialog::backdrop {
   background: var(--white);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
-  padding: 22px;
+  box-shadow: var(--shadow-xs);
+  padding: 24px;
   margin: 20px 0;
 }
 .billing-page p {
@@ -3782,9 +3820,6 @@ dialog::backdrop {
 }
 .jewellery-studio > h1 {
   max-width: 750px;
-  font-size: clamp(30px, 4vw, 46px);
-  line-height: 1.15;
-  letter-spacing: -1.2px;
 }
 .jewellery-studio nav {
   flex-wrap: wrap;
