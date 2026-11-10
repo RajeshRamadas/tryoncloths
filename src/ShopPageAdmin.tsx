@@ -126,7 +126,6 @@ export default function ShopPageAdmin() {
   const link = page ? publicShopUrl(page.path) : "";
   return (
     <main className="billing-page branding-page shop-page-admin">
-      <a href="/">Back to Forme</a>
       <h1>Shop page</h1>
       <p>
         Your store’s own public page with your branding, shop photos and in-stock catalogue.

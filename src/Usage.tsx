@@ -58,7 +58,6 @@ export default function Usage() {
   );
   return (
     <main className="billing-page">
-      <a href="/">Back to Forme</a>
       <h1>Usage</h1>
       {error && <p role="alert">{error}</p>}
       {!report && !error ? (

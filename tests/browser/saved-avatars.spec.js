@@ -69,24 +69,30 @@ test("an explicitly saved customer avatar survives reload, reopens for clothes, 
   await save(page, "Customer A");
   // Saving the same PNG again updates the name rather than duplicating it.
   await save(page, "Customer A updated");
-  const records = await page.evaluate(async () => {
-    const db = await new Promise((resolve, reject) => {
-      const r = indexedDB.open("forme-saved-avatars", 1);
-      r.onsuccess = () => resolve(r.result);
-      r.onerror = () => reject(r.error);
+  // The second save shows the same notice as the first, so wait for the rename to land.
+  const readRecords = () =>
+    page.evaluate(async () => {
+      const db = await new Promise((resolve, reject) => {
+        const r = indexedDB.open("forme-saved-avatars", 1);
+        r.onsuccess = () => resolve(r.result);
+        r.onerror = () => reject(r.error);
+      });
+      const all = await new Promise((resolve, reject) => {
+        const r = db.transaction("avatars").objectStore("avatars").getAll();
+        r.onsuccess = () => resolve(r.result);
+        r.onerror = () => reject(r.error);
+      });
+      db.close();
+      return all.map((item) => ({
+        keys: Object.keys(item).sort(),
+        type: item.image.type,
+        name: item.name,
+      }));
     });
-    const all = await new Promise((resolve, reject) => {
-      const r = db.transaction("avatars").objectStore("avatars").getAll();
-      r.onsuccess = () => resolve(r.result);
-      r.onerror = () => reject(r.error);
-    });
-    db.close();
-    return all.map((item) => ({
-      keys: Object.keys(item).sort(),
-      type: item.image.type,
-      name: item.name,
-    }));
-  });
+  await expect
+    .poll(async () => (await readRecords()).map((record) => record.name))
+    .toEqual(["Customer A updated"]);
+  const records = await readRecords();
   expect(records).toEqual([
     {
       keys: [
