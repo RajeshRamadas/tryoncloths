@@ -10,6 +10,7 @@ import { transaction, installSharedCatalogueSchema } from "./catalogue-fields.js
 import { installSyncSchema, installSyncRoutes } from "./catalogue-sync.js";
 import { installPhotoSchema, installPhotoRoutes } from "./photo-jobs.js";
 import { BrandingStore, installBrandingRoutes } from "./branding.js";
+import { ShopPageStore, installShopPageRoutes } from "./shop-page.js";
 import { ShopperBudgets, installShopperBudgetRoutes } from "./shopper-budgets.js";
 import { ImageSlots } from "./image-slots.js";
 import { installShopifyShopperSchema } from "./shopify-shopper.js";
@@ -141,6 +142,7 @@ export class AccountStore {
       installSyncSchema(this.db);
       installPhotoSchema(this.db);
       this.branding = new BrandingStore(this);
+      this.shopPages = new ShopPageStore(this);
     } catch (error) {
       this.db.close();
       throw error;
@@ -580,6 +582,12 @@ export function installAccountRoutes(
   installShopperBudgetRoutes(app, store, { requireUser, sameOrigin, wrap });
   installShopifyShopperOwner(app, shopifyShopper, { requireUser, sameOrigin, wrap, production });
   installBrandingRoutes(app, store, { requireUser, sameOrigin, wrap });
+  installShopPageRoutes(app, store, {
+    requireUser,
+    sameOrigin,
+    wrap,
+    viewer: (req) => accountUser(store, req),
+  });
   installAnalyticsRoutes(app, store, {
     requireUser,
     sameOrigin,

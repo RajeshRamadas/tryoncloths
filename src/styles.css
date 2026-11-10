@@ -4072,3 +4072,74 @@ dialog::backdrop {
 .pose-hints .pose-ok {
   color: var(--green);
 }
+.shop-page-admin textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  font: inherit;
+  border: 1px solid #d7dfd2;
+  border-radius: 8px;
+}
+.shop-photo-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+  display: grid;
+  gap: 16px;
+}
+.shop-photo-list li {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding-top: 16px;
+  border-top: 1px solid #e3e9df;
+}
+.shop-photo-list img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+.shop-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.shop-page-admin .shop-photo-actions button {
+  margin: 0;
+}
+@media (max-width: 520px) {
+  .shop-photo-list li {
+    grid-template-columns: 1fr;
+  }
+  .shop-photo-list img {
+    width: 100%;
+    height: auto;
+    max-height: 240px;
+  }
+}
+.shop-page-admin > a,
+.shop-page-admin section p > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.shop-page-admin .consent {
+  font-size: 15px;
+  color: inherit;
+  align-items: center;
+}
+.shop-page-admin .consent input {
+  width: 20px;
+  height: 20px;
+}
+.shop-page-admin textarea,
+.shop-page-admin input:not([type="checkbox"]) {
+  font-size: 16px;
+}
+@media (min-width: 900px) {
+  .shop-photo-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
