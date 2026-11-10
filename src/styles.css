@@ -4119,3 +4119,27 @@ dialog::backdrop {
     max-height: 240px;
   }
 }
+.shop-page-admin > a,
+.shop-page-admin section p > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.shop-page-admin .consent {
+  font-size: 15px;
+  color: inherit;
+  align-items: center;
+}
+.shop-page-admin .consent input {
+  width: 20px;
+  height: 20px;
+}
+.shop-page-admin textarea,
+.shop-page-admin input:not([type="checkbox"]) {
+  font-size: 16px;
+}
+@media (min-width: 900px) {
+  .shop-photo-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

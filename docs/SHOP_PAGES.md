@@ -52,6 +52,28 @@ allows same-origin images and inline styles.
 - Saves carry a revision, so two people editing at once get "changed in another tab"
   instead of silently overwriting each other.
 
+## Phones, tablets, laptops and apps
+
+- **Every screen size:** the shop page and the editor are responsive. Phones show two
+  products per row, tablets three to four and laptops up to five, with no sideways
+  scrolling and 44 px touch targets. Notches and home bars are respected
+  (`viewport-fit=cover` with safe-area padding). Checked on iPhone, Android phone, iPad
+  portrait, Android tablet landscape and a 1440 px laptop.
+- **Add to home screen (iOS and Android):** each page has its own web app manifest,
+  theme colour and square icons (180, 192 and 512 px) made from the store logo on the
+  brand colour, or the store's initial when there is no logo. Customers can install the
+  shop from Safari's Share menu or Chrome's menu, and it opens full screen like an app.
+- **Native apps:** `GET /shop/<address>/data.json` returns the same public content as
+  the page as JSON (`version: 1`): store name, colours, logo, contacts, tagline, about,
+  hours, photos, catalogue items with prices (when shown), try-on links and image URLs
+  relative to the studio. It allows any origin (`Access-Control-Allow-Origin: *`)
+  without cookies, so the Forme Android app, a future iOS app or a counter tablet kiosk
+  can render the shop natively. It carries nothing that the public page does not show,
+  and it is unavailable while the page is unpublished.
+- **Editor in the app:** the Shop page editor is part of the studio, so it also works in
+  the Android (Capacitor) app. When the app is connected to a studio, the page link it
+  shows uses that studio's address.
+
 ## Routes
 
 | Route | Access | Purpose |
@@ -62,6 +84,8 @@ allows same-origin images and inline styles.
 | `PATCH /api/shop-page/photos/:id` | owner/manager, same origin | `{caption?, move?: "up" \| "down" \| "first"}` |
 | `DELETE /api/shop-page/photos/:id` | owner/manager, same origin | Remove a photo |
 | `GET /shop/:slug` | public when published | The shop page |
+| `GET /shop/:slug/data.json` | same as the page, any origin | JSON feed for apps |
+| `GET /shop/:slug/manifest.webmanifest`, `/icon-{180,192,512}.png` | same as the page | Home-screen install |
 | `GET /shop/:slug/logo`, `/photos/:id`, `/items/:id/image` | same as the page | Logo, shop photo and catalogue image |
 
 Data lives in the existing account database (`shop_pages`, `shop_page_photos`) and is

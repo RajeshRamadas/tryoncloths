@@ -332,3 +332,88 @@ test("photos can be captioned, reordered, made the cover and removed, up to the 
       assert.equal((await request("/api/shop-page/photos", "POST", { image })).status, 201);
     assert.equal((await request("/api/shop-page/photos", "POST", { image })).status, 409);
   }));
+
+test("apps get a read-only JSON feed, a web app manifest and home-screen icons", async () =>
+  fixture(async ({ request, inStock, soldOut, store, a }) => {
+    await request("/api/shop-page", "PUT", {
+      published: true,
+      slug: "lakshmi",
+      tagline: "Bridal wear",
+      whatsapp: "+919876543210",
+    });
+    await request("/api/shop-page/photos", "POST", { image: await jpeg(), caption: "Front" });
+    const feed = await request(
+      "/shop/lakshmi/data.json",
+      "GET",
+      undefined,
+      "",
+      "capacitor://localhost",
+    );
+    assert.equal(feed.status, 200);
+    assert.equal(feed.headers.get("access-control-allow-origin"), "*");
+    assert.equal(feed.headers.get("access-control-allow-credentials"), null);
+    const data = await feed.json();
+    assert.equal(data.version, 1);
+    assert.equal(data.published, true);
+    assert.equal(data.store.name, "Lakshmi Silks");
+    assert.equal(data.store.primaryColor, "#7a1f3d");
+    assert.equal(data.store.textColor, "#ffffff");
+    assert.equal(data.store.whatsapp, "+919876543210");
+    assert.equal(data.photos.length, 1);
+    assert.equal(data.photos[0].cover, true);
+    assert.match(data.photos[0].image, /^\/shop\/lakshmi\/photos\//);
+    assert.deepEqual(
+      data.items.map((i) => i.id),
+      [inStock.id],
+    );
+    assert.equal(data.items[0].priceInr, 2499);
+    assert.equal(data.items[0].mrpInr, 2999);
+    assert.match(data.items[0].tryOn, /^https:\/\/wa\.me\/919876543210\?text=/);
+    assert.ok(!JSON.stringify(data).includes(soldOut.id));
+    assert.doesNotMatch(JSON.stringify(data), /Private Customer|9123456780|owner@example|Secret/);
+    for (const item of data.items)
+      assert.equal((await request(item.image, "GET", undefined, "")).status, 200);
+    await request("/api/shop-page", "PUT", { showPrices: false });
+    const hidden = await (await request("/shop/lakshmi/data.json", "GET", undefined, "")).json();
+    assert.equal(hidden.items[0].priceInr, null);
+    await request("/api/shop-page", "PUT", { published: false });
+    assert.equal((await request("/shop/lakshmi/data.json", "GET", undefined, "")).status, 404);
+    await request("/api/shop-page", "PUT", { published: true });
+
+    const manifest = await request("/shop/lakshmi/manifest.webmanifest", "GET", undefined, "");
+    assert.match(manifest.headers.get("content-type"), /application\/manifest\+json/);
+    const app = await manifest.json();
+    assert.equal(app.start_url, "/shop/lakshmi");
+    assert.equal(app.display, "standalone");
+    assert.equal(app.theme_color, "#7a1f3d");
+    assert.deepEqual(
+      app.icons.map((i) => i.sizes),
+      ["192x192", "512x512"],
+    );
+    const html = await (await request("/shop/lakshmi", "GET", undefined, "")).text();
+    assert.match(html, /rel="manifest" href="\/shop\/lakshmi\/manifest.webmanifest"/);
+    assert.match(html, /rel="apple-touch-icon" href="\/shop\/lakshmi\/icon-180.png"/);
+    assert.match(html, /viewport-fit=cover/);
+    for (const size of [180, 192, 512]) {
+      const icon = await request(`/shop/lakshmi/icon-${size}.png`, "GET", undefined, "");
+      const meta = await sharp(Buffer.from(await icon.arrayBuffer())).metadata();
+      assert.deepEqual([meta.format, meta.width, meta.height], ["png", size, size]);
+    }
+    assert.equal((await request("/shop/lakshmi/icon-64.png", "GET", undefined, "")).status, 404);
+    await store.branding.update(a, {
+      logo:
+        "data:image/png;base64," +
+        (
+          await sharp({ create: { width: 300, height: 100, channels: 3, background: "#ffffff" } })
+            .png()
+            .toBuffer()
+        ).toString("base64"),
+    });
+    const logoIcon = await request("/shop/lakshmi/icon-512.png", "GET", undefined, "");
+    const meta = await sharp(Buffer.from(await logoIcon.arrayBuffer())).metadata();
+    assert.deepEqual([meta.width, meta.height], [512, 512]);
+    assert.equal(
+      (await (await request("/shop/lakshmi/data.json", "GET", undefined, "")).json()).store.logo,
+      "/shop/lakshmi/logo",
+    );
+  }));

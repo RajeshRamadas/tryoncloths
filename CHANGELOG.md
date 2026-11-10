@@ -8,7 +8,9 @@ Release notes for the Forme web studio, newest first. Feature guides live in [do
   shop photos, about text, opening hours and in-stock catalogue. Each product has a
   **Try it on** button that opens WhatsApp (or calls the store) to book a try-on. Owners
   and managers edit the page and upload up to 12 photos from **Store tools → Shop
-  page**; the owner chooses the address and publishes it. See [shop pages](docs/SHOP_PAGES.md).
+  page**; the owner chooses the address and publishes it. The page works on phones,
+  tablets and laptops, can be added to the home screen on iOS and Android, and has a
+  JSON feed for the mobile apps. See [shop pages](docs/SHOP_PAGES.md).
 - Jewellery cut-outs can now be made from a product photo on a plain backdrop (PNG,
   JPEG or WebP). The background is removed on the staff device with no AI credit,
   with a tolerance control and an option to clear ring holes and chain loops. See

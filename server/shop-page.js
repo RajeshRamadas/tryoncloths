@@ -378,7 +378,7 @@ export function tryOnLink(page, brand, itemName) {
   return "";
 }
 const css =
-  "*{box-sizing:border-box}body{margin:0;background:#f7f8f3;color:#233d31;font:16px/1.6 system-ui,sans-serif}main{max-width:1040px;margin:auto;padding:24px 16px 40px}h2{font-size:22px;margin:32px 0 12px}p{overflow-wrap:anywhere;white-space:pre-line}a{color:#205c47}.tagline{font-size:18px;margin:-8px 0 16px}.cta{display:inline-block;padding:12px 20px;border-radius:999px;background:var(--brand);color:var(--brand-ink);text-decoration:none;font-weight:600}.hero{display:block;width:100%;max-height:60vh;object-fit:cover;border-radius:16px;margin:16px 0}.gallery,.items{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}.gallery figure{margin:0}.gallery img,.item img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:12px;background:white}.item img{object-fit:contain}figcaption{font-size:14px;color:#596b60;margin-top:6px}.item{padding:12px;border:1px solid #d8dfd3;border-radius:14px;background:white;display:flex;flex-direction:column;gap:6px}.item h3{font-size:16px;margin:4px 0 0;overflow-wrap:anywhere}.item .price{font-weight:600}.item s{color:#7a877f;font-weight:400;margin-left:6px}.item .low{color:#a14b12;font-size:14px}.item nav{display:flex;gap:12px;flex-wrap:wrap;margin-top:auto;font-size:15px}.info{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}.info section{padding:16px 20px;border:1px solid #d8dfd3;border-radius:14px;background:white}.info h2{margin-top:0}.powered{margin-top:32px;font-size:13px;color:#596b60}.preview{padding:10px 14px;border-radius:10px;background:#fff4d6;color:#5c4300}";
+  "*{box-sizing:border-box}body{margin:0;background:#f7f8f3;color:#233d31;font:16px/1.6 system-ui,sans-serif}main{max-width:1040px;margin:auto;padding:max(24px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(40px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}@media(min-width:1280px){main{max-width:1200px}}h2{font-size:22px;margin:32px 0 12px}p{overflow-wrap:anywhere;white-space:pre-line}a{color:#205c47}.tagline{font-size:18px;margin:-8px 0 16px}.cta{display:inline-flex;align-items:center;min-height:44px;padding:10px 20px;border-radius:999px;background:var(--brand);color:var(--brand-ink);text-decoration:none;font-weight:600}.hero{display:block;width:100%;max-height:60vh;object-fit:cover;border-radius:16px;margin:16px 0}.gallery,.items{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}@media(max-width:600px){.gallery,.items{gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.item{padding:8px}}.gallery figure{margin:0}.gallery img,.item img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:12px;background:white}.item img{object-fit:contain}figcaption{font-size:14px;color:#596b60;margin-top:6px}.item{padding:12px;border:1px solid #d8dfd3;border-radius:14px;background:white;display:flex;flex-direction:column;gap:6px}.item h3{font-size:16px;margin:4px 0 0;overflow-wrap:anywhere}.item .price{font-weight:600}.item s{color:#7a877f;font-weight:400;margin-left:6px}.item .low{color:#a14b12;font-size:14px}.item nav{display:flex;gap:4px 12px;flex-wrap:wrap;margin-top:auto;font-size:15px}.item nav a,.store-contact nav a{display:inline-flex;align-items:center;min-height:44px}.info{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}.info section{padding:16px 20px;border:1px solid #d8dfd3;border-radius:14px;background:white}.info h2{margin-top:0}.powered{margin-top:32px;font-size:13px;color:#596b60}.preview{padding:10px 14px;border-radius:10px;background:#fff4d6;color:#5c4300}";
 export function shopPageHtml({ page, brand, photos, items, slug, preview = false }) {
   const base = `/shop/${encodeURIComponent(slug)}`,
     [hero, ...rest] = photos,
@@ -400,16 +400,95 @@ export function shopPageHtml({ page, brand, photos, items, slug, preview = false
     page.hours ? `<section><h2>Opening hours</h2><p>${escape(page.hours)}</p></section>` : "",
   ].join("");
   const body = `${preview ? '<p class="preview" role="status">Preview: only your store team can see this page until it is published.</p>' : ""}${brandHeader(brand, `${base}/logo`)}${page.tagline ? `<p class="tagline">${escape(page.tagline)}</p>` : ""}${tryAll ? `<a class="cta" href="${escape(tryAll)}"${external(tryAll)}>Book a try-on</a>` : ""}${hero ? photo(hero, "hero") : ""}${info ? `<div class="info">${info}</div>` : ""}${rest.length ? `<h2>Inside our shop</h2><div class="gallery">${rest.map((p) => `<figure>${photo(p)}${p.caption ? `<figcaption>${escape(p.caption)}</figcaption>` : ""}</figure>`).join("")}</div>` : ""}${page.showCatalogue && items.length ? `<h2>In store now</h2><p>See a piece you like? Tap “Try it on” and the store will set up a virtual try-on on your own avatar.</p><div class="items">${items.map(item).join("")}</div>` : ""}${brandContact(brand)}<p class="powered">Virtual try-on by Forme. Try-on images are an approximate visual guide and do not predict size or fit.</p>`;
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(brand.displayName)}</title>${page.tagline ? `<meta name="description" content="${escape(page.tagline)}">` : ""}<meta property="og:title" content="${escape(brand.displayName)}"><style>${css}${brandCss}</style></head><body><main style="--brand:${brand.primaryColor};--brand-ink:${brandInk(brand.primaryColor)}">${body}</main></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(brand.displayName)}</title><meta name="theme-color" content="${brand.primaryColor}"><link rel="manifest" href="${base}/manifest.webmanifest"><link rel="icon" type="image/png" sizes="192x192" href="${base}/icon-192.png"><link rel="apple-touch-icon" href="${base}/icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="${escape(brand.displayName.slice(0, 30))}">${page.tagline ? `<meta name="description" content="${escape(page.tagline)}">` : ""}<meta property="og:title" content="${escape(brand.displayName)}"><style>${css}${brandCss}</style></head><body><main style="--brand:${brand.primaryColor};--brand-ink:${brandInk(brand.primaryColor)}">${body}</main></body></html>`;
 }
 
+// One public model of the page for the web page and for app clients (iOS, Android,
+// tablets, kiosks). Image links are relative to the studio origin.
+export function shopData({ page, brand, photos, items, slug }) {
+  const base = `/shop/${encodeURIComponent(slug)}`;
+  return {
+    version: 1,
+    slug,
+    url: base,
+    store: {
+      name: brand.displayName,
+      primaryColor: brand.primaryColor,
+      textColor: brandInk(brand.primaryColor),
+      logo: brand.hasLogo ? `${base}/logo` : null,
+      icon: `${base}/icon-512.png`,
+      phone: brand.phone || null,
+      address: brand.address || null,
+      mapUrl: brand.mapUrl || null,
+      whatsapp: page.whatsapp || null,
+    },
+    tagline: page.tagline,
+    about: page.about,
+    hours: page.hours,
+    bookTryOn: tryOnLink(page, brand) || null,
+    photos: photos.map((p, i) => ({
+      id: p.id,
+      caption: p.caption,
+      cover: i === 0,
+      image: `${base}/photos/${encodeURIComponent(p.id)}`,
+    })),
+    items: page.showCatalogue
+      ? items.map((g) => {
+          const label = [g.name, g.variant].filter(Boolean).join(" — ");
+          return {
+            id: g.id,
+            name: g.name,
+            variant: g.variant || "",
+            category: g.category,
+            type: g.garmentType,
+            stock: g.stock,
+            priceInr: page.showPrices && typeof g.priceInr === "number" ? g.priceInr : null,
+            mrpInr:
+              page.showPrices && typeof g.mrpInr === "number" && g.mrpInr > g.priceInr
+                ? g.mrpInr
+                : null,
+            image: `${base}/items/${encodeURIComponent(g.id)}/image`,
+            tryOn: tryOnLink(page, brand, label) || null,
+            productUrl: httpsUrl(g.sourceUrl) || null,
+          };
+        })
+      : [],
+  };
+}
+export async function shopIcon(brand, logo, size) {
+  const inset = Math.round(size * 0.14),
+    background = {
+      create: { width: size, height: size, channels: 4, background: brand.primaryColor },
+    };
+  if (logo) {
+    const mark = await sharp(Buffer.from(logo))
+      .resize(size - inset * 2, size - inset * 2, {
+        fit: "contain",
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .png()
+      .toBuffer();
+    return sharp(background)
+      .composite([{ input: mark, left: inset, top: inset }])
+      .png()
+      .toBuffer();
+  }
+  const letter = escape([...brand.displayName.trim()][0]?.toUpperCase() || "S");
+  return sharp(
+    Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><rect width="100%" height="100%" fill="${brand.primaryColor}"/><text x="50%" y="50%" dy="0.35em" text-anchor="middle" font-family="sans-serif" font-weight="bold" font-size="${Math.round(size * 0.55)}" fill="${brandInk(brand.primaryColor)}">${letter}</text></svg>`,
+    ),
+  )
+    .png()
+    .toBuffer();
+}
 const publicHeaders = (res) =>
   res.set({
     "Cache-Control": "public, max-age=60",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "Content-Security-Policy":
-      "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      "default-src 'none'; img-src 'self'; manifest-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
   });
 const missing = (res) =>
   publicHeaders(res)
@@ -492,6 +571,65 @@ export function installShopPageRoutes(app, store, { requireUser, sameOrigin, wra
         preview: row.published !== 1,
       });
       publicHeaders(res).type("html").send(html);
+    }),
+  );
+  const model = (row) => {
+    const page = settings(row.settingsJson);
+    return shopData({
+      page,
+      brand: store.branding.read(row.store),
+      slug: row.slug,
+      photos: pages.photos(row.store),
+      items: page.showCatalogue ? pages.catalogue(row.store) : [],
+    });
+  };
+  // Read-only feed for the iOS/Android apps and other clients. It carries only what
+  // the public page already shows, so any origin may read it without credentials.
+  app.get(
+    "/shop/:slug/data.json",
+    pub((req, res, row) => {
+      publicHeaders(res).set({ "Access-Control-Allow-Origin": "*", Vary: "Origin" });
+      res.json({ ...model(row), published: row.published === 1 });
+    }),
+  );
+  app.get(
+    "/shop/:slug/manifest.webmanifest",
+    pub((req, res, row) => {
+      const data = model(row);
+      publicHeaders(res)
+        .type("application/manifest+json")
+        .send(
+          JSON.stringify({
+            name: data.store.name,
+            short_name: data.store.name.slice(0, 12),
+            description: data.tagline || undefined,
+            start_url: data.url,
+            scope: data.url,
+            display: "standalone",
+            orientation: "any",
+            theme_color: data.store.primaryColor,
+            background_color: "#f7f8f3",
+            icons: [192, 512].map((size) => ({
+              src: `${data.url}/icon-${size}.png`,
+              sizes: `${size}x${size}`,
+              type: "image/png",
+              purpose: "any",
+            })),
+          }),
+        );
+    }),
+  );
+  app.get(
+    "/shop/:slug/icon-:size.png",
+    pub(async (req, res, row) => {
+      const size = Number(req.params.size);
+      if (![180, 192, 512].includes(size)) return missing(res);
+      const icon = await shopIcon(
+        store.branding.read(row.store),
+        store.branding.logo(row.store),
+        size,
+      );
+      publicHeaders(res).set("Cache-Control", "public, max-age=3600").type("png").send(icon);
     }),
   );
   app.get(
