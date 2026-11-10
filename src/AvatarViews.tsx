@@ -368,7 +368,7 @@ export default function AvatarViews({
     <Container className="billing-page avatar-views-page">
       {!embedded && (
         <nav>
-          <a href="/">Back to Forme</a> · <a href="/catalogue">Store catalogue</a>
+          <a href="/catalogue">Store catalogue</a>
         </nav>
       )}
       {!embedded && <h1>Avatar views</h1>}

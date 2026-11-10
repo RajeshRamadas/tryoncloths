@@ -13,6 +13,7 @@ import Usage from "./Usage";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import ToolHeader from "./ToolHeader";
 import InviteAcceptance from "./InviteAcceptance";
 import Billing from "./Billing";
 import "./styles.css";
@@ -23,8 +24,27 @@ const JewelleryStudio = React.lazy(() => import("./JewelleryStudio"));
 
 document.documentElement.classList.toggle("native-app", isNative);
 
+// Staff pages reached from Store tools (and the try-on studios) share one header.
+const toolPages = new Set([
+  "/complete-look",
+  "/jewellery",
+  "/avatar-views",
+  "/jewellery-catalogue",
+  "/shopper-spending",
+  "/branding",
+  "/shop-page",
+  "/catalogue-photos",
+  "/analytics",
+  "/size-charts",
+  "/catalogue",
+  "/whatsapp",
+  "/billing",
+  "/usage",
+]);
+
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
+    {toolPages.has(window.location.pathname) && <ToolHeader />}
     {window.location.pathname === "/complete-look" ? (
       <React.Suspense fallback={<p role="status">Opening complete looks…</p>}>
         <CompleteLook />

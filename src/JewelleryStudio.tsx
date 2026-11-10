@@ -871,9 +871,6 @@ export default function JewelleryStudio() {
   return (
     <main className="billing-page jewellery-studio">
       <nav className="jewellery-navigation">
-        <a className="button secondary" href="/">
-          ← Back to studio
-        </a>
         {avatar && <TryOnTabs current="jewellery" avatarId={avatar} disabled={!!busy} />}
         <details>
           <summary>More options</summary>

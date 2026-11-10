@@ -112,7 +112,6 @@ export default function ShopperSettings() {
   return (
     <main className="billing-page shopper-settings">
       <nav>
-        <a href="/">Back to Forme</a>
         <a href="/billing">Billing</a>
         <a href="/shopify-shopper">Shopify widget</a>
       </nav>

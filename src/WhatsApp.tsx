@@ -148,7 +148,6 @@ export default function WhatsApp() {
   }
   return (
     <main className="billing-page whatsapp-page">
-      <a href="/">Back to Forme</a>
       <h1>WhatsApp lookbooks</h1>
       <p>
         {store} · {role}

@@ -176,7 +176,6 @@ export default function Branding() {
   };
   return (
     <main className="billing-page branding-page">
-      <a href="/">Back to Forme</a>
       <h1>Store branding</h1>
       <p>
         Set the identity shown on shared outfits, WhatsApp lookbooks and exported images. Branding

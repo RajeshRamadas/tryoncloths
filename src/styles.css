@@ -523,7 +523,7 @@ h1 {
   position: absolute;
   top: 5px;
   right: 5px;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: 50%;
   background: var(--white);
   display: flex;
@@ -958,7 +958,7 @@ h1 {
   top: 29px;
   width: 125px;
   height: 170px;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: 50%;
   transform: rotate(35deg);
   pointer-events: none;
@@ -1247,7 +1247,7 @@ footer > span:last-child {
   flex-shrink: 0;
 }
 dialog {
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
   padding: 34px;
   max-width: min(510px, 92vw);
@@ -2017,7 +2017,7 @@ dialog::backdrop {
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-md);
   background: var(--white);
-  color: var(--brand-800);
+  color: var(--gray-900);
 }
 .outfit-panel > .sample-match-count {
   font-size: 13px;
@@ -2223,7 +2223,7 @@ dialog::backdrop {
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-sm);
   background: var(--white);
-  color: var(--brand-800);
+  color: var(--gray-900);
   padding: 11px;
   margin: 7px 0 14px;
 }
@@ -2798,7 +2798,7 @@ dialog::backdrop {
   margin-top: 6px;
   font: inherit;
   background: var(--white);
-  color: var(--brand-800);
+  color: var(--gray-900);
 }
 .catalogue-grid {
   display: grid;
@@ -2849,7 +2849,7 @@ dialog::backdrop {
   gap: 8px;
 }
 .tone-options button {
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
   background: var(--gray-50);
   color: var(--brand-800);
@@ -2907,7 +2907,7 @@ dialog::backdrop {
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-sm);
   background: var(--white);
-  color: var(--brand-800);
+  color: var(--gray-900);
   font: inherit;
 }
 .body-library-select select:focus-visible {
@@ -3314,7 +3314,7 @@ dialog::backdrop {
 .share-look {
   padding: 16px;
   margin-top: 16px;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
   min-width: 0;
 }
@@ -3368,7 +3368,7 @@ dialog::backdrop {
 .whatsapp-page section {
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
 }
 .whatsapp-page label:not(.consent) {
@@ -3383,10 +3383,10 @@ dialog::backdrop {
   min-width: 0;
   padding: 10px;
   font: inherit;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-300);
   border-radius: var(--radius-sm);
   background: var(--white);
-  color: var(--brand-800);
+  color: var(--gray-900);
 }
 .whatsapp-page button {
   white-space: normal;
@@ -3403,7 +3403,7 @@ dialog::backdrop {
 }
 .wa-options > label {
   padding: 12px;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-sm);
 }
 .wa-options img,
@@ -3423,7 +3423,7 @@ dialog::backdrop {
 .catalogue-manager section {
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
 }
 .catalogue-manager label {
@@ -3438,10 +3438,10 @@ dialog::backdrop {
   min-width: 0;
   padding: 10px;
   font: inherit;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-300);
   border-radius: var(--radius-sm);
   background: var(--white);
-  color: var(--brand-800);
+  color: var(--gray-900);
 }
 .catalogue-manager button {
   white-space: normal;
@@ -3547,7 +3547,7 @@ dialog::backdrop {
 .size-guidance {
   padding: 12px 16px;
   margin: 12px;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
   background: var(--brand-50);
   font-size: 14px;
@@ -3565,7 +3565,7 @@ dialog::backdrop {
 .purchase-look {
   padding: 16px;
   margin-top: 16px;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
 }
 .purchase-look label,
@@ -3584,13 +3584,13 @@ dialog::backdrop {
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-sm);
   font: inherit;
-  color: var(--brand-800);
+  color: var(--gray-900);
   background: var(--white);
 }
 .size-charts-page section {
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
 }
 .size-charts-page button,
@@ -3613,7 +3613,7 @@ dialog::backdrop {
 .analytics-page section {
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
   min-width: 0;
 }
@@ -3642,7 +3642,7 @@ dialog::backdrop {
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-sm);
   background: var(--white);
-  color: var(--brand-800);
+  color: var(--gray-900);
   font: inherit;
 }
 .analytics-cards {
@@ -3652,7 +3652,7 @@ dialog::backdrop {
   margin: 20px 0;
 }
 .analytics-cards article {
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
   padding: 16px;
   background: var(--brand-50);
@@ -3704,7 +3704,8 @@ dialog::backdrop {
   padding: 16px;
   margin: 16px 0;
   border-radius: var(--radius-md);
-  background: var(--brand-50);
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
   min-width: 0;
 }
 .shop-connection p {
@@ -3726,7 +3727,7 @@ dialog::backdrop {
 .photo-page section {
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
   min-width: 0;
 }
@@ -3751,10 +3752,10 @@ dialog::backdrop {
   min-width: 0;
   padding: 10px;
   font: inherit;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-300);
   border-radius: var(--radius-sm);
   background: var(--white);
-  color: var(--brand-800);
+  color: var(--gray-900);
 }
 .photo-page .consent {
   display: flex;
@@ -3769,7 +3770,7 @@ dialog::backdrop {
 }
 .photo-page fieldset {
   min-width: 0;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
   margin: 16px 0;
 }
@@ -3829,7 +3830,7 @@ dialog::backdrop {
 .branding-page section {
   padding: 20px;
   margin: 20px 0;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
 }
 .branding-page label:not(.consent) {
@@ -3843,10 +3844,10 @@ dialog::backdrop {
   min-width: 0;
   padding: 10px;
   font: inherit;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-300);
   border-radius: var(--radius-sm);
   background: var(--white);
-  color: var(--brand-800);
+  color: var(--gray-900);
 }
 .branding-page .consent {
   display: flex;
@@ -3958,7 +3959,7 @@ dialog::backdrop {
   border-radius: var(--radius-md);
   padding: 11px;
   background: var(--white);
-  color: var(--brand-800);
+  color: var(--gray-900);
   margin-top: 7px;
   font: inherit;
 }
@@ -4354,7 +4355,7 @@ dialog::backdrop {
   min-width: 0;
   padding: 10px;
   font: inherit;
-  border: 1px solid var(--brand-200);
+  border: 1px solid var(--gray-300);
   border-radius: var(--radius-sm);
 }
 .shop-photo-list {
@@ -4419,4 +4420,42 @@ dialog::backdrop {
   .shop-photo-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Store-tool pages: shared header, then a page title and white cards. */
+.tool-header .brand {
+  font-size: 22px;
+}
+.tool-header .brand-symbol {
+  width: 28px;
+  height: 28px;
+}
+.billing-page > nav:not(.try-on-tabs):not(.jewellery-navigation) {
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 14px;
+  color: var(--brand-700);
+}
+.billing-page > nav a {
+  color: var(--brand-700);
+  font-weight: 500;
+}
+.billing-page > nav a:hover {
+  text-decoration: underline;
+}
+@media (max-width: 600px) {
+  .tool-header .workspace-name {
+    display: none;
+  }
+}
+.billing-page section > h2:first-child,
+.billing-page section > h3:first-child {
+  margin-top: 0;
+}
+.billing-page p a:not(.button),
+.billing-page li a:not(.button) {
+  color: var(--brand-700);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
