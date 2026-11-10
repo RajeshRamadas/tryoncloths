@@ -1181,24 +1181,6 @@ export default function App() {
                             : "I have reviewed this standard sample avatar."}
                         </span>
                       </label>
-                      {accountState.account && (
-                        <ExportBrandingChoice
-                          key={accountState.account.id}
-                          onChange={setExportFooter}
-                        />
-                      )}
-                      <button
-                        className="button primary full-width"
-                        disabled={!approved || exporting || needsCustomerGeneration}
-                        onClick={() => void download()}
-                      >
-                        <ArrowDownToLine size={16} />{" "}
-                        {exporting
-                          ? "Preparing PNG…"
-                          : isNative
-                            ? "Save or share avatar"
-                            : "Download avatar"}
-                      </button>
                       {personalized && (
                         <div className="save-avatar-box">
                           <label>
@@ -1246,7 +1228,7 @@ export default function App() {
                       )}
                       <div className="fitting-room-actions">
                         <button
-                          className="button secondary full-width try-clothes-button"
+                          className="button primary full-width try-clothes-button"
                           disabled={!approved || exporting || needsCustomerGeneration}
                           onClick={() => setOutfitOpen(true)}
                         >
@@ -1301,6 +1283,26 @@ export default function App() {
                             <ScanFace size={12} /> Create a jewellery portrait from this face photo
                           </button>
                         ))}
+                      <div className="download-group">
+                        {accountState.account && (
+                          <ExportBrandingChoice
+                            key={accountState.account.id}
+                            onChange={setExportFooter}
+                          />
+                        )}
+                        <button
+                          className="button secondary full-width"
+                          disabled={!approved || exporting || needsCustomerGeneration}
+                          onClick={() => void download()}
+                        >
+                          <ArrowDownToLine size={16} />{" "}
+                          {exporting
+                            ? "Preparing PNG…"
+                            : isNative
+                              ? "Save or share avatar"
+                              : "Download avatar"}
+                        </button>
+                      </div>
                       <p className="small-footnote">
                         Approve the avatar to try separate tops, trousers and shoes. Outfit changes
                         use no AI calls.
