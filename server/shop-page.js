@@ -390,7 +390,7 @@ const css = [
   ".item{padding:12px;border:1px solid #e1e6e2;border-radius:14px;background:#fff;display:flex;flex-direction:column;gap:4px;box-shadow:0 1px 2px rgb(24 33 29/.05)}",
   ".item h3{font-size:16px;font-weight:600;margin:8px 0 0;overflow-wrap:anywhere}.item small{color:#535f59}.item .price{font-weight:700}.item s{color:#68746e;font-weight:400;margin-left:6px}.item .low{color:#93500b;font-size:14px;font-weight:500}",
   ".item nav{display:flex;flex-direction:column;gap:2px;margin-top:auto;padding-top:8px;font-size:15px}",
-  ".item nav a:first-child{justify-content:center;border-radius:999px;background:var(--brand);color:var(--brand-ink);text-decoration:none;font-weight:600}.item nav a+a{justify-content:center;font-weight:500}",
+  ".item nav a{justify-content:center;font-weight:500}.item nav a.try{justify-content:center;border-radius:999px;background:var(--brand);color:var(--brand-ink);text-decoration:none;font-weight:600}",
   ".item nav a,.store-contact nav a{display:inline-flex;align-items:center;min-height:44px}",
   ".info{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}.info section{padding:20px 24px;border:1px solid #e1e6e2;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgb(24 33 29/.05)}.info h2{margin-top:0;font-size:18px}",
   ".powered{margin-top:32px;font-size:13px;color:#68746e}.preview{padding:10px 14px;border-radius:10px;background:#fdf6e7;color:#93500b}",
@@ -412,7 +412,7 @@ export function shopPageHtml({ page, brand, photos, items, slug, preview = false
       online = httpsUrl(g.sourceUrl),
       price = page.showPrices ? money(g.priceInr) : "",
       mrp = page.showPrices && g.mrpInr > g.priceInr ? money(g.mrpInr) : "";
-    return `<article class="item"><img src="${base}/items/${encodeURIComponent(g.id)}/image" alt="${escape(label)}" loading="lazy"><h3>${escape(g.name)}</h3>${g.variant ? `<small>${escape(g.variant)}</small>` : ""}${price ? `<span class="price">${escape(price)}${mrp ? `<s>${escape(mrp)}</s>` : ""}</span>` : ""}${g.stock === "low" ? '<span class="low">Only a few left</span>' : ""}<nav>${link ? `<a href="${escape(link)}"${external(link)}>Try it on</a>` : ""}${online ? `<a href="${escape(online)}" target="_blank" rel="noopener noreferrer">View online</a>` : ""}</nav></article>`;
+    return `<article class="item"><img src="${base}/items/${encodeURIComponent(g.id)}/image" alt="${escape(label)}" loading="lazy"><h3>${escape(g.name)}</h3>${g.variant ? `<small>${escape(g.variant)}</small>` : ""}${price ? `<span class="price">${escape(price)}${mrp ? `<s>${escape(mrp)}</s>` : ""}</span>` : ""}${g.stock === "low" ? '<span class="low">Only a few left</span>' : ""}<nav>${link ? `<a class="try" href="${escape(link)}"${external(link)}>Try it on</a>` : ""}${online ? `<a href="${escape(online)}" target="_blank" rel="noopener noreferrer">View online</a>` : ""}</nav></article>`;
   };
   const info = [
     page.about ? `<section><h2>About us</h2><p>${escape(page.about)}</p></section>` : "",
