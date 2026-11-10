@@ -5,6 +5,7 @@ import wasmLoaderPath from "@mediapipe/tasks-vision/vision_wasm_internal.js?url"
 import wasmBinaryPath from "@mediapipe/tasks-vision/vision_wasm_internal.wasm?url";
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 import { assessBodyPose } from "./body-pose-check";
+import { measureBuild } from "./body-build";
 import { loadImage } from "./images";
 
 export type PoseHint = { code: string; message: string };
@@ -73,5 +74,17 @@ export async function segmentPose(image: HTMLImageElement): Promise<PoseSegmenta
     };
   } finally {
     result.close();
+  }
+}
+
+export type BodyBuild = { shoulders: number; waist: number; hips: number };
+
+/** Shoulder, waist and hip proportions from a full-body photo, or null if not measurable. */
+export async function measureBodyBuild(photo: string): Promise<BodyBuild | null> {
+  try {
+    const pose = await segmentPose(await loadImage(photo));
+    return pose && measureBuild(pose.landmarks, pose.person, pose.width, pose.height);
+  } catch {
+    return null;
   }
 }
