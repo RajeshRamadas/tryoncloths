@@ -33,3 +33,19 @@ export function assessMasterAvatarReview(review = {}) {
   }
   return { approved: reasons.length === 0, reasons };
 }
+
+/**
+ * Samples retain the existing review workflow. A personalized avatar must
+ * pass the human quality review before final approval is possible.
+ * Unknown generation state fails closed.
+ */
+export function canApproveAvatar({
+  hasPersonalizedResult,
+  needsCustomerGeneration,
+  qualityReviewPassed,
+} = {}) {
+  return (
+    needsCustomerGeneration === false &&
+    (hasPersonalizedResult !== true || qualityReviewPassed === true)
+  );
+}
