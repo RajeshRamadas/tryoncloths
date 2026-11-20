@@ -30,10 +30,12 @@ export function assessPhotoClarity(input = {}) {
     return {
       status: "unverified",
       issues,
-      warnings: [{
-        code: "PHOTO_ANALYSIS_UNAVAILABLE",
-        message: "This device could not check exposure or sharpness. Inspect the photo manually.",
-      }],
+      warnings: [
+        {
+          code: "PHOTO_ANALYSIS_UNAVAILABLE",
+          message: "This device could not check exposure or sharpness. Inspect the photo manually.",
+        },
+      ],
     };
   }
   if (
