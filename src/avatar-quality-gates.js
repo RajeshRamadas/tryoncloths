@@ -14,11 +14,8 @@ export const AVATAR_REVIEW_CRITERIA = Object.freeze([
  * be approved only when every criterion is at least 4 and the reviewer confirms
  * the customer owns/consented to use of the input photos. Unknowns fail closed.
  */
-export function assessMasterAvatarReview({
-  scores,
-  customerConsent,
-  reviewerConfirmed,
-} = {}) {
+export function assessMasterAvatarReview(review = {}) {
+  const { scores, customerConsent, reviewerConfirmed } = review;
   const reasons = [];
   if (customerConsent !== true) {
     reasons.push("customer_consent_required");
