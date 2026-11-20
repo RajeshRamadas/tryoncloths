@@ -37,9 +37,9 @@ export default function AvatarQualityReview({
     <fieldset className="avatar-quality-review" disabled={disabled}>
       <legend>Personalized avatar quality review</legend>
       <p className="small-footnote">
-        Compare with the customer or their consented reference photos. Score each item from 1
-        (poor) to 5 (excellent). All six need at least 4. This is a human review, not automated
-        identity verification. If you cannot verify an item, leave it unscored.
+        Compare with the customer or their consented reference photos. Score each item from 1 (poor)
+        to 5 (excellent). All six need at least 4. This is a human review, not automated identity
+        verification. If you cannot verify an item, leave it unscored.
       </p>
       <div className="avatar-quality-grid">
         {AVATAR_REVIEW_CRITERIA.map((criterion) => (
