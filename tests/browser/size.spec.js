@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { openStoreTools, useProductSource } from "../helpers/studio-navigation.js";
 import { test, expect } from "@playwright/test";
@@ -20,7 +21,7 @@ async function setup(page, run) {
     measurements: { heightCm: 175, weightKg: 72 },
   });
   const image = `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;
-  await store.save(owner, {
+  await saveApprovedTestAvatar(store, owner, {
     image,
     customerId: customer.id,
     name: "Asha avatar",
