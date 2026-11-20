@@ -52,6 +52,10 @@ import { App as NativeApp } from "@capacitor/app";
 
 type PhotoKind = "face" | "body";
 type ServiceState = "checking" | "available" | "unavailable" | "unauthorized";
+type IdentityReview = {
+  status: "not_checked" | "screen_pass" | "needs_review";
+  reason?: "possible_mismatch" | "check_unavailable";
+};
 
 function AvatarImage({
   index,
@@ -238,6 +242,7 @@ export default function App() {
   const [tryOnAvailable, setTryOnAvailable] = useState(false);
   const [jewelleryAvailable, setJewelleryAvailable] = useState(false);
   const [personalized, setPersonalized] = useState<string | null>(null);
+  const [identityReview, setIdentityReview] = useState<IdentityReview | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generationFailed, setGenerationFailed] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -385,6 +390,7 @@ export default function App() {
     setOutfitOpen(false);
     setGenerationFailed(false);
     setPersonalized(null);
+    setIdentityReview(null);
     setApproved(false);
     setQualityReviewPassed(false);
     setAiConsent(false);
@@ -509,6 +515,7 @@ export default function App() {
     setSaveConsent(false);
     setGenerationFailed(false);
     setPersonalized(null);
+    setIdentityReview(null);
     setError("");
     setApproved(false);
     setQualityReviewPassed(false);
@@ -552,6 +559,11 @@ export default function App() {
           "The studio returned an unsupported result. Update the studio and try again.",
         );
       setPersonalized(data.image);
+      setIdentityReview(
+        ["screen_pass", "needs_review"].includes(data.identityReview?.status)
+          ? data.identityReview
+          : null,
+      );
       setAvatarId(data.avatarId || null);
       setAiConsent(false);
       if (data.accountSaveError) setError(data.accountSaveError);
@@ -1208,6 +1220,15 @@ export default function App() {
                           {height} cm / {weight} kg
                         </strong>
                       </div>
+                      {personalized && identityReview && (
+                        <p className="saved-avatar-note" role="note">
+                          {identityReview.status === "needs_review"
+                            ? identityReview.reason === "possible_mismatch"
+                              ? "Automated face screening flagged a possible identity mismatch. Compare the avatar closely with the original customer photo before scoring likeness. The screening is not conclusive."
+                              : "Automatic face comparison was unavailable or inconclusive. Verify facial likeness directly with the customer before approval."
+                            : "Automatic face comparison did not flag a mismatch. This does not prove identity or likeness; complete the customer review below."}
+                        </p>
+                      )}
                       <ul className="review-list">
                         <li>
                           <Check size={15} /> Check the customer’s face and hair
