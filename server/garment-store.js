@@ -594,7 +594,7 @@ export class GarmentStore {
     );
   }
   async context(account, input, { provider, model }) {
-    this.accounts.requireAvatar(account, input.avatarId);
+    this.accounts.requireApprovedAvatar(account, input.avatarId);
     const garment = this.row(account, input.garmentId);
     if (garment.needsTypeReview)
       throw problem(
@@ -614,7 +614,7 @@ export class GarmentStore {
     } catch {
       throw problem("Use a valid approved avatar PNG.");
     }
-    this.accounts.requireAvatar(account, input.avatarId);
+    this.accounts.requireApprovedAvatar(account, input.avatarId);
     const latest = this.row(account, input.garmentId);
     if (
       latest.imageHash !== garment.imageHash ||
@@ -688,7 +688,7 @@ export class GarmentStore {
         "This adaptation cannot be saved for automatic reuse after a restart or expired session receipt. You can still save the image as a look; do not regenerate it just to save it.",
       );
     }
-    this.accounts.requireAvatar(account, receipt.avatarId);
+    this.accounts.requireApprovedAvatar(account, receipt.avatarId);
     this.row(account, garmentId);
     let image;
     try {
@@ -700,7 +700,7 @@ export class GarmentStore {
       throw problem(
         "The image changed after generation. Save the original adaptation before adding other layers.",
       );
-    this.accounts.requireAvatar(account, receipt.avatarId);
+    this.accounts.requireApprovedAvatar(account, receipt.avatarId);
     this.row(account, garmentId);
     const exists = this.db
       .prepare("SELECT id FROM garment_results WHERE account=? AND id=?")
