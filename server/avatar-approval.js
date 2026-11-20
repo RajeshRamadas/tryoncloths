@@ -1,7 +1,4 @@
-import {
-  assessMasterAvatarReview,
-  AVATAR_REVIEW_CRITERIA,
-} from "../src/avatar-quality-gates.js";
+import { assessMasterAvatarReview, AVATAR_REVIEW_CRITERIA } from "../src/avatar-quality-gates.js";
 
 export const AVATAR_REVIEW_POLICY_VERSION = 1;
 
