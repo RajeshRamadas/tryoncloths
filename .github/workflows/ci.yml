@@ -24,13 +24,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Diagnose photo clarity formatting and unit/build
-        run: |
-          for file in src/photo-clarity.js src/PhotoClarityHints.tsx tests/avatar-readiness.test.js tests/browser/photo-clarity.spec.js tests/photo-clarity.test.js; do
-            diff -u "$file" <(npx prettier "$file") || true
-          done
-          npm test
-          npm run build
       - run: npm run format:check
       - run: npm test
       - run: npm run build
