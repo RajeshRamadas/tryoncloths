@@ -36,6 +36,7 @@ import { downloadAvatar, libraryForIndex, readPhoto } from "./images";
 import BodyPhotoHints from "./BodyPhotoHints";
 import { analyseBodyPhoto, type BodyPhotoAnalysis } from "./body-pose";
 import { suggestBuild } from "./body-build";
+import { assessAvatarReadiness } from "./avatar-readiness.js";
 import { isNative, capturePhoto, clearNativeExports } from "./native";
 import { requestApi } from "./api";
 import StudioConnection from "./StudioConnection";
@@ -473,6 +474,19 @@ export default function App() {
       (accountState.enabled && !accountState.account)
     )
       return;
+    const readiness = assessAvatarReadiness({
+      consent: consent && aiConsent,
+      facePhoto: face,
+      bodyPhoto: body,
+      profileId: selected,
+      templateTone,
+      heightCm: Number(height),
+      bodyAnalysis: analysis ? { status: "valid" } : null,
+    });
+    if (!readiness.ready) {
+      setError(readiness.issues.map((issue) => issue.message).join(" "));
+      return;
+    }
     setGenerating(true);
     setRestoredAvatar(false);
     setAvatarSource("generated");
