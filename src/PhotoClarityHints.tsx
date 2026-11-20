@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { CircleAlert, CircleCheck, LoaderCircle } from "lucide-react";
-import { checkPhotoClarity, type PhotoClarityAssessment } from "./photo-clarity";
+import { checkPhotoClarity, type PhotoClarityAssessment } from "./photo-clarity-browser";
 
 /** No pixels or source photo are retained by this UI's assessment state. */
 export default function PhotoClarityHints({
