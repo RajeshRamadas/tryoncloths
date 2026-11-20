@@ -162,6 +162,7 @@ test("personalization is explicit, generates only on request, and approval reset
   ).toBeVisible();
   expect(calls).toBe(1);
   await page.getByRole("button", { name: "Review avatar" }).click();
+  await expect(page.getByRole("button", { name: "Check framing and body proportions" })).toBeVisible();
   await approvePersonalizedAvatar(page);
   await page.getByRole("button", { name: "Change frame", exact: true }).click();
   await page.getByRole("button", { name: /Select Slim profile/ }).click();
