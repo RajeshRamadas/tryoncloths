@@ -24,6 +24,13 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Diagnose skin tone audit formatting and build
+        run: |
+          for file in src/avatar-tone-audit.js src/AvatarQualityReview.tsx; do
+            diff -u "$file" <(npx prettier "$file") || true
+          done
+          npm test
+          npm run build
       - run: npm run format:check
       - run: npm test
       - run: npm run build
