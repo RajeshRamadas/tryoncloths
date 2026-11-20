@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -26,7 +27,7 @@ async function fixture(run) {
     cm = `forme_session=${store.session(manager)}`;
   const customer = store.customers.save(a, { name: "Private Customer", phoneE164: "9876543210" }),
     image = `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;
-  const avatar = await store.save(a, {
+  const avatar = await saveApprovedTestAvatar(store, a, {
     image,
     customerId: customer.id,
     name: "Customer avatar",
