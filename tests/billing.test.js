@@ -84,7 +84,6 @@ async function generationInput() {
     consent: true,
     consentScope: "face-and-body",
     consentProvider: "gemini",
-    accountStorageConsent: true,
   };
 }
 const tryonInput = (image) => ({
@@ -251,7 +250,7 @@ for (const failure of ["quota", "missing_face"])
       { failure },
     ));
 
-test("meter refunds unusable results; trial watermark is returned and saved", () =>
+test("meter refunds unusable results; trial watermark is returned as an unsaved draft", () =>
   fixture(async ({ store, a, image, request }) => {
     store.billing.grant(a.org, "ai", 3, "grant_admin", "three");
     const opts = { billing: store.billing, account: a, action: "avatar" };
@@ -275,8 +274,10 @@ test("meter refunds unusable results; trial watermark is returned and saved", ()
     assert.equal(r.status, 200);
     const result = await r.json();
     assert.equal(result.image, stamp);
+    assert.equal(result.accountSaved, false);
+    assert.equal(result.avatarId, null);
+    assert.equal(store.list(a).length, 0);
     assert.equal(store.billing.balance(a.org), 2);
-    assert.equal(data(store.image(a, result.avatarId)), stamp);
     const outfit = await request("/api/tryon", tryonInput(image));
     assert.equal(outfit.status, 200);
     assert.equal((await outfit.json()).image, stamp);
