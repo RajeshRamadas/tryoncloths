@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import AvatarReferenceCompare from "./AvatarReferenceCompare";
+import type { AvatarReviewAttestation } from "./account-avatars";
 import {
   inspectAvatarGeometry,
   inspectAvatarTone,
@@ -30,7 +31,7 @@ export default function AvatarQualityReview({
   profileId: string;
   facePhoto: string | null;
   bodyPhoto: string | null;
-  onCompleteChange: (complete: boolean) => void;
+  onCompleteChange: (complete: boolean, review?: AvatarReviewAttestation) => void;
 }) {
   const id = useId();
   const [scores, setScores] = useState<Record<string, number>>({});
@@ -216,7 +217,11 @@ export default function AvatarQualityReview({
         disabled={!result.approved || completed}
         onClick={() => {
           setCompleted(true);
-          onCompleteChange(true);
+          onCompleteChange(true, {
+            scores: { ...scores },
+            customerConsent,
+            reviewerConfirmed,
+          });
         }}
       >
         {completed ? "Quality review passed" : "Confirm quality review"}
