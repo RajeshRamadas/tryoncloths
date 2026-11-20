@@ -1,3 +1,4 @@
+import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import sharp from "sharp";
@@ -120,9 +121,7 @@ test("fitting room reveals one source at a time while retaining product drafts, 
   storeSession(page, async ({ paid }) => {
     await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
     await page.getByRole("button", { name: "Use Sample customer", exact: true }).click();
-    await page
-      .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-      .check();
+    await approvePersonalizedAvatar(page);
     await page.getByRole("button", { name: "Try clothes", exact: true }).click();
     await expect(page.getByRole("button", { name: "Sample clothes", exact: true })).toHaveAttribute(
       "aria-pressed",
