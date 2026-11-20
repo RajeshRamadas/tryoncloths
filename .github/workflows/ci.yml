@@ -24,13 +24,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Diagnose avatar reference comparison formatting and build
-        run: |
-          for file in src/avatar-reference-compare.js src/AvatarReferenceCompare.tsx; do
-            diff -u "$file" <(npx prettier "$file") || true
-          done
-          npm test
-          npm run build
       - run: npm run format:check
       - run: npm test
       - run: npm run build
