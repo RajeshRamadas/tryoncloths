@@ -40,7 +40,7 @@ This interface update does not rebuild the Android APK.
 - Approximate standard-profile suggestion from height/weight, with staff correction. Athletic build is never inferred from weight alone.
 - Male/female template selection with four body profiles and six skin tones each; saved avatars retain the chosen template tone.
 - An explicitly triggered Gemini customer-avatar adapter using both customer photos, a selected body template, and whole-body skin-tone matching instructions, with server-side credentials and consent checks.
-- Review/approval, full-body PNG download, expanded preview, and new-session photo clearing.
+- [Six-point avatar quality review](docs/AVATAR_QUALITY_REVIEW.md): human-scored identity and anatomy checks before approving personalized results for try-on, export or local reuse. Sample browsing remains unchanged.
 - [Outfit sharing](docs/OUTFIT_SHARING.md): expiring public preview links, WhatsApp click-to-chat, and link revocation; uses saved looks with no AI credits.
 - [WhatsApp automation](docs/WHATSAPP.md): encrypted Business connection, consented lookbooks, metered new-arrival previews, review before sending, delivery status and STOP opt-outs.
 - [Catalogue import](docs/CATALOGUE_IMPORT.md): CSV/Excel products, SKU updates, prices, sizes, colours, stock filters and plan limits.
