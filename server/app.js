@@ -473,33 +473,9 @@ export function createApp({
             quality,
           }),
       );
-      let accountSaved = false;
-      let avatarId = null;
-      if (accountStore) {
-        try {
-          const saved = await accountStore.save(owner, {
-            image,
-            customerId: req.body.customerId,
-            name:
-              typeof req.body.avatarName === "string" && req.body.avatarName.trim()
-                ? req.body.avatarName.trim().slice(0, 60)
-                : "Customer avatar",
-            profileId: req.body.profileId,
-            templateTone,
-            heightCm: req.body.measurements.heightCm,
-            weightKg: req.body.measurements.weightKg,
-            source: "generated",
-          });
-          avatarId = saved.id;
-          accountSaved = true;
-        } catch {
-          // Preserve the paid result for manual saving/download. Never retry AI
-          // generation because a database write failed.
-          console.error(JSON.stringify({ event: "avatar_account_save_failed" }));
-        }
-      }
+      // Generated customer output is a draft until the customer reviews it.
+      // Never persist or expose it as a reusable account avatar automatically.
       record(req, "avatar_generated", {
-        avatarId,
         requestId: req.body.requestId,
         source: "studio",
       });
@@ -513,11 +489,9 @@ export function createApp({
         reviewChecks: ["face", "standard-body", "skin-tone"],
         ...(accountStore
           ? {
-              accountSaved,
-              avatarId,
-              accountSaveError: accountSaved
-                ? null
-                : "Avatar created, but saving to your account failed. Download it now or review and save it again; do not regenerate.",
+              accountSaved: false,
+              avatarId: null,
+              accountSaveError: null,
             }
           : {}),
       });
