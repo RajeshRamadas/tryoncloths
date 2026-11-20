@@ -98,3 +98,16 @@ test("invalid identity-screen configuration fails at startup before a provider c
     /TRYON_AVATAR_IDENTITY_MODE/,
   );
 });
+
+test("invalid avatar distance setting fails at startup before generation", () => {
+  assert.throws(
+    () =>
+      createApp({
+        provider: "gemini",
+        apiKey: "test-only-key",
+        accessMode: "public",
+        avatarIdentityMax: "not-a-number",
+      }),
+    /TRYON_AVATAR_IDENTITY_MAX/,
+  );
+});
