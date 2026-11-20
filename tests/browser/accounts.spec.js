@@ -1,3 +1,4 @@
+import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
@@ -66,9 +67,7 @@ test("web store accounts automatically save generated avatars and reopen them in
       page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
     ).toBeVisible();
     await page.getByRole("button", { name: "Review avatar" }).click();
-    await page
-      .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-      .check();
+    await approvePersonalizedAvatar(page);
     await page
       .getByLabel(
         "The customer agrees to save this avatar and measurements to the store account for reuse.",
@@ -110,9 +109,7 @@ test("web store accounts automatically save generated avatars and reopen them in
     await expect(
       second.getByAltText("Customer’s personalized avatar, awaiting visual review"),
     ).toBeVisible();
-    await second
-      .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-      .check();
+    await approvePersonalizedAvatar(second);
     await second.getByRole("button", { name: "Try clothes" }).click();
     await second.getByRole("button", { name: "Navy T-shirt Sample" }).click();
     await expect(second.getByAltText("Avatar wearing the selected outfit")).toBeVisible();
@@ -136,9 +133,7 @@ test("web store accounts automatically save generated avatars and reopen them in
       .getByRole("button", { name: "View looks (1) for Customer Anil", exact: true })
       .click();
     await second.getByRole("button", { name: "Open look Anil navy outfit", exact: true }).click();
-    await second
-      .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-      .check();
+    await approvePersonalizedAvatar(second);
     await second.getByRole("button", { name: "Try clothes", exact: true }).click();
     await expect(
       second
