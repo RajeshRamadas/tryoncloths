@@ -91,7 +91,7 @@ export class JewelleryStore {
   }
   current(account, context) {
     this.actor(account);
-    this.store.requireAvatar(account, context.avatarId);
+    this.store.requireApprovedAvatar(account, context.avatarId);
     const epoch = this.db
       .prepare("SELECT * FROM avatar_view_epochs WHERE store=? AND avatarId=?")
       .get(account.id, context.avatarId);
