@@ -24,13 +24,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Diagnose avatar geometry formatting and build
-        run: |
-          for file in src/avatar-geometry-audit.js tests/avatar-geometry-audit.test.js tests/browser/studio.spec.js; do
-            diff -u "$file" <(npx prettier "$file") || true
-          done
-          npm test
-          npm run build
       - run: npm run format:check
       - run: npm test
       - run: npm run build
