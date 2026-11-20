@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { openStoreTools } from "../helpers/studio-navigation.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -21,7 +22,7 @@ async function setup(page, run) {
     whatsappConsent: true,
   });
   const image = `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;
-  const av = await store.save(owner, {
+  const av = await saveApprovedTestAvatar(store, owner, {
     image,
     customerId: customer.id,
     name: "Regular avatar",
