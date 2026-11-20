@@ -528,8 +528,8 @@ export default function App() {
       if (data.accountSaveError) setError(data.accountSaveError);
       setNotice(
         data.accountSaved
-          ? "Avatar saved to your store account. Review the result before trying clothes."
-          : "Customer avatar created. Review the face, standard body and skin tone before approval.",
+          ? "Avatar generated as a draft. Review and approve it before saving to your store account."
+          : "Customer avatar created as a draft. Review the face, body and skin tone before approval and saving.",
       );
       requestAnimationFrame(() =>
         previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
@@ -1048,7 +1048,7 @@ export default function App() {
                           </label>
                           <p>
                             {accountState.account
-                              ? `The generated avatar and measurements will be saved to ${accountState.account.name}. Original photos are not kept.`
+                              ? `After review and approval, you can save the avatar and measurements to ${accountState.account.name}. Original photos are not kept.`
                               : "Sign in to a store account above before generating. Your avatar will be saved to that account."}
                           </p>
                         </div>
