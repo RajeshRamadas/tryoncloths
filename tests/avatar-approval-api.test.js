@@ -70,13 +70,30 @@ test("account avatars remain draft until approved; reuse rejects drafts, revocat
       storageConsent: true,
     };
     assert.equal((await request("/api/looks", "POST", look, owner)).status, 409);
-    assert.equal((await request(`/api/avatars/${id}/views`, "GET", undefined, owner)).status !== 200, true);
+    assert.equal(
+      (await request(`/api/avatars/${id}/views`, "GET", undefined, owner)).status !== 200,
+      true,
+    );
 
     const wrong = await request(`/api/avatars/${id}/approval`, "POST", review(), foreign);
     assert.equal(wrong.status, 404);
     const missing = { ...review(), scores: { faceLikeness: 5 } };
-    assert.equal((await request(`/api/avatars/${id}/approval`, "POST", missing, owner)).status, 400);
-    assert.equal((await request(`/api/avatars/${id}/approval`, "POST", review(), owner, "https://evil.example")).status, 403);
+    assert.equal(
+      (await request(`/api/avatars/${id}/approval`, "POST", missing, owner)).status,
+      400,
+    );
+    assert.equal(
+      (
+        await request(
+          `/api/avatars/${id}/approval`,
+          "POST",
+          review(),
+          owner,
+          "https://evil.example",
+        )
+      ).status,
+      403,
+    );
     assert.equal(await status(), "draft");
 
     const approved = await request(`/api/avatars/${id}/approval`, "POST", review(), owner);
@@ -101,7 +118,12 @@ test("account avatars remain draft until approved; reuse rejects drafts, revocat
 
     const reapproved = await request(`/api/avatars/${id}/approval`, "POST", review(), owner);
     assert.equal(reapproved.status, 200);
-    const renamed = await request("/api/avatars", "POST", { ...avatar, name: "Changed name" }, owner);
+    const renamed = await request(
+      "/api/avatars",
+      "POST",
+      { ...avatar, name: "Changed name" },
+      owner,
+    );
     assert.equal(renamed.status, 200);
     assert.equal(await status(), "draft", "a resaved avatar must be re-reviewed");
 
