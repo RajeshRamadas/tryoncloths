@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -172,7 +173,7 @@ test("staff can switch member stores and the previous customer's preview is clea
   });
   store.db.prepare("INSERT INTO memberships VALUES(?,?,'manager')").run(owner.user.id, branch.id);
   const image = `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;
-  await store.save(owner, {
+  await saveApprovedTestAvatar(store, owner, {
     image,
     name: "Alpha customer",
     profileId: "regular",
