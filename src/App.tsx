@@ -705,7 +705,8 @@ export default function App() {
       };
       let saved: { id?: string } | undefined;
       if (accountState.enabled) {
-        if (!reviewAttestation) throw new Error("Complete the avatar quality review before saving.");
+        if (!reviewAttestation)
+          throw new Error("Complete the avatar quality review before saving.");
         saved = await saveAccountAvatar(personalized, details);
         if (!saved?.id) throw new Error("The account did not return a saved avatar ID.");
         // Saving always creates a draft. Only server-validated review promotes it.
