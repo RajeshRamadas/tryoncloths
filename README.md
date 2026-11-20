@@ -41,6 +41,7 @@ This interface update does not rebuild the Android APK.
 - Male/female template selection with four body profiles and six skin tones each; saved avatars retain the chosen template tone.
 - An explicitly triggered Gemini customer-avatar adapter using both customer photos, a selected body template, and whole-body skin-tone matching instructions, with server-side credentials and consent checks.
 - [Six-point avatar quality review](docs/AVATAR_QUALITY_REVIEW.md): human-scored identity and anatomy checks before approving personalized results for try-on, export or local reuse. Sample browsing remains unchanged.
+- [Server-enforced avatar approval](docs/AVATAR_SERVER_APPROVAL.md): store-account avatars remain drafts until authenticated six-point human review and final customer approval; clothing, jewellery and saved-look account routes reject unapproved drafts.
 - [Face and full-body reference comparison](docs/AVATAR_REFERENCE_COMPARISON.md): zoomable side-by-side comparison of consented source photos and a newly generated avatar, with explicit unavailable states for reopened avatars; no extra AI call.
 - [On-device avatar geometry audit](docs/AVATAR_GEOMETRY_AUDIT.md): optional no-credit pose, full-body framing and silhouette drift feedback against the selected profile before approval; advisory only.
 - [On-device avatar skin-tone audit](docs/AVATAR_TONE_AUDIT.md): optional colour consistency hints across the generated face, neck and forearms; no extra AI call, no skin classification, and human review remains mandatory.
