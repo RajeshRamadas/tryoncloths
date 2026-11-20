@@ -394,6 +394,7 @@ export default function App() {
     setAccountState(next);
   }
   function invalidate() {
+    reviewRevokedIdRef.current = null;
     setAvatarId(null);
     setOpenedLook(undefined);
     setSaveConsent(false);
