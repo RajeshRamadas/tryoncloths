@@ -130,6 +130,7 @@ test("personalization is explicit, generates only on request, and approval reset
         kind: "customer-avatar",
         provider: "gemini",
         profileId: input.profileId,
+        identityReview: { status: "needs_review", reason: "possible_mismatch" },
       },
     });
   });
@@ -162,6 +163,12 @@ test("personalization is explicit, generates only on request, and approval reset
   ).toBeVisible();
   expect(calls).toBe(1);
   await page.getByRole("button", { name: "Review avatar" }).click();
+  await expect(page.getByText(/Automated face screening flagged a possible identity mismatch/)).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", {
+      name: "The customer approves the face, body and skin tone of this avatar.",
+    }),
+  ).toBeDisabled();
   await approvePersonalizedAvatar(page);
   await page.getByRole("button", { name: "Change frame", exact: true }).click();
   await page.getByRole("button", { name: /Select Slim profile/ }).click();
