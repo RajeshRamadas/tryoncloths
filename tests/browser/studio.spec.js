@@ -162,6 +162,18 @@ test("personalization is explicit, generates only on request, and approval reset
   ).toBeVisible();
   expect(calls).toBe(1);
   await page.getByRole("button", { name: "Review avatar" }).click();
+  const comparison = page.getByRole("region", { name: "Compare reference photos with avatar" });
+  await expect(comparison.getByAltText("Original customer face reference")).toBeVisible();
+  await expect(comparison.getByAltText("Generated avatar face close-up")).toBeVisible();
+  const zoom = comparison.getByRole("slider", { name: /Generated face zoom/ });
+  await expect(zoom).toHaveValue("2");
+  await zoom.press("ArrowRight");
+  await expect(zoom).toHaveValue("2.25");
+  await comparison.getByRole("button", { name: "Full-body comparison" }).click();
+  await expect(comparison.getByAltText("Original customer full-body reference")).toBeVisible();
+  await expect(comparison.getByAltText("Generated avatar full-body comparison")).toBeVisible();
+  await comparison.getByRole("button", { name: "Face comparison" }).click();
+  await expect(comparison.getByAltText("Original customer face reference")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Check framing and body proportions" }),
   ).toBeVisible();
