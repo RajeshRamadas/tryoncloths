@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -160,7 +161,7 @@ test("CSV SKU upsert isolates stores, preserves product IDs and adaptations for 
     assert.notEqual(item.id, other.id);
     // A representative existing result exercises image-change cleanup without AI calls.
     const raw = store.garments.row(a, item.id);
-    const av = await store.save(a, {
+    const av = await saveApprovedTestAvatar(store, a, {
       image: `data:image/png;base64,${Buffer.from(raw.image).toString("base64")}`,
       name: "Customer",
       profileId: "regular",
