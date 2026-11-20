@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import AvatarReferenceCompare from "./AvatarReferenceCompare";
 import {
   inspectAvatarGeometry,
   inspectAvatarTone,
@@ -20,11 +21,15 @@ export default function AvatarQualityReview({
   disabled = false,
   image,
   profileId,
+  facePhoto,
+  bodyPhoto,
   onCompleteChange,
 }: {
   disabled?: boolean;
   image: string;
   profileId: string;
+  facePhoto: string | null;
+  bodyPhoto: string | null;
   onCompleteChange: (complete: boolean) => void;
 }) {
   const id = useId();
@@ -89,6 +94,7 @@ export default function AvatarQualityReview({
         to 5 (excellent). All six need at least 4. This is a human review, not automated identity
         verification. If you cannot verify an item, leave it unscored.
       </p>
+      <AvatarReferenceCompare avatar={image} facePhoto={facePhoto} bodyPhoto={bodyPhoto} />
       <section className="avatar-geometry-audit" aria-label="Local avatar geometry check">
         <strong>Optional local framing and body-shape check</strong>
         <p className="small-footnote">

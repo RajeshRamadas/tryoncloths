@@ -1253,6 +1253,8 @@ export default function App() {
                           key={session}
                           image={personalized}
                           profileId={selected}
+                          facePhoto={face}
+                          bodyPhoto={body}
                           disabled={exporting || generating}
                           onCompleteChange={(passed) => {
                             setQualityReviewPassed(passed);
