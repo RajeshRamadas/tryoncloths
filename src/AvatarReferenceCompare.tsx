@@ -94,7 +94,9 @@ export default function AvatarReferenceCompare({
           </figcaption>
         </figure>
         <figure>
-          <div className={showingFace ? "avatar-reference-image face" : "avatar-reference-image body"}>
+          <div
+            className={showingFace ? "avatar-reference-image face" : "avatar-reference-image body"}
+          >
             <img
               src={avatar}
               alt={
