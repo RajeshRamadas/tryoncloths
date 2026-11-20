@@ -15,6 +15,14 @@ export function parseAvatarIdentityMode(mode) {
   return mode;
 }
 
+export function parseAvatarIdentityMax(value) {
+  const max = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(max) || max <= 0 || max > 1) {
+    throw new Error("TRYON_AVATAR_IDENTITY_MAX must be a number greater than zero and at most 1.");
+  }
+  return max;
+}
+
 function outputBytes(image) {
   const match =
     typeof image === "string"
@@ -91,8 +99,10 @@ export async function screenAvatarIdentity({
   mode = "off",
   detect = detectFaces,
   compare = requireSameIdentity,
+  maxDistance = 0.45,
 } = {}) {
   parseAvatarIdentityMode(mode);
+  parseAvatarIdentityMax(maxDistance);
   if (mode === "off") return { status: "not_checked" };
 
   let sourceCrop;
@@ -102,7 +112,7 @@ export async function screenAvatarIdentity({
     sourceCrop = await avatarFaceCrop(reference, { detect });
     resultBytes = outputBytes(output);
     resultCrop = await avatarFaceCrop(resultBytes, { detect, upper: true });
-    await compare(sourceCrop, resultCrop);
+    await compare(sourceCrop, resultCrop, maxDistance);
     return { status: "screen_pass" };
   } catch (error) {
     const code =
