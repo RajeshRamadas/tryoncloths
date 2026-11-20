@@ -5,6 +5,7 @@ import wasmLoaderPath from "@mediapipe/tasks-vision/vision_wasm_internal.js?url"
 import wasmBinaryPath from "@mediapipe/tasks-vision/vision_wasm_internal.wasm?url";
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 import { assessBodyPose } from "./body-pose-check";
+import { assessAvatarGeometry } from "./avatar-geometry-audit";
 import { measureBodyCm, measureBuild } from "./body-build";
 import { loadImage } from "./images";
 
@@ -103,4 +104,39 @@ export async function analyseBodyPhoto(photo: string): Promise<BodyPhotoAnalysis
 /** Shoulder, waist and hip proportions from a full-body photo, or null if not measurable. */
 export async function measureBodyBuild(photo: string): Promise<BodyBuild | null> {
   return (await analyseBodyPhoto(photo)).build;
+}
+
+export type AvatarGeometryAudit = {
+  status: "clear" | "review" | "unverified";
+  findings: { code: string; message: string }[];
+};
+
+/**
+ * On-demand review of a newly generated or reopened full-body avatar.
+ * The already-shipped MediaPipe model and person segmentation run in the
+ * browser; no image, geometry, or scores are sent to the server or stored.
+ * Pose can assess one foreground person only, not background bystanders.
+ */
+export async function inspectAvatarGeometry(
+  imageDataUrl: string,
+  profileId: string,
+): Promise<AvatarGeometryAudit> {
+  try {
+    const image = await loadImage(imageDataUrl);
+    const pose = await segmentPose(image);
+    if (!pose) {
+      return assessAvatarGeometry({
+        profileId,
+        poseHints: [{ code: "no-person" }],
+        build: null,
+      });
+    }
+    return assessAvatarGeometry({
+      profileId,
+      poseHints: assessBodyPose([pose.landmarks], image.naturalWidth, image.naturalHeight),
+      build: measureBuild(pose.landmarks, pose.person, pose.width, pose.height),
+    });
+  } catch {
+    return assessAvatarGeometry({ profileId, poseHints: null });
+  }
 }
