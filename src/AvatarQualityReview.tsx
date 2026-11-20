@@ -1,4 +1,5 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { inspectAvatarGeometry, type AvatarGeometryAudit } from "./body-pose";
 import { assessMasterAvatarReview, AVATAR_REVIEW_CRITERIA } from "./avatar-quality-gates.js";
 
 const labels: Record<string, string> = {
@@ -12,9 +13,13 @@ const labels: Record<string, string> = {
 
 export default function AvatarQualityReview({
   disabled = false,
+  image,
+  profileId,
   onCompleteChange,
 }: {
   disabled?: boolean;
+  image: string;
+  profileId: string;
   onCompleteChange: (complete: boolean) => void;
 }) {
   const id = useId();
@@ -22,6 +27,27 @@ export default function AvatarQualityReview({
   const [customerConsent, setCustomerConsent] = useState(false);
   const [reviewerConfirmed, setReviewerConfirmed] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [geometry, setGeometry] = useState<AvatarGeometryAudit | null>(null);
+  const [inspecting, setInspecting] = useState(false);
+  const inspectionEpoch = useRef(0);
+  useEffect(() => {
+    inspectionEpoch.current++;
+    setGeometry(null);
+    setInspecting(false);
+    return () => {
+      inspectionEpoch.current++;
+    };
+  }, [image, profileId]);
+
+  async function inspectGeometry() {
+    const current = ++inspectionEpoch.current;
+    setInspecting(true);
+    setGeometry(null);
+    const result = await inspectAvatarGeometry(image, profileId);
+    if (inspectionEpoch.current !== current) return;
+    setGeometry(result);
+    setInspecting(false);
+  }
   const result = assessMasterAvatarReview({ scores, customerConsent, reviewerConfirmed });
   const unscored = AVATAR_REVIEW_CRITERIA.filter((criterion) => !scores[criterion]).length;
   const belowThreshold = AVATAR_REVIEW_CRITERIA.filter(
@@ -41,6 +67,40 @@ export default function AvatarQualityReview({
         to 5 (excellent). All six need at least 4. This is a human review, not automated identity
         verification. If you cannot verify an item, leave it unscored.
       </p>
+      <section className="avatar-geometry-audit" aria-label="Local avatar geometry check">
+        <strong>Optional local framing and body-shape check</strong>
+        <p className="small-footnote">
+          Check the generated head-to-toe pose and approximate shoulder, waist and hip silhouette
+          against the selected frame. The analysis stays on this device and uses no extra AI credit.
+          It is advisory, cannot establish exact measurements, and does not replace your review.
+        </p>
+        <button
+          type="button"
+          className="button secondary full-width"
+          disabled={inspecting || disabled}
+          onClick={() => void inspectGeometry()}
+        >
+          {inspecting ? "Checking avatar framing…" : "Check framing and body proportions"}
+        </button>
+        {geometry && (
+          <div className="avatar-geometry-results">
+            <p className="small-footnote">
+              {geometry.status === "clear"
+                ? "No obvious pose or silhouette concerns were found. Still inspect the image carefully."
+                : geometry.status === "unverified"
+                  ? "The local check was unavailable. Complete the visual review manually."
+                  : "Review these possible issues before approving the avatar:"}
+            </p>
+            {geometry.findings.length > 0 && (
+              <ul>
+                {geometry.findings.map((finding) => (
+                  <li key={finding.code}>{finding.message}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
       <div className="avatar-quality-grid">
         {AVATAR_REVIEW_CRITERIA.map((criterion) => (
           <label className="avatar-quality-row" key={criterion} htmlFor={id + criterion}>
