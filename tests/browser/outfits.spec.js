@@ -1,3 +1,4 @@
+import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import sharp from "sharp";
 import { nativeBridge } from "../helpers/native-bridge.js";
@@ -178,9 +179,7 @@ test("imported clothes follow a generated avatar whose body drifted from the tem
     .check();
   await page.getByRole("button", { name: "Generate customer avatar", exact: true }).click();
   await page.getByRole("button", { name: "Review avatar", exact: true }).click();
-  await page
-    .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-    .check();
+  await approvePersonalizedAvatar(page);
   await page.getByRole("button", { name: "Try clothes" }).click();
   const tee = await sharp(
     Buffer.from(
@@ -375,9 +374,7 @@ test("customer outfit reuses the approved generated image without another provid
     page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
   ).toBeVisible();
   await page.getByRole("button", { name: "Review avatar", exact: true }).click();
-  await page
-    .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-    .check();
+  await approvePersonalizedAvatar(page);
   await page.getByRole("button", { name: "Try clothes" }).click();
   await page.getByRole("button", { name: "Cream T-shirt Sample" }).click();
   await approve(page);

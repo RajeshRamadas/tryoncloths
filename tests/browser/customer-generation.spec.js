@@ -1,3 +1,4 @@
+import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import sharp from "sharp";
 import { nativeBridge } from "../helpers/native-bridge.js";
@@ -106,11 +107,7 @@ test("Android sends both photos once with consent; failures block export; approv
   await expect(page.getByAltText("Original customer body for skin-tone review")).toBeVisible();
   const share = page.getByRole("button", { name: "Save or share avatar" });
   await expect(share).toBeDisabled();
-  await page
-    .getByRole("checkbox", {
-      name: "The customer approves the face, body and skin tone of this avatar.",
-    })
-    .check();
+  await approvePersonalizedAvatar(page);
   await share.click();
   const file = await page.evaluate(
     () => window.__nativeCalls.find((c) => c.method === "writeFile").options,

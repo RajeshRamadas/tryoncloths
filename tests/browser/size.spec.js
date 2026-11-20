@@ -1,3 +1,4 @@
+import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { openStoreTools, useProductSource } from "../helpers/studio-navigation.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -77,9 +78,7 @@ async function setup(page, run) {
 async function dress(page) {
   await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
   await page.getByRole("button", { name: "Use Asha avatar", exact: true }).click();
-  await page
-    .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-    .check();
+  await approvePersonalizedAvatar(page);
   await page.getByRole("button", { name: "Try clothes", exact: true }).click();
   await useProductSource(page);
   await page.getByRole("button", { name: "My store clothes", exact: true }).click();

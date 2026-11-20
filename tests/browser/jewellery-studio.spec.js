@@ -1,3 +1,4 @@
+import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import os from "node:os";
@@ -199,11 +200,7 @@ async function fixture(page, run, { enabled = true, generate, overlayOnly = fals
     if (enabled) {
       await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
       await page.getByRole("button", { name: "Use Customer A", exact: true }).click();
-      await page
-        .getByLabel("The customer approves the face, body and skin tone of this avatar.", {
-          exact: true,
-        })
-        .check();
+      await approvePersonalizedAvatar(page);
       await page.getByRole("button", { name: "Jewellery", exact: true }).click();
     } else await page.goto("/jewellery?avatar=" + avatar.id);
     await expect(page.getByRole("heading", { name: "Try jewellery.", exact: true })).toBeVisible();

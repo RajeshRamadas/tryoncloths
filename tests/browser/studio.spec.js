@@ -1,3 +1,4 @@
+import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import path from "node:path";
 import { customerPhotos } from "../helpers/customer-photos.js";
@@ -161,11 +162,7 @@ test("personalization is explicit, generates only on request, and approval reset
   ).toBeVisible();
   expect(calls).toBe(1);
   await page.getByRole("button", { name: "Review avatar" }).click();
-  await page
-    .getByRole("checkbox", {
-      name: "The customer approves the face, body and skin tone of this avatar.",
-    })
-    .check();
+  await approvePersonalizedAvatar(page);
   await page.getByRole("button", { name: "Change frame", exact: true }).click();
   await page.getByRole("button", { name: /Select Slim profile/ }).click();
   await expect(

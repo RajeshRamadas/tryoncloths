@@ -1,3 +1,4 @@
+import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
@@ -95,9 +96,7 @@ test("customer mobile lookup, generated avatar grouping, reopen and profile eras
     ).toBeVisible();
     await page.getByRole("button", { name: "Review avatar" }).click();
     expect(store.list(owner)).toHaveLength(0);
-    await page
-      .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-      .check();
+    await approvePersonalizedAvatar(page);
     await page
       .getByLabel(
         "The customer agrees to save this avatar and measurements to the store account for reuse.",
@@ -123,9 +122,7 @@ test("customer mobile lookup, generated avatar grouping, reopen and profile eras
       page.getByText("Saving for Asha Rao · +919876543210", { exact: true }),
     ).toBeVisible();
     expect(calls()).toBe(1);
-    await page
-      .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-      .check();
+    await approvePersonalizedAvatar(page);
     await page.getByRole("button", { name: "Try clothes", exact: true }).click();
     await page.getByRole("button", { name: "Navy T-shirt Sample" }).click();
     await expect(page.getByAltText("Avatar wearing the selected outfit")).toBeVisible();

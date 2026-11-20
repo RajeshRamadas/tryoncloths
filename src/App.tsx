@@ -42,6 +42,8 @@ import { requestApi } from "./api";
 import StudioConnection from "./StudioConnection";
 import OutfitStudio from "./OutfitStudio";
 import AvatarViews from "./AvatarViews";
+import AvatarQualityReview from "./AvatarQualityReview";
+import { canApproveAvatar } from "./avatar-quality-gates.js";
 import SavedAvatars from "./SavedAvatars";
 import StoreAccount, { type AccountState } from "./StoreAccount";
 import { accountAvatarImage, listAccountAvatars, saveAccountAvatar } from "./account-avatars";
@@ -240,6 +242,7 @@ export default function App() {
   const [generationFailed, setGenerationFailed] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [approved, setApproved] = useState(false);
+  const [qualityReviewPassed, setQualityReviewPassed] = useState(false);
   const [exportFooter, setExportFooter] = useState<boolean | undefined>(undefined);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -273,6 +276,12 @@ export default function App() {
   const profile = profiles.find((p) => p.id === selected)!;
   const validMeasurements = recommendation !== null;
   const needsCustomerGeneration = Boolean(face || body || restoredAvatar) && !personalized;
+  const approvalReady = canApproveAvatar({
+    hasPersonalizedResult: Boolean(personalized),
+    needsCustomerGeneration,
+    qualityReviewPassed,
+  });
+  const avatarApproved = approved && approvalReady;
   const providerLabel = provider === "gemini" ? "Google Gemini" : "OpenAI";
 
   function checkService() {
@@ -377,6 +386,7 @@ export default function App() {
     setGenerationFailed(false);
     setPersonalized(null);
     setApproved(false);
+    setQualityReviewPassed(false);
     setAiConsent(false);
     setError("");
   }
@@ -429,6 +439,12 @@ export default function App() {
         `Enter a height from 140–${bodyType === "female" ? 200 : 210} cm and weight from 35–200 kg.`,
       );
       return;
+    }
+    if (step === 3 && next !== 3 && personalized) {
+      // Leaving the review panel unmounts the scorecard; a new review is required on return.
+      setQualityReviewPassed(false);
+      setApproved(false);
+      setSaveConsent(false);
     }
     setError("");
     setStep(next);
@@ -495,6 +511,7 @@ export default function App() {
     setPersonalized(null);
     setError("");
     setApproved(false);
+    setQualityReviewPassed(false);
     try {
       const response = await requestApi(
         "/api/personalize",
@@ -619,7 +636,8 @@ export default function App() {
     }
   }
   async function keepAvatar() {
-    if (!personalized || !approved || !saveConsent || exporting || needsCustomerGeneration) return;
+    if (!personalized || !avatarApproved || !saveConsent || exporting || needsCustomerGeneration)
+      return;
     setExporting(true);
     setError("");
     try {
@@ -654,7 +672,7 @@ export default function App() {
     }
   }
   async function download() {
-    if (exporting || !approved || needsCustomerGeneration) return;
+    if (exporting || !avatarApproved || needsCustomerGeneration) return;
     setExporting(true);
     try {
       const exported = await downloadAvatar(
@@ -1201,11 +1219,25 @@ export default function App() {
                           <Check size={15} /> Confirm consistent skin tone across face and body
                         </li>
                       </ul>
+                      {personalized && (
+                        <AvatarQualityReview
+                          key={session}
+                          disabled={exporting || generating}
+                          onCompleteChange={(passed) => {
+                            setQualityReviewPassed(passed);
+                            if (!passed) {
+                              setApproved(false);
+                              setSaveConsent(false);
+                              setOutfitOpen(false);
+                            }
+                          }}
+                        />
+                      )}
                       <label className="consent approval-consent">
                         <input
                           type="checkbox"
-                          checked={approved}
-                          disabled={needsCustomerGeneration || exporting}
+                          checked={avatarApproved}
+                          disabled={!approvalReady || exporting}
                           onChange={(e) => setApproved(e.target.checked)}
                         />
                         <span>
@@ -1235,7 +1267,7 @@ export default function App() {
                             <input
                               type="checkbox"
                               checked={saveConsent}
-                              disabled={!approved || exporting}
+                              disabled={!avatarApproved || exporting}
                               onChange={(e) => setSaveConsent(e.target.checked)}
                             />
                             <span>
@@ -1247,7 +1279,7 @@ export default function App() {
                           <button
                             className="button secondary full-width"
                             disabled={
-                              !approved ||
+                              !avatarApproved ||
                               !saveConsent ||
                               !avatarName.trim() ||
                               exporting ||
@@ -1268,7 +1300,7 @@ export default function App() {
                       <div className="fitting-room-actions">
                         <button
                           className="button primary full-width try-clothes-button"
-                          disabled={!approved || exporting || needsCustomerGeneration}
+                          disabled={!avatarApproved || exporting || needsCustomerGeneration}
                           onClick={() => setOutfitOpen(true)}
                         >
                           Try clothes <ArrowRight size={16} />
@@ -1276,7 +1308,7 @@ export default function App() {
                         {jewelleryAvailable && accountState.account && avatarId && (
                           <button
                             className="button secondary"
-                            disabled={!approved || exporting || needsCustomerGeneration}
+                            disabled={!avatarApproved || exporting || needsCustomerGeneration}
                             onClick={() =>
                               location.assign("/jewellery?avatar=" + encodeURIComponent(avatarId))
                             }
@@ -1316,7 +1348,7 @@ export default function App() {
                         ) : (
                           <button
                             className="text-button"
-                            disabled={!approved || exporting}
+                            disabled={!avatarApproved || exporting}
                             onClick={() => setPortraitFor(avatarId)}
                           >
                             <ScanFace size={12} /> Create a jewellery portrait from this face photo
@@ -1331,7 +1363,7 @@ export default function App() {
                         )}
                         <button
                           className="button secondary full-width"
-                          disabled={!approved || exporting || needsCustomerGeneration}
+                          disabled={!avatarApproved || exporting || needsCustomerGeneration}
                           onClick={() => void download()}
                         >
                           <ArrowDownToLine size={16} />{" "}
@@ -1449,7 +1481,7 @@ export default function App() {
                   <div>
                     <span className="status-dot" />
                     <span>
-                      {approved
+                      {avatarApproved
                         ? "Reviewed and approved"
                         : personalized
                           ? "Ready for customer review"
@@ -1781,7 +1813,7 @@ export default function App() {
           </dialog>
         </div>
       </div>
-      {approved && !needsCustomerGeneration && (
+      {avatarApproved && !needsCustomerGeneration && (
         <OutfitStudio
           key={`${session}-${selected}-${templateTone}`}
           active={outfitOpen}

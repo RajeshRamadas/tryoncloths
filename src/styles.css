@@ -1178,6 +1178,50 @@ footer > span:last-child {
   color: var(--gray-500);
   margin-top: 5px;
 }
+.avatar-quality-review {
+  min-width: 0;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  background: var(--gray-50);
+  padding: 16px;
+  margin: 18px 0;
+}
+.avatar-quality-review legend {
+  padding: 0 6px;
+  color: var(--brand-700);
+  font-weight: 700;
+  font-size: 14px;
+}
+.avatar-quality-review .small-footnote {
+  margin: 10px 0;
+}
+.avatar-quality-review .consent {
+  margin: 12px 0;
+}
+.avatar-quality-grid {
+  display: grid;
+  gap: 11px;
+  margin: 12px 0;
+}
+.avatar-quality-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--brand-700);
+}
+.avatar-quality-row select {
+  width: min(100%, 210px);
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--brand-800);
+  padding: 9px;
+  font-size: 13px;
+}
 .review-list {
   list-style: none;
   padding: 8px 0 0;
