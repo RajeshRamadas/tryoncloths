@@ -167,7 +167,7 @@ test("account mutations require same-origin and consent; passwords and expired s
     assert.equal((await request("/api/avatars", "GET", undefined, c)).status, 401);
   }));
 
-test("generation is saved to the requesting account without original photos or a second provider call", async () =>
+test("generation stays draft until an explicit save and does not call the provider twice", async () =>
   fixture(async ({ request, store, calls }) => {
     const face = `data:image/jpeg;base64,${(await readFile(customerPhotos[0].face)).toString("base64")}`;
     const body = `data:image/jpeg;base64,${(await readFile(customerPhotos[0].body)).toString("base64")}`;
@@ -185,40 +185,44 @@ test("generation is saved to the requesting account without original photos or a
     const c = cookie(
       await request("/api/account/register", "POST", credentials("studio@example.com")),
     );
-    assert.equal((await request("/api/personalize", "POST", input, c)).status, 400);
-    const r = await request(
-      "/api/personalize",
+    const generated = await request("/api/personalize", "POST", input, c);
+    assert.equal(generated.status, 200);
+    const result = await generated.json();
+    assert.equal(result.accountSaved, false);
+    assert.equal(result.avatarId, null);
+    assert.equal(
+      (await (await request("/api/avatars", "GET", undefined, c)).json()).avatars.length,
+      0,
+    );
+    assert.equal(calls(), 1);
+
+    const saved = await request(
+      "/api/avatars",
       "POST",
-      { ...input, accountStorageConsent: true },
+      {
+        image: result.image,
+        name: input.avatarName,
+        profileId: input.profileId,
+        heightCm: input.measurements.heightCm,
+        weightKg: input.measurements.weightKg,
+        source: "generated",
+        storageConsent: true,
+      },
       c,
     );
-    assert.equal(r.status, 200);
-    assert.equal((await r.json()).accountSaved, true);
+    assert.equal(saved.status, 200);
     const list = (await (await request("/api/avatars", "GET", undefined, c)).json()).avatars;
     assert.equal(list.length, 1);
     assert.equal(list[0].name, input.avatarName);
     assert.equal(list[0].source, "generated");
+    assert.equal(calls(), 1, "explicit save must not trigger another provider call");
+
     const columns = store.db
       .prepare("PRAGMA table_info(avatars)")
       .all()
-      .map((c) => c.name);
+      .map((column) => column.name);
     assert.ok(!columns.includes("face"));
     assert.ok(!columns.includes("body"));
-    store.save = async () => {
-      throw new Error("disk full");
-    };
-    const failure = await request(
-      "/api/personalize",
-      "POST",
-      { ...input, accountStorageConsent: true },
-      c,
-    );
-    const result = await failure.json();
-    assert.equal(failure.status, 200);
-    assert.equal(result.accountSaved, false);
-    assert.match(result.image, /^data:image\/png/);
-    assert.match(result.accountSaveError, /do not regenerate/);
-    assert.equal(calls(), 2, "one provider call per explicit request, even when saving fails");
   }));
 
 test("admin password recovery revokes all previous sessions", async () =>

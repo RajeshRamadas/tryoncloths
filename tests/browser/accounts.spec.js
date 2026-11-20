@@ -65,6 +65,21 @@ test("web store accounts automatically save generated avatars and reopen them in
     await expect(
       page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
     ).toBeVisible();
+    await page.getByRole("button", { name: "Review avatar" }).click();
+    await page
+      .getByLabel("The customer approves the face, body and skin tone of this avatar.")
+      .check();
+    await page
+      .getByLabel(
+        "The customer agrees to save this avatar and measurements to the store account for reuse.",
+      )
+      .check();
+    await page.getByRole("button", { name: "Save avatar for reuse" }).click();
+    await expect(
+      page.getByText(
+        "Avatar saved to your store account. Sign in to this account on another browser to reopen it.",
+      ),
+    ).toBeVisible();
     await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Use Customer Anil", exact: true }),

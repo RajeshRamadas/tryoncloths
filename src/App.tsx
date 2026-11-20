@@ -497,9 +497,7 @@ export default function App() {
             consent: true,
             consentScope: "face-and-body",
             consentProvider: provider,
-            ...(accountState.enabled
-              ? { accountStorageConsent: aiConsent, avatarName, customerId: customer?.id }
-              : {}),
+            ...(accountState.enabled ? { customerId: customer?.id } : {}),
           }),
         },
         200000,
@@ -527,9 +525,7 @@ export default function App() {
       setAiConsent(false);
       if (data.accountSaveError) setError(data.accountSaveError);
       setNotice(
-        data.accountSaved
-          ? "Avatar saved to your store account. Review the result before trying clothes."
-          : "Customer avatar created. Review the face, standard body and skin tone before approval.",
+        "Customer avatar created as a draft. Review the face, body and skin tone before approval and saving.",
       );
       requestAnimationFrame(() =>
         previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
@@ -1048,8 +1044,8 @@ export default function App() {
                           </label>
                           <p>
                             {accountState.account
-                              ? `The generated avatar and measurements will be saved to ${accountState.account.name}. Original photos are not kept.`
-                              : "Sign in to a store account above before generating. Your avatar will be saved to that account."}
+                              ? `After review and approval, you can save the avatar and measurements to ${accountState.account.name}. Original photos are not kept.`
+                              : "Sign in to a store account above before generating. You can save the avatar only after review and approval."}
                           </p>
                         </div>
                       )}
@@ -1065,9 +1061,7 @@ export default function App() {
                             The customer agrees to send their face photo, full-body photo and
                             approximate height/weight to {providerLabel}’s image-generation service
                             to generate their avatar and match skin tone. Provider retention terms
-                            apply.{" "}
-                            {accountState.enabled &&
-                              "The customer also agrees to save the generated avatar and measurements to this store account."}
+                            apply.
                           </span>
                         </label>
                       )}
