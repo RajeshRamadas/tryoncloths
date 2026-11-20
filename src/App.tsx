@@ -254,6 +254,7 @@ export default function App() {
   const [qualityReviewPassed, setQualityReviewPassed] = useState(false);
   const [reviewAttestation, setReviewAttestation] = useState<AvatarReviewAttestation | null>(null);
   const [approvingAccount, setApprovingAccount] = useState(false);
+  const reviewRevokedIdRef = useRef<string | null>(null);
   const [exportFooter, setExportFooter] = useState<boolean | undefined>(undefined);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -662,10 +663,14 @@ export default function App() {
       setSaveConsent(false);
       setOutfitOpen(false);
       if (personalized && accountState.account && avatarId) {
+        setApprovingAccount(true);
         try {
           await revokeAccountAvatarApproval(avatarId);
         } catch (cause) {
+          reviewRevokedIdRef.current = null;
           setError((cause as Error).message);
+        } finally {
+          setApprovingAccount(false);
         }
       }
       return;
@@ -679,6 +684,7 @@ export default function App() {
     setError("");
     try {
       await approveAccountAvatar(avatarId, reviewAttestation);
+      reviewRevokedIdRef.current = null;
       setApproved(true);
     } catch (cause) {
       setApproved(false);
@@ -1309,7 +1315,7 @@ export default function App() {
                           profileId={selected}
                           facePhoto={face}
                           bodyPhoto={body}
-                          disabled={exporting || generating}
+                          disabled={exporting || generating || approvingAccount}
                           onCompleteChange={(passed, review) => {
                             setQualityReviewPassed(passed);
                             setReviewAttestation(passed ? (review ?? null) : null);
@@ -1317,6 +1323,16 @@ export default function App() {
                               setApproved(false);
                               setSaveConsent(false);
                               setOutfitOpen(false);
+                              // Revoking review of an account-saved avatar also revokes its
+                              // previously approved server record, not only the UI checkbox.
+                              if (
+                                accountState.account &&
+                                avatarId &&
+                                reviewRevokedIdRef.current !== avatarId
+                              ) {
+                                reviewRevokedIdRef.current = avatarId;
+                                void changeCustomerApproval(false);
+                              }
                             }
                           }}
                         />
