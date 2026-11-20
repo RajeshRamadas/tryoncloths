@@ -1251,6 +1251,8 @@ export default function App() {
                       {personalized && (
                         <AvatarQualityReview
                           key={session}
+                          image={personalized}
+                          profileId={selected}
                           disabled={exporting || generating}
                           onCompleteChange={(passed) => {
                             setQualityReviewPassed(passed);
