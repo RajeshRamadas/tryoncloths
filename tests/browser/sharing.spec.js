@@ -1,3 +1,4 @@
+import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
@@ -153,9 +154,7 @@ test("saving a reviewed outfit enables sharing and changing clothes clears the s
   setup(page, async () => {
     await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
     await page.getByRole("button", { name: "Use Saved customer", exact: true }).click();
-    await page
-      .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-      .check();
+    await approvePersonalizedAvatar(page);
     await page.getByRole("button", { name: "Try clothes", exact: true }).click();
     await page.getByRole("button", { name: "Navy T-shirt Sample" }).click();
     await expect(page.getByAltText("Avatar wearing the selected outfit")).toBeVisible();
