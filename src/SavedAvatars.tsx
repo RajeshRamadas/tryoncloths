@@ -285,6 +285,13 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
                       <br />
                       {new Date(item.savedAt).toLocaleDateString()}
                     </p>
+                    {cloud && !localView && (
+                      <p>
+                        {item.approvalStatus === "approved"
+                          ? "Approved for account-backed fashion reuse. Re-review when reopening."
+                          : "Draft — open and complete the customer quality review before fashion reuse."}
+                      </p>
+                    )}
                     <button
                       className="button primary"
                       disabled={busy}
