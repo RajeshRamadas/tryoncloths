@@ -55,8 +55,14 @@ test("comparison sees only temporary PNG face crops and clears them after use", 
     },
   });
   assert.equal(accepted, true);
-  assert.equal(prepared[0].every((byte) => byte === 0), true);
-  assert.equal(prepared[1].every((byte) => byte === 0), true);
+  assert.equal(
+    prepared[0].every((byte) => byte === 0),
+    true,
+  );
+  assert.equal(
+    prepared[1].every((byte) => byte === 0),
+    true,
+  );
 });
 
 test("rejects missing or multiple generated faces without comparing descriptors", async () => {
