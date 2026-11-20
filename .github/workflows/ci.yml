@@ -24,6 +24,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Diagnose avatar Prettier difference
+        run: |
+          diff -u src/avatar-readiness.js <(npx prettier src/avatar-readiness.js) || true
       - run: npm run format:check
       - run: npm test
       - run: npm run build
