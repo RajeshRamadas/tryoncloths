@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assessMasterAvatarReview, AVATAR_REVIEW_CRITERIA, canApproveAvatar } from "../src/avatar-quality-gates.js";
+import {
+  assessMasterAvatarReview,
+  AVATAR_REVIEW_CRITERIA,
+  canApproveAvatar,
+} from "../src/avatar-quality-gates.js";
 
 const scores = Object.fromEntries(AVATAR_REVIEW_CRITERIA.map((key) => [key, 4]));
 
