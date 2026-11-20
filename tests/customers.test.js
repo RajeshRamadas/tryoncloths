@@ -246,13 +246,18 @@ test("customer avatar association cannot cross stores or move identical images b
     const c = store.customers.save(a, input),
       d = store.customers.save(a, { ...input, phoneE164: "9876543211" }),
       outside = store.customers.save(b, input);
-    await assert.rejects(saveApprovedTestAvatar(store, a, avatar(image, outside.id)), { status: 404 });
+    await assert.rejects(saveApprovedTestAvatar(store, a, avatar(image, outside.id)), {
+      status: 404,
+    });
     const av = await saveApprovedTestAvatar(store, a, avatar(image, c.id)),
       other = await saveApprovedTestAvatar(store, a, avatar(image, d.id)),
       unassigned = await saveApprovedTestAvatar(store, a, avatar(image));
     assert.notEqual(av.id, other.id);
     assert.notEqual(av.id, unassigned.id);
-    assert.equal((await saveApprovedTestAvatar(store, a, { ...avatar(image, c.id), name: "Renamed" })).id, av.id);
+    assert.equal(
+      (await saveApprovedTestAvatar(store, a, { ...avatar(image, c.id), name: "Renamed" })).id,
+      av.id,
+    );
     assert.equal(store.list(a).find((x) => x.id === av.id).customerName, c.name);
     assert.throws(
       () =>
