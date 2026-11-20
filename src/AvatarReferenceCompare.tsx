@@ -67,11 +67,17 @@ export default function AvatarReferenceCompare({
       )}
       <div className="avatar-reference-grid">
         <figure>
-          <div className={showingFace ? "avatar-reference-image face" : "avatar-reference-image body"}>
+          <div
+            className={showingFace ? "avatar-reference-image face" : "avatar-reference-image body"}
+          >
             {referenceAvailable && reference ? (
               <img
                 src={reference}
-                alt={showingFace ? "Original customer face reference" : "Original customer full-body reference"}
+                alt={
+                  showingFace
+                    ? "Original customer face reference"
+                    : "Original customer full-body reference"
+                }
                 className={showingFace ? "avatar-reference-original-face" : ""}
                 draggable={false}
               />
@@ -83,24 +89,32 @@ export default function AvatarReferenceCompare({
               </p>
             )}
           </div>
-          <figcaption>{showingFace ? "Customer face reference" : "Customer body reference"}</figcaption>
+          <figcaption>
+            {showingFace ? "Customer face reference" : "Customer body reference"}
+          </figcaption>
         </figure>
         <figure>
           <div className={showingFace ? "avatar-reference-image face" : "avatar-reference-image body"}>
             <img
               src={avatar}
-              alt={showingFace ? "Generated avatar face close-up" : "Generated avatar full-body comparison"}
+              alt={
+                showingFace
+                  ? "Generated avatar face close-up"
+                  : "Generated avatar full-body comparison"
+              }
               className={showingFace ? "avatar-reference-generated-face" : ""}
               style={showingFace ? { transform: `scale(${zoom})` } : undefined}
               draggable={false}
             />
           </div>
-          <figcaption>{showingFace ? "Generated face detail" : "Generated full-body avatar"}</figcaption>
+          <figcaption>
+            {showingFace ? "Generated face detail" : "Generated full-body avatar"}
+          </figcaption>
         </figure>
       </div>
       <p className="small-footnote">
-        Photos shown here are used only for this on-screen comparison. The comparison itself
-        does not upload, save, or score facial images.
+        Photos shown here are used only for this on-screen comparison. The comparison itself does
+        not upload, save, or score facial images.
       </p>
     </section>
   );
