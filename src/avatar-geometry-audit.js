@@ -24,6 +24,10 @@ const poseFeedback = {
   "arms-covering": "An arm may obscure the torso and hinder clothing try-on.",
 };
 
+/**
+ * @param {{ profileId?: string, build?: Record<string, number> | null, poseHints?: Array<{code?: string}> | null }} [input]
+ * @returns {{status: "clear" | "review" | "unverified", findings: Array<{code: string, message: string}>}}
+ */
 export function assessAvatarGeometry({ profileId, build, poseHints } = {}) {
   if (!Array.isArray(poseHints)) {
     return {
@@ -50,10 +54,7 @@ export function assessAvatarGeometry({ profileId, build, poseHints } = {}) {
       code: "profile-unavailable",
       message: "The selected body frame could not be evaluated.",
     });
-  } else if (
-    !build ||
-    parts.some(([key]) => !Number.isFinite(build[key]) || build[key] <= 0)
-  ) {
+  } else if (!build || parts.some(([key]) => !Number.isFinite(build[key]) || build[key] <= 0)) {
     findings.push({
       code: "silhouette-unavailable",
       message: "The shoulder, waist and hip silhouette could not be checked automatically.",
