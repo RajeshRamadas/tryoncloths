@@ -24,11 +24,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Show temporary Prettier differences
-        run: |
-          for file in src/App.tsx src/AvatarQualityReview.tsx tests/avatar-quality-gates.test.js; do
-            diff -u "$file" <(npx prettier "$file") || true
-          done
       - run: npm run format:check
       - run: npm test
       - run: npm run build
