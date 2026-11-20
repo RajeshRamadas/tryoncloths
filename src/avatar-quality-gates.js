@@ -46,6 +46,7 @@ export function canApproveAvatar({
 } = {}) {
   return (
     needsCustomerGeneration === false &&
-    (hasPersonalizedResult !== true || qualityReviewPassed === true)
+    typeof hasPersonalizedResult === "boolean" &&
+    (hasPersonalizedResult === false || qualityReviewPassed === true)
   );
 }
