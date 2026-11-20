@@ -1106,23 +1106,25 @@ export default function App() {
                           </span>
                         </label>
                       )}
-                      {service === "available" && bodyGenerationAllowed && identityScreenAvailable && (
-                        <label className="consent">
-                          <input
-                            type="checkbox"
-                            checked={identityCheckConsent}
-                            disabled={generating || exporting}
-                            onChange={(e) => setIdentityCheckConsent(e.target.checked)}
-                          />
-                          <span>
-                            The customer also consents to a temporary facial-feature comparison on
-                            this studio server to check the generated face against their reference
-                            photo. No facial descriptors are saved or sent to another provider.
-                            Automated screening can reject a result and is not proof of identity;
-                            customer review is still required.
-                          </span>
-                        </label>
-                      )}
+                      {service === "available" &&
+                        bodyGenerationAllowed &&
+                        identityScreenAvailable && (
+                          <label className="consent">
+                            <input
+                              type="checkbox"
+                              checked={identityCheckConsent}
+                              disabled={generating || exporting}
+                              onChange={(e) => setIdentityCheckConsent(e.target.checked)}
+                            />
+                            <span>
+                              The customer also consents to a temporary facial-feature comparison on
+                              this studio server to check the generated face against their reference
+                              photo. No facial descriptors are saved or sent to another provider.
+                              Automated screening can reject a result and is not proof of identity;
+                              customer review is still required.
+                            </span>
+                          </label>
+                        )}
                       <button
                         className="button primary full-width"
                         disabled={
