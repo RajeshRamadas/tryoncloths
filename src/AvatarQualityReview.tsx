@@ -127,8 +127,8 @@ export default function AvatarQualityReview({
         <strong>Optional generated skin-tone consistency check</strong>
         <p className="small-footnote">
           Compare small colour samples from the generated face, neck and forearms. This stays on
-          your device and uses no extra AI credits. Clothing, makeup, shadows and lighting can
-          cause misleading differences; this does not verify the customer's natural complexion.
+          your device and uses no extra AI credits. Clothing, makeup, shadows and lighting can cause
+          misleading differences; this does not verify the customer's natural complexion.
         </p>
         <button
           type="button"
