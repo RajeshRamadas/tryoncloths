@@ -20,13 +20,19 @@ export function assessMasterAvatarReview({
   reviewerConfirmed,
 } = {}) {
   const reasons = [];
-  if (customerConsent !== true) reasons.push("customer_consent_required");
-  if (reviewerConfirmed !== true) reasons.push("reviewer_confirmation_required");
+  if (customerConsent !== true) {
+    reasons.push("customer_consent_required");
+  }
+  if (reviewerConfirmed !== true) {
+    reasons.push("reviewer_confirmation_required");
+  }
   for (const criterion of AVATAR_REVIEW_CRITERIA) {
     const score = scores?.[criterion];
-    if (!Number.isInteger(score) || score < 1 || score > 5)
+    if (!Number.isInteger(score) || score < 1 || score > 5) {
       reasons.push(`${criterion}_not_scored`);
-    else if (score < 4) reasons.push(`${criterion}_below_threshold`);
+    } else if (score < 4) {
+      reasons.push(`${criterion}_below_threshold`);
+    }
   }
   return { approved: reasons.length === 0, reasons };
 }
