@@ -14,6 +14,10 @@ Changes to any quality score or confirmation revoke the review pass and clear cu
 
 **Sample avatars without customer photos** retain the previous simple sample-approval workflow. A session awaiting photo-based generation cannot approve or export a sample in place of a personalized avatar.
 
+An optional [local identity screen](AVATAR_IDENTITY_SCREEN.md) can flag a possible
+face mismatch or an inconclusive comparison for the reviewer. A passing screen
+is not proof of likeness and never replaces the six scores or customer approval.
+
 ## Limitations and privacy
 
 - These are human scores, not calibrated similarity, anatomical or garment-fit measurements. No score may be interpreted as a guarantee of fidelity.
