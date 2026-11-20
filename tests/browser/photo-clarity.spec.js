@@ -48,9 +48,9 @@ test("on-device photo preflight blocks unusably dark face before any provider re
     .getByRole("checkbox", { name: /The customer agrees to send their face photo/ })
     .check();
   await page.getByRole("button", { name: "Generate customer avatar", exact: true }).click();
-  await expect(page.getByText(/This photo is almost completely dark/)).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("This photo is almost completely dark");
   expect(requests).toBe(0);
-  await page.getByRole("button", { name: "Back to details" }).click();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
   await page
     .getByLabel("Upload face photo")
     .setInputFiles(path.resolve(customerPhotos[0].face));
