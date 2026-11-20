@@ -1,3 +1,4 @@
+import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { useProductSource, useSampleSource } from "../helpers/studio-navigation.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -71,9 +72,7 @@ async function fixture(page, work) {
   async function openAvatar() {
     await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
     await page.getByRole("button", { name: "Use Customer One", exact: true }).click();
-    await page
-      .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-      .check();
+    await approvePersonalizedAvatar(page);
     await page.getByRole("button", { name: "Try clothes", exact: true }).click();
     await expect(page.getByAltText("Avatar wearing the selected outfit")).toBeVisible();
   }
