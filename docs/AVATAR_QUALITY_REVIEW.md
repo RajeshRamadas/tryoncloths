@@ -19,7 +19,7 @@ Changes to any quality score or confirmation revoke the review pass and clear cu
 - These are human scores, not calibrated similarity, anatomical or garment-fit measurements. No score may be interpreted as a guarantee of fidelity.
 - The scores and review confirmation are session-only. Reopening a saved personalized avatar requires another review, because the original photos may not be available and the image could be shown to a different customer.
 - The review UI does **not** change provider data retention, add biometric storage or transmit input photos. The review checklist itself is not saved.
-- This is a **client-side approval gate**. It does not establish authorization for direct API calls or retroactively delete older account-saved avatars; server-side draft/approved lifecycle enforcement remains a separate requirement.
+- Store-account avatars additionally have a [server-enforced draft/approved lifecycle](AVATAR_SERVER_APPROVAL.md). The server validates the human review attestation before account-backed reuse; legacy saved avatars require re-review. The local-only IndexedDB library continues to use its existing in-browser gate.
 - Live identity and visual quality validation still needs consented, representative images and manual review. CI tests validate workflow rules, not perceptual accuracy.
 
 ## Verification
