@@ -35,7 +35,7 @@ import {
 import { downloadAvatar, libraryForIndex, readPhoto } from "./images";
 import BodyPhotoHints from "./BodyPhotoHints";
 import PhotoClarityHints from "./PhotoClarityHints";
-import { checkPhotoClarity } from "./photo-clarity";
+import { checkPhotoClarity } from "./photo-clarity-browser";
 import { analyseBodyPhoto, type BodyPhotoAnalysis } from "./body-pose";
 import { suggestBuild } from "./body-build";
 import { assessAvatarReadiness } from "./avatar-readiness.js";
