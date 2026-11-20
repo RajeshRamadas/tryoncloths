@@ -630,7 +630,8 @@ export default function App() {
     }
   }
   async function keepAvatar() {
-    if (!personalized || !avatarApproved || !saveConsent || exporting || needsCustomerGeneration) return;
+    if (!personalized || !avatarApproved || !saveConsent || exporting || needsCustomerGeneration)
+      return;
     setExporting(true);
     setError("");
     try {
