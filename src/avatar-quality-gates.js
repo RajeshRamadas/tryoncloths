@@ -1,8 +1,12 @@
 // Pure, conservative review gate for a reusable master avatar.
 // This is a human-reviewed quality policy, not automated identity verification.
 export const AVATAR_REVIEW_CRITERIA = Object.freeze([
-  "faceLikeness", "skinToneConsistency", "bodyProportions",
-  "neckBlend", "handsAndFeet", "fullBodyFraming",
+  "faceLikeness",
+  "skinToneConsistency",
+  "bodyProportions",
+  "neckBlend",
+  "handsAndFeet",
+  "fullBodyFraming",
 ]);
 
 /**
