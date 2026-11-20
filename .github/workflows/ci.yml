@@ -24,13 +24,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - name: Diagnose identity screening formatting and unit/build
-        run: |
-          for file in server/app.js server/avatar-identity.js src/App.tsx tests/avatar-identity.test.js; do
-            diff -u "$file" <(npx prettier "$file") || true
-          done
-          npm test
-          npm run build
       - run: npm run format:check
       - run: npm test
       - run: npm run build
