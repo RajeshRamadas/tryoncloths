@@ -84,7 +84,8 @@ export function assessAvatarReadiness(input = {}) {
   if (!bodyAnalysis || bodyAnalysis.status !== "valid") {
     warnings.push({
       code: "BODY_POSE_UNVERIFIED",
-      message: "Full-body pose and visibility have not been verified; request a clear standing photo.",
+      message:
+        "Full-body pose and visibility have not been verified; request a clear standing photo.",
     });
   }
   if (!input.additionalView) {
