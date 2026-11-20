@@ -6,6 +6,7 @@ import wasmBinaryPath from "@mediapipe/tasks-vision/vision_wasm_internal.wasm?ur
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 import { assessBodyPose } from "./body-pose-check";
 import { assessAvatarGeometry } from "./avatar-geometry-audit";
+import { assessAvatarTone } from "./avatar-tone-audit";
 import { measureBodyCm, measureBuild } from "./body-build";
 import { loadImage } from "./images";
 
@@ -138,5 +139,55 @@ export async function inspectAvatarGeometry(
     });
   } catch {
     return assessAvatarGeometry({ profileId, poseHints: null });
+  }
+}
+
+export type AvatarToneAudit = {
+  status: "clear" | "review" | "unverified";
+  findings: { code: string; message: string }[];
+  checkedRegions: number;
+};
+
+/**
+ * Inspect only the currently open avatar, locally. Draw a capped-size canvas
+ * and discard pixel data immediately after the advisory comparison. Pose and
+ * segmentation run in the browser, without extra provider or backend calls.
+ */
+export async function inspectAvatarTone(imageDataUrl: string): Promise<AvatarToneAudit> {
+  let canvas: HTMLCanvasElement | null = null;
+  try {
+    const image = await loadImage(imageDataUrl);
+    const pose = await segmentPose(image);
+    if (!pose) return assessAvatarTone();
+
+    const scale = Math.min(1, 1024 / Math.max(image.naturalWidth, image.naturalHeight));
+    canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return assessAvatarTone();
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const pixelData = context.getImageData(0, 0, canvas.width, canvas.height);
+    try {
+      return assessAvatarTone({
+        pixels: pixelData.data,
+        width: canvas.width,
+        height: canvas.height,
+        landmarks: pose.landmarks,
+        person: pose.person,
+        personWidth: pose.width,
+        personHeight: pose.height,
+      });
+    } finally {
+      pixelData.data.fill(0);
+    }
+  } catch {
+    return assessAvatarTone();
+  } finally {
+    if (canvas) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
   }
 }
