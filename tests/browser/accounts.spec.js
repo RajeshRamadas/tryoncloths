@@ -13,6 +13,10 @@ test("web store accounts automatically save generated avatars and reopen them in
   browser,
   page,
 }) => {
+  // This end-to-end flow spans two browsers, an isolated store database, image processing,
+  // avatar approval, outfit saving, and reloads. Keep its own CI budget instead of
+  // relying on Playwright's 30-second default for short tests.
+  test.setTimeout(90_000);
   const directory = await mkdtemp(path.join(os.tmpdir(), "forme-account-browser-"));
   const store = new AccountStore(directory);
   let generations = 0;
