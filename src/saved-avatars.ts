@@ -27,6 +27,7 @@ export type SavedAvatar = AvatarDetails & {
   thumbnail: string;
   savedAt: number;
   looksCount?: number;
+  approvalStatus?: "draft" | "approved";
 };
 const database = "forme-saved-avatars";
 const storeName = "avatars";
