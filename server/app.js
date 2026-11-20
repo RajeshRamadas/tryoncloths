@@ -31,7 +31,11 @@ import {
 import { providerErrorDetails } from "./provider-errors.js";
 import { openaiPersonalize } from "./openai.js";
 import { geminiPersonalize, GEMINI_REFERENCE_VERSION } from "./gemini.js";
-import { screenAvatarIdentity, parseAvatarIdentityMode } from "./avatar-identity.js";
+import {
+  screenAvatarIdentity,
+  parseAvatarIdentityMode,
+  parseAvatarIdentityMax,
+} from "./avatar-identity.js";
 import { providerConfig } from "./provider-config.js";
 import { installAccountRoutes, accountUser } from "./accounts.js";
 import { meter, validRequestId, BillingError, billingFailure } from "./billing.js";
@@ -107,6 +111,7 @@ export function createApp({
   model = providerConfig(provider).model,
   quality = process.env.TRYON_OPENAI_QUALITY || "low",
   avatarIdentityMode = process.env.TRYON_AVATAR_IDENTITY_MODE || "off",
+  avatarIdentityMax = process.env.TRYON_AVATAR_IDENTITY_MAX || "0.45",
   avatarIdentityScreen = screenAvatarIdentity,
   personalize = provider === "gemini" ? geminiPersonalize : openaiPersonalize,
   production = false,
@@ -135,6 +140,7 @@ export function createApp({
   productLink = readProductLinkWithFallback,
 } = {}) {
   const identityMode = parseAvatarIdentityMode(avatarIdentityMode);
+  const identityMax = parseAvatarIdentityMax(avatarIdentityMax);
   const providerLabel = providerConfig(provider).label;
   if (!["auto", "protected", "public"].includes(accessMode))
     throw new Error("TRYON_ACCESS_MODE must be auto, protected, or public.");
@@ -478,6 +484,7 @@ export function createApp({
             reference: face,
             output: generated,
             mode: identityMode,
+            maxDistance: identityMax,
           });
           return generated;
         },
