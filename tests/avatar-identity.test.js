@@ -66,7 +66,13 @@ test("comparison sees only temporary PNG face crops and clears them after use", 
 });
 
 test("rejects missing or multiple generated faces without comparing descriptors", async () => {
-  for (const boxes of [[], [{ box: { x: 100, y: 20, width: 70, height: 80 } }, { box: { x: 200, y: 20, width: 70, height: 80 } }]]) {
+  for (const boxes of [
+    [],
+    [
+      { box: { x: 100, y: 20, width: 70, height: 80 } },
+      { box: { x: 200, y: 20, width: 70, height: 80 } },
+    ],
+  ]) {
     await assert.rejects(
       screenAvatarIdentity({
         face: reference,
