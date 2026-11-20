@@ -1198,6 +1198,24 @@ footer > span:last-child {
 .avatar-quality-review .consent {
   margin: 12px 0;
 }
+.avatar-geometry-audit {
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+}
+.avatar-geometry-audit strong {
+  font-size: 13px;
+}
+.avatar-geometry-audit ul {
+  margin: 8px 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.avatar-geometry-results {
+  margin-top: 12px;
+}
 .avatar-quality-grid {
   display: grid;
   gap: 11px;
