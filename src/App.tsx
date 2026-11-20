@@ -46,7 +46,14 @@ import AvatarQualityReview from "./AvatarQualityReview";
 import { canApproveAvatar } from "./avatar-quality-gates.js";
 import SavedAvatars from "./SavedAvatars";
 import StoreAccount, { type AccountState } from "./StoreAccount";
-import { accountAvatarImage, listAccountAvatars, saveAccountAvatar } from "./account-avatars";
+import {
+  accountAvatarImage,
+  listAccountAvatars,
+  saveAccountAvatar,
+  approveAccountAvatar,
+  revokeAccountAvatarApproval,
+  type AvatarReviewAttestation,
+} from "./account-avatars";
 import { avatarDataUrl, saveAvatar, type AvatarDetails, type OpenedLook } from "./saved-avatars";
 import { App as NativeApp } from "@capacitor/app";
 
@@ -245,6 +252,8 @@ export default function App() {
   const [exporting, setExporting] = useState(false);
   const [approved, setApproved] = useState(false);
   const [qualityReviewPassed, setQualityReviewPassed] = useState(false);
+  const [reviewAttestation, setReviewAttestation] = useState<AvatarReviewAttestation | null>(null);
+  const [approvingAccount, setApprovingAccount] = useState(false);
   const [exportFooter, setExportFooter] = useState<boolean | undefined>(undefined);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -392,6 +401,7 @@ export default function App() {
     setPersonalized(null);
     setApproved(false);
     setQualityReviewPassed(false);
+    setReviewAttestation(null);
     setAiConsent(false);
     setIdentityCheckConsent(false);
     setError("");
@@ -449,6 +459,7 @@ export default function App() {
     if (step === 3 && next !== 3 && personalized) {
       // Leaving the review panel unmounts the scorecard; a new review is required on return.
       setQualityReviewPassed(false);
+      setReviewAttestation(null);
       setApproved(false);
       setSaveConsent(false);
     }
@@ -520,6 +531,7 @@ export default function App() {
     setError("");
     setApproved(false);
     setQualityReviewPassed(false);
+    setReviewAttestation(null);
     try {
       const response = await requestApi(
         "/api/personalize",
@@ -644,14 +656,45 @@ export default function App() {
       setError((e as Error).message);
     }
   }
+  async function changeCustomerApproval(next: boolean) {
+    if (!next) {
+      setApproved(false);
+      setSaveConsent(false);
+      setOutfitOpen(false);
+      if (personalized && accountState.account && avatarId) {
+        try {
+          await revokeAccountAvatarApproval(avatarId);
+        } catch (cause) {
+          setError((cause as Error).message);
+        }
+      }
+      return;
+    }
+    if (!personalized || !accountState.account || !avatarId) {
+      setApproved(true);
+      return;
+    }
+    if (!reviewAttestation || !qualityReviewPassed) return;
+    setApprovingAccount(true);
+    setError("");
+    try {
+      await approveAccountAvatar(avatarId, reviewAttestation);
+      setApproved(true);
+    } catch (cause) {
+      setApproved(false);
+      setError((cause as Error).message);
+    } finally {
+      setApprovingAccount(false);
+    }
+  }
+
   async function keepAvatar() {
     if (!personalized || !avatarApproved || !saveConsent || exporting || needsCustomerGeneration)
       return;
     setExporting(true);
     setError("");
     try {
-      const save = accountState.enabled ? saveAccountAvatar : saveAvatar;
-      const saved = await save(personalized, {
+      const details = {
         customerId: customer?.id,
         name: avatarName,
         profileId: selected,
@@ -659,7 +702,17 @@ export default function App() {
         heightCm: Number(height),
         weightKg: Number(weight),
         source: avatarSource,
-      });
+      };
+      let saved: { id?: string } | void;
+      if (accountState.enabled) {
+        if (!reviewAttestation) throw new Error("Complete the avatar quality review before saving.");
+        saved = await saveAccountAvatar(personalized, details);
+        if (!saved?.id) throw new Error("The account did not return a saved avatar ID.");
+        // Saving always creates a draft. Only server-validated review promotes it.
+        await approveAccountAvatar(saved.id, reviewAttestation);
+      } else {
+        saved = await saveAvatar(personalized, details);
+      }
       if (saved?.id) setAvatarId(saved.id);
       // Stores that make a portrait with every avatar go straight on to it, reusing the face
       // photo still in this session. Staff confirm consent before any credit is used.
@@ -1256,8 +1309,9 @@ export default function App() {
                           facePhoto={face}
                           bodyPhoto={body}
                           disabled={exporting || generating}
-                          onCompleteChange={(passed) => {
+                          onCompleteChange={(passed, review) => {
                             setQualityReviewPassed(passed);
+                            setReviewAttestation(passed ? (review ?? null) : null);
                             if (!passed) {
                               setApproved(false);
                               setSaveConsent(false);
@@ -1270,8 +1324,8 @@ export default function App() {
                         <input
                           type="checkbox"
                           checked={avatarApproved}
-                          disabled={!approvalReady || exporting}
-                          onChange={(e) => setApproved(e.target.checked)}
+                          disabled={!approvalReady || exporting || approvingAccount}
+                          onChange={(e) => void changeCustomerApproval(e.target.checked)}
                         />
                         <span>
                           {personalized
