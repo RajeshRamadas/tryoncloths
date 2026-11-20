@@ -55,7 +55,7 @@ async function save(page, name) {
     )
     .check();
   await page.getByRole("button", { name: "Save avatar for reuse", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Avatar saved on this device");
+  await expect(page.locator(".toast-region")).toContainText("Avatar saved on this device");
 }
 
 test("an explicitly saved customer avatar survives reload, reopens for clothes, and never stores input photos", async ({
