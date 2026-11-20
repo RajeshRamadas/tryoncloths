@@ -772,12 +772,14 @@ export function installAccountRoutes(
     "/api/avatars/:id/approval",
     sameOrigin,
     requireUser,
+    requireRole("owner", "manager", "staff"),
     wrap((req, res) => res.json(store.approveAvatar(req.account, req.params.id, req.body))),
   );
   app.delete(
     "/api/avatars/:id/approval",
     sameOrigin,
     requireUser,
+    requireRole("owner", "manager", "staff"),
     wrap((req, res) => res.json(store.revokeAvatarApproval(req.account, req.params.id))),
   );
   app.delete(
