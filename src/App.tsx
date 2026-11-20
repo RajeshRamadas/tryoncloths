@@ -694,7 +694,7 @@ export default function App() {
     setExporting(true);
     setError("");
     try {
-      const details = {
+      const details: AvatarDetails = {
         customerId: customer?.id,
         name: avatarName,
         profileId: selected,
@@ -703,7 +703,7 @@ export default function App() {
         weightKg: Number(weight),
         source: avatarSource,
       };
-      let saved: { id?: string } | void;
+      let saved: { id?: string } | undefined;
       if (accountState.enabled) {
         if (!reviewAttestation) throw new Error("Complete the avatar quality review before saving.");
         saved = await saveAccountAvatar(personalized, details);
@@ -711,7 +711,7 @@ export default function App() {
         // Saving always creates a draft. Only server-validated review promotes it.
         await approveAccountAvatar(saved.id, reviewAttestation);
       } else {
-        saved = await saveAvatar(personalized, details);
+        await saveAvatar(personalized, details);
       }
       if (saved?.id) setAvatarId(saved.id);
       // Stores that make a portrait with every avatar go straight on to it, reusing the face
