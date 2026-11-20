@@ -497,9 +497,7 @@ export default function App() {
             consent: true,
             consentScope: "face-and-body",
             consentProvider: provider,
-            ...(accountState.enabled
-              ? { accountStorageConsent: aiConsent, avatarName, customerId: customer?.id }
-              : {}),
+            ...(accountState.enabled ? { customerId: customer?.id } : {}),
           }),
         },
         200000,
@@ -1047,7 +1045,7 @@ export default function App() {
                           <p>
                             {accountState.account
                               ? `After review and approval, you can save the avatar and measurements to ${accountState.account.name}. Original photos are not kept.`
-                              : "Sign in to a store account above before generating. Your avatar will be saved to that account."}
+                              : "Sign in to a store account above before generating. You can save the avatar only after review and approval."}
                           </p>
                         </div>
                       )}
@@ -1063,9 +1061,7 @@ export default function App() {
                             The customer agrees to send their face photo, full-body photo and
                             approximate height/weight to {providerLabel}’s image-generation service
                             to generate their avatar and match skin tone. Provider retention terms
-                            apply.{" "}
-                            {accountState.enabled &&
-                              "The customer also agrees to save the generated avatar and measurements to this store account."}
+                            apply.
                           </span>
                         </label>
                       )}
