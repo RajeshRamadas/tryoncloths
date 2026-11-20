@@ -3,9 +3,21 @@
 export const TONE_DIFFERENCE_LIMIT = 28;
 
 const SITES = [
-  { code: "neck", description: "The sampled neck/collar area differs from the face.", indices: [0, 11, 12] },
-  { code: "left-arm", description: "The sampled left forearm differs from the face or may be covered.", indices: [13, 15] },
-  { code: "right-arm", description: "The sampled right forearm differs from the face or may be covered.", indices: [14, 16] },
+  {
+    code: "neck",
+    description: "The sampled neck/collar area differs from the face.",
+    indices: [0, 11, 12],
+  },
+  {
+    code: "left-arm",
+    description: "The sampled left forearm differs from the face or may be covered.",
+    indices: [13, 15],
+  },
+  {
+    code: "right-arm",
+    description: "The sampled right forearm differs from the face or may be covered.",
+    indices: [14, 16],
+  },
 ];
 
 const unverified = (message) => ({
@@ -67,12 +79,10 @@ function patch(input, point) {
 function toLab(rgb) {
   const linear = rgb.map((value) => {
     const normalized = value / 255;
-    return normalized <= 0.04045
-      ? normalized / 12.92
-      : ((normalized + 0.055) / 1.055) ** 2.4;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
   });
   const [r, g, b] = linear;
-  const pivot = (v) => (v > 216 / 24389 ? Math.cbrt(v) : (24389 / 27 * v + 16) / 116);
+  const pivot = (v) => (v > 216 / 24389 ? Math.cbrt(v) : ((24389 / 27) * v + 16) / 116);
   const x = pivot((0.4124564 * r + 0.3575761 * g + 0.1804375 * b) / 0.95047);
   const y = pivot(0.2126729 * r + 0.7151522 * g + 0.072175 * b);
   const z = pivot((0.0193339 * r + 0.119192 * g + 0.9503041 * b) / 1.08883);
@@ -107,8 +117,12 @@ export function assessAvatarTone(input = {}) {
     pixels.length !== width * height * 4 ||
     !Array.isArray(landmarks) ||
     landmarks.length < 33 ||
-    (person && (!Number.isInteger(personWidth) || !Number.isInteger(personHeight) ||
-      personWidth < 1 || personHeight < 1 || person.length !== personWidth * personHeight))
+    (person &&
+      (!Number.isInteger(personWidth) ||
+        !Number.isInteger(personHeight) ||
+        personWidth < 1 ||
+        personHeight < 1 ||
+        person.length !== personWidth * personHeight))
   ) {
     return unverified("Pixel or pose data could not be inspected. Review skin tone visually.");
   }
@@ -120,7 +134,9 @@ export function assessAvatarTone(input = {}) {
     .map((point) => patch(input, point))
     .filter((colour) => colour !== null);
   if (face.length < 2) {
-    return unverified("The facial colour reference was not reliable. Review the face and neck manually.");
+    return unverified(
+      "The facial colour reference was not reliable. Review the face and neck manually.",
+    );
   }
   const reference = [0, 1, 2].map((channel) => median(face.map((colour) => colour[channel])));
 
@@ -146,7 +162,9 @@ export function assessAvatarTone(input = {}) {
   }
 
   if (checkedRegions === 0) {
-    return unverified("No exposed neck or arm regions could be sampled reliably. Check them visually.");
+    return unverified(
+      "No exposed neck or arm regions could be sampled reliably. Check them visually.",
+    );
   }
   return { status: findings.length ? "review" : "clear", findings, checkedRegions };
 }
