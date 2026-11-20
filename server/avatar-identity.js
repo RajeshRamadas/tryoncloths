@@ -66,12 +66,7 @@ export async function screenAvatarIdentity({
       .catch(() => {
         throw new ProviderError("invalid_image");
       });
-    if (
-      metadata.format !== "png" ||
-      metadata.pages > 1 ||
-      !metadata.width ||
-      !metadata.height
-    ) {
+    if (metadata.format !== "png" || metadata.pages > 1 || !metadata.width || !metadata.height) {
       throw new ProviderError("invalid_image");
     }
     const faces = await locate(output, { upper: true });
