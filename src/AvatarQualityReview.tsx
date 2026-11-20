@@ -1,5 +1,10 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { inspectAvatarGeometry, type AvatarGeometryAudit } from "./body-pose";
+import {
+  inspectAvatarGeometry,
+  inspectAvatarTone,
+  type AvatarGeometryAudit,
+  type AvatarToneAudit,
+} from "./body-pose";
 import { assessMasterAvatarReview, AVATAR_REVIEW_CRITERIA } from "./avatar-quality-gates.js";
 
 const labels: Record<string, string> = {
@@ -30,12 +35,19 @@ export default function AvatarQualityReview({
   const [geometry, setGeometry] = useState<AvatarGeometryAudit | null>(null);
   const [inspecting, setInspecting] = useState(false);
   const inspectionEpoch = useRef(0);
+  const [tone, setTone] = useState<AvatarToneAudit | null>(null);
+  const [toneInspecting, setToneInspecting] = useState(false);
+  const toneEpoch = useRef(0);
   useEffect(() => {
     inspectionEpoch.current++;
+    toneEpoch.current++;
     setGeometry(null);
+    setTone(null);
     setInspecting(false);
+    setToneInspecting(false);
     return () => {
       inspectionEpoch.current++;
+      toneEpoch.current++;
     };
   }, [image, profileId]);
 
@@ -48,6 +60,16 @@ export default function AvatarQualityReview({
     setGeometry(result);
     setInspecting(false);
   }
+  async function inspectTone() {
+    const current = ++toneEpoch.current;
+    setToneInspecting(true);
+    setTone(null);
+    const result = await inspectAvatarTone(image);
+    if (toneEpoch.current !== current) return;
+    setTone(result);
+    setToneInspecting(false);
+  }
+
   const result = assessMasterAvatarReview({ scores, customerConsent, reviewerConfirmed });
   const unscored = AVATAR_REVIEW_CRITERIA.filter((criterion) => !scores[criterion]).length;
   const belowThreshold = AVATAR_REVIEW_CRITERIA.filter(
@@ -94,6 +116,40 @@ export default function AvatarQualityReview({
             {geometry.findings.length > 0 && (
               <ul>
                 {geometry.findings.map((finding) => (
+                  <li key={finding.code}>{finding.message}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </section>
+      <section className="avatar-geometry-audit" aria-label="Local avatar skin-tone check">
+        <strong>Optional generated skin-tone consistency check</strong>
+        <p className="small-footnote">
+          Compare small colour samples from the generated face, neck and forearms. This stays on
+          your device and uses no extra AI credits. Clothing, makeup, shadows and lighting can
+          cause misleading differences; this does not verify the customer's natural complexion.
+        </p>
+        <button
+          type="button"
+          className="button secondary full-width"
+          disabled={toneInspecting || disabled}
+          onClick={() => void inspectTone()}
+        >
+          {toneInspecting ? "Checking colour consistency…" : "Check skin-tone consistency"}
+        </button>
+        {tone && (
+          <div className="avatar-geometry-results" role="status" aria-live="polite">
+            <p className="small-footnote">
+              {tone.status === "clear"
+                ? "No large difference was found among sampled regions. Still compare the avatar with the customer."
+                : tone.status === "unverified"
+                  ? "The samples could not be checked reliably. Review the face, neck and exposed skin manually."
+                  : "Review the following possible colour or coverage differences:"}
+            </p>
+            {tone.findings.length > 0 && (
+              <ul>
+                {tone.findings.map((finding) => (
                   <li key={finding.code}>{finding.message}</li>
                 ))}
               </ul>
