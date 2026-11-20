@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
@@ -245,13 +246,13 @@ test("customer avatar association cannot cross stores or move identical images b
     const c = store.customers.save(a, input),
       d = store.customers.save(a, { ...input, phoneE164: "9876543211" }),
       outside = store.customers.save(b, input);
-    await assert.rejects(store.save(a, avatar(image, outside.id)), { status: 404 });
-    const av = await store.save(a, avatar(image, c.id)),
-      other = await store.save(a, avatar(image, d.id)),
-      unassigned = await store.save(a, avatar(image));
+    await assert.rejects(saveApprovedTestAvatar(store, a, avatar(image, outside.id)), { status: 404 });
+    const av = await saveApprovedTestAvatar(store, a, avatar(image, c.id)),
+      other = await saveApprovedTestAvatar(store, a, avatar(image, d.id)),
+      unassigned = await saveApprovedTestAvatar(store, a, avatar(image));
     assert.notEqual(av.id, other.id);
     assert.notEqual(av.id, unassigned.id);
-    assert.equal((await store.save(a, { ...avatar(image, c.id), name: "Renamed" })).id, av.id);
+    assert.equal((await saveApprovedTestAvatar(store, a, { ...avatar(image, c.id), name: "Renamed" })).id, av.id);
     assert.equal(store.list(a).find((x) => x.id === av.id).customerName, c.name);
     assert.throws(
       () =>
@@ -273,8 +274,8 @@ test("customer erasure cascades to avatars, looks, adaptations and share links w
   fixture(async ({ store, a, b, image, request }) => {
     const c = store.customers.save(a, input),
       other = store.customers.save(b, input);
-    const av = await store.save(a, avatar(image, c.id)),
-      avOther = await store.save(b, avatar(image, other.id));
+    const av = await saveApprovedTestAvatar(store, a, avatar(image, c.id)),
+      avOther = await saveApprovedTestAvatar(store, b, avatar(image, other.id));
     const look = await store.saveLook(a, {
       image,
       avatarId: av.id,
@@ -332,7 +333,7 @@ test("customer erasure cascades to avatars, looks, adaptations and share links w
 test("customer deletion while decoding an avatar cannot resurrect saved customer images", async () =>
   fixture(async ({ store, a, image }) => {
     const c = store.customers.save(a, input);
-    const pending = store.save(a, avatar(image, c.id));
+    const pending = saveApprovedTestAvatar(store, a, avatar(image, c.id));
     store.customers.remove(a, c.id);
     await assert.rejects(pending, { status: 404 });
     assert.equal(store.list(a).length, 0);
@@ -381,7 +382,7 @@ test("generation validates the customer before charging and returns an unsaved d
 
 test("C6 upgrade preserves legacy avatars and is idempotent; customer lists paginate within the active store", async () =>
   fixture(async ({ store, a, directory, image }) => {
-    const legacy = await store.save(a, avatar(image));
+    const legacy = await saveApprovedTestAvatar(store, a, avatar(image));
     store.db.exec(
       "DROP TRIGGER avatars_customer_insert; DROP TRIGGER avatars_customer_update; DROP TRIGGER customers_erase; DROP TABLE share_links; DROP TABLE customers;",
     );
