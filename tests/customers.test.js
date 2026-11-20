@@ -338,7 +338,7 @@ test("customer deletion while decoding an avatar cannot resurrect saved customer
     assert.equal(store.list(a).length, 0);
   }));
 
-test("generation validates customer before provider charge, auto-links output, and retains paid output if customer is deleted in-flight", async () =>
+test("generation validates the customer before charging and returns an unsaved draft", async () =>
   fixture(async ({ store, a, b, request, calls, onGenerate }) => {
     const c = store.customers.save(a, input),
       other = store.customers.save(b, input);
@@ -353,7 +353,6 @@ test("generation validates customer before provider charge, auto-links output, a
       consent: true,
       consentScope: "face-and-body",
       consentProvider: "gemini",
-      accountStorageConsent: true,
       customerId: c.id,
     });
     assert.equal(
@@ -361,15 +360,20 @@ test("generation validates customer before provider charge, auto-links output, a
       404,
     );
     assert.equal(calls(), 0);
+
     const generated = await request("/api/personalize", "POST", payload());
     assert.equal(generated.status, 200);
-    assert.equal((await generated.json()).accountSaved, true);
-    assert.equal(store.list(a)[0].customerId, c.id);
+    const first = await generated.json();
+    assert.equal(first.accountSaved, false);
+    assert.equal(first.avatarId, null);
+    assert.equal(store.list(a).length, 0);
+
     onGenerate(() => store.customers.remove(a, c.id));
     const pending = await request("/api/personalize", "POST", payload()),
       result = await pending.json();
     assert.equal(pending.status, 200);
     assert.equal(result.accountSaved, false);
+    assert.equal(result.avatarId, null);
     assert.match(result.image, /^data:image\/png/);
     assert.equal(store.list(a).length, 0);
     assert.equal(calls(), 2);
