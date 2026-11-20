@@ -1,3 +1,4 @@
+import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -99,9 +100,7 @@ async function saveAvatar(page, { portraitWithAvatar }, run) {
       .check();
     await page.getByRole("button", { name: "Generate customer avatar", exact: true }).click();
     await page.getByRole("button", { name: "Review avatar", exact: true }).click();
-    await page
-      .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-      .check();
+    await approvePersonalizedAvatar(page);
     await page.getByLabel("Avatar name", { exact: true }).fill("Customer P");
     await page
       .getByLabel(
