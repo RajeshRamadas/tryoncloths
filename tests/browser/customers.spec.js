@@ -93,17 +93,18 @@ test("customer mobile lookup, generated avatar grouping, reopen and profile eras
     await expect(
       page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
     ).toBeVisible();
+    await page.getByRole("button", { name: "Review avatar" }).click();
     expect(store.list(owner)).toHaveLength(0);
     await page
       .getByLabel("The customer approves the face, body and skin tone of this avatar.")
       .check();
     await page
-      .getByLabel("The customer agrees to save this avatar and measurements to the store account for reuse.")
+      .getByLabel(
+        "The customer agrees to save this avatar and measurements to the store account for reuse.",
+      )
       .check();
     await page.getByRole("button", { name: "Save avatar for reuse" }).click();
-    await expect
-      .poll(() => store.list(owner)[0]?.customerId)
-      .toBe(customer.id);
+    await expect.poll(() => store.list(owner)[0]?.customerId).toBe(customer.id);
     await page.reload();
     await page.getByLabel("Customer mobile number", { exact: true }).fill("987");
     await page.getByRole("button", { name: "Find customer", exact: true }).click();
