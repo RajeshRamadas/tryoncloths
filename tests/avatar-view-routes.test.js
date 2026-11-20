@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
@@ -56,7 +57,7 @@ async function fixture(run, { app: extra = {}, generate } = {}) {
   let calls = 0,
     anchorCalls = 0;
   const baseImage = url(await standardAvatar("regular"));
-  const av = await store.save(a, {
+  const av = await saveApprovedTestAvatar(store, a, {
     image: baseImage,
     name: "Customer A",
     profileId: "regular",
@@ -64,7 +65,7 @@ async function fixture(run, { app: extra = {}, generate } = {}) {
     weightKg: 72,
     source: "imported",
   });
-  const bv = await store.save(b, {
+  const bv = await saveApprovedTestAvatar(store, b, {
     image: url(await standardAvatar("f-regular")),
     name: "Customer B",
     profileId: "f-regular",
@@ -192,7 +193,7 @@ test("free hands preview requires review, persists in its account, survives rest
     assert.equal((await (await request(endpoint)).json()).views.length, 1);
     assert.equal(store.billing.balance(a.org), balance);
     assert.equal(calls(), 0);
-    await store.save(a, {
+    await saveApprovedTestAvatar(store, a, {
       image: baseImage,
       name: "Renamed customer",
       profileId: "regular",
@@ -443,7 +444,7 @@ test("deletion during generation cannot return or save a paid view and an old re
   await fixture(async ({ store, a, av, endpoint, create, request, baseImage }) => {
     const p = await (await create(hands)).json();
     store.remove(a, av.id);
-    const same = await store.save(a, {
+    const same = await saveApprovedTestAvatar(store, a, {
       image: baseImage,
       name: "Recreated",
       profileId: "regular",
@@ -664,7 +665,7 @@ test("suspending an organisation during generation stops delivery and refunds th
 
 test("female sample hands remain free while female paid portraits honour the existing pilot flag", async () =>
   fixture(async ({ store, a, request, calls }) => {
-    const av = await store.save(a, {
+    const av = await saveApprovedTestAvatar(store, a, {
         image: url(await standardAvatar("f-regular")),
         name: "Female customer",
         profileId: "f-regular",
@@ -692,7 +693,7 @@ test("photo validation is bounded to two concurrent preflights before any credit
       const extra = [];
       for (const profileId of ["athletic", "broad"])
         extra.push(
-          await store.save(a, {
+          await saveApprovedTestAvatar(store, a, {
             image: url(await standardAvatar(profileId)),
             name: profileId,
             profileId,
