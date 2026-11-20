@@ -51,9 +51,7 @@ test("on-device photo preflight blocks unusably dark face before any provider re
   await expect(page.getByRole("alert")).toContainText("This photo is almost completely dark");
   expect(requests).toBe(0);
   await page.getByRole("button", { name: "Back", exact: true }).click();
-  await page
-    .getByLabel("Upload face photo")
-    .setInputFiles(path.resolve(customerPhotos[0].face));
+  await page.getByLabel("Upload face photo").setInputFiles(path.resolve(customerPhotos[0].face));
   await expect(page.getByRole("status", { name: "Face photo clarity check" })).not.toContainText(
     "not usable for generation",
   );
