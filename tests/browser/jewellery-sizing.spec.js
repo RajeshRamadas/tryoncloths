@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -37,7 +38,7 @@ async function fixture(page, run, { enabled = true } = {}) {
       phoneE164: "9876543210",
       measurements: { heightCm: 175, weightKg: 72, chestCm: 98, ringSizeIn: 14 },
     }),
-    avatar = await store.save(account, {
+    avatar = await saveApprovedTestAvatar(store, account, {
       image: url(await standardAvatar("regular")),
       customerId: customer.id,
       name: "Asha avatar",
