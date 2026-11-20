@@ -23,10 +23,16 @@ function photo(paint = () => [128, 128, 128], originalWidth = 960, originalHeigh
 test("almost uniform black and white images are blocked before billable generation", () => {
   const black = assessPhotoClarity(photo(() => [0, 0, 0]));
   assert.equal(black.status, "blocked");
-  assert.deepEqual(black.issues.map((issue) => issue.code), ["PHOTO_UNREADABLY_DARK"]);
+  assert.deepEqual(
+    black.issues.map((issue) => issue.code),
+    ["PHOTO_UNREADABLY_DARK"],
+  );
   const white = assessPhotoClarity(photo(() => [255, 255, 255]));
   assert.equal(white.status, "blocked");
-  assert.deepEqual(white.issues.map((issue) => issue.code), ["PHOTO_UNREADABLY_BRIGHT"]);
+  assert.deepEqual(
+    white.issues.map((issue) => issue.code),
+    ["PHOTO_UNREADABLY_BRIGHT"],
+  );
 });
 
 test("dark but visible pixels and bright backgrounds warn rather than block", () => {
@@ -34,12 +40,18 @@ test("dark but visible pixels and bright backgrounds warn rather than block", ()
     photo((x, y) => (x < WIDTH / 2 ? [20 + y / 7, 20, 30] : [70, 65, 62])),
   );
   assert.notEqual(shadow.status, "blocked");
-  assert.equal(shadow.warnings.some((item) => item.code === "PHOTO_DARK"), true);
+  assert.equal(
+    shadow.warnings.some((item) => item.code === "PHOTO_DARK"),
+    true,
+  );
   const backdrop = assessPhotoClarity(
     photo((x) => (x < WIDTH / 2 ? [220, 225, 220] : [255, 255, 255])),
   );
   assert.notEqual(backdrop.status, "blocked");
-  assert.equal(backdrop.warnings.some((item) => item.code === "PHOTO_BRIGHT"), true);
+  assert.equal(
+    backdrop.warnings.some((item) => item.code === "PHOTO_BRIGHT"),
+    true,
+  );
 });
 
 test("soft, low-contrast and small photos receive warnings without a false hard block", () => {
@@ -57,7 +69,7 @@ test("soft, low-contrast and small photos receive warnings without a false hard 
 test("textured, well exposed photo does not automatically receive a sharpness warning", () => {
   const clear = assessPhotoClarity(
     photo((x, y) => {
-      const value = (x * 31 + y * 17) % 155 + 50;
+      const value = ((x * 31 + y * 17) % 155) + 50;
       return [value, value, value];
     }),
   );
