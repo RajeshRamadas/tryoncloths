@@ -373,10 +373,6 @@ export function createApp({
       return res
         .status(400)
         .json({ error: "Female body profiles are not enabled on this studio." });
-    if (accountStore && req.body.accountStorageConsent !== true)
-      return res.status(400).json({
-        error: "Confirm customer agreement to save the generated avatar in the store account.",
-      });
     try {
       if (
         !origin ||
