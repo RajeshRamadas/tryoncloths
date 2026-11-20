@@ -84,6 +84,9 @@ test("malformed body dimensions and unknown pose hint text do not create false s
     poseHints: [{ code: "arbitrary", message: "untrusted content" }],
   });
   assert.equal(result.status, "review");
-  assert.deepEqual(result.findings.map((f) => f.code), ["silhouette-unavailable"]);
+  assert.deepEqual(
+    result.findings.map((f) => f.code),
+    ["silhouette-unavailable"],
+  );
   assert.ok(!JSON.stringify(result).includes("untrusted content"));
 });
