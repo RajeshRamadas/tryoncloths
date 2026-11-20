@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -62,7 +63,7 @@ async function fixture(run, { generate, extra = {} } = {}) {
     ca = "forme_session=" + token,
     cb = "forme_session=" + store.session(b);
   const avatarImage = url(await standardAvatar("regular")),
-    avatar = await store.save(a, {
+    avatar = await saveApprovedTestAvatar(store, a, {
       image: avatarImage,
       name: "Customer A",
       profileId: "regular",
@@ -572,7 +573,7 @@ test("arbitrary bases and cross-view or cross-user receipts cannot become custom
       409,
     );
     assert.equal((await create({ base: p.image, baseResultId: "0".repeat(64) })).status, 409);
-    const other = await store.save(a, {
+    const other = await saveApprovedTestAvatar(store, a, {
       image: url(await standardAvatar("broad")),
       name: "Different customer",
       profileId: "broad",
@@ -776,7 +777,7 @@ test("view/visual changes invalidate receipts and reuse; deleting the avatar cas
       .run(a.id, avatar.id);
     assert.equal((await save(p)).status, 409);
     store.remove(a, avatar.id);
-    await store.save(a, {
+    await saveApprovedTestAvatar(store, a, {
       image: avatarImage,
       name: "Recreated",
       profileId: "regular",
@@ -913,7 +914,7 @@ test("zero credits and the female pilot flag reject paid work, and result capaci
     assert.equal(calls(), 0);
   });
   await fixture(async ({ store, a, create, calls }) => {
-    const female = await store.save(a, {
+    const female = await saveApprovedTestAvatar(store, a, {
       image: url(await standardAvatar("f-regular")),
       name: "Female customer",
       profileId: "f-regular",

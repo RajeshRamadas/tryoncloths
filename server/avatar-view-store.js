@@ -94,7 +94,7 @@ export class AvatarViewStore {
   }
   avatar(account, id) {
     this.actor(account);
-    this.store.requireAvatar(account, id);
+    this.store.requireApprovedAvatar(account, id);
     return this.db.prepare("SELECT * FROM avatars WHERE account=? AND id=?").get(account.id, id);
   }
   context(account, id, kind) {
@@ -124,7 +124,7 @@ export class AvatarViewStore {
   current(account, id, kind, context) {
     viewKind(kind);
     this.actor(account);
-    this.store.requireAvatar(account, id);
+    this.store.requireApprovedAvatar(account, id);
     // The avatar trigger changes the nonce on every visual/selector change.
     // Poll only this small row instead of reading/hashing the avatar BLOB.
     const epoch = this.db
