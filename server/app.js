@@ -28,7 +28,8 @@ import {
   validTemplateTone,
   DEFAULT_TEMPLATE_TONE,
 } from "../src/profiles.js";
-import { providerErrorDetails } from "./provider-errors.js";
+import { ProviderError, providerErrorDetails } from "./provider-errors.js";
+import { screenAvatarIdentity } from "./avatar-identity.js";
 import { openaiPersonalize } from "./openai.js";
 import { geminiPersonalize, GEMINI_REFERENCE_VERSION } from "./gemini.js";
 import { providerConfig } from "./provider-config.js";
@@ -106,6 +107,8 @@ export function createApp({
   model = providerConfig(provider).model,
   quality = process.env.TRYON_OPENAI_QUALITY || "low",
   personalize = provider === "gemini" ? geminiPersonalize : openaiPersonalize,
+  avatarIdentityEnabled = process.env.TRYON_AVATAR_IDENTITY_CHECK === "1",
+  avatarIdentityScreen = screenAvatarIdentity,
   production = false,
   rateLimit = true,
   mobileToken = process.env.TRYON_MOBILE_TOKEN || "",
@@ -310,6 +313,7 @@ export function createApp({
         jewelleryEnabled && accountStore && provider === "gemini" && apiKey,
       ),
       personalizationAvailable: Boolean(apiKey),
+      avatarIdentityScreenAvailable: Boolean(avatarIdentityEnabled && apiKey),
       provider,
       generationRevision: provider === "gemini" ? GEMINI_REFERENCE_VERSION : "template-first-v1",
       personalizationContract: "customer-avatar-v4",
@@ -390,6 +394,12 @@ export function createApp({
       return res.status(400).json({
         error: `Customer consent to send both photos and measurements to ${providerLabel} is required. Refresh or update the app before generating.`,
       });
+    if (avatarIdentityEnabled && req.body.identityCheckConsent !== true)
+      return res.status(400).json({
+        code: "identity_consent_required",
+        error:
+          "The customer must consent to the private on-server facial comparison before generation.",
+      });
     try {
       accountStore?.customers.requireOptional(owner, req.body.customerId);
     } catch (e) {
@@ -457,8 +467,8 @@ export function createApp({
       const image = await meter(
         req,
         { billing: accountStore?.billing, account: owner, action: "avatar" },
-        () =>
-          staffGenerate(personalize, {
+        async () => {
+          const result = await staffGenerate(personalize, {
             face,
             body,
             avatar,
@@ -467,7 +477,13 @@ export function createApp({
             apiKey,
             model,
             quality,
-          }),
+          });
+          if (avatarIdentityEnabled) {
+            const accepted = await avatarIdentityScreen({ face, image: result });
+            if (accepted !== true) throw new ProviderError("face_check");
+          }
+          return result;
+        },
       );
       // Generated customer output is a draft until the customer reviews it.
       // Never persist or expose it as a reusable account avatar automatically.
