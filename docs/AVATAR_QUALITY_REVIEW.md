@@ -5,7 +5,7 @@ This adds a **human-reviewed approval gate** for the reusable full-body customer
 ## Review workflow
 
 1. Upload consented face and full-body photographs, choose a body profile and generate an avatar.
-2. On the review step, compare the avatar with the customer or consented source photos. Reopened and imported images can be assessed with the customer when original photos are no longer available.
+2. On the review step, use the [side-by-side reference comparison](AVATAR_REFERENCE_COMPARISON.md) to inspect the original face and full-body photos alongside the generated result, including a magnified face view. Reopened and imported images show when original photos are unavailable; compare with the customer or separately consented references.
 3. Score six criteria from 1 to 5: face/hair likeness, whole-body skin-tone consistency, body proportions, neck/collar blend, hands/feet anatomy and full-body framing.
 4. Each score must be **4 or 5**. A missing score, low score, lack of customer permission or lack of reviewer confirmation blocks the **Confirm quality review** button. Do not guess when a criterion cannot be checked.
 5. After confirming the quality review, the separate customer-approval checkbox becomes available. Only then can the user download, explicitly save locally, try clothes or proceed to jewellery from this screen.
