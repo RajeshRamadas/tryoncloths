@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -54,7 +55,7 @@ test("female avatars save body type and existing male avatars remain male", asyn
       password: "test-password-long",
     });
     for (const profileId of ["regular", "f-regular"])
-      await store.save(account, {
+      await saveApprovedTestAvatar(store, account, {
         image: "data:image/png;base64," + (await standardAvatar(profileId)).toString("base64"),
         profileId,
         name: profileId,
