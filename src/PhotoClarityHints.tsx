@@ -27,13 +27,13 @@ export default function PhotoClarityHints({
     <div className="pose-hints" role="status" aria-label={`${title} clarity check`}>
       {!state ? (
         <p>
-          <LoaderCircle className="spin" size={14} /> Checking {title.toLowerCase()} clarity on
-          this device…
+          <LoaderCircle className="spin" size={14} /> Checking {title.toLowerCase()} clarity on this
+          device…
         </p>
       ) : state.status === "clear" ? (
         <p className="pose-ok">
-          <CircleCheck size={14} /> {title} has no obvious exposure or softness warnings.
-          Check likeness and detail yourself.
+          <CircleCheck size={14} /> {title} has no obvious exposure or softness warnings. Check
+          likeness and detail yourself.
         </p>
       ) : (
         <>
@@ -41,7 +41,9 @@ export default function PhotoClarityHints({
             <CircleAlert size={14} />
             {state.status === "blocked"
               ? ` ${title} is not usable for generation. Retake it first.`
-              : ` ${title} may benefit from a retake.`}
+              : state.status === "unverified"
+                ? ` ${title} clarity could not be verified on this device.`
+                : ` ${title} may benefit from a retake.`}
           </p>
           <ul>
             {findings.map((finding) => (
