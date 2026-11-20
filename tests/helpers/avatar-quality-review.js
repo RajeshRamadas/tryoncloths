@@ -19,7 +19,9 @@ export async function approvePersonalizedAvatar(page) {
     .getByLabel("I compared the result against the customer or reference photographs.")
     .check();
   await review.getByRole("button", { name: "Confirm quality review" }).click();
-  await page
-    .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-    .check();
+  const approval = page.getByLabel(
+    "The customer approves the face, body and skin tone of this avatar.",
+  );
+  if (!(await approval.isChecked())) await approval.click();
+  await expect(approval).toBeChecked();
 }
