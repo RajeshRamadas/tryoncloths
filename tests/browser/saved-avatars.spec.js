@@ -117,6 +117,13 @@ test("an explicitly saved customer avatar survives reload, reopens for clothes, 
     page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
   ).toHaveAttribute("src", `data:image/png;base64,${provider.png.toString("base64")}`);
   await expect(page.getByAltText("Original customer face for skin-tone review")).toHaveCount(0);
+  const comparison = page.getByRole("region", { name: "Compare reference photos with avatar" });
+  await expect(comparison.getByText(/Original face photo unavailable/)).toBeVisible();
+  await expect(comparison.getByAltText("Original customer face reference")).toHaveCount(0);
+  await comparison.getByRole("button", { name: "Full-body comparison" }).click();
+  await expect(comparison.getByText(/Original full-body photo unavailable/)).toBeVisible();
+  await expect(comparison.getByAltText("Original customer full-body reference")).toHaveCount(0);
+  await comparison.getByRole("button", { name: "Face comparison" }).click();
   await expect(page.getByRole("button", { name: "Try clothes" })).toBeDisabled();
   await approve(page);
   await page.getByRole("button", { name: "Try clothes" }).click();
