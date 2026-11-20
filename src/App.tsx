@@ -527,9 +527,7 @@ export default function App() {
       setAiConsent(false);
       if (data.accountSaveError) setError(data.accountSaveError);
       setNotice(
-        data.accountSaved
-          ? "Avatar generated as a draft. Review and approve it before saving to your store account."
-          : "Customer avatar created as a draft. Review the face, body and skin tone before approval and saving.",
+        "Customer avatar created as a draft. Review the face, body and skin tone before approval and saving.",
       );
       requestAnimationFrame(() =>
         previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
