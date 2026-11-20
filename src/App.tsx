@@ -440,6 +440,12 @@ export default function App() {
       );
       return;
     }
+    if (step === 3 && next !== 3 && personalized) {
+      // Leaving the review panel unmounts the scorecard; a new review is required on return.
+      setQualityReviewPassed(false);
+      setApproved(false);
+      setSaveConsent(false);
+    }
     setError("");
     setStep(next);
     setTimeout(() => titleRef.current?.focus(), 0);
@@ -1215,7 +1221,7 @@ export default function App() {
                       </ul>
                       {personalized && (
                         <AvatarQualityReview
-                          key={`${session}-${avatarId ?? "local"}`}
+                          key={session}
                           disabled={exporting || generating}
                           onCompleteChange={(passed) => {
                             setQualityReviewPassed(passed);
