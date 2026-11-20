@@ -397,7 +397,8 @@ export function createApp({
     if (avatarIdentityEnabled && req.body.identityCheckConsent !== true)
       return res.status(400).json({
         code: "identity_consent_required",
-        error: "The customer must consent to the private on-server facial comparison before generation.",
+        error:
+          "The customer must consent to the private on-server facial comparison before generation.",
       });
     try {
       accountStore?.customers.requireOptional(owner, req.body.customerId);
