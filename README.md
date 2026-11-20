@@ -42,6 +42,7 @@ This interface update does not rebuild the Android APK.
 - An explicitly triggered Gemini customer-avatar adapter using both customer photos, a selected body template, and whole-body skin-tone matching instructions, with server-side credentials and consent checks.
 - [Six-point avatar quality review](docs/AVATAR_QUALITY_REVIEW.md): human-scored identity and anatomy checks before approving personalized results for try-on, export or local reuse. Sample browsing remains unchanged.
 - [On-device avatar geometry audit](docs/AVATAR_GEOMETRY_AUDIT.md): optional no-credit pose, full-body framing and silhouette drift feedback against the selected profile before approval; advisory only.
+- [On-device avatar skin-tone audit](docs/AVATAR_TONE_AUDIT.md): optional colour consistency hints across the generated face, neck and forearms; no extra AI call, no skin classification, and human review remains mandatory.
 - [Opt-in avatar facial-identity pilot](docs/AVATAR_IDENTITY_SCREEN.md): server-side comparison of a newly generated face to the consented reference before accepting a draft. Separate customer consent, no stored embeddings, disabled by default pending calibration.
 - [Outfit sharing](docs/OUTFIT_SHARING.md): expiring public preview links, WhatsApp click-to-chat, and link revocation; uses saved looks with no AI credits.
 - [WhatsApp automation](docs/WHATSAPP.md): encrypted Business connection, consented lookbooks, metered new-arrival previews, review before sending, delivery status and STOP opt-outs.
