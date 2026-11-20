@@ -1,4 +1,5 @@
 import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import sharp from "sharp";
@@ -19,7 +20,7 @@ async function storeSession(page, run) {
     .extend({ top: 48, bottom: 48, left: 154, right: 154, background: "#c6c6c6" })
     .png()
     .toBuffer();
-  const avatar = await store.save(account, {
+  const avatar = await saveApprovedTestAvatar(store, account, {
     image: "data:image/png;base64," + framed.toString("base64"),
     name: "Sample customer",
     profileId: "regular",
