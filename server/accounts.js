@@ -114,7 +114,10 @@ export class AccountStore {
     )
       this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
     // Older avatars remain reviewable, but default to a draft instead of an implicit pass.
-    const avatarColumns = this.db.prepare("PRAGMA table_info(avatars)").all().map((c) => c.name);
+    const avatarColumns = this.db
+      .prepare("PRAGMA table_info(avatars)")
+      .all()
+      .map((c) => c.name);
     if (!avatarColumns.includes("approved_at"))
       this.db.exec("ALTER TABLE avatars ADD COLUMN approved_at INTEGER");
     if (!avatarColumns.includes("approved_by"))
