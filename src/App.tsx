@@ -34,6 +34,8 @@ import {
 } from "./profiles";
 import { downloadAvatar, libraryForIndex, readPhoto } from "./images";
 import BodyPhotoHints from "./BodyPhotoHints";
+import PhotoClarityHints from "./PhotoClarityHints";
+import { checkPhotoClarity } from "./photo-clarity";
 import { analyseBodyPhoto, type BodyPhotoAnalysis } from "./body-pose";
 import { suggestBuild } from "./body-build";
 import { assessAvatarReadiness } from "./avatar-readiness.js";
@@ -535,6 +537,27 @@ export default function App() {
     setQualityReviewPassed(false);
     setReviewAttestation(null);
     try {
+      // A small, local scan must finish before any billable provider request.
+      // Near-blank photos block; uncertain sharpness and lighting are advisory.
+      const [faceClarity, bodyClarity] = await Promise.all([
+        checkPhotoClarity(face),
+        checkPhotoClarity(body),
+      ]);
+      const photoReadiness = assessAvatarReadiness({
+        consent: consent && aiConsent,
+        facePhoto: face,
+        bodyPhoto: body,
+        profileId: selected,
+        templateTone,
+        heightCm: Number(height),
+        bodyAnalysis: analysis ? { status: "valid" } : null,
+        faceClarity,
+        bodyClarity,
+      });
+      if (!photoReadiness.ready) {
+        setError(photoReadiness.issues.map((issue) => issue.message).join(" "));
+        return;
+      }
       const response = await requestApi(
         "/api/personalize",
         {
@@ -977,6 +1000,8 @@ export default function App() {
                           }}
                         />
                       </div>
+                      {face && <PhotoClarityHints photo={face} kind="face" />}
+                      {body && <PhotoClarityHints photo={body} kind="body" />}
                       {body && <BodyPhotoHints photo={body} />}
                       <p className="photo-hint">
                         <Camera size={13} /> Clear light. Natural pose. No filters.
