@@ -232,6 +232,8 @@ export default function App() {
   const [body, setBody] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [aiConsent, setAiConsent] = useState(false);
+  const [identityScreenAvailable, setIdentityScreenAvailable] = useState(false);
+  const [identityCheckConsent, setIdentityCheckConsent] = useState(false);
   const [service, setService] = useState<ServiceState>("checking");
   const [provider, setProvider] = useState<"gemini" | "openai" | null>(null);
   const [femaleEnabled, setFemaleEnabled] = useState(false);
@@ -289,6 +291,8 @@ export default function App() {
     setTryOnAvailable(false);
     setJewelleryAvailable(false);
     setAiConsent(false);
+    setIdentityScreenAvailable(false);
+    setIdentityCheckConsent(false);
     requestApi("/api/health")
       .then(async (r) => {
         if (r.status === 401) {
@@ -307,6 +311,7 @@ export default function App() {
           data.personalizationContract === "customer-avatar-v4" &&
           ["gemini", "openai"].includes(data.provider);
         setProvider(supported ? data.provider : null);
+        setIdentityScreenAvailable(supported && data.avatarIdentityScreenAvailable === true);
         setTryOnAvailable(
           data.tryOnAvailable === true && data.tryOnContract === "garment-tryon-v1",
         );
@@ -388,6 +393,7 @@ export default function App() {
     setApproved(false);
     setQualityReviewPassed(false);
     setAiConsent(false);
+    setIdentityCheckConsent(false);
     setError("");
   }
   function updateMeasurement(field: "height" | "weight", value: string) {
@@ -464,6 +470,7 @@ export default function App() {
     setBody(null);
     setConsent(false);
     setAiConsent(false);
+    setIdentityCheckConsent(false);
     setHeight("175");
     setWeight("72");
     setSelected("regular");
@@ -483,6 +490,7 @@ export default function App() {
       !body ||
       !aiConsent ||
       !consent ||
+      (identityScreenAvailable && !identityCheckConsent) ||
       !provider ||
       service !== "available" ||
       !bodyGenerationAllowed ||
@@ -528,6 +536,7 @@ export default function App() {
             consent: true,
             consentScope: "face-and-body",
             consentProvider: provider,
+            ...(identityScreenAvailable ? { identityCheckConsent: true } : {}),
             ...(accountState.enabled ? { customerId: customer?.id } : {}),
           }),
         },
@@ -1097,6 +1106,23 @@ export default function App() {
                           </span>
                         </label>
                       )}
+                      {service === "available" && bodyGenerationAllowed && identityScreenAvailable && (
+                        <label className="consent">
+                          <input
+                            type="checkbox"
+                            checked={identityCheckConsent}
+                            disabled={generating || exporting}
+                            onChange={(e) => setIdentityCheckConsent(e.target.checked)}
+                          />
+                          <span>
+                            The customer also consents to a temporary facial-feature comparison on
+                            this studio server to check the generated face against their reference
+                            photo. No facial descriptors are saved or sent to another provider.
+                            Automated screening can reject a result and is not proof of identity;
+                            customer review is still required.
+                          </span>
+                        </label>
+                      )}
                       <button
                         className="button primary full-width"
                         disabled={
@@ -1105,6 +1131,7 @@ export default function App() {
                           !face ||
                           !body ||
                           !aiConsent ||
+                          (identityScreenAvailable && !identityCheckConsent) ||
                           (accountState.enabled && !accountState.account) ||
                           generating
                         }
