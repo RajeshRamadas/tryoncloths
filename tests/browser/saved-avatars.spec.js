@@ -1,3 +1,4 @@
+import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { standardAvatar } from "../../server/app.js";
 import { customerPhotos } from "../helpers/customer-photos.js";
@@ -43,9 +44,7 @@ async function generate(page) {
   return { png, calls: () => calls };
 }
 async function approve(page) {
-  await page
-    .getByLabel("The customer approves the face, body and skin tone of this avatar.")
-    .check();
+  await approvePersonalizedAvatar(page);
 }
 async function save(page, name) {
   await approve(page);
