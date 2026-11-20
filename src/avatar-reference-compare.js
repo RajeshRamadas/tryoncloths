@@ -3,11 +3,7 @@
 const SESSION_PHOTO = /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
 
 export function isSessionReferencePhoto(value) {
-  return (
-    typeof value === "string" &&
-    value.length <= 20_000_000 &&
-    SESSION_PHOTO.test(value)
-  );
+  return typeof value === "string" && value.length <= 20_000_000 && SESSION_PHOTO.test(value);
 }
 
 /**
