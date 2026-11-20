@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -19,7 +20,7 @@ async function setup(page, run) {
     phoneE164: "9876543210",
   });
   const image = `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;
-  const av = await store.save(owner, {
+  const av = await saveApprovedTestAvatar(store, owner, {
     image,
     customerId: customer.id,
     name: "Saved customer",
