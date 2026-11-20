@@ -5,6 +5,7 @@ import { ProviderError } from "../server/provider-errors.js";
 import {
   avatarFaceCrop,
   parseAvatarIdentityMode,
+  parseAvatarIdentityMax,
   screenAvatarIdentity,
 } from "../server/avatar-identity.js";
 
@@ -55,6 +56,14 @@ test("invalid identity mode is rejected instead of silently disabling checks", a
   }
 });
 
+test("distance calibration is separate and rejects invalid settings", async () => {
+  assert.equal(parseAvatarIdentityMax(0.45), 0.45);
+  assert.equal(parseAvatarIdentityMax("0.53"), 0.53);
+  for (const value of ["", null, -1, "NaN", 2]) {
+    assert.throws(() => parseAvatarIdentityMax(value), /TRYON_AVATAR_IDENTITY_MAX/);
+  }
+});
+
 test("full-body face is cropped and upscaled for private comparison; temporary images are cleared", async () => {
   const checked = [];
   const detections = [];
@@ -66,7 +75,8 @@ test("full-body face is cropped and upscaled for private comparison; temporary i
       detections.push({ image: (await sharp(bytes).metadata()).format, upper: options.upper });
       return oneFace(bytes, options);
     },
-    compare: async (a, b) => {
+    compare: async (a, b, max) => {
+      assert.equal(max, 0.45);
       checked.push(a, b);
       for (const crop of [a, b]) {
         const metadata = await sharp(crop).metadata();
