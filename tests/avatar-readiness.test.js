@@ -68,16 +68,21 @@ test("severe exposure issues block before any paid avatar generation", () => {
     ...valid,
     faceClarity: {
       status: "blocked",
-      issues: [{
-        code: "PHOTO_UNREADABLY_DARK",
-        message: "Retake the almost-black face photo.",
-      }],
+      issues: [
+        {
+          code: "PHOTO_UNREADABLY_DARK",
+          message: "Retake the almost-black face photo.",
+        },
+      ],
       warnings: [],
     },
   });
   assert.equal(result.ready, false);
   assert.equal(result.quality, "blocked");
-  assert.deepEqual(result.issues.map((item) => item.code), ["FACE_PHOTO_UNREADABLY_DARK"]);
+  assert.deepEqual(
+    result.issues.map((item) => item.code),
+    ["FACE_PHOTO_UNREADABLY_DARK"],
+  );
   assert.equal(JSON.stringify(result).includes(photo), false);
 });
 
@@ -92,16 +97,18 @@ test("possible blur, shadows and unavailable analysis are advisory and do not bl
     bodyClarity: {
       status: "unverified",
       issues: [],
-      warnings: [{
-        code: "PHOTO_ANALYSIS_UNAVAILABLE",
-        message: "Full-body analysis unavailable.",
-      }],
+      warnings: [
+        {
+          code: "PHOTO_ANALYSIS_UNAVAILABLE",
+          message: "Full-body analysis unavailable.",
+        },
+      ],
     },
   });
   assert.equal(result.ready, true);
   assert.equal(result.quality, "review");
-  assert.deepEqual(result.warnings.map((item) => item.code), [
-    "FACE_PHOTO_LOW_DETAIL",
-    "BODY_PHOTO_ANALYSIS_UNAVAILABLE",
-  ]);
+  assert.deepEqual(
+    result.warnings.map((item) => item.code),
+    ["FACE_PHOTO_LOW_DETAIL", "BODY_PHOTO_ANALYSIS_UNAVAILABLE"],
+  );
 });
