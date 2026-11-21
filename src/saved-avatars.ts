@@ -36,6 +36,8 @@ export type SavedAvatar = AvatarDetails & {
   savedAt: number;
   looksCount?: number;
   approvalStatus?: "draft" | "approved";
+  approvedVersion?: number | null;
+  latestVersion?: number | null;
   generation?: {
     provider: "gemini" | "openai";
     model: string;

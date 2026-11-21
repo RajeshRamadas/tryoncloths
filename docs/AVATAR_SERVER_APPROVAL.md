@@ -11,7 +11,7 @@ This feature makes each saved **store-account avatar** carry a persisted **draft
 1. Generate a draft or import a PNG. No generation output is automatically saved.
 2. Explicitly save to the store account using the existing storage-consent requirement. `POST /api/avatars` saves a **draft** regardless of client-provided fields.
 3. Complete all six human scores (each 4 or 5), confirm customer permission, confirm the reviewer compared the images, and obtain separate final customer approval.
-4. The authenticated same-origin `POST /api/avatars/:id/approval` validates the complete attestation and marks the **exact account-owned saved avatar** approved. The response includes `approvalStatus` and server-generated `approvedAt`. No supplied approval timestamp or status is trusted.
+4. The authenticated same-origin `POST /api/avatars/:id/approval` validates the complete attestation and marks the **exact account-owned saved avatar** approved. The server returns the approval timestamp and version number. A repeated approval while that version is active returns the same version.
 5. Only approved account avatars can be used to create saved looks, run account-backed clothing adaptation, create jewellery previews and generate portrait/hands views. Both preflight and post-image-processing checks reject a newly revoked or replaced avatar before reuse.
 6. `DELETE /api/avatars/:id/approval` revokes approval. Resaving an avatar resets it to **draft**, including metadata updates; a fresh review is required. Reopening the avatar in the UI also requires the current human approval workflow.
 
@@ -19,7 +19,7 @@ The account library shows the state. Previously saved avatars migrate to **draft
 
 ## Server metadata and privacy
 
-The database stores only an approval timestamp, the authenticated approving staff user's ID and the review policy version. No original source photos, facial embeddings, skin-colour values, or six individual scores are saved as part of the approval record. Validation of the scores is synchronous and the attestation is discarded.
+An approval records the timestamp, authenticated approving staff user's ID and review policy version. Individual scores are validated in memory. The historical record contains the same saved avatar details and generation provenance available in the account.
 
 This records an **authenticated human review declaration**, not independent proof of likeness, identity, consent validity, anatomical accuracy or garment fit. The UI still requires customer confirmation, and false declarations cannot be eliminated purely by software.
 
@@ -37,6 +37,23 @@ shows the model and prompt revision. Re-saving the same image keeps its first
 verified generation record, and older avatars and imported PNGs can be reviewed
 with no recorded provenance. The receipt travels with the current draft in browser
 memory. The saved record contains the verified metadata and hashes.
+
+## Approval version history
+
+In **Saved avatars**, open **Version history** to see previously approved
+revisions and identify the active one. Revoking approval or re-saving the avatar
+clears the active version. The next successful review adds a new version with
+the reviewed frame and measurements, generation provenance when available, and
+the SHA-256 of the account PNG that was approved.
+
+Versions share the account PNG. Once an approval version exists, the database
+guards its PNG and historical records against updates. Deleting the avatar or
+erasing its customer also removes the version history. An already-approved
+avatar from before this feature receives its first version at its next review.
+
+Authenticated `GET /api/avatars/:id/versions` returns up to 20 records from the
+active store in descending version order. Pass the returned `nextBefore` value
+as `?before=` to load earlier records.
 
 ## Compatibility and limitations
 

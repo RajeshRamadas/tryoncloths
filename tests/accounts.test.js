@@ -411,6 +411,9 @@ test("look validation, capacity, account cascade and old database upgrade", asyn
     const { id: avatarId } = await saveApprovedTestAvatar(store, owner, image);
     // Simulate a pre-feature database: avatar data must survive adding the table.
     store.db.exec(`DROP TABLE looks;
+      DROP TRIGGER avatar_version_image_immutable;
+      DROP TABLE avatar_versions;
+      ALTER TABLE avatars DROP COLUMN approved_version;
       ALTER TABLE avatars DROP COLUMN profile_selection;
       ALTER TABLE avatars DROP COLUMN generation_provenance;`);
     const upgraded = new AccountStore(directory);
@@ -418,6 +421,8 @@ test("look validation, capacity, account cascade and old database upgrade", asyn
     assert.equal(store.list(owner).length, 1);
     assert.equal(store.list(owner)[0].profileSelection, null);
     assert.equal(store.list(owner)[0].generation, null);
+    assert.equal(store.list(owner)[0].approvedVersion, null);
+    store.requireApprovedAvatar(owner, avatarId);
     const input = { avatarId, image: image.image, name: "Look", garments: ["Shirt"] };
     await assert.rejects(store.saveLook(owner, { ...input, garments: Array(11).fill("Shirt") }), {
       status: 400,
