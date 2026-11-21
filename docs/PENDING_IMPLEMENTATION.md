@@ -8,9 +8,8 @@ remains, grouped by what they need.
 
 ## At a glance
 
-- **Code still to write:** body measurements in cm from the photo and size
-  prediction from them (in progress: chest, waist and hip are now estimated and feed
-  size suggestions; calibration on taped customers is still open).
+- **Photo-based sizing:** chest, waist and hip estimates feed size suggestions.
+  The local calibration tool is ready for taped pilot data.
 - **Needs pilot data:** calibrate the standard avatars, the photo thresholds and the
   photo girth factors against real customers. The jewellery face check needs 50+
   pilot portraits. Test on a physical Android phone.
@@ -25,7 +24,7 @@ remains, grouped by what they need.
 
 | Item | Current state | Source |
 | --- | --- | --- |
-| Automatic body measurements and fit prediction from customer photos | Mostly done: the full-body photo suggests the closest body profile ([build from the photo](BODY_PHOTO_CHECK.md#build-from-the-photo)) and estimates chest, waist and hip in cm from the entered height ([measurements in cm](BODY_PHOTO_CHECK.md#measurements-in-cm)). Staff can save them to the customer, and size suggestions use them, capped at Medium confidence. Still open: calibrating the girth factors on taped pilot customers | [README](../README.md), [LEVEL_1](LEVEL_1.md) |
+| Automatic body measurements and fit prediction from customer photos | Mostly done: the full-body photo suggests the closest body profile ([build from the photo](BODY_PHOTO_CHECK.md#build-from-the-photo)) and estimates chest, waist and hip in cm from the entered height ([measurements in cm](BODY_PHOTO_CHECK.md#measurements-in-cm)). Staff can save them to the customer, and size suggestions use them, capped at Medium confidence. A [local calibration tool](BODY_PHOTO_CHECK.md#pilot-girth-calibration) fits and evaluates candidate girth factors. Still open: collecting and evaluating taped pilot samples | [README](../README.md), [LEVEL_1](LEVEL_1.md) |
 | Calibrate standard avatars against real body measurements; define height/build bands | Sample profiles have no calibrated measurements | [LEVEL_1](LEVEL_1.md) |
 | ~~Local pose/silhouette analysis to assist the full-body photo review~~ | Done: on-device pose hints for framing, stance and arms ([body photo check](BODY_PHOTO_CHECK.md)). Still open: calibrating the thresholds on pilot photos, and using the landmarks for occlusion masks or profile matching | [LEVEL_1](LEVEL_1.md) |
 | ~~Aligned transparent garment layers and masks for the clothing compositor~~ | Done: product photos become cleaned, mask-aligned layers on the device ([clothing layers](CLOTHING_LAYERS.md)). Forearms and hands are drawn in front of imported tops, and imported layers are fitted to the generated avatar's pose (shoulders, elbows, wrists, hips, knees, ankles) | [LEVEL_1](LEVEL_1.md) |

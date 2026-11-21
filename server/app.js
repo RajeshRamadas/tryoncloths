@@ -28,6 +28,7 @@ import {
   validTemplateTone,
   DEFAULT_TEMPLATE_TONE,
 } from "../src/profiles.js";
+import { assessPhotoClarity } from "../src/photo-clarity.js";
 import { ProviderError, providerErrorDetails } from "./provider-errors.js";
 import {
   parseAvatarIdentityMax,
@@ -53,6 +54,26 @@ import { installGarmentRoutes } from "./garment-routes.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const maxPhotoBytes = 5 * 1024 * 1024;
+
+async function blankPhotoIssue(photo) {
+  let pixels;
+  try {
+    const { data, info } = await sharp(photo)
+      .resize(192, 192, { fit: "inside", withoutEnlargement: true })
+      .toColourspace("srgb")
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    pixels = data;
+    const result = assessPhotoClarity({ data, width: info.width, height: info.height });
+    return result.status === "blocked" ? result.issues[0] : undefined;
+  } catch {
+    // The photo already passed decoding. An unavailable clarity check is advisory.
+    return undefined;
+  } finally {
+    pixels?.fill(0);
+  }
+}
 
 export async function normalizePhoto(dataUrl, kind = "face") {
   if (typeof dataUrl !== "string" || dataUrl.length > maxPhotoBytes * 1.4)
@@ -373,6 +394,7 @@ export function createApp({
     return true;
   };
   let inFlight = 0;
+  let avatarPreflights = 0;
   const attempts = new Map();
   app.post("/api/personalize", async (req, res) => {
     req.body ||= {};
@@ -437,7 +459,7 @@ export function createApp({
         error:
           "Customer avatar generation is not connected. Configure the studio before generating a customer avatar.",
       });
-    if (inFlight >= 2)
+    if (inFlight >= 2 || avatarPreflights >= 2)
       return res.status(429).json({
         error: "The studio is processing another avatar. Please try again shortly.",
       });
@@ -449,12 +471,26 @@ export function createApp({
         error: "Please wait before generating again. This pilot allows up to 20 attempts per hour.",
       });
     let face, body, avatar;
+    avatarPreflights++;
     try {
       face = await normalizePhoto(req.body.face);
       body = await normalizePhoto(req.body.body, "full-body");
+      for (const [label, photo] of [
+        ["Face photo", face],
+        ["Full-body photo", body],
+      ]) {
+        const issue = await blankPhotoIssue(photo);
+        if (issue)
+          return res.status(400).json({
+            code: "photo_unusable",
+            error: `${label}: ${issue.message}`,
+          });
+      }
       avatar = await standardAvatar(req.body.profileId, templateTone);
     } catch (e) {
       return res.status(400).json({ error: e.message });
+    } finally {
+      avatarPreflights--;
     }
     // Recheck after decoding: multiple requests may have arrived during asynchronous validation.
     const latest = attempts.get(req.ip);

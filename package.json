@@ -23,6 +23,7 @@
     "android:check": "npm run android:sync && node scripts/android-build.mjs assembleDebug lintDebug",
     "android:assets": "node scripts/mobile-assets.mjs",
     "benchmark:links": "node --env-file-if-exists=.env server/evaluation/link-benchmark.js",
+    "evaluate:body-girth": "node server/evaluation/body-girth.js",
     "evaluate:quality": "node server/evaluation/quality-cli.js",
     "evaluate:jewellery": "node server/evaluation/jewellery-cli.js"
   },
