@@ -1,5 +1,5 @@
-import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
-import { randomUUID } from "node:crypto";
+import { approveTestAvatar, saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
+import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -302,6 +302,75 @@ test("only a reviewed, signed provider result is reusable; exact reuse skips pai
     },
     { app: { rateLimit: true } },
   ));
+test("saved clothing adaptations and receipts are pinned to the approval that produced them", async () =>
+  fixture(async ({ request, store, ca, a, garment, input, calls }) => {
+    const endpoint = `/api/garments/${garment.id}`;
+    const output = await (await request("/api/tryon", input, ca)).json();
+    assert.ok(output.reuseReceipt);
+    const approval = output.sourceApproval;
+    assert.equal(approval.avatarId, input.avatarId);
+    assert.equal(approval.masterId, input.avatarId);
+    assert.equal(approval.masterVersion, 1);
+    assert.equal(approval.approvalVersion, 1);
+    assert.equal(
+      approval.imageSha256,
+      createHash("sha256").update(store.image(a, input.avatarId)).digest("hex"),
+    );
+    const save = {
+      image: output.image,
+      receipt: output.reuseReceipt,
+      reviewed: true,
+      storageConsent: true,
+    };
+    const first = await request(endpoint + "/results", save, ca);
+    assert.equal(first.status, 200);
+    const { id: oldId, sourceApproval } = await first.json();
+    assert.deepEqual(sourceApproval, approval);
+    const row = store.db
+      .prepare("SELECT source_approval FROM garment_results WHERE account=? AND id=?")
+      .get(a.id, oldId);
+    assert.deepEqual(JSON.parse(row.source_approval), approval);
+
+    store.revokeAvatarApproval(a, input.avatarId);
+    assert.equal((await request(endpoint + "/results", save, ca)).status, 409);
+    approveTestAvatar(store, a, input.avatarId);
+    const stale = await request(endpoint + "/results", save, ca);
+    assert.equal(stale.status, 409);
+    assert.match((await stale.json()).error, /approval changed/);
+    assert.equal((await (await request(endpoint + "/reuse", input, ca)).json()).match, false);
+    assert.equal(calls(), 1);
+
+    const renewed = await (await request("/api/tryon", input, ca)).json();
+    assert.equal(renewed.sourceApproval.approvalVersion, 2);
+    assert.equal(renewed.sourceApproval.imageSha256, approval.imageSha256);
+    const next = await request(
+      endpoint + "/results",
+      { ...save, image: renewed.image, receipt: renewed.reuseReceipt },
+      ca,
+    );
+    assert.equal(next.status, 200);
+    const { id: newId } = await next.json();
+    assert.notEqual(newId, oldId);
+    assert.equal(
+      (
+        await request(
+          endpoint + "/reuse/use",
+          { ...input, requestId: randomUUID(), resultId: oldId },
+          ca,
+        )
+      ).status,
+      404,
+    );
+    const reused = await request(
+      endpoint + "/reuse/use",
+      { ...input, requestId: randomUUID(), resultId: newId },
+      ca,
+    );
+    assert.equal(reused.status, 200);
+    assert.deepEqual((await reused.json()).sourceApproval, renewed.sourceApproval);
+    assert.equal(calls(), 2);
+  }));
+
 test("changed outfit, avatar, category, product or model cannot reuse a previous adaptation", async () =>
   fixture(async ({ store, a, request, ca, input, garment, garmentInput }) => {
     const result = await (await request("/api/tryon", input, ca)).json();
@@ -420,7 +489,45 @@ test("provider and receipt failures never trigger another generation or silently
     assert.equal(calls(), 1);
   });
 });
+test("an approval change during generation preserves the paid image without a stale receipt", async () => {
+  let changeApproval;
+  await fixture(
+    async ({ store, a, request, input, ca, calls }) => {
+      changeApproval = () => {
+        store.revokeAvatarApproval(a, input.avatarId);
+        approveTestAvatar(store, a, input.avatarId);
+      };
+      const response = await request("/api/tryon", input, ca);
+      assert.equal(response.status, 200);
+      const result = await response.json();
+      assert.ok(result.image);
+      assert.equal(result.sourceApproval.approvalVersion, 1);
+      assert.equal(result.reuseReceipt, undefined);
+      assert.match(result.reuseWarning, /do not regenerate/);
+      assert.equal(calls(), 1);
+    },
+    {
+      generate: async ({ avatar }) => {
+        changeApproval();
+        return dataUrl(avatar);
+      },
+    },
+  );
+});
 test("a deletion or newly approved result during decoding is respected before charging", async () => {
+  await fixture(async ({ store, request, ca, a, input, calls }) => {
+    const context = store.garments.context.bind(store.garments);
+    store.garments.context = async (...args) => {
+      const result = await context(...args);
+      store.revokeAvatarApproval(a, result.avatarId);
+      approveTestAvatar(store, a, result.avatarId);
+      return result;
+    };
+    const response = await request("/api/tryon", input, ca);
+    assert.equal(response.status, 409);
+    assert.match((await response.json()).error, /approval changed/);
+    assert.equal(calls(), 0);
+  });
   await fixture(async ({ store, request, ca, a, input, calls }) => {
     const context = store.garments.context.bind(store.garments);
     store.garments.context = async (...args) => {

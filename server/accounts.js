@@ -570,13 +570,44 @@ export class AccountStore {
     this.views?.invalidate(account.id, id);
     return { id, approvalStatus: "draft" };
   }
-  requireApprovedAvatar(account, id) {
-    this.requireAvatar(account, id);
-    const row = this.db
-      .prepare("SELECT approved_at,review_policy FROM avatars WHERE account=? AND id=?")
-      .get(account.id, id);
+  requireApprovedAvatar(account, id, expectedApproval) {
+    const row =
+      typeof id === "string" &&
+      this.db
+        .prepare(
+          `SELECT a.approved_at,a.review_policy,a.approved_version,a.body_type,
+          COALESCE(a.master_id,a.id) AS masterId,a.master_version AS masterVersion,
+          v.image_sha256,CASE WHEN a.approved_version IS NULL AND a.approved_at IS NOT NULL THEN a.image END AS legacyImage
+        FROM avatars a LEFT JOIN avatar_versions v
+          ON v.account=a.account AND v.avatarId=a.id AND v.version=a.approved_version
+        WHERE a.account=? AND a.id=?`,
+        )
+        .get(account.id, id);
+    if (!row) throw error("Avatar not found.", 404);
     if (!row.approved_at || row.review_policy !== AVATAR_REVIEW_POLICY_VERSION)
       throw error("This avatar needs customer and quality review before it can be reused.", 409);
+    if (!row.image_sha256 && row.approved_version != null)
+      throw error(
+        "The avatar’s approval record is unavailable. Reopen and review the avatar.",
+        409,
+      );
+    const sourceApproval = {
+      avatarId: id,
+      masterId: row.masterId,
+      masterVersion: row.masterVersion,
+      approvalVersion: row.approved_version,
+      approvedAt: row.approved_at,
+      imageSha256: row.image_sha256 || digest(row.legacyImage),
+    };
+    if (
+      expectedApproval !== undefined &&
+      JSON.stringify(expectedApproval) !== JSON.stringify(sourceApproval)
+    )
+      throw error(
+        "The avatar approval changed. Reopen the approved avatar before continuing.",
+        409,
+      );
+    return { sourceApproval, bodyType: row.body_type };
   }
   avatarVersions(account, id, before) {
     const upperBound = before === undefined ? Number.MAX_SAFE_INTEGER : Number(before);

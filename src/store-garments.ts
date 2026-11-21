@@ -34,6 +34,7 @@ export type Adaptation = {
   reuseReceipt?: string;
   reused?: boolean;
   reuseWarning?: string;
+  sourceApproval?: { masterVersion: number; approvalVersion: number | null };
 };
 export async function catalogueRequest(
   path: string,
@@ -99,5 +100,6 @@ export const useAdaptation = (
     bodyType: string;
     requestId: string;
     sessionId?: string;
+    resultId?: string;
   },
 ) => catalogueRequest(`/api/garments/${encodeURIComponent(id)}/reuse/use`, input);

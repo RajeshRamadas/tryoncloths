@@ -301,14 +301,16 @@ export default function LinkTryOn({
         bodyType,
         sessionId,
         requestId: crypto.randomUUID(),
+        resultId: lookup?.id,
       });
       onResult(
         result.image,
         `${garmentChoices.find(([id]) => id === garmentType)?.[1]} · ${title}`,
-        { garmentId: saved.id, reused: true },
+        { garmentId: saved.id, reused: true, sourceApproval: result.sourceApproval },
       );
     } catch (e) {
       setError((e as Error).message);
+      setLookupRevision((previous) => previous + 1);
     } finally {
       finish();
     }
@@ -369,6 +371,7 @@ export default function LinkTryOn({
         reuseReceipt: data.reuseReceipt,
         reused: data.reused,
         reuseWarning: data.reuseWarning,
+        sourceApproval: data.sourceApproval,
       });
       setConsent(false);
     } catch (e) {

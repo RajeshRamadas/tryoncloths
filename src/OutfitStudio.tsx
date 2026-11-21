@@ -179,6 +179,7 @@ export default function OutfitStudio({
     1,
   );
   const lastAdaptation = dressed.at(-1);
+  const sourceApproval = lastAdaptation?.adaptation?.sourceApproval;
   const canSaveAdaptation = Boolean(
     avatarId &&
     lastAdaptation?.adaptation?.reuseReceipt &&
@@ -484,6 +485,13 @@ export default function OutfitStudio({
             </button>
           )}
           {lastAdaptation?.adaptationSaved && <p role="status">Adaptation saved for reuse.</p>}
+          {sourceApproval && (
+            <p className="small-footnote">
+              Source avatar master version {sourceApproval.masterVersion}
+              {sourceApproval.approvalVersion != null &&
+                ` · approval ${sourceApproval.approvalVersion}`}
+            </p>
+          )}
           <button
             className="button secondary full-width"
             disabled={

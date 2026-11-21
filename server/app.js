@@ -754,6 +754,7 @@ export function createApp({
             needsReview: true,
             reused: true,
             garmentId: catalogueContext.garmentId,
+            sourceApproval: catalogueContext.sourceApproval,
           });
         }
       } catch (error) {
@@ -808,7 +809,11 @@ export function createApp({
       try {
         // Decoding yielded to other requests. Respect deletion or an approval
         // saved in another tab before committing to a paid call.
-        accountStore.requireAvatar(owner, catalogueContext.avatarId);
+        accountStore.requireApprovedAvatar(
+          owner,
+          catalogueContext.avatarId,
+          catalogueContext.sourceApproval,
+        );
         accountStore.garments.row(owner, catalogueContext.garmentId);
         const cached = accountStore.garments.cached(owner, catalogueContext);
         if (cached) {
@@ -830,6 +835,7 @@ export function createApp({
             needsReview: true,
             reused: true,
             garmentId: catalogueContext.garmentId,
+            sourceApproval: catalogueContext.sourceApproval,
           });
         }
       } catch (error) {
@@ -895,6 +901,7 @@ export function createApp({
         ...(catalogueContext
           ? {
               garmentId: catalogueContext.garmentId,
+              sourceApproval: catalogueContext.sourceApproval,
               reuseReceipt,
               ...(!reuseReceipt
                 ? {

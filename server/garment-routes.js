@@ -175,7 +175,7 @@ export function installGarmentRoutes(app, store, config) {
           config,
         ),
         result = store.garments.cached(owner, context);
-      if (!result)
+      if (!result || (req.body.resultId != null && req.body.resultId !== result.id))
         return res.status(404).json({
           error:
             "The saved adaptation is no longer available. Check before generating; no AI request was made.",
