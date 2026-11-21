@@ -30,6 +30,8 @@ import {
   recommendProfile,
   skinTones,
   approximateSelection,
+  compareProfileSuggestions,
+  parseProfileSelection,
   DEFAULT_TEMPLATE_TONE,
 } from "./profiles";
 import { downloadAvatar, libraryForIndex, readPhoto } from "./images";
@@ -57,7 +59,13 @@ import {
   revokeAccountAvatarApproval,
   type AvatarReviewAttestation,
 } from "./account-avatars";
-import { avatarDataUrl, saveAvatar, type AvatarDetails, type OpenedLook } from "./saved-avatars";
+import {
+  avatarDataUrl,
+  saveAvatar,
+  type AvatarDetails,
+  type OpenedLook,
+  type ProfileSelection,
+} from "./saved-avatars";
 import { App as NativeApp } from "@capacitor/app";
 
 type PhotoKind = "face" | "body";
@@ -65,6 +73,18 @@ type ServiceState = "checking" | "available" | "unavailable" | "unauthorized";
 type IdentityReview = {
   status: "screen_pass" | "needs_review";
   reason?: "possible_mismatch" | "check_unavailable";
+};
+const profileSourceLabels: Record<ProfileSelection["source"], string> = {
+  measurements: "Suggested from height and weight",
+  photo: "Selected from the full-body photo suggestion",
+  manual: "Selected by staff",
+  saved: "Reused from a saved profile",
+};
+const profileComparisonMessages: Record<ProfileSelection["comparison"], string> = {
+  agree: "Both suggestions point to the same frame.",
+  close: "Two photo matches are close. Compare the frames with the customer before choosing.",
+  different: "The suggestions differ. Compare both frames with the customer before choosing.",
+  unavailable: "",
 };
 
 function AvatarImage({
@@ -238,7 +258,10 @@ export default function App() {
   const [weight, setWeight] = useState("72");
   const [selected, setSelected] = useState("regular");
   const [templateTone, setTemplateTone] = useState(DEFAULT_TEMPLATE_TONE);
-  const [manual, setManual] = useState(false);
+  const [profileSource, setProfileSource] = useState<ProfileSelection["source"]>("measurements");
+  const [avatarProfileSelection, setAvatarProfileSelection] = useState<ProfileSelection | null>(
+    null,
+  );
   const [face, setFace] = useState<string | null>(null);
   // Jewellery portrait for a just-saved avatar: open for, and approved for, which avatar id.
   const [portraitFor, setPortraitFor] = useState<string | null>(null);
@@ -284,6 +307,7 @@ export default function App() {
   >(null);
   const analysis = body && photoAnalysis?.photo === body ? photoAnalysis : null;
   const buildSuggestion = analysis ? suggestBuild(analysis.build, bodyType) : null;
+  const profileComparison = compareProfileSuggestions(recommendation, buildSuggestion);
   const photoGirths = analysis ? analysis.girths(Number(height), bodyType) : null;
   // The selected customer's saved measurements, to avoid replacing taped girths.
   const [customerFit, setCustomerFit] = useState<Customer["measurements"]>(null);
@@ -409,6 +433,7 @@ export default function App() {
     setOutfitOpen(false);
     setGenerationFailed(false);
     setPersonalized(null);
+    setAvatarProfileSelection(null);
     setIdentityReview(null);
     setApproved(false);
     setQualityReviewPassed(false);
@@ -426,13 +451,19 @@ export default function App() {
       Number(field === "weight" ? value : weight),
       bodyType,
     );
-    if (!manual && match) setSelected(match);
+    if (profileSource === "measurements" && match) setSelected(match);
   }
-  function changeProfile(id: string) {
-    if (id === selected || generating || exporting) return;
-    invalidate();
-    setSelected(id);
-    setManual(true);
+  function changeProfile(id: string, source: ProfileSelection["source"] = "manual") {
+    if (generating || exporting) return;
+    if (id !== selected) {
+      invalidate();
+      setSelected(id);
+    }
+    setProfileSource(source);
+  }
+  function changeBodyPhoto(next: string | null) {
+    if (next !== body && profileSource === "photo") setProfileSource("manual");
+    setBody(next);
   }
   useEffect(() => setEditFrame(false), [step]);
   // The jewellery studio's Clothes tab links back here with ?avatar=<id>; open that saved
@@ -497,7 +528,7 @@ export default function App() {
     setWeight("72");
     setSelected("regular");
     setTemplateTone(DEFAULT_TEMPLATE_TONE);
-    setManual(false);
+    setProfileSource("measurements");
     setStep(1);
     invalidate();
     setConfirmReset(false);
@@ -539,6 +570,7 @@ export default function App() {
     setSaveConsent(false);
     setGenerationFailed(false);
     setPersonalized(null);
+    setAvatarProfileSelection(null);
     setIdentityReview(null);
     setError("");
     setApproved(false);
@@ -611,6 +643,7 @@ export default function App() {
           ? data.identityReview
           : null,
       );
+      setAvatarProfileSelection({ source: profileSource, comparison: profileComparison });
       setAvatarId(data.avatarId || null);
       setAiConsent(false);
       if (data.accountSaveError) setError(data.accountSaveError);
@@ -642,7 +675,11 @@ export default function App() {
       if (measurements.weightKg != null) setWeight(String(measurements.weightKg));
       if (measurements.bodyProfileId) {
         setSelected(measurements.bodyProfileId);
-        setManual(true);
+        setProfileSource("saved");
+      } else {
+        setSelected(
+          recommendProfile(measurements.heightCm ?? 175, measurements.weightKg ?? 72) ?? "regular",
+        );
       }
     }
   }
@@ -666,7 +703,8 @@ export default function App() {
     setOpenedLook(details.look);
     setSelected(details.profileId);
     setTemplateTone(details.templateTone || DEFAULT_TEMPLATE_TONE);
-    setManual(true);
+    setProfileSource("saved");
+    setAvatarProfileSelection(parseProfileSelection(details.profileSelection));
     setHeight(String(details.heightCm));
     setWeight(String(details.weightKg));
     setPersonalized(image);
@@ -741,6 +779,7 @@ export default function App() {
         customerId: customer?.id,
         name: avatarName,
         profileId: selected,
+        profileSelection: avatarProfileSelection,
         templateTone,
         heightCm: Number(height),
         weightKg: Number(weight),
@@ -982,7 +1021,7 @@ export default function App() {
                             setConsent(e.target.checked);
                             if (!e.target.checked) {
                               setFace(null);
-                              setBody(null);
+                              changeBodyPhoto(null);
                               setAiConsent(false);
                               setSession((s) => s + 1);
                               invalidate();
@@ -1009,7 +1048,7 @@ export default function App() {
                           disabled={!consent || generating}
                           onChange={(value) => {
                             invalidate();
-                            setBody(value);
+                            changeBodyPhoto(value);
                           }}
                         />
                       </div>
@@ -1033,7 +1072,7 @@ export default function App() {
                           disabled={generating || exporting}
                           onChange={(e) => {
                             invalidate();
-                            setManual(false);
+                            setProfileSource("measurements");
                             setSelected(
                               recommendProfile(Number(height), Number(weight), e.target.value) ||
                                 (e.target.value === "female" ? "f-regular" : "regular"),
@@ -1659,6 +1698,11 @@ export default function App() {
                         <strong>{profile.name}</strong> frame ·{" "}
                         {skinTones.find((t) => t.id === templateTone)?.name} template tone
                       </p>
+                      {avatarProfileSelection && (
+                        <p className="profile-footnote">
+                          {profileSourceLabels[avatarProfileSelection.source]}.
+                        </p>
+                      )}
                       <button
                         type="button"
                         className="button secondary"
@@ -1755,32 +1799,45 @@ export default function App() {
                         <p>
                           {recommendation ? (
                             <>
-                              <strong>{profiles.find((p) => p.id === recommendation)?.name}</strong>{" "}
-                              is a starting suggestion from height and weight.
+                              <strong>{profileName(recommendation)}</strong> is a starting
+                              suggestion from height and weight.
                             </>
                           ) : (
                             "Enter valid measurements to see a suggestion."
                           )}
                         </p>
                       </div>
-                      {buildSuggestion && (
+                      {body && (
                         <div
                           className="recommendation photo-build"
                           aria-label="Build from the photo"
                         >
                           <ScanFace size={16} />
-                          <p>
-                            The full-body photo looks closest to{" "}
-                            <strong>{profileName(buildSuggestion.profileId)}</strong>
-                            {buildSuggestion.closeTo && (
-                              <>
-                                {" "}
-                                (or <strong>{profileName(buildSuggestion.closeTo)}</strong>)
-                              </>
-                            )}
-                            , from shoulder, waist and hip proportions. Loose clothing can make the
-                            body look fuller.
-                          </p>
+                          {buildSuggestion ? (
+                            <div>
+                              <p>
+                                The full-body photo looks closest to{" "}
+                                <strong>{profileName(buildSuggestion.profileId)}</strong>
+                                {buildSuggestion.closeTo && (
+                                  <>
+                                    {" "}
+                                    (or <strong>{profileName(buildSuggestion.closeTo)}</strong>)
+                                  </>
+                                )}
+                                , from shoulder, waist and hip proportions. Loose clothing can make
+                                the body look fuller.
+                              </p>
+                              {profileComparison !== "unavailable" && (
+                                <p role="status">{profileComparisonMessages[profileComparison]}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <p role="status">
+                              {analysis
+                                ? "Couldn’t estimate the build from this photo. Try a front-facing photo with shoulders and hips visible."
+                                : "Checking the full-body photo on this device…"}
+                            </p>
+                          )}
                         </div>
                       )}
                       {photoGirths && (
@@ -1817,30 +1874,22 @@ export default function App() {
                             <Ruler size={12} /> Save to {customer.name} for size suggestions
                           </button>
                         ) : null)}
-                      {buildSuggestion && selected !== buildSuggestion.profileId && (
+                      {buildSuggestion && profileSource !== "photo" && (
                         <button
                           className="text-button"
                           disabled={generating || exporting}
-                          onClick={() => {
-                            invalidate();
-                            setSelected(buildSuggestion.profileId);
-                            setManual(true);
-                          }}
+                          onClick={() => changeProfile(buildSuggestion.profileId, "photo")}
                         >
                           <ScanFace size={12} /> Use the photo’s build
                         </button>
                       )}
-                      {manual && recommendation && selected !== recommendation && (
+                      {profileSource !== "measurements" && recommendation && (
                         <button
                           className="text-button"
                           disabled={generating || exporting}
-                          onClick={() => {
-                            invalidate();
-                            setSelected(recommendation);
-                            setManual(false);
-                          }}
+                          onClick={() => changeProfile(recommendation, "measurements")}
                         >
-                          <RotateCcw size={12} /> Use suggested profile
+                          <RotateCcw size={12} /> Use height and weight suggestion
                         </button>
                       )}
                       <p className="profile-footnote">

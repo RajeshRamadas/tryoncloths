@@ -35,6 +35,7 @@ import {
   recommendProfile,
   validTemplateTone,
   DEFAULT_TEMPLATE_TONE,
+  parseProfileSelection,
 } from "../src/profiles.js";
 import { GarmentStore } from "./garment-store.js";
 import {
@@ -113,18 +114,20 @@ export class AccountStore {
         .some((c) => c.name === "template_tone")
     )
       this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
-    // Older avatars remain reviewable, but default to a draft instead of an implicit pass.
-    const avatarColumns = this.db
-      .prepare("PRAGMA table_info(avatars)")
-      .all()
-      .map((c) => c.name);
-    if (!avatarColumns.includes("approved_at"))
-      this.db.exec("ALTER TABLE avatars ADD COLUMN approved_at INTEGER");
-    if (!avatarColumns.includes("approved_by"))
-      this.db.exec("ALTER TABLE avatars ADD COLUMN approved_by TEXT");
-    if (!avatarColumns.includes("review_policy"))
-      this.db.exec("ALTER TABLE avatars ADD COLUMN review_policy INTEGER NOT NULL DEFAULT 0");
     transaction(this.db, () => {
+      // Older avatars default to draft and have no recorded profile selection.
+      const avatarColumns = this.db
+        .prepare("PRAGMA table_info(avatars)")
+        .all()
+        .map((c) => c.name);
+      if (!avatarColumns.includes("approved_at"))
+        this.db.exec("ALTER TABLE avatars ADD COLUMN approved_at INTEGER");
+      if (!avatarColumns.includes("approved_by"))
+        this.db.exec("ALTER TABLE avatars ADD COLUMN approved_by TEXT");
+      if (!avatarColumns.includes("review_policy"))
+        this.db.exec("ALTER TABLE avatars ADD COLUMN review_policy INTEGER NOT NULL DEFAULT 0");
+      if (!avatarColumns.includes("profile_selection"))
+        this.db.exec("ALTER TABLE avatars ADD COLUMN profile_selection TEXT");
       const columns = this.db
         .prepare("PRAGMA table_info(looks)")
         .all()
@@ -343,6 +346,9 @@ export class AccountStore {
     const { profileId, heightCm, weightKg } = input;
     const templateTone = input.templateTone ?? DEFAULT_TEMPLATE_TONE;
     if (!validTemplateTone(templateTone)) throw error("Choose an available template skin tone.");
+    const profileSelection = parseProfileSelection(input.profileSelection);
+    if (input.profileSelection != null && !profileSelection)
+      throw error("Use a valid profile selection source and comparison.");
     const name = typeof input.name === "string" ? input.name.trim() : "";
     if (
       !name ||
@@ -370,7 +376,9 @@ export class AccountStore {
       throw error("Your account holds up to 100 avatars. Delete one before adding another.", 409);
     this.db
       .prepare(
-        `INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type,template_tone,customer) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET name=excluded.name, profileId=excluded.profileId,heightCm=excluded.heightCm,weightKg=excluded.weightKg,source=excluded.source,savedAt=excluded.savedAt,body_type=excluded.body_type,template_tone=excluded.template_tone,approved_at=NULL,approved_by=NULL,review_policy=0`,
+        `INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type,template_tone,customer,profile_selection)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         ON CONFLICT(account,id) DO UPDATE SET name=excluded.name,profileId=excluded.profileId,heightCm=excluded.heightCm,weightKg=excluded.weightKg,source=excluded.source,savedAt=excluded.savedAt,body_type=excluded.body_type,template_tone=excluded.template_tone,profile_selection=excluded.profile_selection,approved_at=NULL,approved_by=NULL,review_policy=0`,
       )
       .run(
         id,
@@ -386,6 +394,7 @@ export class AccountStore {
         profiles.find((p) => p.id === profileId).body,
         templateTone,
         input.customerId ?? null,
+        profileSelection ? JSON.stringify(profileSelection) : null,
       );
     this.views?.invalidate(account.id, id);
     return { id, savedAt, approvalStatus: "draft" };
@@ -423,11 +432,12 @@ export class AccountStore {
   list(account) {
     return this.db
       .prepare(
-        "SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,CASE WHEN approved_at IS NOT NULL AND review_policy=1 THEN 'approved' ELSE 'draft' END AS approvalStatus,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC",
+        "SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,profile_selection,CASE WHEN approved_at IS NOT NULL AND review_policy=1 THEN 'approved' ELSE 'draft' END AS approvalStatus,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC",
       )
       .all(account.id)
-      .map((row) => ({
+      .map(({ profile_selection, ...row }) => ({
         ...row,
+        profileSelection: profile_selection ? JSON.parse(profile_selection) : null,
         thumbnail: `data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`,
       }));
   }

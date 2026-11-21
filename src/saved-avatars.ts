@@ -1,5 +1,11 @@
 import { loadImage } from "./images";
-import { profiles, recommendProfile, validTemplateTone, DEFAULT_TEMPLATE_TONE } from "./profiles";
+import {
+  profiles,
+  recommendProfile,
+  validTemplateTone,
+  DEFAULT_TEMPLATE_TONE,
+  parseProfileSelection,
+} from "./profiles";
 
 export type OpenedLook = {
   garmentIds?: string[];
@@ -8,6 +14,7 @@ export type OpenedLook = {
   name: string;
   garments: string[];
 };
+export type ProfileSelection = NonNullable<ReturnType<typeof parseProfileSelection>>;
 export type AvatarDetails = {
   customerId?: string | null;
   customerName?: string;
@@ -16,6 +23,7 @@ export type AvatarDetails = {
   look?: OpenedLook;
   name: string;
   profileId: string;
+  profileSelection?: ProfileSelection | null;
   templateTone?: string;
   heightCm: number;
   weightKg: number;
@@ -106,6 +114,7 @@ export async function saveAvatar(image: string, details: AvatarDetails): Promise
     id,
     name: details.name.trim(),
     profileId: details.profileId,
+    profileSelection: parseProfileSelection(details.profileSelection),
     templateTone: details.templateTone ?? DEFAULT_TEMPLATE_TONE,
     heightCm: details.heightCm,
     weightKg: details.weightKg,

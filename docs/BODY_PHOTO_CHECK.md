@@ -54,9 +54,16 @@ the height and weight suggestion. When the next profile is almost as close, it i
 too. Hips count half, because trousers and skirts change the outline there more than a
 top does.
 
-Staff can press **Use the photo’s build** to select it. Nothing is chosen
-automatically, and no photo is uploaded. The estimate is skipped when the customer is
-turned side-on, or when the hips or shoulders are hidden.
+The frame picker shows when the two suggestions agree, when they differ, or when
+the photo gives two close candidates. Staff can choose **Use the photo’s build**,
+**Use height and weight suggestion**, or select a template directly. If the photo
+cannot be measured, the studio suggests a front-facing retake with the shoulders and
+hips visible. Photo analysis runs on the device.
+
+When a generated avatar is saved for reuse, the studio records the selection source
+and the comparison at generation time alongside the profile and entered measurements.
+The comparison describes how the two estimates relate. Frame matching and girth
+estimates still need calibration against measurements from consented pilot customers.
 
 If the template images change, re-measure them. The browser test
 `tests/browser/body-build.spec.js` checks that each template still suggests its own profile.

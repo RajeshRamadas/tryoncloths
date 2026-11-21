@@ -24,7 +24,7 @@ test("each standard template's build suggests its own profile", async ({ page })
   for (const [id, suggested] of results) expect(suggested, id).toBe(id);
 });
 
-test("staff see the build the full-body photo suggests and can use it", async ({ page }) => {
+test("staff compare suggestions and choose which body profile to use", async ({ page }) => {
   test.setTimeout(90_000);
   const uploads = [];
   page.on("request", (req) => {
@@ -42,9 +42,23 @@ test("staff see the build the full-body photo suggests and can use it", async ({
     .setInputFiles(path.resolve(customerPhotos[0].body));
   const estimate = page.getByLabel("Build from the photo");
   await expect(estimate).toContainText("closest to Broad", { timeout: 30_000 });
+  await expect(estimate).toContainText("The suggestions differ");
+  const regular = page.getByRole("button", { name: "Select Regular profile" });
+  const broad = page.getByRole("button", { name: "Select Broad profile" });
+  const weight = page.getByRole("spinbutton", { name: "Weight in kilograms" });
+  await expect(regular).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Use the photo’s build" }).click();
-  await expect(page.getByRole("button", { name: "Select Broad profile" })).toHaveClass(/selected/);
+  await expect(broad).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Use the photo’s build" })).toHaveCount(0);
+  await weight.fill("100");
+  await expect(estimate).toContainText("Both suggestions point to the same frame");
+  await page.getByRole("button", { name: "Use height and weight suggestion" }).click();
+  await weight.fill("72");
+  await expect(regular).toHaveAttribute("aria-pressed", "true");
+  const athletic = page.getByRole("button", { name: "Select Athletic profile" });
+  await athletic.click();
+  await weight.fill("100");
+  await expect(athletic).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Remove full-body photo" }).click();
   await expect(estimate).toHaveCount(0);
   expect(uploads).toEqual([]);
