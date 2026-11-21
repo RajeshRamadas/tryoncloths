@@ -62,3 +62,53 @@ test("does not expose customer image data in assessment", () => {
   const result = assessAvatarReadiness(valid);
   assert.ok(!JSON.stringify(result).includes(photo));
 });
+
+test("severe exposure issues block before any paid avatar generation", () => {
+  const result = assessAvatarReadiness({
+    ...valid,
+    faceClarity: {
+      status: "blocked",
+      issues: [
+        {
+          code: "PHOTO_UNREADABLY_DARK",
+          message: "Retake the almost-black face photo.",
+        },
+      ],
+      warnings: [],
+    },
+  });
+  assert.equal(result.ready, false);
+  assert.equal(result.quality, "blocked");
+  assert.deepEqual(
+    result.issues.map((item) => item.code),
+    ["FACE_PHOTO_UNREADABLY_DARK"],
+  );
+  assert.equal(JSON.stringify(result).includes(photo), false);
+});
+
+test("possible blur, shadows and unavailable analysis are advisory and do not block", () => {
+  const result = assessAvatarReadiness({
+    ...valid,
+    faceClarity: {
+      status: "review",
+      issues: [],
+      warnings: [{ code: "PHOTO_LOW_DETAIL", message: "Check that the face is sharp." }],
+    },
+    bodyClarity: {
+      status: "unverified",
+      issues: [],
+      warnings: [
+        {
+          code: "PHOTO_ANALYSIS_UNAVAILABLE",
+          message: "Full-body analysis unavailable.",
+        },
+      ],
+    },
+  });
+  assert.equal(result.ready, true);
+  assert.equal(result.quality, "review");
+  assert.deepEqual(
+    result.warnings.map((item) => item.code),
+    ["FACE_PHOTO_LOW_DETAIL", "BODY_PHOTO_ANALYSIS_UNAVAILABLE"],
+  );
+});

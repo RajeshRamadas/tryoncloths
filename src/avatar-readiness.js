@@ -8,6 +8,8 @@
  * @property {string | null} [facePhoto]
  * @property {string | null} [bodyPhoto]
  * @property {{ status: string } | null} [bodyAnalysis]
+ * @property {{ status: string, issues?: Array<{code:string,message:string}>, warnings?: Array<{code:string,message:string}> } | null} [faceClarity]
+ * @property {{ status: string, issues?: Array<{code:string,message:string}>, warnings?: Array<{code:string,message:string}> } | null} [bodyClarity]
  * @property {number | null} [heightCm]
  * @property {string | null} [profileId]
  * @property {string | null} [templateTone]
@@ -31,6 +33,8 @@ export function assessAvatarReadiness(input = {}) {
     facePhoto = null,
     bodyPhoto = null,
     bodyAnalysis = null,
+    faceClarity = null,
+    bodyClarity = null,
     heightCm = null,
     profileId = null,
     templateTone = null,
@@ -74,6 +78,23 @@ export function assessAvatarReadiness(input = {}) {
       code: "HEIGHT_INVALID",
       message: "Height must be between 100 and 230 cm when provided.",
     });
+  }
+  // Only obvious near-blank images block paid generation. Blur, low resolution,
+  // shadows and uncertain analysis remain staff-reviewed warnings.
+  for (const [kind, check] of [
+    ["FACE", faceClarity],
+    ["BODY", bodyClarity],
+  ]) {
+    if (!check) continue;
+    if (check.status === "blocked") {
+      for (const issue of check.issues || []) {
+        issues.push({ code: `${kind}_${issue.code}`, message: issue.message });
+      }
+    } else {
+      for (const warning of check.warnings || []) {
+        warnings.push({ code: `${kind}_${warning.code}`, message: warning.message });
+      }
+    }
   }
   if (heightCm == null) {
     warnings.push({
