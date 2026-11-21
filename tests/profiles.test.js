@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { profiles, recommendProfile } from "../src/profiles.js";
+import { compareProfileSuggestions, profiles, recommendProfile } from "../src/profiles.js";
 
 test("suggests sample profiles from valid height and weight", () => {
   assert.equal(recommendProfile(175, 55), "slim");
@@ -23,4 +23,20 @@ test("athletic profile requires human selection; numeric inputs do not infer mus
   assert.ok(profiles.some((p) => p.id === "athletic"));
   for (let weight = 35; weight <= 200; weight++)
     assert.notEqual(recommendProfile(175, weight), "athletic");
+});
+
+test("compares independent body profile suggestions without overstating close photo matches", () => {
+  const photo = { profileId: "f-regular", closeTo: null };
+  assert.equal(compareProfileSuggestions("f-regular", photo), "agree");
+  assert.equal(compareProfileSuggestions("f-slim", photo), "different");
+  assert.equal(
+    compareProfileSuggestions("f-regular", { ...photo, closeTo: "f-athletic" }),
+    "close",
+  );
+  assert.equal(
+    compareProfileSuggestions("f-athletic", { ...photo, closeTo: "f-athletic" }),
+    "close",
+  );
+  assert.equal(compareProfileSuggestions(null, photo), "unavailable");
+  assert.equal(compareProfileSuggestions("f-regular", null), "unavailable");
 });

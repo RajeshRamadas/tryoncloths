@@ -31,7 +31,9 @@ async function generate(page) {
   await page.getByLabel("The customer agrees to use their photos for this avatar session.").check();
   await page.getByLabel("Upload face photo").setInputFiles(customerPhotos[0].face);
   await page.getByLabel("Upload full-body photo").setInputFiles(customerPhotos[0].body);
-  await expect(page.getByAltText("Customer full-body photo")).toBeVisible();
+  await expect(page.getByLabel("Build from the photo")).toContainText("The suggestions differ", {
+    timeout: 30_000,
+  });
   await page.getByRole("button", { name: "Continue to match" }).click();
   await page
     .getByRole("checkbox", { name: /The customer agrees to send their face photo/ })
@@ -86,6 +88,7 @@ test("an explicitly saved customer avatar survives reload, reopens for clothes, 
         keys: Object.keys(item).sort(),
         type: item.image.type,
         name: item.name,
+        profileSelection: item.profileSelection,
       }));
     });
   await expect
@@ -100,6 +103,7 @@ test("an explicitly saved customer avatar survives reload, reopens for clothes, 
         "image",
         "name",
         "profileId",
+        "profileSelection",
         "savedAt",
         "source",
         "templateTone",
@@ -108,6 +112,7 @@ test("an explicitly saved customer avatar survives reload, reopens for clothes, 
       ],
       type: "image/png",
       name: "Customer A updated",
+      profileSelection: { source: "measurements", comparison: "different" },
     },
   ]);
   await page.reload();
@@ -119,6 +124,7 @@ test("an explicitly saved customer avatar survives reload, reopens for clothes, 
   await page.screenshot({ path: "test-results/saved-avatar-library-mobile.png", fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole("button", { name: "Use Customer A updated", exact: true }).click();
+  await expect(page.getByText("Suggested from height and weight.", { exact: true })).toBeVisible();
   await expect(
     page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
   ).toHaveAttribute("src", `data:image/png;base64,${provider.png.toString("base64")}`);

@@ -93,3 +93,31 @@ export function recommendProfile(height, weight, body = "male") {
   if (body === "female") return ratio < 20 ? "f-slim" : ratio < 27 ? "f-regular" : "f-curvy";
   return ratio < 20 ? "slim" : ratio < 27 ? "regular" : "broad";
 }
+
+const profileSources = /** @type {const} */ (["measurements", "photo", "manual", "saved"]);
+const profileComparisons = /** @type {const} */ (["agree", "close", "different", "unavailable"]);
+
+/**
+ * @param {string | null} fromMeasurements
+ * @param {{profileId: string, closeTo: string | null} | null} fromPhoto
+ * @returns {(typeof profileComparisons)[number]}
+ */
+export function compareProfileSuggestions(fromMeasurements, fromPhoto) {
+  if (!fromMeasurements || !fromPhoto) return "unavailable";
+  if (fromPhoto.closeTo) return "close";
+  return fromMeasurements === fromPhoto.profileId ? "agree" : "different";
+}
+
+/**
+ * Keep only the source and qualitative comparison as avatar metadata.
+ * @returns {{source: (typeof profileSources)[number], comparison: (typeof profileComparisons)[number]} | null}
+ */
+export function parseProfileSelection(selection) {
+  if (
+    !selection ||
+    !profileSources.includes(selection.source) ||
+    !profileComparisons.includes(selection.comparison)
+  )
+    return null;
+  return { source: selection.source, comparison: selection.comparison };
+}

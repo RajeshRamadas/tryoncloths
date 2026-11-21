@@ -70,7 +70,28 @@ test("account avatars are isolated, survive database reopen, and sign-in works f
     assert.match(a.headers.get("set-cookie"), /SameSite=Strict/);
     const b = await request("/api/account/register", "POST", credentials("store-b@example.com"));
     const cb = cookie(b);
-    const saved = await request("/api/avatars", "POST", await avatar(), ca);
+    const input = await avatar();
+    const profileSelection = { source: "photo", comparison: "different" };
+    assert.equal(
+      (
+        await request(
+          "/api/avatars",
+          "POST",
+          { ...input, profileSelection: { ...profileSelection, comparison: "guaranteed" } },
+          ca,
+        )
+      ).status,
+      400,
+    );
+    const saved = await request(
+      "/api/avatars",
+      "POST",
+      {
+        ...input,
+        profileSelection: { ...profileSelection, photo: "private data" },
+      },
+      ca,
+    );
     assert.equal(saved.status, 200);
     const { id } = await saved.json();
     assert.equal((await request("/api/avatars")).status, 401);
@@ -90,7 +111,9 @@ test("account avatars are isolated, survive database reopen, and sign-in works f
     const reopened = new AccountStore(directory);
     try {
       const user = reopened.user(second.split("=")[1]);
-      assert.equal(reopened.list(user).length, 1);
+      const [record, ...others] = reopened.list(user);
+      assert.equal(others.length, 0);
+      assert.deepEqual(record.profileSelection, profileSelection);
     } finally {
       reopened.close();
     }
@@ -326,10 +349,11 @@ test("look validation, capacity, account cascade and old database upgrade", asyn
     const image = await avatar();
     const { id: avatarId } = await saveApprovedTestAvatar(store, owner, image);
     // Simulate a pre-feature database: avatar data must survive adding the table.
-    store.db.exec("DROP TABLE looks");
+    store.db.exec("DROP TABLE looks; ALTER TABLE avatars DROP COLUMN profile_selection;");
     const upgraded = new AccountStore(directory);
     upgraded.close();
     assert.equal(store.list(owner).length, 1);
+    assert.equal(store.list(owner)[0].profileSelection, null);
     const input = { avatarId, image: image.image, name: "Look", garments: ["Shirt"] };
     await assert.rejects(store.saveLook(owner, { ...input, garments: Array(11).fill("Shirt") }), {
       status: 400,
