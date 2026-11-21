@@ -33,6 +33,18 @@ type Connection = {
   wabaId?: string;
   language?: string;
 };
+const templateChecks = {
+  ready: "Ready",
+  missing: "Template missing for this language.",
+  not_approved: "Template needs Meta approval.",
+  wrong_category: "Template category does not match Forme’s setup.",
+  incompatible: "Check the image header, two body fields, and the first lookbook URL button.",
+  unavailable: "Could not verify this template. Check the connection in Meta.",
+};
+type TemplateCheck = {
+  language: string;
+  templates: { name: string; status: keyof typeof templateChecks }[];
+};
 async function api(path: string, method = "GET", body?: unknown, timeout = 30000) {
   const response = await requestApi(
     path,
@@ -53,6 +65,7 @@ export default function WhatsApp() {
     [store, setStore] = useState(""),
     [workspace, setWorkspace] = useState<Workspace | null>(null),
     [connection, setConnection] = useState<Connection | null>(null);
+  const [templateCheck, setTemplateCheck] = useState<TemplateCheck | null>(null);
   const [phone, setPhone] = useState(""),
     [waba, setWaba] = useState(""),
     [token, setToken] = useState(""),
@@ -178,6 +191,7 @@ export default function WhatsApp() {
                 onSubmit={(e) => {
                   e.preventDefault();
                   void action(async () => {
+                    setTemplateCheck(null);
                     try {
                       setConnection(
                         await api("/api/integrations/whatsapp", "PUT", {
@@ -248,6 +262,7 @@ export default function WhatsApp() {
                     onClick={() =>
                       void action(async () => {
                         await api("/api/integrations/whatsapp", "DELETE");
+                        setTemplateCheck(null);
                         await refresh();
                         setNotice("Business connection removed.");
                       })
@@ -257,6 +272,36 @@ export default function WhatsApp() {
                   </button>
                 )}
               </form>
+            )}
+            {role === "owner" && connection.connected && (
+              <>
+                <button
+                  className="button secondary"
+                  disabled={busy || !connection.available}
+                  onClick={() =>
+                    void action(async () => {
+                      setTemplateCheck(null);
+                      setTemplateCheck(
+                        await api("/api/integrations/whatsapp/templates/check", "POST"),
+                      );
+                    })
+                  }
+                >
+                  Check Meta templates
+                </button>
+                {templateCheck && (
+                  <div role="status">
+                    <p>Template check for {templateCheck.language}</p>
+                    <ul>
+                      {templateCheck.templates.map(({ name, status }) => (
+                        <li key={name}>
+                          <strong>{name}</strong> · {templateChecks[status]}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
             )}
           </section>
           <section>
