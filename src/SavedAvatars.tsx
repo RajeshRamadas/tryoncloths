@@ -27,11 +27,13 @@ type Props = {
   disabled: boolean;
   cloud?: boolean;
   onUse: (image: string, details: AvatarDetails) => void;
+  onRegenerate: (item: SavedAvatar) => Promise<void>;
 };
-export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) {
+export default function SavedAvatars({ disabled, cloud = false, onUse, onRegenerate }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const [items, setItems] = useState<SavedAvatar[]>([]);
+  const [masterFilter, setMasterFilter] = useState<string | null>(null);
   const [viewsAvailable, setViewsAvailable] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -63,6 +65,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
     setShareLook(null);
     setLooks([]);
     setLocalView(false);
+    setMasterFilter(null);
     setItems([]);
     setBusy(true);
     setError("");
@@ -102,6 +105,18 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
       setItems(await (cloud && !localView ? listAccountAvatars() : listAvatars()));
       setConfirmDelete(null);
       if (looksFor?.id === id) setLooksFor(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function regenerate(item: SavedAvatar) {
+    setBusy(true);
+    setError("");
+    try {
+      await onRegenerate(item);
+      close();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -185,7 +200,10 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
       setBusy(false);
     }
   }
-  const groups = items.reduce<Record<string, { name: string; items: SavedAvatar[] }>>(
+  const visibleItems = masterFilter
+    ? items.filter((item) => item.masterId === masterFilter)
+    : items;
+  const groups = visibleItems.reduce<Record<string, { name: string; items: SavedAvatar[] }>>(
     (result, item) => {
       const key = cloud && !localView ? item.customerId || "unassigned" : "device";
       (result[key] ||= {
@@ -245,6 +263,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
               setError("");
               setConfirmDelete(null);
               setLooksFor(null);
+              setMasterFilter(null);
               try {
                 setItems(await (localView ? listAccountAvatars() : listAvatars()));
                 setLocalView(!localView);
@@ -265,10 +284,21 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
           </p>
         )}
         {busy && <p role="status">Opening library…</p>}
-        {!busy && !items.length && (
+        {masterFilter && (
+          <button
+            type="button"
+            className="button secondary"
+            disabled={busy}
+            onClick={() => setMasterFilter(null)}
+          >
+            Show all saved avatars
+          </button>
+        )}
+        {!busy && !visibleItems.length && (
           <p>
-            No saved avatars yet. Approve an avatar and choose “Save avatar for reuse”, or open a
-            downloaded PNG below.
+            {masterFilter
+              ? "No saved versions for this master."
+              : "No saved avatars yet. Approve an avatar and choose “Save avatar for reuse”, or open a downloaded PNG below."}
           </p>
         )}
         <div className="saved-avatar-list">
@@ -291,10 +321,13 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
                         Generated with {item.generation.model} · {item.generation.promptRevision}
                       </p>
                     )}
+                    {cloud && !localView && item.masterVersion != null && (
+                      <p>Master version {item.masterVersion}</p>
+                    )}
                     {cloud && !localView && (
                       <p>
                         {item.approvalStatus === "approved"
-                          ? `${item.approvedVersion ? `Version ${item.approvedVersion} approved` : "Approved"} for account-backed fashion reuse. Re-review when reopening.`
+                          ? `${item.approvedVersion ? `Approval ${item.approvedVersion} active` : "Approved"} for account-backed fashion reuse. Re-review when reopening.`
                           : "Draft — open and complete the customer quality review before fashion reuse."}
                       </p>
                     )}
@@ -305,6 +338,32 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
                     >
                       Use {item.name}
                     </button>
+                    {cloud && !localView && item.masterId && item.approvalStatus === "approved" && (
+                      <button
+                        type="button"
+                        className="button secondary"
+                        disabled={busy}
+                        onClick={() => void regenerate(item)}
+                      >
+                        Regenerate {item.name} as new version
+                      </button>
+                    )}
+                    {cloud &&
+                      !localView &&
+                      item.masterId &&
+                      !masterFilter &&
+                      items.some(
+                        (other) => other.masterId === item.masterId && other.id !== item.id,
+                      ) && (
+                        <button
+                          type="button"
+                          className="button secondary"
+                          disabled={busy}
+                          onClick={() => setMasterFilter(item.masterId ?? null)}
+                        >
+                          View master versions for {item.name}
+                        </button>
+                      )}
                     {cloud && !localView && (
                       <button
                         className="button secondary"

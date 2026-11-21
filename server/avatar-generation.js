@@ -24,8 +24,8 @@ export function issueAvatarGenerationReceipt(key, account, customerId, image, ge
 }
 
 export function verifyAvatarGenerationReceipt(key, account, input) {
-  const { generationReceipt, source, image, customerId } = input;
-  if (generationReceipt == null) return null;
+  const { generationReceipt, source, image, customerId, regenerateFromId } = input;
+  if (generationReceipt == null && regenerateFromId == null) return null;
   try {
     if (
       source !== "generated" ||
@@ -45,6 +45,7 @@ export function verifyAvatarGenerationReceipt(key, account, input) {
       claims.store !== account.id ||
       claims.user !== account.user.id ||
       claims.customer !== (customerId ?? null) ||
+      (claims.generation.regenerateFromId ?? null) !== (regenerateFromId ?? null) ||
       claims.generation.outputSha256 !== pngHash(image)
     )
       throw new Error();

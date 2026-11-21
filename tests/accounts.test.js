@@ -20,9 +20,9 @@ async function fixture(run) {
     accessMode: "public",
     rateLimit: false,
     apiKey: "test",
-    personalize: async () => {
+    personalize: async ({ profileId }) => {
       calls++;
-      return `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;
+      return `data:image/png;base64,${(await standardAvatar(profileId)).toString("base64")}`;
     },
   }).listen(0, "127.0.0.1");
   await new Promise((r) => server.once("listening", r));
@@ -308,6 +308,118 @@ test("explicit avatar save verifies generation provenance and preserves it acros
       .map((column) => column.name);
     assert.ok(!columns.includes("face"));
     assert.ok(!columns.includes("body"));
+  }));
+
+test("a regenerated master keeps separate approved images and scoped, retryable version numbers", async () =>
+  fixture(async ({ request, store, calls }) => {
+    const session = cookie(
+      await request("/api/account/register", "POST", credentials("master@example.com")),
+    );
+    const foreign = cookie(
+      await request("/api/account/register", "POST", credentials("foreign-master@example.com")),
+    );
+    const owner = store.user(session.split("=")[1]);
+    const customer = store.customers.save(owner, {
+      name: "Master customer",
+      phoneE164: "+919000000011",
+    });
+    const other = store.customers.save(owner, {
+      name: "Other customer",
+      phoneE164: "+919000000012",
+    });
+    const source = { ...(await avatar()), customerId: customer.id };
+    const base = await store.save(owner, source);
+    const input = {
+      regenerateFromId: base.id,
+      customerId: customer.id,
+      face: `data:image/jpeg;base64,${(await readFile(customerPhotos[0].face)).toString("base64")}`,
+      body: `data:image/jpeg;base64,${(await readFile(customerPhotos[0].body)).toString("base64")}`,
+      profileId: "slim",
+      measurements: { heightCm: 175, weightKg: 72 },
+      consent: true,
+      consentScope: "face-and-body",
+      consentProvider: "gemini",
+    };
+    assert.equal((await request("/api/personalize", "POST", input, session)).status, 409);
+    approveTestAvatar(store, owner, base.id);
+    assert.equal(
+      (await request("/api/personalize", "POST", { ...input, customerId: other.id }, session))
+        .status,
+      409,
+    );
+    assert.equal(
+      (await request("/api/personalize", "POST", { ...input, customerId: null }, foreign)).status,
+      404,
+    );
+    assert.equal(calls(), 0);
+    const original = store.image(owner, base.id);
+    const previousLook = await store.saveLook(owner, {
+      avatarId: base.id,
+      name: "Original look",
+      image: source.image,
+      garments: ["Shirt"],
+    });
+
+    async function generateVersion(profileId, regenerateFromId = base.id) {
+      const generated = await request(
+        "/api/personalize",
+        "POST",
+        { ...input, profileId, regenerateFromId },
+        session,
+      );
+      assert.equal(generated.status, 200);
+      return {
+        ...source,
+        ...(await generated.json()),
+        regenerateFromId,
+        source: "generated",
+      };
+    }
+    const candidate = await generateVersion("slim");
+    const save = (value) => request("/api/avatars", "POST", value, session);
+    for (const value of [
+      { ...candidate, generationReceipt: undefined },
+      { ...candidate, regenerateFromId: undefined },
+    ])
+      assert.equal((await save(value)).status, 400);
+    store.revokeAvatarApproval(owner, base.id);
+    assert.equal((await save(candidate)).status, 409);
+    approveTestAvatar(store, owner, base.id);
+    const copies = await Promise.all([save(candidate), save(candidate)]);
+    for (const response of copies) assert.equal(response.status, 200);
+    const [next, duplicate] = await Promise.all(copies.map((r) => r.json()));
+    assert.deepEqual(next, duplicate);
+    assert.equal(next.masterId, base.id);
+    assert.equal(next.masterVersion, 2);
+    assert.equal(next.approvalStatus, "draft");
+    assert.notEqual(next.id, base.id);
+    assert.throws(() => store.requireApprovedAvatar(owner, next.id), { status: 409 });
+    approveTestAvatar(store, owner, next.id);
+    assert.equal((await (await save(candidate)).json()).approvalStatus, "approved");
+    assert.deepEqual(store.image(owner, base.id), original);
+    assert.equal(store.listLooks(owner, base.id)[0].id, previousLook.id);
+    assert.equal(
+      (await save(await generateVersion("regular", next.id))).status,
+      409,
+      "an identical PNG cannot take over the original",
+    );
+
+    store.remove(owner, next.id);
+    const third = await save(await generateVersion("broad"));
+    assert.equal(third.status, 200);
+    const renewed = await third.json();
+    assert.equal(renewed.masterVersion, 3);
+    assert.equal(renewed.masterId, base.id);
+    store.remove(owner, base.id);
+    assert.equal(store.list(owner)[0].masterId, base.id);
+    store.customers.remove(owner, customer.id);
+    assert.equal(store.list(owner).length, 0);
+    assert.equal(
+      store.db
+        .prepare("SELECT count(*) AS total FROM avatar_master_sequences WHERE account=?")
+        .get(owner.id).total,
+      0,
+    );
   }));
 
 test("admin password recovery revokes all previous sessions", async () =>

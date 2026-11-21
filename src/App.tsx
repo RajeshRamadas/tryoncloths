@@ -65,6 +65,7 @@ import {
   type AvatarDetails,
   type OpenedLook,
   type ProfileSelection,
+  type SavedAvatar,
 } from "./saved-avatars";
 import { App as NativeApp } from "@capacitor/app";
 
@@ -248,6 +249,7 @@ export default function App() {
   const accountIdentity = useRef<string | null>(null);
   const [customer, setCustomer] = useState<CustomerRef | null>(null);
   const [avatarId, setAvatarId] = useState<string | null>(null);
+  const [replacement, setReplacement] = useState<{ id: string; name: string } | null>(null);
   const [openedLook, setOpenedLook] = useState<OpenedLook | undefined>();
   const [outfitOpen, setOutfitOpen] = useState(false);
   const [restoredAvatar, setRestoredAvatar] = useState(false);
@@ -320,7 +322,8 @@ export default function App() {
   const bodyGenerationAllowed = bodyType === "male" || femaleEnabled;
   const profile = profiles.find((p) => p.id === selected)!;
   const validMeasurements = recommendation !== null;
-  const needsCustomerGeneration = Boolean(face || body || restoredAvatar) && !personalized;
+  const needsCustomerGeneration =
+    Boolean(face || body || restoredAvatar || replacement) && !personalized;
   const approvalReady = canApproveAvatar({
     hasPersonalizedResult: Boolean(personalized),
     needsCustomerGeneration,
@@ -513,6 +516,7 @@ export default function App() {
   }
   function reset() {
     setCustomer(null);
+    setReplacement(null);
     setRestoredAvatar(false);
     setAvatarSource("generated");
     setAvatarName("Customer avatar");
@@ -618,6 +622,7 @@ export default function App() {
             consentProvider: provider,
             ...(identityScreenAvailable ? { identityCheckConsent: true } : {}),
             ...(accountState.enabled ? { customerId: customer?.id } : {}),
+            ...(replacement ? { regenerateFromId: replacement.id } : {}),
           }),
         },
         200000,
@@ -688,6 +693,26 @@ export default function App() {
       }
     }
   }
+  function prefillAvatarFrame(details: AvatarDetails) {
+    setSelected(details.profileId);
+    setTemplateTone(details.templateTone || DEFAULT_TEMPLATE_TONE);
+    setProfileSource("saved");
+    setHeight(String(details.heightCm));
+    setWeight(String(details.weightKg));
+    setAvatarName(details.name);
+  }
+  async function startRegeneration(item: SavedAvatar) {
+    const linkedCustomer: Customer | null = item.customerId
+      ? (await customerRequest(`/${item.customerId}`)).customer
+      : null;
+    reset();
+    setCustomer(linkedCustomer);
+    setCustomerFit(linkedCustomer?.measurements ?? null);
+    prefillAvatarFrame(item);
+    setReplacement({ id: item.id, name: item.name });
+    setNotice("");
+    requestAnimationFrame(() => titleRef.current?.focus());
+  }
   function useSavedAvatar(image: string, details: AvatarDetails) {
     if (details.avatarId)
       setCustomer(
@@ -700,22 +725,18 @@ export default function App() {
           : null,
       );
     invalidate();
+    setReplacement(null);
     setFace(null);
     setBody(null);
     setConsent(false);
     setSession((s) => s + 1);
     setAvatarId(details.avatarId || null);
     setOpenedLook(details.look);
-    setSelected(details.profileId);
-    setTemplateTone(details.templateTone || DEFAULT_TEMPLATE_TONE);
-    setProfileSource("saved");
+    prefillAvatarFrame(details);
     setAvatarProfileSelection(parseProfileSelection(details.profileSelection));
-    setHeight(String(details.heightCm));
-    setWeight(String(details.weightKg));
     setPersonalized(image);
     setRestoredAvatar(true);
     setAvatarSource(details.source);
-    setAvatarName(details.name);
     setStep(3);
     setNotice("Avatar opened without an AI request. Review it, then choose Try clothes.");
     requestAnimationFrame(() => titleRef.current?.focus());
@@ -794,7 +815,12 @@ export default function App() {
       if (accountState.enabled) {
         if (!reviewAttestation)
           throw new Error("Complete the avatar quality review before saving.");
-        saved = await saveAccountAvatar(personalized, details, generationReceipt.current);
+        saved = await saveAccountAvatar(
+          personalized,
+          details,
+          generationReceipt.current,
+          replacement?.id,
+        );
         if (!saved?.id) throw new Error("The account did not return a saved avatar ID.");
         // Saving always creates a draft. Only server-validated review promotes it.
         await approveAccountAvatar(saved.id, reviewAttestation);
@@ -802,6 +828,10 @@ export default function App() {
         await saveAvatar(personalized, details);
       }
       if (saved?.id) setAvatarId(saved.id);
+      if (replacement) {
+        setReplacement(null);
+        generationReceipt.current = null;
+      }
       // Stores that make a portrait with every avatar go straight on to it, reusing the face
       // photo still in this session. Staff confirm consent before any credit is used.
       if (accountState.enabled && jewelleryAvailable && face && saved?.id) {
@@ -811,9 +841,11 @@ export default function App() {
         if (branding?.portraitWithAvatar === true) setPortraitFor(saved.id);
       }
       setNotice(
-        accountState.enabled
-          ? "Avatar saved to your store account. Sign in to this account on another browser to reopen it."
-          : "Avatar saved on this device. Open Saved avatars next time; no generation is needed.",
+        replacement
+          ? "New master version saved. Earlier versions and their looks are still in Saved avatars."
+          : accountState.enabled
+            ? "Avatar saved to your store account. Sign in to this account on another browser to reopen it."
+            : "Avatar saved on this device. Open Saved avatars next time; no generation is needed.",
       );
     } catch (e) {
       setError((e as Error).message);
@@ -956,6 +988,7 @@ export default function App() {
                   generating || exporting || (accountState.enabled && !accountState.account)
                 }
                 onUse={useSavedAvatar}
+                onRegenerate={startRegeneration}
               />
               <span>Already have an avatar? Reopen it here without generating again.</span>
             </div>
@@ -1002,6 +1035,12 @@ export default function App() {
                       <p className="section-copy">
                         A few details to find their closest starting point.
                       </p>
+                      {replacement && (
+                        <p className="section-copy">
+                          New master version for {replacement.name}. Add fresh customer photos and
+                          confirm consent.
+                        </p>
+                      )}
                       {accountState.account && (
                         <CustomerPicker
                           key={`${accountState.account.id}-${session}`}
@@ -1483,7 +1522,7 @@ export default function App() {
                             }
                             onClick={() => void keepAvatar()}
                           >
-                            Save avatar for reuse
+                            {replacement ? "Save new master version" : "Save avatar for reuse"}
                           </button>
                           <p className="small-footnote">
                             {accountState.enabled

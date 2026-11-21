@@ -134,7 +134,23 @@ export class AccountStore {
         this.db.exec("ALTER TABLE avatars ADD COLUMN generation_provenance TEXT");
       if (!avatarColumns.includes("approved_version"))
         this.db.exec("ALTER TABLE avatars ADD COLUMN approved_version INTEGER");
+      if (!avatarColumns.includes("master_id"))
+        this.db.exec("ALTER TABLE avatars ADD COLUMN master_id TEXT");
+      if (!avatarColumns.includes("master_version"))
+        this.db.exec("ALTER TABLE avatars ADD COLUMN master_version INTEGER NOT NULL DEFAULT 1");
       this.db.exec(`
+        CREATE TABLE IF NOT EXISTS avatar_master_sequences (
+          account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+          masterId TEXT NOT NULL,
+          last_version INTEGER NOT NULL,
+          PRIMARY KEY(account,masterId)
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS avatar_master_versions ON avatars(account,COALESCE(master_id,id),master_version);
+        CREATE TRIGGER IF NOT EXISTS avatar_master_sequence_cleanup AFTER DELETE ON avatars
+        BEGIN
+          DELETE FROM avatar_master_sequences WHERE account=OLD.account AND masterId=COALESCE(OLD.master_id,OLD.id)
+          AND NOT EXISTS(SELECT 1 FROM avatars WHERE account=OLD.account AND COALESCE(master_id,id)=COALESCE(OLD.master_id,OLD.id));
+        END;
         CREATE TABLE IF NOT EXISTS avatar_versions (
           account TEXT NOT NULL,
           avatarId TEXT NOT NULL,
@@ -368,6 +384,22 @@ export class AccountStore {
     }
   }
 
+  requireRegenerationSource(account, id, customerId) {
+    if (typeof id !== "string" || !/^[a-f0-9]{64}$/.test(id))
+      throw error("Choose an approved avatar to regenerate.");
+    const source = this.db
+      .prepare(
+        "SELECT customer,COALESCE(master_id,id) AS masterId,approved_at,review_policy FROM avatars WHERE account=? AND id=?",
+      )
+      .get(account.id, id);
+    if (!source) throw error("Avatar not found.", 404);
+    if (source.customer !== (customerId ?? null))
+      throw error("Keep the same customer when regenerating a master avatar.", 409);
+    if (!source.approved_at || source.review_policy !== AVATAR_REVIEW_POLICY_VERSION)
+      throw error("Review and approve the source avatar before regenerating it.", 409);
+    return source.masterId;
+  }
+
   async save(account, input) {
     const { profileId, heightCm, weightKg } = input;
     const templateTone = input.templateTone ?? DEFAULT_TEMPLATE_TONE;
@@ -386,47 +418,89 @@ export class AccountStore {
       throw error("Use a name, body profile and valid measurements.");
     this.customers.requireOptional(account, input.customerId);
     const { image, thumbnail } = await savedImage(input.image);
-    this.customers.requireOptional(account, input.customerId);
     const generation = verifyAvatarGenerationReceipt(this.views.key, account, input);
     // Scope deduplication to the customer so identical images cannot move ownership.
     const id = input.customerId
         ? digest(Buffer.concat([image, Buffer.from(input.customerId)]))
         : digest(image),
       savedAt = Date.now();
-    const exists = this.db
-      .prepare("SELECT id FROM avatars WHERE account=? AND id=?")
-      .get(account.id, id);
-    const count = this.db
-      .prepare("SELECT count(*) AS total FROM avatars WHERE account=?")
-      .get(account.id).total;
-    if (!exists && count >= 100)
-      throw error("Your account holds up to 100 avatars. Delete one before adding another.", 409);
-    this.db
-      .prepare(
-        `INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type,template_tone,customer,profile_selection,generation_provenance)
-         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    return transaction(this.db, () => {
+      this.customers.requireOptional(account, input.customerId);
+      const existing = this.db
+        .prepare(
+          "SELECT master_id,master_version,savedAt,approved_at,review_policy,generation_provenance FROM avatars WHERE account=? AND id=?",
+        )
+        .get(account.id, id);
+      let masterId = existing?.master_id ?? null;
+      let masterVersion = existing?.master_version ?? 1;
+      if (input.regenerateFromId != null) {
+        masterId = this.requireRegenerationSource(
+          account,
+          input.regenerateFromId,
+          input.customerId,
+        );
+        if (existing) {
+          const savedGeneration = JSON.parse(existing.generation_provenance ?? "null");
+          if (
+            existing.master_id !== masterId ||
+            savedGeneration?.requestId !== generation.requestId
+          )
+            throw error(
+              "This regenerated image matches a saved avatar. A new master version needs a different image.",
+              409,
+            );
+          const approved =
+            existing.approved_at && existing.review_policy === AVATAR_REVIEW_POLICY_VERSION;
+          return {
+            id,
+            savedAt: existing.savedAt,
+            masterId,
+            masterVersion,
+            approvalStatus: approved ? "approved" : "draft",
+          };
+        }
+        masterVersion = this.db
+          .prepare(
+            `INSERT INTO avatar_master_sequences(account,masterId,last_version)
+          VALUES(?,?,2) ON CONFLICT(account,masterId) DO UPDATE SET last_version=last_version+1
+          RETURNING last_version`,
+          )
+          .get(account.id, masterId).last_version;
+      }
+      const count = this.db
+        .prepare("SELECT count(*) AS total FROM avatars WHERE account=?")
+        .get(account.id).total;
+      if (!existing && count >= 100)
+        throw error("Your account holds up to 100 avatars. Delete one before adding another.", 409);
+      this.db
+        .prepare(
+          `INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type,template_tone,customer,profile_selection,generation_provenance,master_id,master_version)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
          ON CONFLICT(account,id) DO UPDATE SET name=excluded.name,profileId=excluded.profileId,heightCm=excluded.heightCm,weightKg=excluded.weightKg,source=excluded.source,savedAt=excluded.savedAt,body_type=excluded.body_type,template_tone=excluded.template_tone,profile_selection=excluded.profile_selection,
            generation_provenance=COALESCE(avatars.generation_provenance,excluded.generation_provenance),approved_at=NULL,approved_by=NULL,review_policy=0,approved_version=NULL`,
-      )
-      .run(
-        id,
-        account.id,
-        name,
-        profileId,
-        heightCm,
-        weightKg,
-        input.source,
-        savedAt,
-        image,
-        thumbnail,
-        profiles.find((p) => p.id === profileId).body,
-        templateTone,
-        input.customerId ?? null,
-        profileSelection ? JSON.stringify(profileSelection) : null,
-        generation ? JSON.stringify({ ...generation, storedSha256: digest(image) }) : null,
-      );
-    this.views?.invalidate(account.id, id);
-    return { id, savedAt, approvalStatus: "draft" };
+        )
+        .run(
+          id,
+          account.id,
+          name,
+          profileId,
+          heightCm,
+          weightKg,
+          input.source,
+          savedAt,
+          image,
+          thumbnail,
+          profiles.find((p) => p.id === profileId).body,
+          templateTone,
+          input.customerId ?? null,
+          profileSelection ? JSON.stringify(profileSelection) : null,
+          generation ? JSON.stringify({ ...generation, storedSha256: digest(image) }) : null,
+          masterId,
+          masterVersion,
+        );
+      this.views?.invalidate(account.id, id);
+      return { id, savedAt, masterId: masterId ?? id, masterVersion, approvalStatus: "draft" };
+    });
   }
   approveAvatar(account, id, review) {
     if (!validateAvatarApproval(review))
@@ -535,7 +609,7 @@ export class AccountStore {
   list(account) {
     return this.db
       .prepare(
-        "SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,profile_selection,generation_provenance,approved_version AS approvedVersion,(SELECT max(v.version) FROM avatar_versions v WHERE v.account=avatars.account AND v.avatarId=avatars.id) AS latestVersion,CASE WHEN approved_at IS NOT NULL AND review_policy=1 THEN 'approved' ELSE 'draft' END AS approvalStatus,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC",
+        "SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,profile_selection,generation_provenance,COALESCE(master_id,id) AS masterId,master_version AS masterVersion,approved_version AS approvedVersion,(SELECT max(v.version) FROM avatar_versions v WHERE v.account=avatars.account AND v.avatarId=avatars.id) AS latestVersion,CASE WHEN approved_at IS NOT NULL AND review_policy=1 THEN 'approved' ELSE 'draft' END AS approvalStatus,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC",
       )
       .all(account.id)
       .map(({ profile_selection, generation_provenance, ...row }) => ({

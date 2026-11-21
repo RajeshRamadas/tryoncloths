@@ -17,7 +17,7 @@ test("store accounts save reviewed avatars and reopen them with generation detai
   // This end-to-end flow spans two browsers, an isolated store database, image processing,
   // avatar approval, outfit saving, and reloads. Keep its own CI budget instead of
   // relying on Playwright's 30-second default for short tests.
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const directory = await mkdtemp(path.join(os.tmpdir(), "forme-account-browser-"));
   const store = new AccountStore(directory);
   let generations = 0;
@@ -28,9 +28,9 @@ test("store accounts save reviewed avatars and reopen them with generation detai
     apiKey: "test",
     accessMode: "public",
     rateLimit: false,
-    personalize: async () => {
+    personalize: async ({ profileId }) => {
       generations++;
-      return `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;
+      return `data:image/png;base64,${(await standardAvatar(profileId)).toString("base64")}`;
     },
   });
   const server = app.listen(0, "127.0.0.1");
@@ -156,6 +156,54 @@ test("store accounts save reviewed avatars and reopen them with generation detai
     ).toBeVisible();
     await expect(second.getByAltText("Avatar wearing the selected outfit")).toBeVisible();
     expect(generations).toBe(1);
+
+    await second.getByRole("button", { name: "Back to avatar", exact: true }).click();
+    await second.getByRole("button", { name: "Saved avatars", exact: true }).click();
+    await second.getByRole("button", { name: "Regenerate Customer Anil as new version" }).click();
+    await expect(second.getByText(/New master version for Customer Anil/)).toBeVisible();
+    await expect(second.getByAltText("Customer face photo", { exact: true })).toHaveCount(0);
+    await expect(second.getByLabel("Upload face photo")).toBeDisabled();
+    expect(generations).toBe(1);
+    await second.getByRole("button", { name: "Continue to match" }).click();
+    await expect(second.getByRole("button", { name: "Review avatar", exact: true })).toBeDisabled();
+    await second.getByRole("button", { name: "Back", exact: true }).click();
+    await second
+      .getByLabel("The customer agrees to use their photos for this avatar session.")
+      .check();
+    await second.getByLabel("Upload face photo").setInputFiles(customerPhotos[0].face);
+    await second.getByLabel("Upload full-body photo").setInputFiles(customerPhotos[0].body);
+    await expect(second.getByAltText("Customer full-body photo")).toBeVisible();
+    await second.getByRole("button", { name: "Continue to match" }).click();
+    await second.getByRole("button", { name: "Select Slim profile", exact: true }).click();
+    await second.getByLabel("Customer / avatar name").fill("Anil updated avatar");
+    await second
+      .getByRole("checkbox", { name: /The customer agrees to send their face photo/ })
+      .check();
+    await second.getByRole("button", { name: "Generate customer avatar", exact: true }).click();
+    await expect(
+      second.getByAltText("Customer’s personalized avatar, awaiting visual review"),
+    ).toBeVisible();
+    await second.getByRole("button", { name: "Review avatar" }).click();
+    await approvePersonalizedAvatar(second);
+    await second
+      .getByLabel(
+        "The customer agrees to save this avatar and measurements to the store account for reuse.",
+      )
+      .check();
+    await second.getByRole("button", { name: "Save new master version", exact: true }).click();
+    await expect(second.getByText(/New master version saved/)).toBeVisible();
+    await second.getByRole("button", { name: "Saved avatars", exact: true }).click();
+    await second
+      .getByRole("button", { name: "View master versions for Anil updated avatar" })
+      .click();
+    const newer = second
+      .locator("article")
+      .filter({ has: second.getByRole("heading", { name: "Anil updated avatar", exact: true }) });
+    await expect(newer).toContainText("Master version 2");
+    await expect(
+      second.getByRole("button", { name: "View looks (1) for Customer Anil", exact: true }),
+    ).toBeVisible();
+    expect(generations).toBe(2);
   } finally {
     await other.close();
     await new Promise((r) => server.close(r));
