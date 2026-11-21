@@ -30,8 +30,15 @@ page text, credentials or raw exception messages. No AI calls are made.
 4. Inspect `links-report.json`. Fewer than 20 links is a diagnostic run and sets
    `benchmarkComplete: false`. A completed measurement is **not** rollout approval:
    failed sites still need the upload fallback. Check returned photos in the app
-   for correctness, record retailer coverage, and measure worker peak memory with
-   `docker stats` before enabling it for staff.
+   for correctness and record retailer coverage. In comparison mode,
+   `workerMemory.before` and `workerMemory.after` report the isolated worker's
+   current usage, lifetime peak and container limit in bytes. These readings
+   require an updated worker with a private cgroup v2, a readable
+   `memory.peak` counter and a limit matching the Compose setting. An unavailable
+   reading is `null`. Use a fresh worker
+   dedicated to the benchmark to attribute the peak to the pilot. An older
+   container's peak may include earlier pages and concurrent traffic. Use
+   host-side monitoring when the counters are unavailable.
 
 The CLI is also shipped in the runtime image at
 `/app/server/evaluation/link-benchmark.js`. Supply the private input through a

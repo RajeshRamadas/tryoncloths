@@ -1,5 +1,48 @@
 import { readProductLink, safeFetch, parseProductUrl, LinkError } from "./product-link.js";
 
+import { parseWorkerMemory } from "./worker-memory.js";
+
+async function boundedWorkerJson(response, limit) {
+  const reader = response.body.getReader();
+  let bytes = 0;
+  const chunks = [];
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.length;
+      if (bytes > limit) throw new LinkError("too_large");
+      chunks.push(Buffer.from(value));
+    }
+  } finally {
+    await reader.cancel();
+  }
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+export async function requestWorkerMemory({
+  endpoint = process.env.TRYON_READER_URL,
+  token = process.env.TRYON_READER_TOKEN,
+  fetchImpl = fetch,
+} = {}) {
+  if (!endpoint || !token || token.length < 32) return null;
+  try {
+    const response = await fetchImpl(new URL("/health?memory=1", endpoint), {
+      redirect: "error",
+      signal: AbortSignal.timeout(2000),
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      await response.body?.cancel();
+      return null;
+    }
+    const data = await boundedWorkerJson(response, 1024);
+    return data?.ok === true ? parseWorkerMemory(data.memory) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function requestRenderedPage(
   url,
   {
@@ -20,22 +63,7 @@ export async function requestRenderedPage(
       body: JSON.stringify({ url: parseProductUrl(url).href }),
     });
     if (!response.ok) throw new LinkError(response.status === 504 ? "timeout" : "site_refused");
-    // Bound the worker response as well as its browser network transfer.
-    const reader = response.body.getReader();
-    let bytes = 0;
-    const chunks = [];
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        bytes += value.length;
-        if (bytes > 5 * 1024 * 1024) throw new LinkError("too_large");
-        chunks.push(Buffer.from(value));
-      }
-    } finally {
-      await reader.cancel();
-    }
-    const data = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    const data = await boundedWorkerJson(response, 5 * 1024 * 1024);
     if (typeof data.html !== "string" || Buffer.byteLength(data.html) > 4 * 1024 * 1024)
       throw new LinkError("too_large");
     return { html: data.html, url: parseProductUrl(data.url).href };

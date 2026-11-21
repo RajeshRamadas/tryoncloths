@@ -5,8 +5,13 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import sharp from "sharp";
 import { allowBrowserRequest } from "../server/browser-policy.js";
-import { readProductLinkWithFallback, requestRenderedPage } from "../server/browser-reader.js";
+import {
+  readProductLinkWithFallback,
+  requestRenderedPage,
+  requestWorkerMemory,
+} from "../server/browser-reader.js";
 import { workerServer } from "../server/browser-worker.js";
+import { readWorkerMemory } from "../server/worker-memory.js";
 import { safeFetch, LinkError } from "../server/product-link.js";
 
 test("browser request filter refuses private destinations, downloads and unrelated scripts", () => {
@@ -145,6 +150,78 @@ test("worker authenticates requests, serializes pages and sanitizes renderer err
     await new Promise((r) => server.close(r));
   }
 });
+test("worker memory is scoped to a limited private cgroup v2", async () => {
+  const files = {
+    "/proc/self/cgroup": "0::/\n",
+    "/sys/fs/cgroup/memory.current": "100\n",
+    "/sys/fs/cgroup/memory.peak": "300\n",
+    "/sys/fs/cgroup/memory.max": "512\n",
+  };
+  const read = async (file) => {
+    if (!(file in files)) throw new Error("Counter unavailable");
+    return files[file];
+  };
+  const sample = () => readWorkerMemory({ expectedLimit: 512, read });
+  assert.deepEqual(await sample(), {
+    currentBytes: 100,
+    peakBytes: 300,
+    limitBytes: 512,
+  });
+  for (const limit of ["max", "8192"]) {
+    files["/sys/fs/cgroup/memory.max"] = limit;
+    assert.equal(await sample(), null);
+  }
+  files["/sys/fs/cgroup/memory.max"] = "512\n";
+  delete files["/sys/fs/cgroup/memory.peak"];
+  assert.equal(await sample(), null);
+  assert.equal(
+    await readWorkerMemory({
+      expectedLimit: 512,
+      read: async (file) => {
+        assert.equal(file, "/proc/self/cgroup");
+        return "0::/system.slice/reader.service\n";
+      },
+    }),
+    null,
+  );
+});
+
+test("worker memory uses authenticated health and older workers remain compatible", async () => {
+  const token = "test-reader-token-at-least-32-characters";
+  const snapshot = { currentBytes: 100, peakBytes: 300, limitBytes: 512 };
+  let samples = 0;
+  const server = workerServer({
+    token,
+    memory: async () => {
+      samples++;
+      return snapshot;
+    },
+    render: async () => assert.fail("A memory read must not start Chromium."),
+  }).listen(0, "127.0.0.1");
+  await new Promise((resolve) => server.once("listening", resolve));
+  const endpoint = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const health = await fetch(`${endpoint}/health`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    assert.deepEqual(await health.json(), { ok: true });
+    assert.equal((await fetch(`${endpoint}/health?memory=1`)).status, 401);
+    assert.equal(samples, 0);
+    assert.deepEqual(await requestWorkerMemory({ endpoint, token }), snapshot);
+    assert.equal(samples, 1);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+
+  for (const fetchImpl of [
+    async () => new Response(null, { status: 404 }),
+    async () => Response.json({ ok: true, memory: { ...snapshot, peakBytes: 50 } }),
+    async () => Response.json({ ok: true, memory: snapshot, padding: "x".repeat(1024) }),
+  ]) {
+    assert.equal(await requestWorkerMemory({ endpoint, token, fetchImpl }), null);
+  }
+});
+
 test("static fetch enforces an absolute deadline on a continuously streaming response", async (t) => {
   let destroyed = false,
     interval;

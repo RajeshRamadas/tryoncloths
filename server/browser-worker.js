@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { parseProductUrl } from "./public-url.js";
 import { LinkError } from "./link-errors.js";
 import { allowBrowserRequest } from "./browser-policy.js";
+import { readWorkerMemory } from "./worker-memory.js";
 
 export async function renderPublicPage(
   raw,
@@ -97,6 +98,7 @@ export async function renderPublicPage(
 export function workerServer({
   token = process.env.TRYON_READER_TOKEN,
   render = renderPublicPage,
+  memory = readWorkerMemory,
 } = {}) {
   if (!token || token.length < 32)
     throw new Error("Configure a reader token of at least 32 characters.");
@@ -112,6 +114,8 @@ export function workerServer({
     if (!timingSafeEqual(hash(req.headers.authorization || ""), hash(`Bearer ${token}`)))
       return send(401, { error: "Unauthorized" });
     if (req.method === "GET" && req.url === "/health") return send(200, { ok: true });
+    if (req.method === "GET" && req.url === "/health?memory=1")
+      return send(200, { ok: true, memory: await memory() });
     if (req.method !== "POST" || req.url !== "/render") return send(404, { error: "Not found" });
     if (busy) return send(429, { error: "Reader busy" });
     busy = true;

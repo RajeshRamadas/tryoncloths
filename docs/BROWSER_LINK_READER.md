@@ -86,4 +86,11 @@ containers and their network were removed. The first run failed closed because
 this kernel lacks IPv6 REJECT support; IPv6 DROP passed the same isolation test.
 No real-shop benchmark or live provider-generation quality check was performed.
 
-Use the [release benchmark CLI](RELEASE_VALIDATION.md) to record the required fixed 20-link comparison.
+Use the [release benchmark CLI](RELEASE_VALIDATION.md) to record the required fixed
+20-link comparison. An updated worker reports container memory before and after
+the run through its authenticated health endpoint. The lifetime peak includes
+Chromium child processes. Compose sets the worker limit and
+`TRYON_READER_MEMORY_LIMIT_BYTES` to the same value (512 MiB by default). When
+running the container outside Compose, set that variable to the container limit
+in bytes. The comparison still runs with unavailable counters, such as on
+rootless Docker without cgroup limits.

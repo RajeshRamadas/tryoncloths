@@ -30,8 +30,10 @@ test("benchmark validates every URL and duplicate before any network call", asyn
 });
 test("benchmark measures all twenty successes and failures without storing images or raw errors", async () => {
   let reads = 0,
-    waits = 0;
+    waits = 0,
+    memoryReads = 0;
   const report = await benchmarkLinks(manifest, {
+    memoryReader: async () => memoryReads++,
     wait: async (ms) => {
       assert.equal(ms, 2000);
       waits++;
@@ -45,6 +47,8 @@ test("benchmark measures all twenty successes and failures without storing image
   });
   assert.equal(reads, 20);
   assert.equal(waits, 19);
+  assert.equal(memoryReads, 0);
+  assert.equal(Object.hasOwn(report, "workerMemory"), false);
   assert.equal(report.benchmarkComplete, true);
   assert.equal(report.rolloutApproved, false);
   assert.equal(report.summary.static.passed, 18);
@@ -54,11 +58,17 @@ test("benchmark measures all twenty successes and failures without storing image
 });
 test("comparison reuses static responses and reports browser improvement separately", async () => {
   let reads = 0;
+  const snapshot = { currentBytes: 100, peakBytes: 300, limitBytes: 512 };
+  const snapshots = [];
   const times = [0, 2, 3, 10, 14, 16];
   const report = await benchmarkLinks(
     { version: 1, links: manifest.links.slice(0, 2) },
     {
       compare: true,
+      memoryReader: async () => {
+        snapshots.push(reads);
+        return reads === 0 ? snapshot : { ...snapshot, peakBytes: 400 };
+      },
       wait: async () => {},
       now: () => times.shift(),
       staticReader: async () => {
@@ -76,9 +86,31 @@ test("comparison reuses static responses and reports browser improvement separat
     },
   );
   assert.equal(reads, 2);
+  assert.deepEqual(snapshots, [0, 2]);
+  assert.deepEqual(report.workerMemory, {
+    before: snapshot,
+    after: { ...snapshot, peakBytes: 400 },
+  });
   assert.equal(report.summary.static.passed, 1);
   assert.equal(report.summary.withBrowser.passed, 2);
   assert.equal(report.summary.static.medianMs, 3);
   assert.equal(report.summary.withBrowser.medianMs, 4.5);
   assert.equal(report.benchmarkComplete, false);
+});
+
+test("unavailable worker memory does not prevent recording benchmark results", async () => {
+  const report = await benchmarkLinks(
+    { version: 1, links: manifest.links.slice(0, 1) },
+    {
+      compare: true,
+      memoryReader: async () => {
+        throw new Error("private worker configuration");
+      },
+      staticReader: async () => ({ images: [{}] }),
+      fallbackReader: async (_url, { staticReader }) => staticReader(),
+    },
+  );
+  assert.deepEqual(report.workerMemory, { before: null, after: null });
+  assert.equal(report.summary.withBrowser.passed, 1);
+  assert.ok(!JSON.stringify(report).includes("private worker configuration"));
 });
