@@ -488,6 +488,7 @@ test("persistent per-store locks prevent concurrent runs and connection changes;
       }),
     );
     const running = service.run(a, "shopify");
+    assert.equal(service.summary(a).connections[0].history[0].status, "running");
     await assert.rejects(service.run(a, "shopify"), { status: 409 });
     await assert.rejects(
       service.connect(a, "shopify", { shopDomain: "sample.myshopify.com", token: secret }),
@@ -515,6 +516,60 @@ test("persistent per-store locks prevent concurrent runs and connection changes;
     assert.deepEqual(
       store.db.prepare("SELECT lastAttemptAt,lastScheduledDay FROM catalogue_integrations").get(),
       last,
+    );
+  }));
+
+test("recent sync history separates manual and nightly outcomes and is bounded per store", async () =>
+  fixture(async ({ store, a, b, service, connect, request, cookies, setMode }) => {
+    await connect();
+    const report = await service.run(a, "shopify");
+    const scheduledDay = "2026-11-07";
+    setMode("bad-token");
+    await assert.rejects(service.run(a, "shopify", { scheduledDay }));
+    // A stale scheduler can reach a run after another coordinator claimed its day.
+    assert.equal(await service.run(a, "shopify", { scheduledDay }), undefined);
+
+    const token = randomBytes(16).toString("hex"),
+      now = Date.now();
+    store.db
+      .prepare(
+        "INSERT INTO catalogue_sync_runs(token,store,provider,trigger,startedAt,status) VALUES(?,?,'shopify','manual',?,'running')",
+      )
+      .run(token, a.id, now - 600001);
+    store.db.prepare("INSERT INTO catalogue_sync_locks VALUES(?,?,?)").run(a.id, token, now - 1);
+
+    const summary = await (
+      await request("/api/integrations", "GET", undefined, cookies.manager)
+    ).json();
+    const { history, lastError, report: lastReport } = summary.connections[0];
+    assert.deepEqual(
+      history.map(({ trigger, status }) => [trigger, status]),
+      [
+        ["manual", "interrupted"],
+        ["nightly", "failed"],
+        ["manual", "completed"],
+      ],
+    );
+    assert.equal(history[0].finishedAt, null);
+    assert.equal(history[1].report, null);
+    assert.ok(history[1].finishedAt >= history[1].startedAt);
+    assert.deepEqual(history[2].report, report);
+    assert.deepEqual(lastReport, report);
+    assert.match(lastError, /shop API rejected/);
+    assert.ok(!JSON.stringify(summary).includes(secret));
+    assert.ok(!JSON.stringify(summary).includes(token));
+    assert.deepEqual(service.summary(b).connections[0].history, []);
+    assert.deepEqual(summary.connections[1].history, []);
+
+    for (let i = 0; i < 9; i++) await assert.rejects(service.run(a, "shopify"));
+    const disconnected = service.disconnect(a, "shopify").connections[0];
+    assert.equal(disconnected.connected, false);
+    assert.equal(disconnected.history.length, 10);
+    assert.ok(disconnected.history.slice(0, 9).every(({ status }) => status === "failed"));
+    assert.equal(disconnected.history[9].status, "interrupted");
+    assert.equal(
+      store.db.prepare("SELECT count(*) AS total FROM catalogue_sync_runs").get().total,
+      10,
     );
   }));
 

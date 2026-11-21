@@ -3895,6 +3895,12 @@ dialog::backdrop {
   cursor: pointer;
   font-weight: 600;
 }
+.sync-history {
+  margin-block: 12px;
+}
+.sync-history li {
+  margin-block: 6px;
+}
 .catalogue-manager .consent {
   flex-direction: row;
   align-items: start;

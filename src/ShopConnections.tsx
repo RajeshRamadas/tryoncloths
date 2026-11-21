@@ -8,6 +8,13 @@ type SyncReport = {
   markedOut: number;
   needsTypeReview: number;
 };
+type SyncRun = {
+  trigger: "manual" | "nightly";
+  startedAt: number;
+  finishedAt: number | null;
+  status: "running" | "completed" | "failed" | "interrupted";
+  report: SyncReport | null;
+};
 type Connection = {
   provider: Provider;
   connected: boolean;
@@ -15,6 +22,7 @@ type Connection = {
   lastSyncAt?: number;
   lastError?: string;
   report?: SyncReport;
+  history?: SyncRun[];
 };
 type Summary = {
   available: boolean;
@@ -24,6 +32,14 @@ type Summary = {
   master: { store: string; name: string } | null;
   stores: { id: string; name: string }[];
 };
+const syncStatus = {
+  running: "Running",
+  completed: "Completed",
+  failed: "Failed",
+  interrupted: "Interrupted",
+};
+const formatSyncTime = (value: number) =>
+  new Date(value).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) + " IST";
 const label = (p: Provider) => (p === "shopify" ? "Shopify" : "WooCommerce");
 export default function ShopConnections({
   owner,
@@ -124,12 +140,7 @@ export default function ShopConnections({
         <article className="shop-connection" key={c.provider}>
           <h3>{label(c.provider)}</h3>
           <p>{c.connected ? `Connected: ${c.baseUrl}` : "Not connected"}</p>
-          {c.lastSyncAt && (
-            <p>
-              Last successful sync:{" "}
-              {new Date(c.lastSyncAt).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST
-            </p>
-          )}
+          {c.lastSyncAt && <p>Last successful sync: {formatSyncTime(c.lastSyncAt)}</p>}
           {c.lastError && <p role="alert">{c.lastError}</p>}
           {c.report && (
             <p>
@@ -137,6 +148,32 @@ export default function ShopConnections({
               unchanged · {c.report.markedOut} marked out · {c.report.needsTypeReview} need type
               review
             </p>
+          )}
+          {Boolean(c.history?.length) && (
+            <details className="sync-history">
+              <summary>Recent sync runs</summary>
+              <ul>
+                {c.history?.map((run, index) => (
+                  <li key={`${run.startedAt}-${index}`}>
+                    <time dateTime={new Date(run.startedAt).toISOString()}>
+                      {formatSyncTime(run.startedAt)}
+                    </time>
+                    {" · "}
+                    {run.trigger === "nightly" ? "Nightly" : "Manual"}
+                    {" · "}
+                    {syncStatus[run.status]}
+                    {run.report && (
+                      <span>
+                        {" · "}
+                        {run.report.created} created · {run.report.updated} updated ·{" "}
+                        {run.report.unchanged} unchanged · {run.report.markedOut} marked out ·{" "}
+                        {run.report.needsTypeReview} need type review
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
           {c.connected && (
             <>

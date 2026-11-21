@@ -2,7 +2,8 @@
 
 Web `0.18.0-alpha.1` adds **Shop connections** inside **Catalogue**. Owners connect
 or disconnect shops. Owners and managers can run **Sync now** and see the latest
-successful sync, counts and error. Staff can browse products and use confirmed
+successful sync, counts and error. **Recent sync runs** shows the last ten manual
+and nightly runs for each provider in the active store. Staff can browse products and use confirmed
 clothing types, but cannot manage connections. Sync downloads product data and
 photos; it does not generate images or spend AI credits.
 
@@ -125,6 +126,11 @@ different shop while old products are retained.
   Refresh the catalogue/status after an interrupted browser response before
   deciding to run another sync.
 
+- Sync history starts with runs after this update. Successful runs include product
+  counts. If a process stops before recording an outcome, its run shows as
+  **Interrupted** once the existing lease expires. History is kept when a shop
+  disconnects and contains only run status, timestamps, and counts.
+
 ## Chain shared master catalogue
 
 An owner on the **Chain** plan can select **Master catalogue store**. The selected
@@ -154,7 +160,7 @@ or customer data is shared across organisations.
 
 | Method and route | Role | Result |
 | --- | --- | --- |
-| `GET /api/integrations` | owner/manager | Active-store connection status, sync/error counts and master status; no credentials |
+| `GET /api/integrations` | owner/manager | Active-store connection status, recent sync runs and master status; no credentials |
 | `PUT /api/integrations/shopify` | owner | Test/save `{shopDomain, token}` |
 | `PUT /api/integrations/woo` | owner | Test/save `{siteUrl, key, secret, currency:"INR"}` |
 | `DELETE /api/integrations/:provider` | owner | Disconnect without deleting products |

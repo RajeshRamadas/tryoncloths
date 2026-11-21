@@ -133,13 +133,21 @@ async function connect(page) {
 test("mobile owner connects, syncs without credits, confirms clothing type, sees errors and shares a read-only Chain master", async ({
   page,
 }) =>
-  setup(page, async ({ store, owner, branch, setFail, ai }) => {
+  setup(page, async ({ store, owner, branch, service, setFail, ai }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await connect(page);
     await expect(page.getByLabel("Shopify read-only access token")).toHaveValue("");
     await page.getByRole("button", { name: "Sync Shopify now", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Summer piece", exact: true })).toBeVisible();
-    await expect(page.getByText(/1 created · 0 updated · 0 unchanged/)).toBeVisible();
+    await expect(
+      page.getByText(/1 created · 0 updated · 0 unchanged/).filter({ visible: true }),
+    ).toBeVisible();
+    const shopify = page.locator(".shop-connection").filter({
+      has: page.getByRole("heading", { name: "Shopify", exact: true }),
+    });
+    const history = shopify.locator(".sync-history");
+    await shopify.getByText("Recent sync runs", { exact: true }).click();
+    await expect(history.getByRole("listitem")).toHaveText(/Manual · Completed · 1 created/);
     await page.getByLabel("Clothing type for Summer piece", { exact: true }).selectOption("shirt");
     await page.getByRole("button", { name: "Confirm type for Summer piece", exact: true }).click();
     await expect(page.getByText("Clothing type confirmed.", { exact: true })).toBeVisible();
@@ -151,6 +159,12 @@ test("mobile owner connects, syncs without credits, confirms clothing type, sees
     setFail(true);
     await page.getByRole("button", { name: "Sync Shopify now", exact: true }).click();
     await expect(page.getByRole("alert").first()).toContainText("shop API rejected");
+    await expect(history.getByRole("listitem").first()).toHaveText(/Manual · Failed/);
+    setFail(false);
+    await service.runDue(Date.parse("2026-11-06T20:30:00Z"));
+    await page.reload();
+    await shopify.getByText("Recent sync runs", { exact: true }).click();
+    await expect(history.getByRole("listitem").first()).toHaveText(/Nightly · Completed/);
     expect(await page.locator("body").innerText()).not.toContain("do-not-echo-token");
     expect(store.garments.list(owner)).toHaveLength(1);
     expect(ai()).toBe(0);
