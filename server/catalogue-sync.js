@@ -15,6 +15,7 @@ import { requireRole } from "./tenancy.js";
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 const id = () => randomBytes(16).toString("hex");
 const providers = ["shopify", "woo"];
+const historyLimit = 10;
 const errorText =
   "Shop sync could not finish. Check the connection, product data and images. No catalogue changes were published.";
 export function installSyncSchema(db) {
@@ -24,6 +25,8 @@ export function installSyncSchema(db) {
  CREATE TABLE IF NOT EXISTS catalogue_connection_errors(store TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,provider TEXT NOT NULL,lastError TEXT NOT NULL,PRIMARY KEY(store,provider));
  CREATE TABLE IF NOT EXISTS catalogue_source_origins(store TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,provider TEXT NOT NULL,baseUrl TEXT NOT NULL,PRIMARY KEY(store,provider));
  CREATE TABLE IF NOT EXISTS catalogue_sync_locks(store TEXT PRIMARY KEY REFERENCES stores(id) ON DELETE CASCADE,token TEXT NOT NULL UNIQUE,expiresAt INTEGER NOT NULL);
+ CREATE TABLE IF NOT EXISTS catalogue_sync_runs(token TEXT PRIMARY KEY,store TEXT NOT NULL REFERENCES stores(id) ON DELETE CASCADE,provider TEXT NOT NULL CHECK(provider IN ('shopify','woo')),trigger TEXT NOT NULL CHECK(trigger IN ('manual','nightly')),startedAt INTEGER NOT NULL,finishedAt INTEGER,status TEXT NOT NULL CHECK(status IN ('running','completed','failed')),reportJson TEXT);
+ CREATE INDEX IF NOT EXISTS catalogue_sync_runs_store_provider ON catalogue_sync_runs(store,provider);
  CREATE TABLE IF NOT EXISTS catalogue_sync_staging(token TEXT NOT NULL REFERENCES catalogue_sync_locks(token) ON DELETE CASCADE,externalId TEXT NOT NULL,fieldsJson TEXT NOT NULL,image BLOB,thumbnail BLOB,imageHash TEXT,signature TEXT,colour TEXT,PRIMARY KEY(token,externalId));
  `),
   );
@@ -76,6 +79,14 @@ export class CatalogueSync {
         "SELECT provider,baseUrl,connectedAt,lastAttemptAt,lastSyncAt,lastError,reportJson FROM catalogue_integrations WHERE store=? ORDER BY provider",
       )
       .all(account.id);
+    const history = this.db.prepare(
+      `SELECT r.trigger,r.startedAt,r.finishedAt,
+       CASE WHEN r.status='running' AND l.token IS NULL THEN 'interrupted' ELSE r.status END AS status,
+       r.reportJson FROM catalogue_sync_runs r
+       LEFT JOIN catalogue_sync_locks l ON l.store=r.store AND l.token=r.token AND l.expiresAt>?
+       WHERE r.store=? AND r.provider=? ORDER BY r.rowid DESC LIMIT ?`,
+    );
+    const now = Date.now();
     return {
       available: this.enabled(),
       connections: providers.map((provider) => {
@@ -96,12 +107,18 @@ export class CatalogueSync {
               }
             : {}),
           lastError: error?.lastError || row?.lastError || null,
+          history: history
+            .all(now, account.id, provider, historyLimit)
+            .map(({ reportJson, ...run }) => ({
+              ...run,
+              report: reportJson ? JSON.parse(reportJson) : null,
+            })),
         };
       }),
       syncing: Boolean(
         this.db
           .prepare("SELECT 1 FROM catalogue_sync_locks WHERE store=? AND expiresAt>?")
-          .get(account.id, Date.now()),
+          .get(account.id, now),
       ),
       ...this.master(account),
     };
@@ -266,14 +283,16 @@ export class CatalogueSync {
         "Another catalogue sync is running on this server. Try again when it finishes.",
         409,
       );
-    const connection = this.db
-      .prepare("SELECT * FROM catalogue_integrations WHERE store=? AND provider=?")
-      .get(account.id, provider);
-    if (!connection) throw fail("Connect this shop first.", 409);
     const token = id(),
       now = Date.now(),
       deadline = now + this.deadlineMs;
-    transaction(this.db, () => {
+    const connection = transaction(this.db, () => {
+      const current = this.db
+        .prepare("SELECT * FROM catalogue_integrations WHERE store=? AND provider=?")
+        .get(account.id, provider);
+      if (!current) throw fail("Connect this shop first.", 409);
+      if (scheduledDay && current.lastScheduledDay && current.lastScheduledDay >= scheduledDay)
+        return null;
       this.db
         .prepare(
           "DELETE FROM catalogue_sync_staging WHERE token IN (SELECT token FROM catalogue_sync_locks WHERE expiresAt<=?)",
@@ -289,7 +308,21 @@ export class CatalogueSync {
           "UPDATE catalogue_integrations SET lastAttemptAt=?,lastScheduledDay=COALESCE(?,lastScheduledDay),lastError=NULL WHERE store=? AND provider=?",
         )
         .run(now, scheduledDay, account.id, provider);
+      this.db
+        .prepare(
+          "INSERT INTO catalogue_sync_runs(token,store,provider,trigger,startedAt,status) VALUES(?,?,?,?,?,'running')",
+        )
+        .run(token, account.id, provider, scheduledDay ? "nightly" : "manual", now);
+      this.db
+        .prepare(
+          `DELETE FROM catalogue_sync_runs WHERE rowid IN (
+           SELECT rowid FROM catalogue_sync_runs WHERE store=? AND provider=? ORDER BY rowid DESC LIMIT -1 OFFSET ?
+           )`,
+        )
+        .run(account.id, provider, historyLimit);
+      return current;
     });
+    if (!connection) return;
     this.running = true;
     try {
       let credentials;
@@ -498,11 +531,18 @@ export class CatalogueSync {
           )
           .run(Date.now(), account.id, provider, token);
         report.markedOut += removed.changes;
+        const finishedAt = Date.now(),
+          reportJson = JSON.stringify(report);
         this.db
           .prepare(
             "UPDATE catalogue_integrations SET lastSyncAt=?,lastError=NULL,reportJson=? WHERE store=? AND provider=?",
           )
-          .run(Date.now(), JSON.stringify(report), account.id, provider);
+          .run(finishedAt, reportJson, account.id, provider);
+        this.db
+          .prepare(
+            "UPDATE catalogue_sync_runs SET finishedAt=?,status='completed',reportJson=? WHERE token=?",
+          )
+          .run(finishedAt, reportJson, token);
         this.db
           .prepare("DELETE FROM catalogue_connection_errors WHERE store=? AND provider=?")
           .run(account.id, provider);
@@ -510,11 +550,17 @@ export class CatalogueSync {
       });
     } catch (e) {
       const message = e.status ? e.message : errorText;
-      this.db
-        .prepare(
-          "UPDATE catalogue_integrations SET lastError=? WHERE store=? AND provider=? AND revision=?",
-        )
-        .run(message, account.id, provider, connection.revision);
+      transaction(this.db, () => {
+        this.db
+          .prepare(
+            `UPDATE catalogue_integrations SET lastError=? WHERE store=? AND provider=? AND revision=?
+             AND EXISTS(SELECT 1 FROM catalogue_sync_locks WHERE store=? AND token=?)`,
+          )
+          .run(message, account.id, provider, connection.revision, account.id, token);
+        this.db
+          .prepare("UPDATE catalogue_sync_runs SET finishedAt=?,status='failed' WHERE token=?")
+          .run(Date.now(), token);
+      });
       throw fail(message, e.status || 502);
     } finally {
       this.running = false;
