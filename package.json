@@ -14,6 +14,7 @@
     "test:e2e": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "check:smtp": "node --env-file-if-exists=.env server/check-smtp.js",
     "check:shopper": "node --env-file-if-exists=.env server/check-shopper.js",
     "mobile:sync": "npm run android:sync",
     "android:open": "cap open android",

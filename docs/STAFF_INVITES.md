@@ -28,6 +28,12 @@ recipient. Public browser account mode works with account authentication for
 staff APIs. Without mail configuration, invitations fail with an actionable 503;
 no invitation token or fallback link is returned to the inviter or logged.
 
+Run `npm run check:smtp` on the configured server to verify the SMTP connection
+and authentication without sending a message. Inside the Lightsail container, run
+`node server/check-smtp.js` with the container's existing environment. A successful
+check does not verify sender acceptance or inbox delivery. Test those separately
+using an approved test mailbox before relying on invitations, invoices or reports.
+
 ## Staff workflow
 
 1. Sign in, select the store and open **Staff**.
