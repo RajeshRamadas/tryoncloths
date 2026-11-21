@@ -207,6 +207,53 @@ test("paid routes block zero credits before provider calls and require valid req
     assert.equal(store.billing.balance(a.org), 0);
   }));
 
+test("near-blank face and body photos are rejected before any paid work", () =>
+  fixture(async ({ store, a, request, calls }) => {
+    store.billing.grant(a.org, "ai", 2, "grant_admin", "two");
+    const input = await generationInput();
+    for (const [field, label, background, hint] of [
+      ["face", "Face photo", "#000000", "almost completely dark"],
+      ["body", "Full-body photo", "#ffffff", "almost completely white"],
+    ]) {
+      const photo = await sharp({ create: { width: 256, height: 400, channels: 3, background } })
+        .png()
+        .toBuffer();
+      const response = await request("/api/personalize", { ...input, [field]: data(photo) });
+      assert.equal(response.status, 400);
+      const result = await response.json();
+      assert.equal(result.code, "photo_unusable");
+      assert.ok(result.error.startsWith(label));
+      assert.ok(result.error.includes(hint));
+      assert.equal(calls(), 0);
+      assert.equal(store.billing.balance(a.org), 2);
+      assert.equal(
+        store.db
+          .prepare("SELECT count(*) AS total FROM ledger WHERE requestId=?")
+          .get(input.requestId).total,
+        0,
+      );
+    }
+
+    for (const dimensions of [
+      { width: 256, height: 400 }, // Advisory-only underexposure.
+      { width: 128, height: 2048 }, // The downsample is too narrow to assess.
+    ]) {
+      const photo = await sharp({
+        create: { ...dimensions, channels: 3, background: "#404040" },
+      })
+        .png()
+        .toBuffer();
+      const response = await request("/api/personalize", {
+        ...input,
+        requestId: randomUUID(),
+        body: data(photo),
+      });
+      assert.equal(response.status, 200);
+    }
+    assert.equal(calls(), 2);
+    assert.equal(store.billing.balance(a.org), 0);
+  }));
+
 test("successful avatar and try-on consume one credit, record staff, reject replays and isolate orgs", () =>
   fixture(async ({ store, a, b, image, request, calls }) => {
     store.billing.grant(a.org, "ai", 3, "grant_admin", "three");

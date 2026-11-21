@@ -22,14 +22,14 @@ A smooth complexion or blank background can trigger low-detail warnings. Busy, s
 
 ## Privacy, cost and resilience
 
-- Photo sampling and comparisons happen **only in the browser**. The canvas and raw pixel array are cleared after inspection; the checker returns only issue codes and actionable messages.
+- Upload hints are computed in the browser. The canvas and raw pixel array are cleared after inspection. The checker returns only issue codes and actionable messages.
 - No input photos, pixel histograms or scores are stored by this feature. No extra provider request or AI credit is used.
 - The existing explicit generation call, provider consent, tenant boundaries, privacy controls and fail-closed server verification remain unchanged.
-- The new near-blank block applies to the staff studio's *client-side* request flow. Direct APIs retain their separate server validation rules; this is not a server-side fraud barrier.
+- The staff `/api/personalize` endpoint applies the same near-blank rule to the normalized photos it already receives for generation. It returns `400 photo_unusable` with a retake message before reserving credits or calling the provider. The server keeps the downsampled pixels only for the check and lets advisory or unavailable checks pass. Browser and server sampling can differ because the server checks the normalized JPEG.
 - No automatic retake, photo alteration, or paid retry is attempted.
 
 ## Verification
 
-Synthetic tests cover near-black/white blockers, dim/bright exposure, soft and low-resolution warnings, clear textured photos, malformed input and minimal private output. Readiness tests ensure only severe blockers prevent a paid request. A browser test uploads a black face image, verifies the live retake warning and confirms that clicking Generate produces a local error with **zero** outgoing `/api/personalize` calls. Regular generation fixtures continue to work.
+Synthetic tests cover near-black/white blockers, dim/bright exposure, soft and low-resolution warnings, clear textured photos, malformed input and minimal private output. Readiness tests ensure only severe blockers prevent a paid request. A browser test uploads a black face image, verifies the live retake warning and confirms that clicking Generate produces a local error with **zero** outgoing `/api/personalize` calls. An authenticated API test verifies that dark face and white full-body uploads create neither provider calls nor ledger entries. It also checks that an advisory-only photo can reach the provider.
 
 Evaluate the thresholds on consented real customer photos before widening hard rejection. Automated checks do not measure perceptual avatar fidelity.

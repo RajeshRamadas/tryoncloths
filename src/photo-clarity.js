@@ -130,6 +130,8 @@ export function assessPhotoClarity(input = {}) {
       message: "Fine detail may be soft or hidden. Check that the face and body edges are sharp.",
     });
   }
+  luminance.fill(0);
+  histogram.fill(0);
   return {
     status: issues.length ? "blocked" : warnings.length ? "review" : "clear",
     issues,

@@ -87,6 +87,49 @@ are saved. The photo is not uploaded for this. The browser test
 `tests/browser/body-build.spec.js` checks the templates still measure within 6 cm of the
 table.
 
+## Pilot girth calibration
+
+For each consenting pilot customer, record the body library used, the three
+photo estimates shown in the studio using the current factors, and the matching
+tape measurements taken using the same measurement protocol. Use one row per
+customer and assign each customer to exactly one of `calibration` or `validation`
+before fitting. Keep both groups representative of the intended customers and
+capture conditions. Use this JSON format (synthetic example):
+
+```json
+[
+  {
+    "body": "male",
+    "split": "calibration",
+    "photoCm": { "chest": 95, "waist": 80, "hip": 100 },
+    "tapeCm": { "chest": 99, "waist": 82, "hip": 103 }
+  },
+  {
+    "body": "male",
+    "split": "validation",
+    "photoCm": { "chest": 98, "waist": 85, "hip": 102 },
+    "tapeCm": { "chest": 101, "waist": 88, "hip": 105 }
+  }
+]
+```
+
+Run `npm run evaluate:body-girth -- /path/to/pilot-samples.json`. Keep the input
+outside the repository and omit names, identifiers, and photos. The tool assumes
+all photo estimates were computed using the same girth factors as the checkout
+running the report. Each supplied library (`male` or `female`) needs rows in both
+groups. The report contains aggregate results only. The split is supplied by the
+operator, so the tool cannot verify customer independence.
+
+For each measurement, the tool multiplies the current girth factor by the
+median tape-to-photo ratio in the calibration group. The report compares the
+current and candidate factors on the validation group, using mean absolute
+error and signed mean error (positive means estimates run large). Candidate
+errors approximate the original calculation because the recorded photo
+estimates are already rounded. The report includes sample counts and does not
+apply changes. Use the held-out error and sample counts to decide whether any
+candidate is worth further evaluation. A candidate can perform worse than the
+current factor.
+
 ## Limits
 
 - The thresholds are first estimates from synthetic photos. Calibrate them on consented
