@@ -43,7 +43,7 @@ remains, grouped by what they need.
 - [ ] Confirm `TRYON_TRUST_PROXY_HOPS=1` behind Caddy so per-IP limits work.
 - [ ] Female body library quality review (pilot, disabled by default).
 - [ ] Razorpay test mode, then live mode; verify subscriptions, packs, webhooks and GST invoices.
-- [ ] SMTP delivery for staff invitations, invoices and monthly analytics emails.
+- [ ] SMTP delivery for staff invitations, invoices and monthly analytics emails. Use the [SMTP delivery check](STAFF_INVITES.md#server-setup) before exercising each workflow on the pilot.
 - [ ] Shopify and WooCommerce: live shop connectivity and nightly sync after deployment ([catalogue sync](CATALOGUE_SYNC.md)).
 - [ ] WhatsApp Business: Meta template approval, live delivery, STOP opt-out and charges on a real account ([WhatsApp](WHATSAPP.md)).
 - [ ] Calibrate the photo checks on pilot customers: the pose-hint thresholds, the build suggestion and the photo girth factors (`GIRTH_FACTORS`), against taped chest, waist and hip measurements.
