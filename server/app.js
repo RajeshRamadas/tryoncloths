@@ -29,7 +29,11 @@ import {
   DEFAULT_TEMPLATE_TONE,
 } from "../src/profiles.js";
 import { ProviderError, providerErrorDetails } from "./provider-errors.js";
-import { screenAvatarIdentity } from "./avatar-identity.js";
+import {
+  parseAvatarIdentityMax,
+  parseAvatarIdentityMode,
+  screenAvatarIdentity,
+} from "./avatar-identity.js";
 import { openaiPersonalize } from "./openai.js";
 import { geminiPersonalize, GEMINI_REFERENCE_VERSION } from "./gemini.js";
 import { providerConfig } from "./provider-config.js";
@@ -108,6 +112,9 @@ export function createApp({
   quality = process.env.TRYON_OPENAI_QUALITY || "low",
   personalize = provider === "gemini" ? geminiPersonalize : openaiPersonalize,
   avatarIdentityEnabled = process.env.TRYON_AVATAR_IDENTITY_CHECK === "1",
+  avatarIdentityMode = process.env.TRYON_AVATAR_IDENTITY_MODE ||
+    (avatarIdentityEnabled ? "enforce" : "off"),
+  avatarIdentityMax = process.env.TRYON_AVATAR_IDENTITY_MAX ?? "0.45",
   avatarIdentityScreen = screenAvatarIdentity,
   production = false,
   rateLimit = true,
@@ -134,6 +141,9 @@ export function createApp({
   tryOn = geminiTryOn,
   productLink = readProductLinkWithFallback,
 } = {}) {
+  const identityMode = parseAvatarIdentityMode(avatarIdentityMode);
+  const identityMax = parseAvatarIdentityMax(avatarIdentityMax);
+  const identityScreenEnabled = identityMode !== "off";
   const providerLabel = providerConfig(provider).label;
   if (!["auto", "protected", "public"].includes(accessMode))
     throw new Error("TRYON_ACCESS_MODE must be auto, protected, or public.");
@@ -313,7 +323,8 @@ export function createApp({
         jewelleryEnabled && accountStore && provider === "gemini" && apiKey,
       ),
       personalizationAvailable: Boolean(apiKey),
-      avatarIdentityScreenAvailable: Boolean(avatarIdentityEnabled && apiKey),
+      avatarIdentityScreenAvailable: Boolean(identityScreenEnabled && apiKey),
+      avatarIdentityMode: identityMode,
       provider,
       generationRevision: provider === "gemini" ? GEMINI_REFERENCE_VERSION : "template-first-v1",
       personalizationContract: "customer-avatar-v4",
@@ -394,7 +405,7 @@ export function createApp({
       return res.status(400).json({
         error: `Customer consent to send both photos and measurements to ${providerLabel} is required. Refresh or update the app before generating.`,
       });
-    if (avatarIdentityEnabled && req.body.identityCheckConsent !== true)
+    if (identityScreenEnabled && req.body.identityCheckConsent !== true)
       return res.status(400).json({
         code: "identity_consent_required",
         error:
@@ -464,6 +475,7 @@ export function createApp({
       } catch (e) {
         return res.status(e.status || 500).json({ error: e.message });
       }
+      let identityReview;
       const image = await meter(
         req,
         { billing: accountStore?.billing, account: owner, action: "avatar" },
@@ -478,9 +490,25 @@ export function createApp({
             model,
             quality,
           });
-          if (avatarIdentityEnabled) {
-            const accepted = await avatarIdentityScreen({ face, image: result });
-            if (accepted !== true) throw new ProviderError("face_check");
+          if (identityScreenEnabled) {
+            try {
+              const accepted = await avatarIdentityScreen({
+                face,
+                image: result,
+                maxDistance: identityMax,
+              });
+              if (accepted !== true) throw new ProviderError("face_check");
+              identityReview = { status: "screen_pass" };
+            } catch (error) {
+              if (identityMode === "enforce") throw error;
+              identityReview = {
+                status: "needs_review",
+                reason:
+                  error instanceof ProviderError && error.code === "identity_mismatch"
+                    ? "possible_mismatch"
+                    : "check_unavailable",
+              };
+            }
           }
           return result;
         },
@@ -498,6 +526,7 @@ export function createApp({
         templateTone,
         kind: "customer-avatar",
         needsReview: true,
+        ...(identityReview ? { identityReview } : {}),
         reviewChecks: ["face", "standard-body", "skin-tone"],
         ...(accountStore
           ? {

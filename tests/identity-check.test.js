@@ -42,6 +42,15 @@ test("identity comparison uses all 128 coordinates, accepts the threshold and re
   assert.equal(await identical("a", "b"), 0);
 });
 
+test("the avatar comparison can retain full precision at the acceptance threshold", async () => {
+  const check = createIdentityChecker({
+    describe: async (input) => vector(input),
+    roundDistance: false,
+  });
+  const distance = await check(0, 0.456, 0.457);
+  assert.ok(distance > 0.455 && distance <= 0.457);
+});
+
 test("a mismatch is rejected before rounding and both descriptors are cleared without entering errors or logs", async () => {
   const a = vector(0),
     b = vector(0.454);

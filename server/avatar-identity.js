@@ -1,7 +1,22 @@
 import sharp from "sharp";
 import { detectFaces } from "./face-check.js";
-import { requireSameIdentity } from "./identity-check.js";
+import { createIdentityChecker } from "./identity-check.js";
 import { ProviderError } from "./provider-errors.js";
+
+const compareAvatarFaces = createIdentityChecker({ roundDistance: false });
+
+export function parseAvatarIdentityMode(mode) {
+  if (!["off", "review", "enforce"].includes(mode))
+    throw new Error("TRYON_AVATAR_IDENTITY_MODE must be off, review or enforce.");
+  return mode;
+}
+
+export function parseAvatarIdentityMax(value) {
+  const max = Number(value);
+  if (!Number.isFinite(max) || max <= 0 || max > 1)
+    throw new Error("TRYON_AVATAR_IDENTITY_MAX must be a number greater than zero and at most 1.");
+  return max;
+}
 
 /**
  * Return a face-centered crop, enlarged enough to retain hair and jaw.
@@ -43,7 +58,7 @@ export async function screenAvatarIdentity({
   face,
   image,
   locate = detectFaces,
-  compare = requireSameIdentity,
+  compare = compareAvatarFaces,
   maxDistance = Number(process.env.TRYON_AVATAR_IDENTITY_MAX || 0.45),
 } = {}) {
   if (!Number.isFinite(maxDistance) || maxDistance <= 0 || maxDistance > 1)
@@ -79,6 +94,7 @@ export async function screenAvatarIdentity({
       .toBuffer();
     candidate = await sharp(output, { limitInputPixels: 25_000_000, animated: false })
       .extract(region)
+      .resize({ width: 512, height: 512, fit: "inside" })
       .png()
       .toBuffer();
     const distance = await compare(reference, candidate, maxDistance);

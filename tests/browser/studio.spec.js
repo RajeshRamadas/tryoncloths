@@ -108,6 +108,7 @@ test("personalization is explicit, generates only on request, and approval reset
     route.fulfill({
       json: {
         personalizationAvailable: true,
+        avatarIdentityScreenAvailable: true,
         personalizationContract: "customer-avatar-v4",
         provider: "gemini",
       },
@@ -119,6 +120,7 @@ test("personalization is explicit, generates only on request, and approval reset
     const input = route.request().postDataJSON();
     expect(input.body).toMatch(/^data:image\/jpeg;base64,/);
     expect(input.face).toMatch(/^data:image\/jpeg;base64,/);
+    expect(input.identityCheckConsent).toBe(true);
     expect(input.consentScope).toBe("face-and-body");
     expect(input.consentProvider).toBe("gemini");
     expect(input.measurements).toEqual({ heightCm: 175, weightKg: 72 });
@@ -130,6 +132,7 @@ test("personalization is explicit, generates only on request, and approval reset
         kind: "customer-avatar",
         provider: "gemini",
         profileId: input.profileId,
+        identityReview: { status: "needs_review", reason: "possible_mismatch" },
       },
     });
   });
@@ -156,12 +159,23 @@ test("personalization is explicit, generates only on request, and approval reset
       name: /The customer agrees to send their face photo/,
     })
     .check();
-  await page.getByRole("button", { name: "Generate customer avatar", exact: true }).click();
+  const generate = page.getByRole("button", { name: "Generate customer avatar", exact: true });
+  await expect(generate).toBeDisabled();
+  await page.getByRole("checkbox", { name: /temporary facial-feature comparison/ }).check();
+  await generate.click();
   await expect(
     page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
   ).toBeVisible();
   expect(calls).toBe(1);
   await page.getByRole("button", { name: "Review avatar" }).click();
+  await expect(
+    page.getByText(/Automated face screening flagged a possible identity mismatch/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", {
+      name: "The customer approves the face, body and skin tone of this avatar.",
+    }),
+  ).toBeDisabled();
   const comparison = page.getByRole("region", { name: "Compare reference photos with avatar" });
   await expect(comparison.getByAltText("Original customer face reference")).toBeVisible();
   await expect(comparison.getByAltText("Generated avatar face close-up")).toBeVisible();
@@ -185,5 +199,8 @@ test("personalization is explicit, generates only on request, and approval reset
     page.getByText("Generate again with the current photos and selected body."),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Download avatar" })).toBeDisabled();
+  await expect(
+    page.getByText(/Automated face screening flagged a possible identity mismatch/),
+  ).toHaveCount(0);
   expect(calls).toBe(1);
 });

@@ -49,8 +49,8 @@ test("comparison sees only temporary PNG face crops and clears them after use", 
       assert.equal(inputInfo.format, "png");
       assert.equal(inputInfo.width, 300);
       assert.equal(cropInfo.format, "png");
-      assert.equal(cropInfo.width, 197);
-      assert.equal(cropInfo.height, 243);
+      assert.equal(cropInfo.width, 415);
+      assert.equal(cropInfo.height, 512);
       return 0.29;
     },
   });

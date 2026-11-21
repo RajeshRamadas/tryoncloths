@@ -79,7 +79,7 @@ export async function descriptor(pngBuffer) {
 
 // Dependency injection keeps distance/error/cleanup tests independent of model
 // scores. This factory is server-internal and is never exposed as an endpoint.
-export function createIdentityChecker({ describe = descriptor } = {}) {
+export function createIdentityChecker({ describe = descriptor, roundDistance = true } = {}) {
   return async function requireSameIdentity(
     reference,
     candidate,
@@ -99,7 +99,7 @@ export function createIdentityChecker({ describe = descriptor } = {}) {
       const distance = Math.sqrt(squared);
       // Compare the unrounded value so reporting precision cannot accept a miss.
       if (distance > max) throw new ProviderError("identity_mismatch");
-      return Math.round(distance * 100) / 100;
+      return roundDistance ? Math.round(distance * 100) / 100 : distance;
     } catch (error) {
       if (
         error instanceof ProviderError &&
