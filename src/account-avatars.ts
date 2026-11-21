@@ -56,6 +56,7 @@ export async function saveAccountAvatar(
   image: string,
   details: AvatarDetails,
   generationReceipt?: string | null,
+  regenerateFromId?: string,
 ) {
   return json("/api/avatars", {
     method: "POST",
@@ -65,6 +66,7 @@ export async function saveAccountAvatar(
       image,
       storageConsent: true,
       ...(generationReceipt ? { generationReceipt } : {}),
+      ...(regenerateFromId ? { regenerateFromId } : {}),
     }),
   });
 }

@@ -437,6 +437,15 @@ export function createApp({
       });
     try {
       accountStore?.customers.requireOptional(owner, req.body.customerId);
+      if (req.body.regenerateFromId != null) {
+        if (!accountStore)
+          return res.status(400).json({ error: "Sign in to regenerate a saved master avatar." });
+        accountStore.requireRegenerationSource(
+          owner,
+          req.body.regenerateFromId,
+          req.body.customerId,
+        );
+      }
     } catch (e) {
       return res.status(e.status || 500).json({ error: e.message });
     }
@@ -510,6 +519,12 @@ export function createApp({
     try {
       try {
         accountStore?.customers.requireOptional(owner, req.body.customerId);
+        if (req.body.regenerateFromId != null)
+          accountStore.requireRegenerationSource(
+            owner,
+            req.body.regenerateFromId,
+            req.body.customerId,
+          );
       } catch (e) {
         return res.status(e.status || 500).json({ error: e.message });
       }
@@ -582,6 +597,10 @@ export function createApp({
                   templateTone,
                   heightCm: req.body.measurements.heightCm,
                   weightKg: req.body.measurements.weightKg,
+                  ...(req.body.regenerateFromId != null && {
+                    regenerateFromId: req.body.regenerateFromId,
+                    requestId: req.body.requestId,
+                  }),
                 },
               ),
               accountSaved: false,

@@ -35,6 +35,8 @@ export type SavedAvatar = AvatarDetails & {
   thumbnail: string;
   savedAt: number;
   looksCount?: number;
+  masterId?: string;
+  masterVersion?: number;
   approvalStatus?: "draft" | "approved";
   approvedVersion?: number | null;
   latestVersion?: number | null;

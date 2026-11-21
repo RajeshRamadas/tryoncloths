@@ -55,6 +55,23 @@ Authenticated `GET /api/avatars/:id/versions` returns up to 20 records from the
 active store in descending version order. Pass the returned `nextBefore` value
 as `?before=` to load earlier records.
 
+## Regenerate a master avatar
+
+In **Saved avatars**, choose **Regenerate as new version** on an approved account
+avatar. The studio carries over the customer, body frame, measurements and template
+tone. Add fresh photos and complete the usual generation consent, customer review
+and storage consent. Saving creates a new numbered master version with its own
+image, approval history and saved looks. Open **View master versions** to find the
+related images. Earlier approved images remain available with their original looks.
+
+Master versions identify different PNGs. Approval revisions track reviews of a
+particular saved PNG. The `regenerateFromId` field identifies the approved source
+on both `/api/personalize` and `/api/avatars`. The generation receipt binds that
+source to the delivered result. The save checks that the source is still approved
+and belongs to the same store and customer. Retrying the same save returns the
+existing version, and a different generation with identical bytes prompts staff
+to use the existing saved version.
+
 ## Compatibility and limitations
 
 - Applies to **saved store-account avatars** and the account-backed garment/jewellery/portrait/looks routes. It does not change the offline IndexedDB library, sample-avatar browsing, or raw image operations that have no account avatar identity.
