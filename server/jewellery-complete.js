@@ -12,7 +12,7 @@ const escape = (s) =>
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c],
   );
 function sources(store, account, input) {
-  store.requireAvatar(account, input.avatarId);
+  store.requireApprovedAvatar(account, input.avatarId);
   const find = (id) =>
     typeof id === "string" &&
     id.length <= 200 &&

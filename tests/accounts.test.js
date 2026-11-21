@@ -7,6 +7,7 @@ import path from "node:path";
 import { AccountStore } from "./helpers/pilot-accounts.js";
 import { createApp, standardAvatar } from "../server/app.js";
 import { customerPhotos } from "./helpers/customer-photos.js";
+import { approveTestAvatar, saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 
 async function fixture(run) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "forme-accounts-"));
@@ -257,6 +258,7 @@ test("saved looks remain owned by their avatar account and persist across reopen
     );
     const image = await avatar();
     const { id: avatarId } = await (await request("/api/avatars", "POST", image, ca)).json();
+    approveTestAvatar(store, store.user(ca.split("=")[1]), avatarId);
     const input = {
       avatarId,
       image: image.image,
@@ -322,7 +324,7 @@ test("look validation, capacity, account cascade and old database upgrade", asyn
     );
     const owner = store.user(c.split("=")[1]);
     const image = await avatar();
-    const { id: avatarId } = await store.save(owner, image);
+    const { id: avatarId } = await saveApprovedTestAvatar(store, owner, image);
     // Simulate a pre-feature database: avatar data must survive adding the table.
     store.db.exec("DROP TABLE looks");
     const upgraded = new AccountStore(directory);

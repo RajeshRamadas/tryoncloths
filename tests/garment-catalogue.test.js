@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -64,7 +65,7 @@ async function fixture(run, options = {}) {
     cb = await login("b@example.com");
   const a = store.user(ca.split("=")[1]),
     b = store.user(cb.split("=")[1]);
-  const { id: avatarId } = await store.save(a, {
+  const { id: avatarId } = await saveApprovedTestAvatar(store, a, {
     image: avatar,
     name: "Customer",
     profileId: "regular",

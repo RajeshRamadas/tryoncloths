@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
@@ -33,7 +34,7 @@ async function fixture(page, run, { enabled = true, generate, overlayOnly = fals
       name: "Jewellery store",
       password: "test-password-long",
     });
-  const avatar = await store.save(account, {
+  const avatar = await saveApprovedTestAvatar(store, account, {
     image: "data:image/png;base64," + (await standardAvatar("regular")).toString("base64"),
     name: "Customer A",
     profileId: "regular",

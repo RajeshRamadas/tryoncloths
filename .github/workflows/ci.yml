@@ -49,3 +49,27 @@ jobs:
             playwright-report/
             test-results/
           if-no-files-found: ignore
+
+  lightsail:
+    name: Lightsail image startup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f deploy/lightsail/Dockerfile -t forme:ci .
+      - name: Wait for the production health check
+        shell: bash
+        run: |
+          container=$(docker run -d --env TRYON_MOBILE_TOKEN=ci-health-check-token-only forme:ci)
+          trap 'docker rm -f "$container" >/dev/null' EXIT
+          for attempt in {1..30}; do
+            state=$(docker inspect --format '{{.State.Status}} {{.State.Health.Status}}' "$container")
+            case "$state" in
+              "running healthy") exit 0 ;;
+              "running starting") sleep 2 ;;
+              *) break ;;
+            esac
+          done
+          echo "Lightsail image failed to become healthy: $state" >&2
+          docker logs "$container" >&2
+          exit 1

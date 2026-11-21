@@ -34,6 +34,8 @@ import {
 } from "./profiles";
 import { downloadAvatar, libraryForIndex, readPhoto } from "./images";
 import BodyPhotoHints from "./BodyPhotoHints";
+import PhotoClarityHints from "./PhotoClarityHints";
+import { checkPhotoClarity } from "./photo-clarity-browser";
 import { analyseBodyPhoto, type BodyPhotoAnalysis } from "./body-pose";
 import { suggestBuild } from "./body-build";
 import { assessAvatarReadiness } from "./avatar-readiness.js";
@@ -46,14 +48,21 @@ import AvatarQualityReview from "./AvatarQualityReview";
 import { canApproveAvatar } from "./avatar-quality-gates.js";
 import SavedAvatars from "./SavedAvatars";
 import StoreAccount, { type AccountState } from "./StoreAccount";
-import { accountAvatarImage, listAccountAvatars, saveAccountAvatar } from "./account-avatars";
+import {
+  accountAvatarImage,
+  listAccountAvatars,
+  saveAccountAvatar,
+  approveAccountAvatar,
+  revokeAccountAvatarApproval,
+  type AvatarReviewAttestation,
+} from "./account-avatars";
 import { avatarDataUrl, saveAvatar, type AvatarDetails, type OpenedLook } from "./saved-avatars";
 import { App as NativeApp } from "@capacitor/app";
 
 type PhotoKind = "face" | "body";
 type ServiceState = "checking" | "available" | "unavailable" | "unauthorized";
 type IdentityReview = {
-  status: "not_checked" | "screen_pass" | "needs_review";
+  status: "screen_pass" | "needs_review";
   reason?: "possible_mismatch" | "check_unavailable";
 };
 
@@ -236,6 +245,8 @@ export default function App() {
   const [body, setBody] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
   const [aiConsent, setAiConsent] = useState(false);
+  const [identityScreenAvailable, setIdentityScreenAvailable] = useState(false);
+  const [identityCheckConsent, setIdentityCheckConsent] = useState(false);
   const [service, setService] = useState<ServiceState>("checking");
   const [provider, setProvider] = useState<"gemini" | "openai" | null>(null);
   const [femaleEnabled, setFemaleEnabled] = useState(false);
@@ -248,6 +259,9 @@ export default function App() {
   const [exporting, setExporting] = useState(false);
   const [approved, setApproved] = useState(false);
   const [qualityReviewPassed, setQualityReviewPassed] = useState(false);
+  const [reviewAttestation, setReviewAttestation] = useState<AvatarReviewAttestation | null>(null);
+  const [approvingAccount, setApprovingAccount] = useState(false);
+  const reviewRevokedIdRef = useRef<string | null>(null);
   const [exportFooter, setExportFooter] = useState<boolean | undefined>(undefined);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -294,6 +308,8 @@ export default function App() {
     setTryOnAvailable(false);
     setJewelleryAvailable(false);
     setAiConsent(false);
+    setIdentityScreenAvailable(false);
+    setIdentityCheckConsent(false);
     requestApi("/api/health")
       .then(async (r) => {
         if (r.status === 401) {
@@ -312,6 +328,7 @@ export default function App() {
           data.personalizationContract === "customer-avatar-v4" &&
           ["gemini", "openai"].includes(data.provider);
         setProvider(supported ? data.provider : null);
+        setIdentityScreenAvailable(supported && data.avatarIdentityScreenAvailable === true);
         setTryOnAvailable(
           data.tryOnAvailable === true && data.tryOnContract === "garment-tryon-v1",
         );
@@ -384,6 +401,7 @@ export default function App() {
     setAccountState(next);
   }
   function invalidate() {
+    reviewRevokedIdRef.current = null;
     setAvatarId(null);
     setOpenedLook(undefined);
     setSaveConsent(false);
@@ -393,7 +411,9 @@ export default function App() {
     setIdentityReview(null);
     setApproved(false);
     setQualityReviewPassed(false);
+    setReviewAttestation(null);
     setAiConsent(false);
+    setIdentityCheckConsent(false);
     setError("");
   }
   function updateMeasurement(field: "height" | "weight", value: string) {
@@ -449,6 +469,7 @@ export default function App() {
     if (step === 3 && next !== 3 && personalized) {
       // Leaving the review panel unmounts the scorecard; a new review is required on return.
       setQualityReviewPassed(false);
+      setReviewAttestation(null);
       setApproved(false);
       setSaveConsent(false);
     }
@@ -470,6 +491,7 @@ export default function App() {
     setBody(null);
     setConsent(false);
     setAiConsent(false);
+    setIdentityCheckConsent(false);
     setHeight("175");
     setWeight("72");
     setSelected("regular");
@@ -489,6 +511,7 @@ export default function App() {
       !body ||
       !aiConsent ||
       !consent ||
+      (identityScreenAvailable && !identityCheckConsent) ||
       !provider ||
       service !== "available" ||
       !bodyGenerationAllowed ||
@@ -519,7 +542,29 @@ export default function App() {
     setError("");
     setApproved(false);
     setQualityReviewPassed(false);
+    setReviewAttestation(null);
     try {
+      // A small, local scan must finish before any billable provider request.
+      // Near-blank photos block; uncertain sharpness and lighting are advisory.
+      const [faceClarity, bodyClarity] = await Promise.all([
+        checkPhotoClarity(face),
+        checkPhotoClarity(body),
+      ]);
+      const photoReadiness = assessAvatarReadiness({
+        consent: consent && aiConsent,
+        facePhoto: face,
+        bodyPhoto: body,
+        profileId: selected,
+        templateTone,
+        heightCm: Number(height),
+        bodyAnalysis: analysis ? { status: "valid" } : null,
+        faceClarity,
+        bodyClarity,
+      });
+      if (!photoReadiness.ready) {
+        setError(photoReadiness.issues.map((issue) => issue.message).join(" "));
+        return;
+      }
       const response = await requestApi(
         "/api/personalize",
         {
@@ -535,6 +580,7 @@ export default function App() {
             consent: true,
             consentScope: "face-and-body",
             consentProvider: provider,
+            ...(identityScreenAvailable ? { identityCheckConsent: true } : {}),
             ...(accountState.enabled ? { customerId: customer?.id } : {}),
           }),
         },
@@ -647,14 +693,50 @@ export default function App() {
       setError((e as Error).message);
     }
   }
+  async function changeCustomerApproval(next: boolean) {
+    if (!next) {
+      setApproved(false);
+      setSaveConsent(false);
+      setOutfitOpen(false);
+      if (personalized && accountState.account && avatarId) {
+        setApprovingAccount(true);
+        try {
+          await revokeAccountAvatarApproval(avatarId);
+        } catch (cause) {
+          reviewRevokedIdRef.current = null;
+          setError((cause as Error).message);
+        } finally {
+          setApprovingAccount(false);
+        }
+      }
+      return;
+    }
+    if (!personalized || !accountState.account || !avatarId) {
+      setApproved(true);
+      return;
+    }
+    if (!reviewAttestation || !qualityReviewPassed) return;
+    setApprovingAccount(true);
+    setError("");
+    try {
+      await approveAccountAvatar(avatarId, reviewAttestation);
+      reviewRevokedIdRef.current = null;
+      setApproved(true);
+    } catch (cause) {
+      setApproved(false);
+      setError((cause as Error).message);
+    } finally {
+      setApprovingAccount(false);
+    }
+  }
+
   async function keepAvatar() {
     if (!personalized || !avatarApproved || !saveConsent || exporting || needsCustomerGeneration)
       return;
     setExporting(true);
     setError("");
     try {
-      const save = accountState.enabled ? saveAccountAvatar : saveAvatar;
-      const saved = await save(personalized, {
+      const details: AvatarDetails = {
         customerId: customer?.id,
         name: avatarName,
         profileId: selected,
@@ -662,7 +744,18 @@ export default function App() {
         heightCm: Number(height),
         weightKg: Number(weight),
         source: avatarSource,
-      });
+      };
+      let saved: { id?: string } | undefined;
+      if (accountState.enabled) {
+        if (!reviewAttestation)
+          throw new Error("Complete the avatar quality review before saving.");
+        saved = await saveAccountAvatar(personalized, details);
+        if (!saved?.id) throw new Error("The account did not return a saved avatar ID.");
+        // Saving always creates a draft. Only server-validated review promotes it.
+        await approveAccountAvatar(saved.id, reviewAttestation);
+      } else {
+        await saveAvatar(personalized, details);
+      }
       if (saved?.id) setAvatarId(saved.id);
       // Stores that make a portrait with every avatar go straight on to it, reusing the face
       // photo still in this session. Staff confirm consent before any credit is used.
@@ -919,6 +1012,8 @@ export default function App() {
                           }}
                         />
                       </div>
+                      {face && <PhotoClarityHints photo={face} kind="face" />}
+                      {body && <PhotoClarityHints photo={body} kind="body" />}
                       {body && <BodyPhotoHints photo={body} />}
                       <p className="photo-hint">
                         <Camera size={13} /> Clear light. Natural pose. No filters.
@@ -1109,6 +1204,24 @@ export default function App() {
                           </span>
                         </label>
                       )}
+                      {service === "available" &&
+                        bodyGenerationAllowed &&
+                        identityScreenAvailable && (
+                          <label className="consent">
+                            <input
+                              type="checkbox"
+                              checked={identityCheckConsent}
+                              disabled={generating || exporting}
+                              onChange={(e) => setIdentityCheckConsent(e.target.checked)}
+                            />
+                            <span>
+                              The customer also consents to a temporary facial-feature comparison on
+                              this studio server to check the generated face against their reference
+                              photo. No facial descriptors are saved or sent to another provider.
+                              Customer review is still required.
+                            </span>
+                          </label>
+                        )}
                       <button
                         className="button primary full-width"
                         disabled={
@@ -1117,6 +1230,7 @@ export default function App() {
                           !face ||
                           !body ||
                           !aiConsent ||
+                          (identityScreenAvailable && !identityCheckConsent) ||
                           (accountState.enabled && !accountState.account) ||
                           generating
                         }
@@ -1243,13 +1357,28 @@ export default function App() {
                       {personalized && (
                         <AvatarQualityReview
                           key={session}
-                          disabled={exporting || generating}
-                          onCompleteChange={(passed) => {
+                          image={personalized}
+                          profileId={selected}
+                          facePhoto={face}
+                          bodyPhoto={body}
+                          disabled={exporting || generating || approvingAccount}
+                          onCompleteChange={(passed, review) => {
                             setQualityReviewPassed(passed);
+                            setReviewAttestation(passed ? (review ?? null) : null);
                             if (!passed) {
                               setApproved(false);
                               setSaveConsent(false);
                               setOutfitOpen(false);
+                              // Revoking review of an account-saved avatar also revokes its
+                              // previously approved server record, not only the UI checkbox.
+                              if (
+                                accountState.account &&
+                                avatarId &&
+                                reviewRevokedIdRef.current !== avatarId
+                              ) {
+                                reviewRevokedIdRef.current = avatarId;
+                                void changeCustomerApproval(false);
+                              }
                             }
                           }}
                         />
@@ -1258,8 +1387,8 @@ export default function App() {
                         <input
                           type="checkbox"
                           checked={avatarApproved}
-                          disabled={!approvalReady || exporting}
-                          onChange={(e) => setApproved(e.target.checked)}
+                          disabled={!approvalReady || exporting || approvingAccount}
+                          onChange={(e) => void changeCustomerApproval(e.target.checked)}
                         />
                         <span>
                           {personalized

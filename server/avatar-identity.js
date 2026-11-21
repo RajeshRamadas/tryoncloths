@@ -1,133 +1,112 @@
 import sharp from "sharp";
 import { detectFaces } from "./face-check.js";
-import { requireSameIdentity } from "./identity-check.js";
+import { createIdentityChecker } from "./identity-check.js";
 import { ProviderError } from "./provider-errors.js";
 
-export const AVATAR_IDENTITY_MODES = Object.freeze(["off", "review", "enforce"]);
+const compareAvatarFaces = createIdentityChecker({ roundDistance: false });
 
-/**
- * Invalid settings must never silently disable an explicitly requested check.
- */
 export function parseAvatarIdentityMode(mode) {
-  if (!AVATAR_IDENTITY_MODES.includes(mode)) {
+  if (!["off", "review", "enforce"].includes(mode))
     throw new Error("TRYON_AVATAR_IDENTITY_MODE must be off, review or enforce.");
-  }
   return mode;
 }
 
 export function parseAvatarIdentityMax(value) {
-  const max = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(max) || max <= 0 || max > 1) {
+  const max = Number(value);
+  if (!Number.isFinite(max) || max <= 0 || max > 1)
     throw new Error("TRYON_AVATAR_IDENTITY_MAX must be a number greater than zero and at most 1.");
-  }
   return max;
 }
 
-function outputBytes(image) {
-  const match =
-    typeof image === "string"
-      ? /^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/.exec(image)
-      : null;
-  if (!match || match[1].length > 28_000_000) throw new ProviderError("invalid_image");
-  const bytes = Buffer.from(match[1], "base64");
-  if (!bytes.length || bytes.length > 20 * 1024 * 1024) {
-    throw new ProviderError("invalid_image");
+/**
+ * Return a face-centered crop, enlarged enough to retain hair and jaw.
+ * The matcher works on the face rather than the tiny head in a full-body PNG.
+ */
+export function avatarFaceCrop(box, { width, height }) {
+  if (
+    !box ||
+    ![box.x, box.y, box.width, box.height, width, height].every(Number.isFinite) ||
+    box.width < 30 ||
+    box.height < 30 ||
+    width < 128 ||
+    height < 128 ||
+    box.x < 0 ||
+    box.y < 0 ||
+    box.x + box.width > width + 1 ||
+    box.y + box.height > height + 1
+  ) {
+    throw new ProviderError("missing_face");
   }
-  return bytes;
+  const left = Math.max(0, Math.floor(box.x - box.width * 0.65));
+  const top = Math.max(0, Math.floor(box.y - box.height * 0.55));
+  const right = Math.min(width, Math.ceil(box.x + box.width * 1.65));
+  const bottom = Math.min(height, Math.ceil(box.y + box.height * 1.65));
+  if (right - left < 48 || bottom - top < 48) throw new ProviderError("missing_face");
+  return { left, top, width: right - left, height: bottom - top };
 }
 
 /**
- * Crop a detected face to a square portrait before recognition. The generated
- * full-body image often contains too few face pixels for direct comparison.
- * The caller clears the returned temporary image buffer after checking.
+ * Optional, server-only biometric screening of a generated avatar.
+ *
+ * The generated image is never returned from this function, and neither images
+ * nor face descriptors are persisted or logged. This is not identity proof;
+ * staff/customer quality review remains mandatory.
+ *
+ * Dependency injection permits safe tests without loading recognition models.
  */
-export async function avatarFaceCrop(bytes, { detect = detectFaces, upper = false } = {}) {
-  if (!Buffer.isBuffer(bytes) || !bytes.length || bytes.length > 20 * 1024 * 1024) {
+export async function screenAvatarIdentity({
+  face,
+  image,
+  locate = detectFaces,
+  compare = compareAvatarFaces,
+  maxDistance = Number(process.env.TRYON_AVATAR_IDENTITY_MAX || 0.45),
+} = {}) {
+  if (!Number.isFinite(maxDistance) || maxDistance <= 0 || maxDistance > 1)
     throw new ProviderError("face_check");
-  }
+  if (!Buffer.isBuffer(face) || face.length === 0 || face.length > 5 * 1024 * 1024)
+    throw new ProviderError("face_input");
+  const matched =
+    typeof image === "string" &&
+    image.length < 28_000_000 &&
+    /^data:image\/png;base64,([A-Za-z0-9+/]+={0,2})$/.exec(image);
+  if (!matched) throw new ProviderError("invalid_image");
+  const output = Buffer.from(matched[1], "base64");
+  let reference;
+  let candidate;
   try {
-    const { width, height } = await sharp(bytes, {
-      animated: false,
-      limitInputPixels: 25_000_000,
-    }).metadata();
-    if (!width || !height || width < 64 || height < 64) {
-      throw new ProviderError("face_check");
+    if (!output.length || output.length > 20 * 1024 * 1024)
+      throw new ProviderError("invalid_image");
+    const metadata = await sharp(output, { limitInputPixels: 25_000_000, animated: false })
+      .metadata()
+      .catch(() => {
+        throw new ProviderError("invalid_image");
+      });
+    if (metadata.format !== "png" || metadata.pages > 1 || !metadata.width || !metadata.height) {
+      throw new ProviderError("invalid_image");
     }
-    const faces = await detect(bytes, { upper });
-    if (!Array.isArray(faces) || faces.length !== 1) {
-      throw new ProviderError("missing_face");
-    }
-    const box = faces[0]?.box;
-    if (
-      !box ||
-      ![box.x, box.y, box.width, box.height].every(Number.isFinite) ||
-      box.width < 24 ||
-      box.height < 24 ||
-      box.x < 0 ||
-      box.y < 0 ||
-      box.x + box.width > width + 1 ||
-      box.y + box.height > height + 1
-    ) {
-      throw new ProviderError("face_check");
-    }
-    const size = Math.min(
-      width,
-      height,
-      Math.max(64, Math.ceil(Math.max(box.width, box.height) * 2.1)),
-    );
-    const left = Math.max(0, Math.min(width - size, Math.round(box.x + box.width / 2 - size / 2)));
-    const top = Math.max(0, Math.min(height - size, Math.round(box.y + box.height / 2 - size / 2)));
-    return await sharp(bytes, { animated: false, limitInputPixels: 25_000_000 })
-      .extract({ left, top, width: size, height: size })
-      .resize(512, 512)
+    const faces = await locate(output, { upper: true });
+    if (!Array.isArray(faces) || faces.length !== 1) throw new ProviderError("missing_face");
+    const region = avatarFaceCrop(faces[0].box, metadata);
+    // prepare only the identity areas; the original full-body output is unchanged.
+    reference = await sharp(face, { limitInputPixels: 25_000_000, animated: false })
+      .rotate()
       .png()
       .toBuffer();
+    candidate = await sharp(output, { limitInputPixels: 25_000_000, animated: false })
+      .extract(region)
+      .resize({ width: 512, height: 512, fit: "inside" })
+      .png()
+      .toBuffer();
+    const distance = await compare(reference, candidate, maxDistance);
+    if (!Number.isFinite(distance) || distance < 0 || distance > maxDistance)
+      throw new ProviderError("face_check");
+    return true;
   } catch (error) {
     if (error instanceof ProviderError) throw error;
     throw new ProviderError("face_check");
-  }
-}
-
-/**
- * An advisory screen, not a verified claim of identity. Review mode never
- * exposes face vectors, scores, or the source images. Enforce mode rejects
- * uncertain results; it must only be enabled after representative calibration.
- */
-export async function screenAvatarIdentity({
-  reference,
-  output,
-  mode = "off",
-  detect = detectFaces,
-  compare = requireSameIdentity,
-  maxDistance = 0.45,
-} = {}) {
-  parseAvatarIdentityMode(mode);
-  parseAvatarIdentityMax(maxDistance);
-  if (mode === "off") return { status: "not_checked" };
-
-  let sourceCrop;
-  let resultCrop;
-  let resultBytes;
-  try {
-    sourceCrop = await avatarFaceCrop(reference, { detect });
-    resultBytes = outputBytes(output);
-    resultCrop = await avatarFaceCrop(resultBytes, { detect, upper: true });
-    await compare(sourceCrop, resultCrop, maxDistance);
-    return { status: "screen_pass" };
-  } catch (error) {
-    const code =
-      error instanceof ProviderError &&
-      ["missing_face", "identity_mismatch", "face_check", "invalid_image"].includes(error.code)
-        ? error.code
-        : "face_check";
-    if (mode === "enforce") throw new ProviderError(code);
-    return {
-      status: "needs_review",
-      reason: code === "identity_mismatch" ? "possible_mismatch" : "check_unavailable",
-    };
   } finally {
-    if (sourceCrop) sourceCrop.fill(0);
-    if (resultCrop) resultCrop.fill(0);
-    if (resultBytes) resultBytes.fill(0);
+    reference?.fill(0);
+    candidate?.fill(0);
+    output.fill(0);
   }
 }

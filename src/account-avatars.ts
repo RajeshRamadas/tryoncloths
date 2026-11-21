@@ -7,6 +7,24 @@ async function json(path: string, init?: RequestInit) {
   if (!response.ok) throw new Error(data.error || "Account request failed.");
   return data;
 }
+export type AvatarReviewAttestation = {
+  scores: Record<string, number>;
+  customerConsent: boolean;
+  reviewerConfirmed: boolean;
+};
+
+export async function approveAccountAvatar(id: string, review: AvatarReviewAttestation) {
+  return json(`/api/avatars/${encodeURIComponent(id)}/approval`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...review, customerApproved: true }),
+  });
+}
+
+export async function revokeAccountAvatarApproval(id: string) {
+  return json(`/api/avatars/${encodeURIComponent(id)}/approval`, { method: "DELETE" });
+}
+
 export async function listAccountAvatars(): Promise<SavedAvatar[]> {
   const data = await json("/api/avatars");
   return data.avatars.map((a: SavedAvatar) => ({

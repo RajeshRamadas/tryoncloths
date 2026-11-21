@@ -24,6 +24,7 @@ import { ShareStore, installShareRoutes } from "./sharing.js";
 import { CustomerStore, installCustomerRoutes } from "./customers.js";
 import { installAdminSchema, claimTrial, trialKeys } from "./commercial-admin.js";
 import { DatabaseSync } from "node:sqlite";
+import { AVATAR_REVIEW_POLICY_VERSION, validateAvatarApproval } from "./avatar-approval.js";
 import { mkdirSync, chmodSync } from "node:fs";
 import path from "node:path";
 import { randomBytes, createHash, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
@@ -112,6 +113,17 @@ export class AccountStore {
         .some((c) => c.name === "template_tone")
     )
       this.db.exec("ALTER TABLE avatars ADD COLUMN template_tone TEXT NOT NULL DEFAULT 'medium'");
+    // Older avatars remain reviewable, but default to a draft instead of an implicit pass.
+    const avatarColumns = this.db
+      .prepare("PRAGMA table_info(avatars)")
+      .all()
+      .map((c) => c.name);
+    if (!avatarColumns.includes("approved_at"))
+      this.db.exec("ALTER TABLE avatars ADD COLUMN approved_at INTEGER");
+    if (!avatarColumns.includes("approved_by"))
+      this.db.exec("ALTER TABLE avatars ADD COLUMN approved_by TEXT");
+    if (!avatarColumns.includes("review_policy"))
+      this.db.exec("ALTER TABLE avatars ADD COLUMN review_policy INTEGER NOT NULL DEFAULT 0");
     transaction(this.db, () => {
       const columns = this.db
         .prepare("PRAGMA table_info(looks)")
@@ -358,7 +370,7 @@ export class AccountStore {
       throw error("Your account holds up to 100 avatars. Delete one before adding another.", 409);
     this.db
       .prepare(
-        `INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type,template_tone,customer) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET name=excluded.name, profileId=excluded.profileId,heightCm=excluded.heightCm,weightKg=excluded.weightKg,source=excluded.source,savedAt=excluded.savedAt,body_type=excluded.body_type,template_tone=excluded.template_tone`,
+        `INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type,template_tone,customer) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET name=excluded.name, profileId=excluded.profileId,heightCm=excluded.heightCm,weightKg=excluded.weightKg,source=excluded.source,savedAt=excluded.savedAt,body_type=excluded.body_type,template_tone=excluded.template_tone,approved_at=NULL,approved_by=NULL,review_policy=0`,
       )
       .run(
         id,
@@ -375,12 +387,43 @@ export class AccountStore {
         templateTone,
         input.customerId ?? null,
       );
-    return { id, savedAt };
+    this.views?.invalidate(account.id, id);
+    return { id, savedAt, approvalStatus: "draft" };
+  }
+  approveAvatar(account, id, review) {
+    if (!validateAvatarApproval(review))
+      throw error("Complete all six quality checks and obtain explicit customer approval.", 400);
+    const approvedAt = Date.now();
+    const changed = this.db
+      .prepare(
+        "UPDATE avatars SET approved_at=?,approved_by=?,review_policy=? WHERE account=? AND id=?",
+      )
+      .run(approvedAt, account.user.id, AVATAR_REVIEW_POLICY_VERSION, account.id, id);
+    if (!changed.changes) throw error("Avatar not found.", 404);
+    return { id, approvalStatus: "approved", approvedAt };
+  }
+  revokeAvatarApproval(account, id) {
+    const changed = this.db
+      .prepare(
+        "UPDATE avatars SET approved_at=NULL,approved_by=NULL,review_policy=0 WHERE account=? AND id=?",
+      )
+      .run(account.id, id);
+    if (!changed.changes) throw error("Avatar not found.", 404);
+    this.views?.invalidate(account.id, id);
+    return { id, approvalStatus: "draft" };
+  }
+  requireApprovedAvatar(account, id) {
+    this.requireAvatar(account, id);
+    const row = this.db
+      .prepare("SELECT approved_at,review_policy FROM avatars WHERE account=? AND id=?")
+      .get(account.id, id);
+    if (!row.approved_at || row.review_policy !== AVATAR_REVIEW_POLICY_VERSION)
+      throw error("This avatar needs customer and quality review before it can be reused.", 409);
   }
   list(account) {
     return this.db
       .prepare(
-        "SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC",
+        "SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,CASE WHEN approved_at IS NOT NULL AND review_policy=1 THEN 'approved' ELSE 'draft' END AS approvalStatus,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC",
       )
       .all(account.id)
       .map((row) => ({
@@ -402,11 +445,11 @@ export class AccountStore {
       input.garments.some((x) => typeof x !== "string" || !x.trim() || x.length > 120)
     )
       throw error("Use a look name and up to 10 garment labels of at most 120 characters.");
-    this.requireAvatar(account, input.avatarId);
+    this.requireApprovedAvatar(account, input.avatarId);
     validateLookTracking(this, account, input);
     const { image, thumbnail } = await savedImage(input.image, view);
-    // Recheck after decoding: the avatar may have been deleted meanwhile.
-    this.requireAvatar(account, input.avatarId);
+    // Recheck after decoding: the avatar may have been revoked or deleted meanwhile.
+    this.requireApprovedAvatar(account, input.avatarId);
     return transaction(this.db, () => {
       guard?.();
       validateLookTracking(this, account, input);
@@ -724,6 +767,20 @@ export function installAccountRoutes(
         throw error("Confirm customer agreement before saving to the store account.");
       res.json(await store.save(req.account, req.body));
     }),
+  );
+  app.post(
+    "/api/avatars/:id/approval",
+    sameOrigin,
+    requireUser,
+    requireRole("owner", "manager", "staff"),
+    wrap((req, res) => res.json(store.approveAvatar(req.account, req.params.id, req.body))),
+  );
+  app.delete(
+    "/api/avatars/:id/approval",
+    sameOrigin,
+    requireUser,
+    requireRole("owner", "manager", "staff"),
+    wrap((req, res) => res.json(store.revokeAvatarApproval(req.account, req.params.id))),
   );
   app.delete(
     "/api/avatars/:id",

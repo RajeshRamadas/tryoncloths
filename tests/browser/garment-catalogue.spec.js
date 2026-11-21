@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { useProductSource, useSampleSource } from "../helpers/studio-navigation.js";
 import { test, expect } from "@playwright/test";
@@ -21,7 +22,7 @@ async function fixture(page, work) {
     password: "long-test-password-123",
   });
   const avatar = `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;
-  await store.save(owner, {
+  await saveApprovedTestAvatar(store, owner, {
     image: avatar,
     name: "Customer One",
     profileId: "regular",

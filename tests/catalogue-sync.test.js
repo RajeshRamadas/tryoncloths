@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -373,7 +374,7 @@ test("unmapped types block try-on until confirmed, confirmed types survive sync,
     assert.deepEqual(item.sizes, ["M", "L"]);
     assert.ok(calls.some((c) => JSON.parse(c.options.body || "{}").query?.includes("product(id:")));
     const image = `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`,
-      avatar = await store.save(a, {
+      avatar = await saveApprovedTestAvatar(store, a, {
         image,
         name: "Avatar",
         profileId: "regular",
@@ -549,7 +550,7 @@ test("Chain master products are visible read-only, mirrored only on use, scoped 
     assert.equal((await store.garments.matches(branch, { image: source })).exact[0].id, shared.id);
     const png = await standardAvatar("regular"),
       avatarImage = `data:image/png;base64,${png.toString("base64")}`,
-      avatar = await store.save(branch, {
+      avatar = await saveApprovedTestAvatar(store, branch, {
         image: avatarImage,
         name: "Branch customer",
         profileId: "regular",
@@ -615,7 +616,7 @@ test("disconnect preserves identities, removal preserves adaptations, and name/i
       item = items[0];
     const png = await standardAvatar("regular"),
       image = `data:image/png;base64,${png.toString("base64")}`,
-      avatar = await store.save(a, {
+      avatar = await saveApprovedTestAvatar(store, a, {
         image,
         name: "Avatar",
         profileId: "regular",

@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
@@ -423,7 +424,7 @@ test("clothing generation rejects jewellery IDs before provider calls or credit 
   fixture(async ({ store, a, request, input, calls }) => {
     const item = (await store.garments.save(a, input, enabled)).garment,
       image = dataUrl(await standardAvatar("regular"));
-    const avatar = await store.save(a, {
+    const avatar = await saveApprovedTestAvatar(store, a, {
         image,
         name: "Customer",
         profileId: "regular",

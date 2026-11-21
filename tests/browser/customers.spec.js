@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -191,7 +192,7 @@ test("finding a returning customer lists their saved avatars and opens one witho
   setup(page, async ({ store, owner, calls }) => {
     await createCustomer(page);
     const customer = store.customers.list(owner)[0];
-    await store.save(owner, {
+    await saveApprovedTestAvatar(store, owner, {
       image: `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`,
       customerId: customer.id,
       name: "Asha festive",
@@ -214,7 +215,7 @@ test("finding a returning customer lists their saved avatars and opens one witho
 
 test("a link with a saved avatar id reopens it for try-on after sign-in", async ({ page }) =>
   setup(page, async ({ store, owner, calls }) => {
-    const saved = await store.save(owner, {
+    const saved = await saveApprovedTestAvatar(store, owner, {
       image: `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`,
       name: "Linked avatar",
       profileId: "regular",

@@ -240,7 +240,6 @@ export default function CatalogueManager() {
   }
   return (
     <main className="billing-page catalogue-manager">
-      <a href="/">Back to Forme</a>
       <h1>Store catalogue</h1>
       {jewelleryEnabled && (
         <p>

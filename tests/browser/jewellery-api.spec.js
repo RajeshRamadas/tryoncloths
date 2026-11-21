@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
@@ -16,7 +17,7 @@ test("signed-in mobile browser approves hands, calls the guarded jewellery API, 
     name: "Jewellery API store",
     password: "test-password-long",
   });
-  const avatar = await store.save(account, {
+  const avatar = await saveApprovedTestAvatar(store, account, {
     image: "data:image/png;base64," + (await standardAvatar("regular")).toString("base64"),
     name: "Customer API",
     profileId: "regular",

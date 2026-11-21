@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -13,6 +14,10 @@ test("web store accounts automatically save generated avatars and reopen them in
   browser,
   page,
 }) => {
+  // This end-to-end flow spans two browsers, an isolated store database, image processing,
+  // avatar approval, outfit saving, and reloads. Keep its own CI budget instead of
+  // relying on Playwright's 30-second default for short tests.
+  test.setTimeout(90_000);
   const directory = await mkdtemp(path.join(os.tmpdir(), "forme-account-browser-"));
   const store = new AccountStore(directory);
   let generations = 0;
@@ -168,7 +173,7 @@ test("staff can switch member stores and the previous customer's preview is clea
   });
   store.db.prepare("INSERT INTO memberships VALUES(?,?,'manager')").run(owner.user.id, branch.id);
   const image = `data:image/png;base64,${(await standardAvatar("regular")).toString("base64")}`;
-  await store.save(owner, {
+  await saveApprovedTestAvatar(store, owner, {
     image,
     name: "Alpha customer",
     profileId: "regular",

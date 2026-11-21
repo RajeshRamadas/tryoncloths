@@ -281,8 +281,7 @@ export default function JewelleryCatalogue() {
   return (
     <main className="billing-page jewellery-catalogue">
       <nav>
-        <a href="/">Back to Forme</a> · <a href="/catalogue">Clothing catalogue</a> ·{" "}
-        <a href="/jewellery">Jewellery studio</a>
+        <a href="/catalogue">Clothing catalogue</a> · <a href="/jewellery">Jewellery studio</a>
       </nav>
       <h1>Jewellery catalogue</h1>
       <p>

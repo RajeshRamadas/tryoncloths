@@ -212,7 +212,6 @@ export default function Analytics() {
   );
   return (
     <main className="billing-page analytics-page">
-      <a href="/">Back to Forme</a>
       <h1>Store analytics</h1>
       <p>Recorded fitting activity and purchase marks for your stores. All dates use India time.</p>
       {error && (

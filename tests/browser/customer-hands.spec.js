@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
@@ -14,7 +15,7 @@ async function setup(page, run, { generate, enabled = true, key = "test" } = {})
       email: "hands@example.test",
       password: "test-password-long",
     }),
-    avatar = await store.save(owner, {
+    avatar = await saveApprovedTestAvatar(store, owner, {
       image: "data:image/png;base64," + (await standardAvatar("regular")).toString("base64"),
       name: "Customer",
       profileId: "regular",

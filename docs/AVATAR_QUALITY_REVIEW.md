@@ -5,7 +5,7 @@ This adds a **human-reviewed approval gate** for the reusable full-body customer
 ## Review workflow
 
 1. Upload consented face and full-body photographs, choose a body profile and generate an avatar.
-2. On the review step, compare the avatar with the customer or consented source photos. Reopened and imported images can be assessed with the customer when original photos are no longer available.
+2. On the review step, use the [side-by-side reference comparison](AVATAR_REFERENCE_COMPARISON.md) to inspect the original face and full-body photos alongside the generated result, including a magnified face view. Reopened and imported images show when original photos are unavailable; compare with the customer or separately consented references.
 3. Score six criteria from 1 to 5: face/hair likeness, whole-body skin-tone consistency, body proportions, neck/collar blend, hands/feet anatomy and full-body framing.
 4. Each score must be **4 or 5**. A missing score, low score, lack of customer permission or lack of reviewer confirmation blocks the **Confirm quality review** button. Do not guess when a criterion cannot be checked.
 5. After confirming the quality review, the separate customer-approval checkbox becomes available. Only then can the user download, explicitly save locally, try clothes or proceed to jewellery from this screen.
@@ -23,7 +23,7 @@ is not proof of likeness and never replaces the six scores or customer approval.
 - These are human scores, not calibrated similarity, anatomical or garment-fit measurements. No score may be interpreted as a guarantee of fidelity.
 - The scores and review confirmation are session-only. Reopening a saved personalized avatar requires another review, because the original photos may not be available and the image could be shown to a different customer.
 - The review UI does **not** change provider data retention, add biometric storage or transmit input photos. The review checklist itself is not saved.
-- This is a **client-side approval gate**. It does not establish authorization for direct API calls or retroactively delete older account-saved avatars; server-side draft/approved lifecycle enforcement remains a separate requirement.
+- Store-account avatars additionally have a [server-enforced draft/approved lifecycle](AVATAR_SERVER_APPROVAL.md). The server validates the human review attestation before account-backed reuse; legacy saved avatars require re-review. The local-only IndexedDB library continues to use its existing in-browser gate.
 - Live identity and visual quality validation still needs consented, representative images and manual review. CI tests validate workflow rules, not perceptual accuracy.
 
 ## Verification

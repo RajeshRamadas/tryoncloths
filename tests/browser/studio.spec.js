@@ -108,6 +108,7 @@ test("personalization is explicit, generates only on request, and approval reset
     route.fulfill({
       json: {
         personalizationAvailable: true,
+        avatarIdentityScreenAvailable: true,
         personalizationContract: "customer-avatar-v4",
         provider: "gemini",
       },
@@ -119,6 +120,7 @@ test("personalization is explicit, generates only on request, and approval reset
     const input = route.request().postDataJSON();
     expect(input.body).toMatch(/^data:image\/jpeg;base64,/);
     expect(input.face).toMatch(/^data:image\/jpeg;base64,/);
+    expect(input.identityCheckConsent).toBe(true);
     expect(input.consentScope).toBe("face-and-body");
     expect(input.consentProvider).toBe("gemini");
     expect(input.measurements).toEqual({ heightCm: 175, weightKg: 72 });
@@ -157,7 +159,10 @@ test("personalization is explicit, generates only on request, and approval reset
       name: /The customer agrees to send their face photo/,
     })
     .check();
-  await page.getByRole("button", { name: "Generate customer avatar", exact: true }).click();
+  const generate = page.getByRole("button", { name: "Generate customer avatar", exact: true });
+  await expect(generate).toBeDisabled();
+  await page.getByRole("checkbox", { name: /temporary facial-feature comparison/ }).check();
+  await generate.click();
   await expect(
     page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
   ).toBeVisible();
@@ -171,6 +176,22 @@ test("personalization is explicit, generates only on request, and approval reset
       name: "The customer approves the face, body and skin tone of this avatar.",
     }),
   ).toBeDisabled();
+  const comparison = page.getByRole("region", { name: "Compare reference photos with avatar" });
+  await expect(comparison.getByAltText("Original customer face reference")).toBeVisible();
+  await expect(comparison.getByAltText("Generated avatar face close-up")).toBeVisible();
+  const zoom = comparison.getByRole("slider", { name: /Generated face zoom/ });
+  await expect(zoom).toHaveValue("2");
+  await zoom.press("ArrowRight");
+  await expect(zoom).toHaveValue("2.25");
+  await comparison.getByRole("button", { name: "Full-body comparison" }).click();
+  await expect(comparison.getByAltText("Original customer full-body reference")).toBeVisible();
+  await expect(comparison.getByAltText("Generated avatar full-body comparison")).toBeVisible();
+  await comparison.getByRole("button", { name: "Face comparison" }).click();
+  await expect(comparison.getByAltText("Original customer face reference")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Check framing and body proportions" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check skin-tone consistency" })).toBeVisible();
   await approvePersonalizedAvatar(page);
   await page.getByRole("button", { name: "Change frame", exact: true }).click();
   await page.getByRole("button", { name: /Select Slim profile/ }).click();
@@ -178,5 +199,8 @@ test("personalization is explicit, generates only on request, and approval reset
     page.getByText("Generate again with the current photos and selected body."),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Download avatar" })).toBeDisabled();
+  await expect(
+    page.getByText(/Automated face screening flagged a possible identity mismatch/),
+  ).toHaveCount(0);
   expect(calls).toBe(1);
 });

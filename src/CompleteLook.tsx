@@ -264,7 +264,6 @@ export default function CompleteLook() {
   return (
     <main className="billing-page complete-look">
       <nav>
-        <a href="/">Back to Forme</a>
         <a href={"/jewellery?avatar=" + encodeURIComponent(avatar)}>Jewellery studio</a>
       </nav>
       <span className="eyebrow">THE WHOLE LOOK</span>

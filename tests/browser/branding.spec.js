@@ -1,3 +1,4 @@
+import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { openStoreTools } from "../helpers/studio-navigation.js";
 import { test, expect } from "@playwright/test";
@@ -19,7 +20,7 @@ async function setup(page, run) {
     });
   const png = await standardAvatar("regular"),
     image = `data:image/png;base64,${png.toString("base64")}`,
-    avatar = await store.save(owner, {
+    avatar = await saveApprovedTestAvatar(store, owner, {
       image,
       name: "Customer avatar",
       profileId: "regular",
