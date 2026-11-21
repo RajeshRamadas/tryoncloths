@@ -10,7 +10,7 @@ import { customerPhotos } from "../helpers/customer-photos.js";
 
 // Exercise the actual account routes/database, forwarding the dev browser's API
 // requests to an isolated backend. Provider output alone is stubbed.
-test("web store accounts automatically save generated avatars and reopen them in another browser", async ({
+test("store accounts save reviewed avatars and reopen them with generation details", async ({
   browser,
   page,
 }) => {
@@ -23,6 +23,8 @@ test("web store accounts automatically save generated avatars and reopen them in
   let generations = 0;
   const app = createApp({
     accountStore: store,
+    provider: "gemini",
+    model: "gemini-2.5-flash-image",
     apiKey: "test",
     accessMode: "public",
     rateLimit: false,
@@ -106,6 +108,9 @@ test("web store accounts automatically save generated avatars and reopen them in
       second.getByRole("button", { name: "Use Customer Anil", exact: true }),
     ).toBeVisible();
     await second.setViewportSize({ width: 390, height: 844 });
+    await expect(
+      second.getByText("Generated with gemini-2.5-flash-image · customer-neck-v6"),
+    ).toBeVisible();
     await second.screenshot({ path: "test-results/account-library-mobile.png" });
     expect(await second.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,

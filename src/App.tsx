@@ -262,6 +262,7 @@ export default function App() {
   const [avatarProfileSelection, setAvatarProfileSelection] = useState<ProfileSelection | null>(
     null,
   );
+  const generationReceipt = useRef<string | null>(null);
   const [face, setFace] = useState<string | null>(null);
   // Jewellery portrait for a just-saved avatar: open for, and approved for, which avatar id.
   const [portraitFor, setPortraitFor] = useState<string | null>(null);
@@ -427,6 +428,7 @@ export default function App() {
   }
   function invalidate() {
     reviewRevokedIdRef.current = null;
+    generationReceipt.current = null;
     setAvatarId(null);
     setOpenedLook(undefined);
     setSaveConsent(false);
@@ -565,6 +567,7 @@ export default function App() {
       return;
     }
     setGenerating(true);
+    generationReceipt.current = null;
     setRestoredAvatar(false);
     setAvatarSource("generated");
     setSaveConsent(false);
@@ -638,6 +641,8 @@ export default function App() {
           "The studio returned an unsupported result. Update the studio and try again.",
         );
       setPersonalized(data.image);
+      generationReceipt.current =
+        typeof data.generationReceipt === "string" ? data.generationReceipt : null;
       setIdentityReview(
         ["screen_pass", "needs_review"].includes(data.identityReview?.status)
           ? data.identityReview
@@ -789,7 +794,7 @@ export default function App() {
       if (accountState.enabled) {
         if (!reviewAttestation)
           throw new Error("Complete the avatar quality review before saving.");
-        saved = await saveAccountAvatar(personalized, details);
+        saved = await saveAccountAvatar(personalized, details, generationReceipt.current);
         if (!saved?.id) throw new Error("The account did not return a saved avatar ID.");
         // Saving always creates a draft. Only server-validated review promotes it.
         await approveAccountAvatar(saved.id, reviewAttestation);

@@ -23,6 +23,21 @@ The database stores only an approval timestamp, the authenticated approving staf
 
 This records an **authenticated human review declaration**, not independent proof of likeness, identity, consent validity, anatomical accuracy or garment fit. The UI still requires customer confirmation, and false declarations cannot be eliminated purely by software.
 
+## Generation provenance
+
+For new account-backed generations, the studio returns a signed receipt scoped to
+the store, staff user, customer and delivered PNG. The browser submits the receipt
+on the explicit avatar save. The server verifies it and records the provider,
+configured model, prompt revision, generation time, frame, template tone and
+measurements used for that generation.
+
+The record includes the SHA-256 of the delivered PNG and the SHA-256 of the
+normalized PNG served by the saved avatar image endpoint. The saved avatar library
+shows the model and prompt revision. Re-saving the same image keeps its first
+verified generation record, and older avatars and imported PNGs can be reviewed
+with no recorded provenance. The receipt travels with the current draft in browser
+memory. The saved record contains the verified metadata and hashes.
+
 ## Compatibility and limitations
 
 - Applies to **saved store-account avatars** and the account-backed garment/jewellery/portrait/looks routes. It does not change the offline IndexedDB library, sample-avatar browsing, or raw image operations that have no account avatar identity.

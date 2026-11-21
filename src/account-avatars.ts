@@ -38,11 +38,20 @@ export async function accountAvatarImage(id: string): Promise<Blob> {
   if (!r.ok) throw new Error("This avatar could not be opened. Sign in again and retry.");
   return r.blob();
 }
-export async function saveAccountAvatar(image: string, details: AvatarDetails) {
+export async function saveAccountAvatar(
+  image: string,
+  details: AvatarDetails,
+  generationReceipt?: string | null,
+) {
   return json("/api/avatars", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...details, image, storageConsent: true }),
+    body: JSON.stringify({
+      ...details,
+      image,
+      storageConsent: true,
+      ...(generationReceipt ? { generationReceipt } : {}),
+    }),
   });
 }
 export async function deleteAccountAvatar(id: string) {

@@ -25,6 +25,7 @@ import { CustomerStore, installCustomerRoutes } from "./customers.js";
 import { installAdminSchema, claimTrial, trialKeys } from "./commercial-admin.js";
 import { DatabaseSync } from "node:sqlite";
 import { AVATAR_REVIEW_POLICY_VERSION, validateAvatarApproval } from "./avatar-approval.js";
+import { verifyAvatarGenerationReceipt } from "./avatar-generation.js";
 import { mkdirSync, chmodSync } from "node:fs";
 import path from "node:path";
 import { randomBytes, createHash, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
@@ -128,6 +129,8 @@ export class AccountStore {
         this.db.exec("ALTER TABLE avatars ADD COLUMN review_policy INTEGER NOT NULL DEFAULT 0");
       if (!avatarColumns.includes("profile_selection"))
         this.db.exec("ALTER TABLE avatars ADD COLUMN profile_selection TEXT");
+      if (!avatarColumns.includes("generation_provenance"))
+        this.db.exec("ALTER TABLE avatars ADD COLUMN generation_provenance TEXT");
       const columns = this.db
         .prepare("PRAGMA table_info(looks)")
         .all()
@@ -361,6 +364,7 @@ export class AccountStore {
     this.customers.requireOptional(account, input.customerId);
     const { image, thumbnail } = await savedImage(input.image);
     this.customers.requireOptional(account, input.customerId);
+    const generation = verifyAvatarGenerationReceipt(this.views.key, account, input);
     // Scope deduplication to the customer so identical images cannot move ownership.
     const id = input.customerId
         ? digest(Buffer.concat([image, Buffer.from(input.customerId)]))
@@ -376,9 +380,10 @@ export class AccountStore {
       throw error("Your account holds up to 100 avatars. Delete one before adding another.", 409);
     this.db
       .prepare(
-        `INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type,template_tone,customer,profile_selection)
-         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-         ON CONFLICT(account,id) DO UPDATE SET name=excluded.name,profileId=excluded.profileId,heightCm=excluded.heightCm,weightKg=excluded.weightKg,source=excluded.source,savedAt=excluded.savedAt,body_type=excluded.body_type,template_tone=excluded.template_tone,profile_selection=excluded.profile_selection,approved_at=NULL,approved_by=NULL,review_policy=0`,
+        `INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type,template_tone,customer,profile_selection,generation_provenance)
+         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         ON CONFLICT(account,id) DO UPDATE SET name=excluded.name,profileId=excluded.profileId,heightCm=excluded.heightCm,weightKg=excluded.weightKg,source=excluded.source,savedAt=excluded.savedAt,body_type=excluded.body_type,template_tone=excluded.template_tone,profile_selection=excluded.profile_selection,
+           generation_provenance=COALESCE(avatars.generation_provenance,excluded.generation_provenance),approved_at=NULL,approved_by=NULL,review_policy=0`,
       )
       .run(
         id,
@@ -395,6 +400,7 @@ export class AccountStore {
         templateTone,
         input.customerId ?? null,
         profileSelection ? JSON.stringify(profileSelection) : null,
+        generation ? JSON.stringify({ ...generation, storedSha256: digest(image) }) : null,
       );
     this.views?.invalidate(account.id, id);
     return { id, savedAt, approvalStatus: "draft" };
@@ -432,12 +438,13 @@ export class AccountStore {
   list(account) {
     return this.db
       .prepare(
-        "SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,profile_selection,CASE WHEN approved_at IS NOT NULL AND review_policy=1 THEN 'approved' ELSE 'draft' END AS approvalStatus,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC",
+        "SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,profile_selection,generation_provenance,CASE WHEN approved_at IS NOT NULL AND review_policy=1 THEN 'approved' ELSE 'draft' END AS approvalStatus,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC",
       )
       .all(account.id)
-      .map(({ profile_selection, ...row }) => ({
+      .map(({ profile_selection, generation_provenance, ...row }) => ({
         ...row,
         profileSelection: profile_selection ? JSON.parse(profile_selection) : null,
+        generation: generation_provenance ? JSON.parse(generation_provenance) : null,
         thumbnail: `data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`,
       }));
   }
