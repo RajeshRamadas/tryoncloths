@@ -97,6 +97,21 @@ Without payment configuration the existing pilot continues; new payment creation
 returns a clear 503. No production credentials or supplier tax information have
 been configured from the development workspace.
 
+### Read-only readiness check
+
+Run `npm run check:razorpay -- test` from the repository with the pilot's test
+configuration. Inside the Lightsail application container, run
+`node server/check-razorpay.js test` with the existing environment. Use `live`
+in place of `test` when checking the intended live credentials.
+
+The command checks that the key matches the requested mode and validates
+supplier invoice details and the presence of a separate webhook secret. It reads each configured subscription plan from Razorpay and
+checks the GST-inclusive amount, currency, period and interval using the same
+rules as checkout. The command exits with code 1 when a check is blocked and
+prints only check names and fixed status codes. It can run without an account
+database and uses only GET requests. Checkout, webhook delivery, invoice
+issuance and SMTP delivery require their own end-to-end validation.
+
 ## Recovery and remaining work
 
 Provider calls are not automatically retried. A subscription creation timeout

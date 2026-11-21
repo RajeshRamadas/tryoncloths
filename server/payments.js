@@ -22,6 +22,9 @@ export const PLANS = Object.freeze({
   growth: { credits: 1000, base: 599900 },
   chain: { credits: 3000, base: 1499900 },
 });
+const planOptions = Object.keys(PLANS).flatMap((plan) =>
+  ["monthly", "annual"].map((period) => ({ plan, period })),
+);
 const tax = (base) => ({
   base,
   gst: Math.round((base * 18) / 100),
@@ -75,15 +78,119 @@ export function paymentConfig(env = process.env) {
       gstin: env.FORME_GSTIN,
     },
     planIds: Object.fromEntries(
-      Object.keys(PLANS).flatMap((p) =>
-        ["monthly", "annual"].map((period) => [
-          `${p}:${period}`,
-          env[`RAZORPAY_PLAN_${p.toUpperCase()}${period === "annual" ? "_ANNUAL" : ""}`] || "",
-        ]),
-      ),
+      planOptions.map(({ plan, period }) => [
+        `${plan}:${period}`,
+        env[`RAZORPAY_PLAN_${plan.toUpperCase()}${period === "annual" ? "_ANNUAL" : ""}`] || "",
+      ]),
     ),
   };
 }
+function validSupplierProfile(supplier) {
+  try {
+    return Boolean(profile(supplier).gstin);
+  } catch {
+    return false;
+  }
+}
+
+async function razorpayRequest(config, fetchImpl, path, body) {
+  let response;
+  try {
+    response = await fetchImpl(`https://api.razorpay.com/v1/${path}`, {
+      method: body ? "POST" : "GET",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${config.keyId}:${config.keySecret}`).toString("base64")}`,
+        "Content-Type": "application/json",
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(15000),
+      redirect: "error",
+    });
+  } catch {
+    throw problem(
+      "payment_provider_unavailable",
+      "Payment provider could not be reached. Check Billing before trying again.",
+      502,
+    );
+  }
+  if (!response.ok)
+    throw problem(
+      "payment_provider_error",
+      "Payment provider could not complete this request.",
+      502,
+    );
+  try {
+    return await response.json();
+  } catch {
+    throw problem("payment_provider_error", "Payment provider returned an invalid response.", 502);
+  }
+}
+
+async function validatedSubscriptionPlan(config, plan, period, get) {
+  const planId = config.planIds[`${plan}:${period}`];
+  if (!providerId(planId))
+    throw problem("billing_unavailable", "This subscription plan is not configured.", 503);
+  const price = tax(PLANS[plan].base * (period === "annual" ? 10 : 1));
+  const providerPlan = await get(`plans/${planId}`);
+  if (
+    providerPlan?.id !== planId ||
+    providerPlan.item?.amount !== price.amount ||
+    providerPlan.item?.currency !== "INR" ||
+    providerPlan.period !== (period === "annual" ? "yearly" : "monthly") ||
+    providerPlan.interval !== 1
+  )
+    throw problem(
+      "plan_configuration",
+      "The provider plan does not match the configured price, GST or period.",
+      503,
+    );
+  return { planId, price };
+}
+
+export async function checkRazorpayReadiness(
+  mode,
+  { config = paymentConfig(), fetchImpl = fetch } = {},
+) {
+  if (!["test", "live"].includes(mode)) throw new Error("Choose test or live mode.");
+  const checks = [];
+  const check = (id, condition, code) =>
+    checks.push(condition ? { id, state: "pass" } : { id, state: "blocked", code });
+  const credentialsReady =
+    /^rzp_(test|live)_[A-Za-z0-9]+$/.test(config.keyId) &&
+    config.keyId.startsWith(`rzp_${mode}_`) &&
+    Boolean(config.keySecret.trim());
+  check("credentials", credentialsReady, "key_missing_or_wrong_mode");
+  check(
+    "webhook-secret",
+    Boolean(config.webhookSecret.trim()) && config.webhookSecret.trim() !== config.keySecret.trim(),
+    "separate_webhook_secret_required",
+  );
+  check("supplier-invoice", validSupplierProfile(config.supplier), "supplier_details_invalid");
+  for (const { plan, period } of planOptions) {
+    const id = `${plan}:${period}`;
+    if (!providerId(config.planIds[id])) {
+      checks.push({ id, state: "blocked", code: "plan_id_invalid" });
+      continue;
+    }
+    if (!credentialsReady) {
+      checks.push({ id, state: "skipped", code: "credentials_not_ready" });
+      continue;
+    }
+    try {
+      await validatedSubscriptionPlan(config, plan, period, (path) =>
+        razorpayRequest(config, fetchImpl, path),
+      );
+      checks.push({ id, state: "pass" });
+    } catch (error) {
+      const code = ["plan_configuration", "payment_provider_unavailable"].includes(error.code)
+        ? error.code
+        : "payment_provider_error";
+      checks.push({ id, state: "blocked", code });
+    }
+  }
+  return { mode, ready: checks.every(({ state }) => state === "pass"), checks };
+}
+
 export class PaymentStore {
   constructor(
     accounts,
@@ -132,9 +239,7 @@ export class PaymentStore {
         "Online payments are not configured on this studio.",
         503,
       );
-    try {
-      if (!profile(this.config.supplier).gstin) throw new Error();
-    } catch {
+    if (!validSupplierProfile(this.config.supplier)) {
       throw problem(
         "billing_unavailable",
         "Supplier invoice details are not configured on this studio.",
@@ -144,40 +249,7 @@ export class PaymentStore {
   }
   async api(path, body) {
     this.ready();
-    let response;
-    try {
-      response = await this.fetch(`https://api.razorpay.com/v1/${path}`, {
-        method: body ? "POST" : "GET",
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${this.config.keyId}:${this.config.keySecret}`).toString("base64")}`,
-          "Content-Type": "application/json",
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
-        signal: AbortSignal.timeout(15000),
-        redirect: "error",
-      });
-    } catch {
-      throw problem(
-        "payment_provider_unavailable",
-        "Payment provider could not be reached. Check Billing before trying again.",
-        502,
-      );
-    }
-    if (!response.ok)
-      throw problem(
-        "payment_provider_error",
-        "Payment provider could not complete this request.",
-        502,
-      );
-    try {
-      return await response.json();
-    } catch {
-      throw problem(
-        "payment_provider_error",
-        "Payment provider returned an invalid response.",
-        502,
-      );
-    }
+    return razorpayRequest(this.config, this.fetch, path, body);
   }
   details(org) {
     const row = this.db.prepare("SELECT details FROM billing_profiles WHERE org=?").get(org);
@@ -249,24 +321,10 @@ export class PaymentStore {
     this.assertPurchasable(org);
     if (!Object.hasOwn(PLANS, plan) || !["monthly", "annual"].includes(period))
       throw problem("invalid_plan", "Choose an available plan and billing period.");
-    const details = this.details(org),
-      planId = this.config.planIds[`${plan}:${period}`];
-    if (!providerId(planId))
-      throw problem("billing_unavailable", "This subscription plan is not configured.", 503);
-    const price = tax(PLANS[plan].base * (period === "annual" ? 10 : 1));
-    const providerPlan = await this.api(`plans/${planId}`);
-    if (
-      providerPlan.id !== planId ||
-      providerPlan.item?.amount !== price.amount ||
-      providerPlan.item?.currency !== "INR" ||
-      providerPlan.period !== (period === "annual" ? "yearly" : "monthly") ||
-      providerPlan.interval !== 1
-    )
-      throw problem(
-        "plan_configuration",
-        "The provider plan does not match the configured price, GST or period.",
-        503,
-      );
+    const details = this.details(org);
+    const { planId, price } = await validatedSubscriptionPlan(this.config, plan, period, (path) =>
+      this.api(path),
+    );
     const duplicate = this.db
       .prepare(
         "SELECT 1 FROM subscriptions WHERE org=? AND status NOT IN ('cancelled','completed','expired')",
