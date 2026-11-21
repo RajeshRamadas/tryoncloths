@@ -37,6 +37,7 @@ import {
 } from "./avatar-identity.js";
 import { openaiPersonalize } from "./openai.js";
 import { geminiPersonalize, GEMINI_REFERENCE_VERSION } from "./gemini.js";
+import { issueAvatarGenerationReceipt } from "./avatar-generation.js";
 import { providerConfig } from "./provider-config.js";
 import { installAccountRoutes, accountUser } from "./accounts.js";
 import { meter, validRequestId, BillingError, billingFailure } from "./billing.js";
@@ -166,6 +167,7 @@ export function createApp({
   const identityMax = parseAvatarIdentityMax(avatarIdentityMax);
   const identityScreenEnabled = identityMode !== "off";
   const providerLabel = providerConfig(provider).label;
+  const generationRevision = provider === "gemini" ? GEMINI_REFERENCE_VERSION : "template-first-v1";
   if (!["auto", "protected", "public"].includes(accessMode))
     throw new Error("TRYON_ACCESS_MODE must be auto, protected, or public.");
   // Public mode is an explicit operator choice for anonymous browser generation.
@@ -347,7 +349,7 @@ export function createApp({
       avatarIdentityScreenAvailable: Boolean(identityScreenEnabled && apiKey),
       avatarIdentityMode: identityMode,
       provider,
-      generationRevision: provider === "gemini" ? GEMINI_REFERENCE_VERSION : "template-first-v1",
+      generationRevision,
       personalizationContract: "customer-avatar-v4",
       storage: accountStore ? "account" : "ephemeral",
       accountsAvailable: Boolean(accountStore),
@@ -566,6 +568,22 @@ export function createApp({
         reviewChecks: ["face", "standard-body", "skin-tone"],
         ...(accountStore
           ? {
+              generationReceipt: issueAvatarGenerationReceipt(
+                accountStore.views.key,
+                owner,
+                req.body.customerId,
+                image,
+                {
+                  provider,
+                  model,
+                  promptRevision: generationRevision,
+                  generatedAt: Date.now(),
+                  profileId: req.body.profileId,
+                  templateTone,
+                  heightCm: req.body.measurements.heightCm,
+                  weightKg: req.body.measurements.weightKg,
+                },
+              ),
               accountSaved: false,
               avatarId: null,
               accountSaveError: null,

@@ -285,6 +285,11 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
                       <br />
                       {new Date(item.savedAt).toLocaleDateString()}
                     </p>
+                    {item.generation && (
+                      <p>
+                        Generated with {item.generation.model} · {item.generation.promptRevision}
+                      </p>
+                    )}
                     {cloud && !localView && (
                       <p>
                         {item.approvalStatus === "approved"

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
@@ -15,6 +15,8 @@ async function fixture(run) {
   let calls = 0;
   const server = createApp({
     accountStore: store,
+    provider: "gemini",
+    model: "gemini-2.5-flash-image",
     accessMode: "public",
     rateLimit: false,
     apiKey: "test",
@@ -114,6 +116,7 @@ test("account avatars are isolated, survive database reopen, and sign-in works f
       const [record, ...others] = reopened.list(user);
       assert.equal(others.length, 0);
       assert.deepEqual(record.profileSelection, profileSelection);
+      assert.equal(record.generation, null);
     } finally {
       reopened.close();
     }
@@ -191,8 +194,8 @@ test("account mutations require same-origin and consent; passwords and expired s
     assert.equal((await request("/api/avatars", "GET", undefined, c)).status, 401);
   }));
 
-test("generation stays draft until an explicit save and does not call the provider twice", async () =>
-  fixture(async ({ request, store, calls }) => {
+test("explicit avatar save verifies generation provenance and preserves it across re-saves", async () =>
+  fixture(async ({ request, store, calls, directory }) => {
     const face = `data:image/jpeg;base64,${(await readFile(customerPhotos[0].face)).toString("base64")}`;
     const body = `data:image/jpeg;base64,${(await readFile(customerPhotos[0].body)).toString("base64")}`;
     const input = {
@@ -209,6 +212,14 @@ test("generation stays draft until an explicit save and does not call the provid
     const c = cookie(
       await request("/api/account/register", "POST", credentials("studio@example.com")),
     );
+    const owner = store.user(c.split("=")[1]);
+    const customer = store.customers.save(owner, {
+      name: "Synthetic customer",
+      phoneE164: "+919000000001",
+    });
+    const other = cookie(
+      await request("/api/account/register", "POST", credentials("other-studio@example.com")),
+    );
     const generated = await request("/api/personalize", "POST", input, c);
     assert.equal(generated.status, 200);
     const result = await generated.json();
@@ -220,25 +231,75 @@ test("generation stays draft until an explicit save and does not call the provid
     );
     assert.equal(calls(), 1);
 
-    const saved = await request(
-      "/api/avatars",
-      "POST",
-      {
-        image: result.image,
-        name: input.avatarName,
-        profileId: input.profileId,
-        heightCm: input.measurements.heightCm,
-        weightKg: input.measurements.weightKg,
-        source: "generated",
-        storageConsent: true,
-      },
-      c,
-    );
+    const draft = {
+      image: result.image,
+      name: input.avatarName,
+      profileId: input.profileId,
+      ...input.measurements,
+      source: "generated",
+      storageConsent: true,
+      generationReceipt: result.generationReceipt,
+    };
+    const changedImage = `data:image/png;base64,${(await standardAvatar("slim")).toString("base64")}`;
+    for (const [patch, session] of [
+      [{ image: changedImage }, c],
+      [{ generationReceipt: result.generationReceipt + "x" }, c],
+      [{ customerId: customer.id }, c],
+      [{}, other],
+    ]) {
+      const response = await request("/api/avatars", "POST", { ...draft, ...patch }, session);
+      assert.equal(response.status, 400);
+      assert.match((await response.json()).error, /generation receipt/);
+    }
+    const saved = await request("/api/avatars", "POST", draft, c);
     assert.equal(saved.status, 200);
+    const { id, approvalStatus } = await saved.json();
+    assert.equal(approvalStatus, "draft");
     const list = (await (await request("/api/avatars", "GET", undefined, c)).json()).avatars;
     assert.equal(list.length, 1);
     assert.equal(list[0].name, input.avatarName);
     assert.equal(list[0].source, "generated");
+    const storedPng = await (
+      await request(`/api/avatars/${id}/image`, "GET", undefined, c)
+    ).arrayBuffer();
+    const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+    assert.deepEqual(list[0].generation, {
+      provider: "gemini",
+      model: "gemini-2.5-flash-image",
+      promptRevision: "customer-neck-v6",
+      generatedAt: list[0].generation.generatedAt,
+      profileId: "regular",
+      templateTone: "medium",
+      heightCm: 175,
+      weightKg: 72,
+      outputSha256: sha256(Buffer.from(result.image.split(",")[1], "base64")),
+      storedSha256: sha256(Buffer.from(storedPng)),
+    });
+    assert.ok(
+      Number.isSafeInteger(list[0].generation.generatedAt) && list[0].generation.generatedAt > 0,
+    );
+    assert.equal(Object.hasOwn(list[0], "generationReceipt"), false);
+
+    const renamed = await request(
+      "/api/avatars",
+      "POST",
+      {
+        ...draft,
+        name: "Updated display name",
+        generationReceipt: null,
+        generation: { model: "caller-supplied" },
+      },
+      c,
+    );
+    assert.equal(renamed.status, 200);
+    const reopened = new AccountStore(directory);
+    try {
+      const [avatar] = reopened.list(owner);
+      assert.equal(avatar.name, "Updated display name");
+      assert.deepEqual(avatar.generation, list[0].generation);
+    } finally {
+      reopened.close();
+    }
     assert.equal(calls(), 1, "explicit save must not trigger another provider call");
 
     const columns = store.db
@@ -349,11 +410,14 @@ test("look validation, capacity, account cascade and old database upgrade", asyn
     const image = await avatar();
     const { id: avatarId } = await saveApprovedTestAvatar(store, owner, image);
     // Simulate a pre-feature database: avatar data must survive adding the table.
-    store.db.exec("DROP TABLE looks; ALTER TABLE avatars DROP COLUMN profile_selection;");
+    store.db.exec(`DROP TABLE looks;
+      ALTER TABLE avatars DROP COLUMN profile_selection;
+      ALTER TABLE avatars DROP COLUMN generation_provenance;`);
     const upgraded = new AccountStore(directory);
     upgraded.close();
     assert.equal(store.list(owner).length, 1);
     assert.equal(store.list(owner)[0].profileSelection, null);
+    assert.equal(store.list(owner)[0].generation, null);
     const input = { avatarId, image: image.image, name: "Look", garments: ["Shirt"] };
     await assert.rejects(store.saveLook(owner, { ...input, garments: Array(11).fill("Shirt") }), {
       status: 400,

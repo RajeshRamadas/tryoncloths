@@ -36,6 +36,18 @@ export type SavedAvatar = AvatarDetails & {
   savedAt: number;
   looksCount?: number;
   approvalStatus?: "draft" | "approved";
+  generation?: {
+    provider: "gemini" | "openai";
+    model: string;
+    promptRevision: string;
+    generatedAt: number;
+    profileId: string;
+    templateTone: string;
+    heightCm: number;
+    weightKg: number;
+    outputSha256: string;
+    storedSha256: string;
+  } | null;
 };
 const database = "forme-saved-avatars";
 const storeName = "avatars";
