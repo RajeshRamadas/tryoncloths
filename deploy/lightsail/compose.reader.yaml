@@ -16,6 +16,7 @@ services:
     init: true
     environment:
       TRYON_READER_TOKEN: ${TRYON_READER_TOKEN:?Set a separate reader token of at least 32 characters}
+      TRYON_READER_MEMORY_LIMIT_BYTES: ${TRYON_READER_MEMORY_LIMIT_BYTES:-536870912}
     networks: [reader_shared]
     read_only: true
     tmpfs:
@@ -25,7 +26,7 @@ services:
     # Used by the entrypoint only, then all capabilities are dropped before Node/Chromium.
     cap_add: [NET_ADMIN, SETUID, SETGID, SETPCAP]
     security_opt: [no-new-privileges:true]
-    mem_limit: 512m
+    mem_limit: ${TRYON_READER_MEMORY_LIMIT_BYTES:-536870912}
     pids_limit: 128
     cpus: 0.75
     logging:

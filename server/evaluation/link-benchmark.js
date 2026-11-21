@@ -2,7 +2,7 @@ import { performance } from "node:perf_hooks";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 import { readProductLink, parseProductUrl, LinkError } from "../product-link.js";
-import { readProductLinkWithFallback } from "../browser-reader.js";
+import { readProductLinkWithFallback, requestWorkerMemory } from "../browser-reader.js";
 import { digest, readJson, newReportDirectory, privateJson, options } from "./files.js";
 
 export function validateLinks(manifest) {
@@ -49,6 +49,7 @@ export async function benchmarkLinks(
     compare = false,
     staticReader = readProductLink,
     fallbackReader = readProductLinkWithFallback,
+    memoryReader = requestWorkerMemory,
     wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     now = () => performance.now(),
     progress = () => {},
@@ -56,6 +57,14 @@ export async function benchmarkLinks(
 ) {
   // Validate the entire set before making any outbound request.
   const links = validateLinks(manifest);
+  const readMemory = async () => {
+    try {
+      return await memoryReader();
+    } catch {
+      return null;
+    }
+  };
+  const before = compare ? await readMemory() : null;
   const rows = [];
   for (const [index, link] of links.entries()) {
     if (index) await wait(2000);
@@ -87,6 +96,7 @@ export async function benchmarkLinks(
     rows.push(row);
     progress(row);
   }
+  const after = compare ? await readMemory() : null;
   const summarize = (key) => {
     const passed = rows.filter((row) => row[key].ok).length;
     const times = rows.map((row) => row[key].elapsedMs).sort((a, b) => a - b);
@@ -108,6 +118,7 @@ export async function benchmarkLinks(
     measuredLinks: rows.length,
     requiredLinks: 20,
     benchmarkComplete: rows.length === 20,
+    ...(compare ? { workerMemory: { before, after } } : {}),
     rolloutApproved: false,
     note: "Measured extraction only. Staff must check photo correctness, retailer coverage and worker memory before rollout.",
     summary: {

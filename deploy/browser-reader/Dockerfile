@@ -6,7 +6,7 @@ COPY deploy/browser-reader/package.json deploy/browser-reader/package-lock.json 
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
     npm ci --omit=dev --strict-ssl=true --no-audit --no-fund && npm cache clean --force
-COPY server/browser-worker.js server/browser-policy.js server/public-url.js server/link-errors.js ./server/
+COPY server/browser-worker.js server/browser-policy.js server/public-url.js server/link-errors.js server/worker-memory.js ./server/
 COPY deploy/browser-reader/entrypoint.sh ./entrypoint.sh
 RUN chmod -R a+rX /app && chmod 755 /app/entrypoint.sh
 ENV CHROMIUM_PATH=/usr/bin/chromium NODE_ENV=production
