@@ -50,6 +50,19 @@ Provider quality, threshold calibration and live store pilot targets remain
 pending; the new [evaluation workflow](JEWELLERY_EVALUATION.md) measures those
 before general release.
 
+### Avatar approval on jewellery results
+
+AI try-ons and free overlay previews carry the source master version, approval
+revision and SHA-256 of the approved avatar PNG. The studio shows the version
+and revision on the preview. Reuse entries and single-view saved jewellery looks
+record the same approval. The server checks it before generating, saving or
+using a jewellery result as the base for another item. View, catalogue item and
+starting-image checks also apply.
+
+Reapproval starts a new reuse context. Earlier saved looks remain available to
+open and download. Start from the approved avatar view to build a fresh look
+when an earlier result belongs to a different approval or predates this tracking.
+
 ## Module contract
 
 `server/jewellery-tryon.js` exports:

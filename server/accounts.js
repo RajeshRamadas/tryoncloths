@@ -182,6 +182,8 @@ export class AccountStore {
         this.db.exec("ALTER TABLE looks ADD COLUMN previewMode TEXT NOT NULL DEFAULT 'ai'");
       if (!columns.includes("handsGeometryJson"))
         this.db.exec("ALTER TABLE looks ADD COLUMN handsGeometryJson TEXT");
+      if (!columns.includes("source_approval"))
+        this.db.exec("ALTER TABLE looks ADD COLUMN source_approval TEXT");
     });
     this.garments = new GarmentStore(this);
     try {
@@ -653,7 +655,14 @@ export class AccountStore {
   async saveLook(
     account,
     input,
-    { view = "full", itemsJson = [], previewMode = "ai", handsGeometry = null, guard } = {},
+    {
+      view = "full",
+      itemsJson = [],
+      previewMode = "ai",
+      handsGeometry = null,
+      sourceApproval,
+      guard,
+    } = {},
   ) {
     const name = typeof input.name === "string" ? input.name.trim() : "";
     if (
@@ -664,15 +673,16 @@ export class AccountStore {
       input.garments.some((x) => typeof x !== "string" || !x.trim() || x.length > 120)
     )
       throw error("Use a look name and up to 10 garment labels of at most 120 characters.");
-    this.requireApprovedAvatar(account, input.avatarId);
+    this.requireApprovedAvatar(account, input.avatarId, sourceApproval);
     validateLookTracking(this, account, input);
     const { image, thumbnail } = await savedImage(input.image, view);
     // Recheck after decoding: the avatar may have been revoked or deleted meanwhile.
-    this.requireApprovedAvatar(account, input.avatarId);
     return transaction(this.db, () => {
+      this.requireApprovedAvatar(account, input.avatarId, sourceApproval);
       guard?.();
       validateLookTracking(this, account, input);
-      const id = digest(Buffer.concat([image, Buffer.from(input.avatarId)])),
+      const sourceKey = sourceApproval ? JSON.stringify(sourceApproval) : null;
+      const id = digest(Buffer.concat([image, Buffer.from(input.avatarId + (sourceKey ?? ""))])),
         savedAt = Date.now();
       const exists = this.db
         .prepare("SELECT id FROM looks WHERE account=? AND id=?")
@@ -685,7 +695,7 @@ export class AccountStore {
         throw error("Your account holds up to 200 looks. Delete one before adding another.", 409);
       this.db
         .prepare(
-          `INSERT INTO looks(id,account,avatarId,name,garments,image,thumbnail,savedAt,view,itemsJson,previewMode,handsGeometryJson) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET avatarId=excluded.avatarId,name=excluded.name,garments=excluded.garments,savedAt=excluded.savedAt,view=excluded.view,itemsJson=excluded.itemsJson,previewMode=excluded.previewMode,handsGeometryJson=excluded.handsGeometryJson`,
+          `INSERT INTO looks(id,account,avatarId,name,garments,image,thumbnail,savedAt,view,itemsJson,previewMode,handsGeometryJson,source_approval) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET avatarId=excluded.avatarId,name=excluded.name,garments=excluded.garments,savedAt=excluded.savedAt,view=excluded.view,itemsJson=excluded.itemsJson,previewMode=excluded.previewMode,handsGeometryJson=excluded.handsGeometryJson`,
         )
         .run(
           id,
@@ -700,6 +710,7 @@ export class AccountStore {
           JSON.stringify(itemsJson),
           previewMode,
           handsGeometry ? JSON.stringify(handsGeometry) : null,
+          sourceKey,
         );
       attributeLook(this, account, id, input);
       return { id, avatarId: input.avatarId, savedAt };

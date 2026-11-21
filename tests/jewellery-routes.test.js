@@ -1,10 +1,10 @@
-import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
+import { approveTestAvatar, saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { AccountStore } from "./helpers/pilot-accounts.js";
 import { createApp, standardAvatar } from "../server/app.js";
@@ -205,6 +205,12 @@ test("one paid request stores nothing until review; exact approved reuse costs n
       const row = store.db.prepare("SELECT * FROM garment_results").get();
       assert.equal(row.view, "hands");
       assert.equal(row.avatarId, avatar.id);
+      assert.deepEqual(JSON.parse(row.source_approval), result.sourceApproval);
+      assert.equal(result.sourceApproval.approvalVersion, 1);
+      assert.equal(
+        result.sourceApproval.imageSha256,
+        createHash("sha256").update(store.image(a, avatar.id)).digest("hex"),
+      );
       const reuse = await (await create()).json();
       assert.equal(reuse.reused, true);
       assert.equal(reuse.creditsUsed, 0);
@@ -540,6 +546,103 @@ test("reuse includes placement, starting-state hash, second angle, product attri
     assert.equal((await (await create()).json()).reused, false);
     assert.equal(calls(), 5);
   }));
+
+test("reapproval invalidates jewellery previews, cached results and saved looks as starting images", async () =>
+  fixture(async ({ store, a, avatar, item, create, save, request, calls }) => {
+    const originalResponse = await create();
+    assert.equal(originalResponse.status, 200);
+    const original = await originalResponse.json();
+    assert.equal((await save(original)).status, 200);
+
+    const lookInput = {
+      ...approve(original),
+      avatarId: avatar.id,
+      view: "hands",
+      name: "Reviewed ring look",
+      itemsJson: [
+        { itemId: item.id, name: item.name, type: "ring", hand: "right", finger: "ring" },
+      ],
+    };
+    const initialLook = await request("/api/jewellery/looks", "POST", lookInput);
+    assert.equal(initialLook.status, 200);
+    const initialId = (await initialLook.json()).id;
+    const lookPath = `/api/jewellery/looks/${initialId}`;
+    const recorded = await (await request(lookPath, "GET")).json();
+    assert.deepEqual(recorded.sourceApproval, original.sourceApproval);
+
+    store.revokeAvatarApproval(a, avatar.id);
+    approveTestAvatar(store, a, avatar.id);
+    const stale = await save(original);
+    assert.equal(stale.status, 409);
+    assert.match((await stale.json()).error, /approval changed/);
+    for (const proof of [
+      { base: original.image, baseReceipt: original.receipt, baseReviewed: true },
+      { base: original.image, baseResultId: original.resultId },
+      { base: recorded.image, baseLookId: initialId, baseReviewed: true },
+    ])
+      assert.equal((await create(proof)).status, 409);
+    assert.equal(
+      (
+        await request("/api/jewellery/looks", "POST", {
+          ...lookInput,
+          receipt: undefined,
+          resultId: original.resultId,
+        })
+      ).status,
+      409,
+    );
+    assert.equal(
+      (await request(lookPath, "GET")).status,
+      200,
+      "historical looks can still be opened",
+    );
+    assert.equal(calls(), 1);
+
+    const next = await (await create()).json();
+    assert.equal(next.reused, false);
+    assert.equal(next.sourceApproval.approvalVersion, 2);
+    assert.equal(next.sourceApproval.imageSha256, original.sourceApproval.imageSha256);
+    assert.notEqual(next.resultId, original.resultId);
+    assert.equal((await save(next)).status, 200);
+    const nextLook = await request("/api/jewellery/looks", "POST", {
+      ...lookInput,
+      image: next.image,
+      receipt: next.receipt,
+    });
+    assert.equal(nextLook.status, 200);
+    assert.notEqual((await nextLook.json()).id, initialId);
+    const cached = await (await create()).json();
+    assert.equal(cached.reused, true);
+    assert.deepEqual(cached.sourceApproval, next.sourceApproval);
+    assert.equal(calls(), 2);
+  }));
+
+test("jewellery generation stops if the avatar is reapproved while the provider is running", async () => {
+  let changeApproval;
+  await fixture(
+    async ({ store, a, avatar, create, calls }) => {
+      changeApproval = () => {
+        store.revokeAvatarApproval(a, avatar.id);
+        approveTestAvatar(store, a, avatar.id);
+      };
+      const before = store.billing.balance(a.org);
+      const response = await create();
+      assert.equal(response.status, 409);
+      const result = await response.json();
+      assert.match(result.error, /approval changed/);
+      assert.equal(result.image, undefined);
+      assert.equal(result.receipt, undefined);
+      assert.equal(store.billing.balance(a.org), before);
+      assert.equal(calls(), 1);
+    },
+    {
+      generate: async ({ base }) => {
+        changeApproval();
+        return url(base);
+      },
+    },
+  );
+});
 
 test("arbitrary bases and cross-view or cross-user receipts cannot become customer input", async () =>
   fixture(async ({ store, a, b, avatar, create, request, cb, calls }) => {

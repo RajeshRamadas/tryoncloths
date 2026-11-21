@@ -91,7 +91,7 @@ export class JewelleryStore {
   }
   current(account, context) {
     this.actor(account);
-    this.store.requireApprovedAvatar(account, context.avatarId);
+    this.store.requireApprovedAvatar(account, context.avatarId, context.sourceApproval);
     const epoch = this.db
       .prepare("SELECT * FROM avatar_view_epochs WHERE store=? AND avatarId=?")
       .get(account.id, context.avatarId);
@@ -135,6 +135,7 @@ export class JewelleryStore {
         value.contract !== JEWELLERY_CONTRACT ||
         value.store !== account.id ||
         value.user !== account.user.id ||
+        !value.sourceApproval ||
         !Number.isFinite(value.expires) ||
         value.expires < Date.now()
       )
@@ -158,6 +159,7 @@ export class JewelleryStore {
         user: account.user.id,
         id: context.id,
         avatarId: context.avatarId,
+        sourceApproval: context.sourceApproval,
         view: context.view,
         nonce: context.nonce,
         revision: context.revision,
@@ -211,6 +213,7 @@ export class JewelleryStore {
         },
       });
     }
+    const { sourceApproval } = this.store.requireApprovedAvatar(account, input.avatarId);
     const { view } = selection,
       reference = this.store.views.context(
         account,
@@ -219,6 +222,7 @@ export class JewelleryStore {
       );
     const context = {
       avatarId: input.avatarId,
+      sourceApproval,
       view,
       nonce: reference.nonce,
       revision: view === "full" ? null : reference.revision,
@@ -272,31 +276,39 @@ export class JewelleryStore {
         } else if (input.baseResultId !== undefined) {
           const row = this.db
             .prepare(
-              "SELECT r.image,r.previewMode,r.handsGeometryJson FROM garment_results r JOIN garments g ON g.account=r.account AND g.id=r.garmentId WHERE r.account=? AND r.id=? AND r.avatarId=? AND r.view=? AND g.category='jewellery'",
+              "SELECT r.image,r.previewMode,r.handsGeometryJson,r.source_approval FROM garment_results r JOIN garments g ON g.account=r.account AND g.id=r.garmentId WHERE r.account=? AND r.id=? AND r.avatarId=? AND r.view=? AND g.category='jewellery'",
             )
             .get(account.id, input.baseResultId, context.avatarId, view);
           baseMode = row?.previewMode || "ai";
           if (row?.handsGeometryJson) handsPacket = JSON.parse(row.handsGeometryJson);
           if (
             !row ||
+            row.source_approval !== JSON.stringify(sourceApproval) ||
             hash(await normalizeJewelleryView(Buffer.from(row.image), view)) !== hash(supplied)
           )
-            throw fail("The approved base result is unavailable for this avatar view.", 409);
+            throw fail(
+              "The base result is unavailable for this avatar view and approval. Start from the approved view.",
+              409,
+            );
         } else if (input.baseLookId !== undefined) {
           if (input.baseReviewed !== true)
             throw fail("Review this saved jewellery look before adding another item.");
           const row = this.db
             .prepare(
-              "SELECT image,previewMode,handsGeometryJson FROM looks WHERE account=? AND id=? AND avatarId=? AND view=? AND itemsJson<>'[]'",
+              "SELECT image,previewMode,handsGeometryJson,source_approval FROM looks WHERE account=? AND id=? AND avatarId=? AND view=? AND itemsJson<>'[]'",
             )
             .get(account.id, input.baseLookId, context.avatarId, view);
           baseMode = row?.previewMode || "ai";
           if (row?.handsGeometryJson) handsPacket = JSON.parse(row.handsGeometryJson);
           if (
             !row ||
+            row.source_approval !== JSON.stringify(sourceApproval) ||
             hash(await normalizeJewelleryView(Buffer.from(row.image), view)) !== hash(supplied)
           )
-            throw fail("The saved jewellery look is unavailable for this avatar view.", 409);
+            throw fail(
+              "The saved jewellery look is unavailable for this avatar view and approval. Start from the approved view.",
+              409,
+            );
         } else
           throw fail(
             "Use an approved saved view or a verified, reviewed jewellery result as the base.",
@@ -367,9 +379,16 @@ export class JewelleryStore {
     if (!context.itemId) return null;
     const row = this.db
       .prepare(
-        "SELECT image,previewMode FROM garment_results WHERE account=? AND id=? AND avatarId=? AND garmentId=? AND view=?",
+        "SELECT image,previewMode FROM garment_results WHERE account=? AND id=? AND avatarId=? AND garmentId=? AND view=? AND source_approval=?",
       )
-      .get(account.id, context.id, context.avatarId, context.itemId, context.view);
+      .get(
+        account.id,
+        context.id,
+        context.avatarId,
+        context.itemId,
+        context.view,
+        JSON.stringify(context.sourceApproval),
+      );
     return row
       ? { image: dataUrl(row.image), resultId: context.id, previewMode: row.previewMode }
       : null;
@@ -412,7 +431,7 @@ export class JewelleryStore {
         );
       this.db
         .prepare(
-          "INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt,view,previewMode,handsGeometryJson) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO NOTHING",
+          "INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt,view,previewMode,handsGeometryJson,source_approval) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO NOTHING",
         )
         .run(
           account.id,
@@ -424,6 +443,7 @@ export class JewelleryStore {
           context.view,
           context.previewMode || "ai",
           context.handsGeometry ? JSON.stringify(context.handsGeometry) : null,
+          JSON.stringify(context.sourceApproval),
         );
       return { ok: true, resultId: id, view: context.view };
     });
