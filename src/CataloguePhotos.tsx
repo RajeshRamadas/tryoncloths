@@ -248,8 +248,7 @@ export default function CataloguePhotos() {
   return (
     <main className="billing-page photo-page">
       <nav>
-        <a href="/">Back to Forme</a> · <a href="/catalogue">Catalogue</a> ·{" "}
-        <a href="/billing">Billing</a>
+        <a href="/catalogue">Catalogue</a> · <a href="/billing">Billing</a>
       </nav>
       <h1>AI catalogue photos</h1>
       <p>

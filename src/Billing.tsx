@@ -160,7 +160,7 @@ export default function Billing() {
   return (
     <main className="billing-page">
       <nav>
-        <a href="/">Back to Forme</a> <a href="/usage">Usage</a>
+        <a href="/usage">Usage</a>
       </nav>
       <h1>Billing</h1>
       {error && (

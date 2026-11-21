@@ -112,7 +112,6 @@ export default function SizeCharts() {
   }
   return (
     <main className="billing-page size-charts-page">
-      <a href="/">Back to Forme</a>
       <h1>Size charts</h1>
       <p>
         Enter chart targets in centimetres for the exact product brand and clothing type. Guidance
