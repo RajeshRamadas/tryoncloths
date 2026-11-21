@@ -1,4 +1,5 @@
 import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
+import { metaTemplate } from "../helpers/whatsapp-templates.js";
 import { openStoreTools } from "../helpers/studio-navigation.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -53,6 +54,13 @@ async function setup(page, run) {
     verifyToken: "verify-secret",
     publicUrl: "https://studio.example.test",
     fetchImpl: async (url, init) => {
+      if (url.includes("/message_templates")) {
+        expect(init.method).toBe("GET");
+        const name = new URL(url).searchParams.get("name");
+        return Response.json({
+          data: [metaTemplate(name, name === "new_arrivals" ? { status: "PENDING" } : {})],
+        });
+      }
       if (url.includes("/messages")) {
         sends++;
         lastPayload = JSON.parse(init.body);
@@ -126,6 +134,15 @@ test("owner connects securely, sends a saved look and sees signed delivery and S
   setup(page, async ({ store, owner, customer, api, sends, payload }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await connect(page);
+    await page.getByRole("button", { name: "Check Meta templates", exact: true }).click();
+    await expect(page.getByText("Template check for en_US", { exact: true })).toBeVisible();
+    await expect(page.getByRole("listitem").filter({ hasText: "look_share" })).toContainText(
+      "Ready",
+    );
+    await expect(page.getByRole("listitem").filter({ hasText: "new_arrivals" })).toContainText(
+      "Template needs Meta approval.",
+    );
+    expect(sends()).toBe(0);
     await page.getByLabel("Lookbook customer").selectOption(customer.id);
     await page.getByLabel("Blue outfit", { exact: true }).check();
     await page

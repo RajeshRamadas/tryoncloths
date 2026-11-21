@@ -8,6 +8,7 @@ import path from "node:path";
 import { AccountStore } from "./helpers/pilot-accounts.js";
 import { createApp, standardAvatar } from "../server/app.js";
 import { encrypt, decrypt } from "../server/secrets.js";
+import { metaTemplate } from "./helpers/whatsapp-templates.js";
 const key = "ab".repeat(32),
   secret = "app-secret",
   verify = "verify-secret",
@@ -60,6 +61,8 @@ async function fixture(run) {
   ).garment;
   let sends = 0,
     ai = 0,
+    templateReads = 0,
+    templateReply = (name) => Response.json({ data: [metaTemplate(name)] }),
     mode = "ok",
     aiFailure = false,
     onAi = () => {};
@@ -81,6 +84,15 @@ async function fixture(run) {
       verifyToken: verify,
       fetchImpl: async (url, options) => {
         assert.equal(options.headers.Authorization, `Bearer ${accessToken}`);
+        if (url.includes("/message_templates")) {
+          const request = new URL(url);
+          assert.equal(request.host, "graph.facebook.com");
+          assert.equal(request.pathname, "/v23.0/987654321/message_templates");
+          assert.equal(options.method, "GET");
+          assert.equal(options.body, undefined);
+          templateReads++;
+          return templateReply(request.searchParams.get("name"));
+        }
         if (url.includes("/messages")) {
           sends++;
           if (mode === "timeout") throw new Error("token=" + accessToken);
@@ -165,6 +177,10 @@ async function fixture(run) {
       connect,
       send,
       sends: () => sends,
+      templateReads: () => templateReads,
+      setTemplateReply: (reply) => {
+        templateReply = reply;
+      },
       ai: () => ai,
       setMode: (m) => {
         mode = m;
@@ -240,6 +256,95 @@ test("owner verifies phone and WABA, stores ciphertext only, hides tokens, enfor
       false,
     );
   }));
+
+test("only the active store owner can check Meta templates without sending or spending credits", async () =>
+  fixture(
+    async ({ store, a, b, cb, request, connect, sends, ai, templateReads, setTemplateReply }) => {
+      const endpoint = "/api/integrations/whatsapp/templates/check";
+      assert.equal((await request(endpoint, "POST")).status, 409);
+      assert.equal((await connect()).status, 200);
+      assert.equal((await request(endpoint, "POST", undefined, cb)).status, 409);
+      store.db.prepare("INSERT INTO memberships VALUES(?,?,'manager')").run(b.user.id, a.id);
+      const manager = `forme_session=${store.session(store.identity(b.user.id, a.id))}`;
+      assert.equal((await request(endpoint, "POST", undefined, manager)).status, 403);
+      assert.equal(
+        (await request(endpoint, "POST", undefined, undefined, "https://unrelated.example.test"))
+          .status,
+        403,
+      );
+      assert.equal(templateReads(), 0);
+
+      const balance = store.billing.balance(a.org),
+        before = store.db.prepare("SELECT * FROM whatsapp_integrations").all();
+      const response = await request(endpoint, "POST");
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      assert.deepEqual(await response.json(), {
+        language: "en_US",
+        templates: [
+          { name: "look_share", status: "ready" },
+          { name: "new_arrivals", status: "ready" },
+        ],
+      });
+
+      setTemplateReply((name) =>
+        Response.json({
+          data:
+            name === "look_share"
+              ? [metaTemplate(name, { language: "en_GB" })]
+              : [metaTemplate(name, { status: "PENDING" })],
+        }),
+      );
+      const blocked = await (await request(endpoint, "POST")).json();
+      assert.deepEqual(
+        blocked.templates.map(({ status }) => status),
+        ["missing", "not_approved"],
+      );
+
+      setTemplateReply((name) =>
+        Response.json({
+          data: [
+            name === "look_share"
+              ? metaTemplate(name, { category: "MARKETING" })
+              : metaTemplate(name, {
+                  components: metaTemplate(name).components.map((part) =>
+                    part.type === "BUTTONS"
+                      ? {
+                          ...part,
+                          buttons: [
+                            { ...part.buttons[0], url: "https://wrong.example.test/w/{{1}}" },
+                          ],
+                        }
+                      : part,
+                  ),
+                }),
+          ],
+        }),
+      );
+      const mismatched = await (await request(endpoint, "POST")).json();
+      assert.deepEqual(
+        mismatched.templates.map(({ status }) => status),
+        ["wrong_category", "incompatible"],
+      );
+
+      setTemplateReply((name) =>
+        name === "look_share"
+          ? Response.json({ error: { message: accessToken } }, { status: 403 })
+          : Response.json({ data: [], paging: { next: "https://graph.facebook.com/next" } }),
+      );
+      const unavailable = await (await request(endpoint, "POST")).text();
+      assert.deepEqual(
+        JSON.parse(unavailable).templates.map(({ status }) => status),
+        ["unavailable", "unavailable"],
+      );
+      assert.ok(!unavailable.includes(accessToken));
+      assert.equal(templateReads(), 8);
+      assert.equal(sends(), 0);
+      assert.equal(ai(), 0);
+      assert.equal(store.billing.balance(a.org), balance);
+      assert.deepEqual(store.db.prepare("SELECT * FROM whatsapp_integrations").all(), before);
+    },
+  ));
 
 test("send validates opt-in, utility permission and same-customer looks before any Meta request", async () =>
   fixture(async ({ store, a, b, customer, look, send, connect, sends, request, ca, cb }) => {

@@ -98,6 +98,15 @@ No live Meta account, messages, billing, template approval or live AI quality wa
 verified by development tests. The app's previous click-to-chat sharing remains
 available without Meta credentials.
 
+## Check templates before sending
+
+The owner can select **Check Meta templates** under **WhatsApp → Business
+connection**. Forme looks up both template names in the connected Business
+account and checks the saved language, Meta approval, category, IMAGE header,
+two numbered body parameters, and the lookbook URL in button position zero.
+The lookup sends no message and spends no credits. Check STOP, preview image
+delivery, and charges separately with an approved test recipient.
+
 ## Delivery and retry rules
 
 Every explicit send carries a UUID request ID, unique per store. Duplicating that
@@ -142,6 +151,7 @@ Endpoints:
 | --- | --- |
 | GET `/api/integrations/whatsapp` | Staff+: redacted connection status |
 | PUT/DELETE `/api/integrations/whatsapp` | Owner: verify/save or disconnect |
+| POST `/api/integrations/whatsapp/templates/check` | Owner: read and check the two required Meta templates |
 | POST `/api/whatsapp/send` | Staff for `look_share`, manager+ for `new_arrivals` |
 | GET `/api/whatsapp/messages` | Staff+: last 100 sends, delivery status |
 | DELETE `/api/whatsapp/messages/:id/link` | Staff+: remove the public lookbook |

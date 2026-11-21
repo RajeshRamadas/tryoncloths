@@ -23,6 +23,31 @@ const publicHeaders = (res) =>
     "Content-Security-Policy":
       "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
   });
+const templateCategories = {
+  look_share: "UTILITY",
+  new_arrivals: "MARKETING",
+};
+function templateStatus(row, category, base) {
+  if (row.status !== "APPROVED") return "not_approved";
+  if (row.category !== category) return "wrong_category";
+  if (!Array.isArray(row.components)) return "incompatible";
+  const header = row.components.find((part) => part?.type === "HEADER");
+  const body = row.components.find((part) => part?.type === "BODY");
+  const buttons = row.components.find((part) => part?.type === "BUTTONS")?.buttons;
+  const button = Array.isArray(buttons) ? buttons[0] : null;
+  const parameters = [
+    ...(typeof body?.text === "string" ? body.text : "").matchAll(/\{\{([^{}]+)\}\}/g),
+  ];
+  return header?.format === "IMAGE" &&
+    parameters.length === 2 &&
+    parameters[0][1].trim() === "1" &&
+    parameters[1][1].trim() === "2" &&
+    button?.type === "URL" &&
+    button.url === `${base}/w/{{1}}` &&
+    buttons.slice(1).every((extra) => extra?.type === "QUICK_REPLY")
+    ? "ready"
+    : "incompatible";
+}
 export class WhatsApp {
   constructor(
     store,
@@ -173,6 +198,47 @@ export class WhatsApp {
       throw e;
     }
     return this.summary(account);
+  }
+  async checkTemplates(account) {
+    this.access(account);
+    if (!this.enabled())
+      throw fail("Configure WhatsApp encryption and webhook secrets first.", 503);
+    const base = this.base();
+    const integration = this.integration(account);
+    let token;
+    try {
+      token = decrypt(integration.token, this.key, account.id);
+    } catch {
+      throw fail("The WhatsApp token could not be opened. Reconnect the Business number.", 503);
+    }
+
+    const templates = await Promise.all(
+      Object.entries(templateCategories).map(async ([name, category]) => {
+        const query = new URLSearchParams({
+          name,
+          fields: "name,language,status,category,components",
+          limit: "50",
+        });
+        try {
+          const page = await this.graph(`${integration.wabaId}/message_templates?${query}`, token);
+          if (!Array.isArray(page?.data)) return { name, status: "unavailable" };
+          const matches = page.data.filter(
+            (row) => row?.name === name && row.language === integration.language,
+          );
+          if (matches.length === 1)
+            return { name, status: templateStatus(matches[0], category, base) };
+          if (matches.length === 0 && !page.paging?.next) return { name, status: "missing" };
+          // A partial or ambiguous result cannot establish the configured language's status.
+          return { name, status: "unavailable" };
+        } catch {
+          return { name, status: "unavailable" };
+        }
+      }),
+    );
+    this.access(account);
+    if (this.integration(account).token !== integration.token)
+      throw fail("The Business connection changed. Check the templates again.", 409);
+    return { language: integration.language, templates };
   }
   consent(account, customerId, template) {
     this.access(account);
@@ -479,6 +545,16 @@ export function installWhatsAppRoutes(app, store, service, { requireUser, sameOr
     wrap((req, res) => {
       store.db.prepare("DELETE FROM whatsapp_integrations WHERE store=?").run(req.account.id);
       res.json({ ok: true });
+    }),
+  );
+  app.post(
+    "/api/integrations/whatsapp/templates/check",
+    sameOrigin,
+    requireUser,
+    owner,
+    wrap(async (req, res) => {
+      res.setHeader("Cache-Control", "no-store");
+      res.json(await service.checkTemplates(req.account));
     }),
   );
   app.post(
