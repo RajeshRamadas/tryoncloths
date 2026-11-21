@@ -112,6 +112,9 @@ test("saved store clothes and reviewed adaptations reopen without another produc
     await expect(
       page.getByText("Try-on created. Check the face, body and garment before keeping this look."),
     ).toBeVisible();
+    await expect(
+      page.getByText("Source avatar master version 1 · approval 1", { exact: true }),
+    ).toBeVisible();
     await page
       .getByLabel("I have checked clothing placement and approve this outfit preview.")
       .check();
@@ -130,6 +133,9 @@ test("saved store clothes and reviewed adaptations reopen without another produc
       page.getByText(
         "Saved adaptation reused without an AI request. Review it before keeping this look.",
       ),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Source avatar master version 1 · approval 1", { exact: true }),
     ).toBeVisible();
     expect(calls()).toEqual({ links: 1, generations: 1 });
     await expect(page.getByRole("button", { name: "Download outfit", exact: true })).toBeDisabled();

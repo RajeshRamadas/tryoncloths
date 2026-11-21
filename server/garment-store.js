@@ -210,6 +210,13 @@ export class GarmentStore {
         this.db.exec(
           "ALTER TABLE garment_results ADD COLUMN previewMode TEXT NOT NULL DEFAULT 'ai'",
         );
+      if (
+        !this.db
+          .prepare("PRAGMA table_info(garment_results)")
+          .all()
+          .some((c) => c.name === "source_approval")
+      )
+        this.db.exec("ALTER TABLE garment_results ADD COLUMN source_approval TEXT");
     });
     installCatalogueSchema(this.db);
   }
@@ -594,7 +601,10 @@ export class GarmentStore {
     );
   }
   async context(account, input, { provider, model }) {
-    this.accounts.requireApprovedAvatar(account, input.avatarId);
+    const { sourceApproval, bodyType: approvedBodyType } = this.accounts.requireApprovedAvatar(
+      account,
+      input.avatarId,
+    );
     const garment = this.row(account, input.garmentId);
     if (garment.needsTypeReview)
       throw problem(
@@ -604,17 +614,15 @@ export class GarmentStore {
     if (garment.garmentType !== input.garmentType)
       throw problem("Use the saved garment category, or save it as a different item.");
     const bodyType = input.bodyType || "male";
-    const avatarRow = this.db
-      .prepare("SELECT body_type FROM avatars WHERE account=? AND id=?")
-      .get(account.id, input.avatarId);
-    if (bodyType !== avatarRow.body_type) throw problem("Use the saved avatar body library.");
+    if (bodyType !== approvedBodyType) throw problem("Use the saved avatar body library.");
     let avatar;
     try {
       avatar = await normalizeAvatar(input.avatar);
     } catch {
       throw problem("Use a valid approved avatar PNG.");
     }
-    this.accounts.requireApprovedAvatar(account, input.avatarId);
+    const baseHash = await pixelHash(avatar);
+    this.accounts.requireApprovedAvatar(account, input.avatarId, sourceApproval);
     const latest = this.row(account, input.garmentId);
     if (
       latest.imageHash !== garment.imageHash ||
@@ -625,7 +633,8 @@ export class GarmentStore {
     const id = digest(
       JSON.stringify({
         avatarId: input.avatarId,
-        baseHash: await pixelHash(avatar),
+        sourceApproval,
+        baseHash,
         garmentId: garment.id,
         garmentHash: garment.imageHash,
         garmentType: garment.garmentType,
@@ -636,25 +645,36 @@ export class GarmentStore {
         title: garment.name,
       }),
     );
-    return { id, avatarId: input.avatarId, garmentId: garment.id, avatar, garment };
+    return { id, avatarId: input.avatarId, garmentId: garment.id, avatar, garment, sourceApproval };
   }
   cached(account, context) {
+    this.accounts.requireApprovedAvatar(account, context.avatarId, context.sourceApproval);
     const row = this.db
       .prepare(
-        "SELECT image FROM garment_results WHERE account=? AND id=? AND avatarId=? AND garmentId=?",
+        "SELECT image FROM garment_results WHERE account=? AND id=? AND avatarId=? AND garmentId=? AND source_approval=?",
       )
-      .get(account.id, context.id, context.avatarId, context.garmentId);
-    return row ? { id: context.id, image: png(row.image) } : null;
+      .get(
+        account.id,
+        context.id,
+        context.avatarId,
+        context.garmentId,
+        JSON.stringify(context.sourceApproval),
+      );
+    return row
+      ? { id: context.id, image: png(row.image), sourceApproval: context.sourceApproval }
+      : null;
   }
   async receipt(account, context, image) {
-    const normalized = await normalizeAvatar(image);
+    const outputHash = await pixelHash(await normalizeAvatar(image));
+    this.accounts.requireApprovedAvatar(account, context.avatarId, context.sourceApproval);
     const payload = Buffer.from(
       JSON.stringify({
         account: account.id,
         id: context.id,
         avatarId: context.avatarId,
         garmentId: context.garmentId,
-        outputHash: await pixelHash(normalized),
+        sourceApproval: context.sourceApproval,
+        outputHash,
         expires: Date.now() + 24 * 3600000,
       }),
     ).toString("base64url");
@@ -680,6 +700,7 @@ export class GarmentStore {
       if (
         receipt.account !== account.id ||
         receipt.garmentId !== garmentId ||
+        !receipt.sourceApproval ||
         receipt.expires < Date.now()
       )
         throw new Error();
@@ -688,7 +709,7 @@ export class GarmentStore {
         "This adaptation cannot be saved for automatic reuse after a restart or expired session receipt. You can still save the image as a look; do not regenerate it just to save it.",
       );
     }
-    this.accounts.requireApprovedAvatar(account, receipt.avatarId);
+    this.accounts.requireApprovedAvatar(account, receipt.avatarId, receipt.sourceApproval);
     this.row(account, garmentId);
     let image;
     try {
@@ -700,26 +721,36 @@ export class GarmentStore {
       throw problem(
         "The image changed after generation. Save the original adaptation before adding other layers.",
       );
-    this.accounts.requireApprovedAvatar(account, receipt.avatarId);
-    this.row(account, garmentId);
-    const exists = this.db
-      .prepare("SELECT id FROM garment_results WHERE account=? AND id=?")
-      .get(account.id, receipt.id);
-    if (
-      !exists &&
-      this.db.prepare("SELECT count(*) AS n FROM garment_results WHERE account=?").get(account.id)
-        .n >= 200
-    )
-      throw problem(
-        "Your store holds up to 200 saved adaptations. Remove an unused result or garment first.",
-        409,
-      );
-    this.db
-      .prepare(
-        "INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt) VALUES(?,?,?,?,?,?) ON CONFLICT(account,id) DO NOTHING",
+    return transaction(this.db, () => {
+      this.accounts.requireApprovedAvatar(account, receipt.avatarId, receipt.sourceApproval);
+      this.row(account, garmentId);
+      const exists = this.db
+        .prepare("SELECT id FROM garment_results WHERE account=? AND id=?")
+        .get(account.id, receipt.id);
+      if (
+        !exists &&
+        this.db.prepare("SELECT count(*) AS n FROM garment_results WHERE account=?").get(account.id)
+          .n >= 200
       )
-      .run(account.id, receipt.id, receipt.avatarId, garmentId, image, Date.now());
-    return { id: receipt.id };
+        throw problem(
+          "Your store holds up to 200 saved adaptations. Remove an unused result or garment first.",
+          409,
+        );
+      this.db
+        .prepare(
+          "INSERT INTO garment_results(account,id,avatarId,garmentId,image,savedAt,source_approval) VALUES(?,?,?,?,?,?,?) ON CONFLICT(account,id) DO NOTHING",
+        )
+        .run(
+          account.id,
+          receipt.id,
+          receipt.avatarId,
+          garmentId,
+          image,
+          Date.now(),
+          JSON.stringify(receipt.sourceApproval),
+        );
+      return { id: receipt.id, sourceApproval: receipt.sourceApproval };
+    });
   }
   removeResult(account, garmentId, id) {
     this.row(account, garmentId);

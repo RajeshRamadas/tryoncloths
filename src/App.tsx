@@ -1457,6 +1457,7 @@ export default function App() {
                               // Revoking review of an account-saved avatar also revokes its
                               // previously approved server record, not only the UI checkbox.
                               if (
+                                qualityReviewPassed &&
                                 accountState.account &&
                                 avatarId &&
                                 reviewRevokedIdRef.current !== avatarId

@@ -79,6 +79,20 @@ and after a server restart; approved saved results remain available across resta
 If an unsaved receipt expires, save the existing image as a complete look instead
 of generating again. The app preserves paid output when receipt creation fails.
 
+Each new catalogue clothing adaptation records the source master version,
+approval revision and SHA-256 of the approved PNG. The starting outfit's pixels
+are hashed separately so layered outfits still have distinct cache entries. The
+server checks the source approval before generation, receipt creation and result
+save. Revoking and approving again creates a new reuse context, even for the same
+PNG. Filling in a fresh review after reopening an already approved avatar keeps
+that approval active unless staff explicitly revoke it or edit a completed review.
+
+Older catalogue adaptations have no approval revision on record. They remain in
+storage and are excluded from automatic matches. Complete saved looks can still
+be opened. A new reuse entry starts with an explicit try-on and review under the
+active approval. An older approved avatar without a numbered review is identified
+by its approval date and PNG hash until its next review creates a revision.
+
 Deleting a garment deletes its adaptations. Deleting a customer avatar deletes
 that avatar's adaptations, while retaining the store's garment catalogue. Existing
 complete saved looks remain independent of garment deletion. **Forget saved
@@ -106,9 +120,11 @@ API processes in future, move the in-flight lock to shared durable coordination.
 
 `POST /api/tryon` accepts optional `garmentId` and `avatarId`. When supplied, it
 uses the owned stored garment's photo, category and name; client-supplied replacements
-cannot poison the cache. Results may include `reuseReceipt`, `garmentId`, `reused`
-or `reuseWarning`. The existing `garment-tryon-v1` contract and anonymous/raw-photo
-flow remain compatible. Health adds `garmentCatalogueAvailable` when accounts exist.
+cannot poison the cache. Catalogue results include `sourceApproval` containing the
+avatar ID, master ID and version, approval date and revision, and PNG SHA-256. Results
+may also include `reuseReceipt`, `garmentId`, `reused` or `reuseWarning`. The existing
+`garment-tryon-v1` contract supports raw-photo try-ons. Health adds
+`garmentCatalogueAvailable` when accounts exist.
 
 ## Deployment and validation
 
