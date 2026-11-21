@@ -42,6 +42,7 @@ export type JewelleryResult = {
   receiptUnavailable?: boolean;
   kind?: string;
   previewMode?: PreviewMode;
+  sourceApproval?: { masterVersion: number; approvalVersion: number | null };
 };
 export const regions: Record<JewelleryType, string> = {
   stud_earrings: "ears",

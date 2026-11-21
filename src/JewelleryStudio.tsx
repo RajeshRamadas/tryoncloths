@@ -49,6 +49,7 @@ type Frame = {
   baseLookId?: string;
   saved?: boolean;
   previewMode?: PreviewMode;
+  sourceApproval?: JewelleryResult["sourceApproval"];
 };
 const emptyDraft = (): Draft => ({
   name: "",
@@ -257,6 +258,7 @@ export default function JewelleryStudio() {
                   items: look.itemsJson,
                   baseLookId: look.id,
                   previewMode: look.previewMode,
+                  sourceApproval: look.sourceApproval,
                 },
               ],
             }));
@@ -868,6 +870,7 @@ export default function JewelleryStudio() {
     reviewed &&
     (!current || !!baseProof) &&
     (current?.items.length || 0) < 10;
+  const sourceApproval = current?.result?.sourceApproval ?? current?.sourceApproval;
   return (
     <main className="billing-page jewellery-studio">
       <nav className="jewellery-navigation">
@@ -1032,6 +1035,13 @@ export default function JewelleryStudio() {
                   {!!frames.length && (
                     <>
                       <h2>Pieces in this view</h2>
+                      {sourceApproval && (
+                        <p className="small-footnote">
+                          Source avatar master version {sourceApproval.masterVersion}
+                          {sourceApproval.approvalVersion != null &&
+                            ` · approval ${sourceApproval.approvalVersion}`}
+                        </p>
+                      )}
                       {current?.baseLookId && (
                         <p className="small-footnote">
                           This saved look is a complete image. Undo applies to new additions made in

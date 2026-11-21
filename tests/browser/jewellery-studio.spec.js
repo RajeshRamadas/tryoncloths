@@ -310,6 +310,9 @@ test("mobile portrait → earrings → nose pin → undo → save/share/reopen a
     await page.getByRole("button", { name: /^Gold drop earrings/ }).click();
     await expect(page.getByText(/38 mm drop/)).toBeVisible();
     await tryPiece(page);
+    await expect(
+      page.getByText("Source avatar master version 1 · approval 1", { exact: true }),
+    ).toBeVisible();
     const earrings = await page
       .getByRole("img", { name: "Customer jewellery preview", exact: true })
       .getAttribute("src");
@@ -360,6 +363,9 @@ test("mobile portrait → earrings → nose pin → undo → save/share/reopen a
     await page.goto("/jewellery?avatar=" + avatar.id + "&look=" + look.id);
     await expect(
       page.getByRole("img", { name: "Customer jewellery preview", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Source avatar master version 1 · approval 1", { exact: true }),
     ).toBeVisible();
     expect(calls()).toBe(2);
     expect(portraits()).toBe(1);
@@ -653,6 +659,9 @@ test("free cut-out upload → anchored mobile editor → drag/scale/rotate/reset
         page.getByRole("img", { name: "Customer jewellery preview", exact: true }),
       ).toBeVisible();
       await expect(page.locator(".jewellery-ai-label")).toHaveText("Overlay preview");
+      await expect(
+        page.getByText("Source avatar master version 1 · approval 1", { exact: true }),
+      ).toBeVisible();
       await review(page).check();
       await page.getByLabel("Jewellery look name", { exact: true }).fill("Gold drops overlay");
       await page

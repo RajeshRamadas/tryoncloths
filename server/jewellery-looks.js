@@ -98,9 +98,11 @@ export async function saveJewelleryLook(store, jewellery, account, input, guard)
   guard();
   let claims,
     previewMode = "ai",
-    handsPacket;
+    handsPacket,
+    sourceApproval;
   if (input.receipt) {
     claims = jewellery.claims(account, input.receipt);
+    sourceApproval = claims.sourceApproval;
     previewMode = claims.previewMode || "ai";
     handsPacket = claims.handsGeometry;
     if (
@@ -118,10 +120,16 @@ export async function saveJewelleryLook(store, jewellery, account, input, guard)
       .get(account.id, input.resultId, input.avatarId, input.view);
     previewMode = row?.previewMode || "ai";
     if (row?.handsGeometryJson) handsPacket = JSON.parse(row.handsGeometryJson);
-    if (!row || hash(row.image) !== hash(image) || row.garmentId !== items.at(-1).itemId)
+    if (
+      !row?.source_approval ||
+      hash(row.image) !== hash(image) ||
+      row.garmentId !== items.at(-1).itemId
+    )
       throw fail("The approved jewellery result is unavailable.", 409);
+    sourceApproval = JSON.parse(row.source_approval);
   } else if (input.baseLookId) {
     const row = jewelleryLook(store, account, input.baseLookId);
+    sourceApproval = row.source_approval ? JSON.parse(row.source_approval) : undefined;
     previewMode = row.previewMode;
     if (row.handsGeometryJson) handsPacket = JSON.parse(row.handsGeometryJson);
     if (
@@ -138,6 +146,7 @@ export async function saveJewelleryLook(store, jewellery, account, input, guard)
   const check = () => {
     guard();
     if (claims) jewellery.current(account, claims);
+    else store.requireApprovedAvatar(account, input.avatarId, sourceApproval);
   };
   check();
   const labels = items.map((i) =>
@@ -161,6 +170,7 @@ export async function saveJewelleryLook(store, jewellery, account, input, guard)
       itemsJson: items,
       previewMode,
       handsGeometry: geometry?.packet,
+      sourceApproval,
       guard: check,
     },
   );
