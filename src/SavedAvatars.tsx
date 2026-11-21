@@ -1,5 +1,6 @@
 import PurchaseLook from "./PurchaseLook";
 import ShareLook from "./ShareLook";
+import AvatarVersionHistory from "./AvatarVersionHistory";
 import { useRef, useState, useEffect } from "react";
 import { catalogueApi } from "./catalogue";
 import { FolderOpen, X } from "lucide-react";
@@ -293,7 +294,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
                     {cloud && !localView && (
                       <p>
                         {item.approvalStatus === "approved"
-                          ? "Approved for account-backed fashion reuse. Re-review when reopening."
+                          ? `${item.approvedVersion ? `Version ${item.approvedVersion} approved` : "Approved"} for account-backed fashion reuse. Re-review when reopening.`
                           : "Draft — open and complete the customer quality review before fashion reuse."}
                       </p>
                     )}
@@ -312,6 +313,9 @@ export default function SavedAvatars({ disabled, cloud = false, onUse }: Props) 
                       >
                         View looks ({item.looksCount || 0}) for {item.name}
                       </button>
+                    )}
+                    {cloud && !localView && item.latestVersion != null && (
+                      <AvatarVersionHistory id={item.id} name={item.name} />
                     )}
                     {cloud && !localView && viewsAvailable && !busy && (
                       <a

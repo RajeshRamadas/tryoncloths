@@ -108,6 +108,10 @@ test("store accounts save reviewed avatars and reopen them with generation detai
       second.getByRole("button", { name: "Use Customer Anil", exact: true }),
     ).toBeVisible();
     await second.setViewportSize({ width: 390, height: 844 });
+    await second.getByRole("button", { name: "Version history for Customer Anil" }).click();
+    const history = second.getByRole("region", { name: "Approved versions for Customer Anil" });
+    await expect(history).toContainText("Version 1 · Active");
+    await expect(history).toContainText("Regular · 175 cm · 72 kg");
     await expect(
       second.getByText("Generated with gemini-2.5-flash-image · customer-neck-v6"),
     ).toBeVisible();

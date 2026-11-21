@@ -32,6 +32,20 @@ export async function listAccountAvatars(): Promise<SavedAvatar[]> {
     image: new Blob([], { type: "image/png" }),
   }));
 }
+export type AvatarVersion = Pick<AvatarDetails, "name" | "profileId" | "heightCm" | "weightKg"> & {
+  version: number;
+  approvedAt: number;
+  current: boolean;
+};
+
+export async function listAvatarVersions(
+  id: string,
+  before?: number,
+): Promise<{ versions: AvatarVersion[]; nextBefore: number | null }> {
+  const path = `/api/avatars/${encodeURIComponent(id)}/versions`;
+  return json(before === undefined ? path : `${path}?before=${before}`);
+}
+
 export async function accountAvatarImage(id: string): Promise<Blob> {
   const r = await requestApi(`/api/avatars/${encodeURIComponent(id)}/image`, {}, 30000);
   if (r.status === 401) window.dispatchEvent(new Event("forme-account-expired"));

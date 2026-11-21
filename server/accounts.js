@@ -52,6 +52,7 @@ const scrypt = promisify(scryptCallback);
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const cookieName = "forme_session";
 const lifetime = 30 * 24 * 3600 * 1000;
+const avatarVersionsPageSize = 20;
 const error = (message, status = 400) => Object.assign(new Error(message), { status });
 const emailValue = (value) => (typeof value === "string" ? value.trim().toLowerCase() : "");
 
@@ -131,6 +132,28 @@ export class AccountStore {
         this.db.exec("ALTER TABLE avatars ADD COLUMN profile_selection TEXT");
       if (!avatarColumns.includes("generation_provenance"))
         this.db.exec("ALTER TABLE avatars ADD COLUMN generation_provenance TEXT");
+      if (!avatarColumns.includes("approved_version"))
+        this.db.exec("ALTER TABLE avatars ADD COLUMN approved_version INTEGER");
+      this.db.exec(`
+        CREATE TABLE IF NOT EXISTS avatar_versions (
+          account TEXT NOT NULL,
+          avatarId TEXT NOT NULL,
+          version INTEGER NOT NULL,
+          image_sha256 TEXT NOT NULL,
+          metadata TEXT NOT NULL,
+          approved_at INTEGER NOT NULL,
+          approved_by TEXT NOT NULL,
+          review_policy INTEGER NOT NULL,
+          PRIMARY KEY(account,avatarId,version),
+          FOREIGN KEY(account,avatarId) REFERENCES avatars(account,id) ON DELETE CASCADE
+        );
+        CREATE TRIGGER IF NOT EXISTS avatar_versions_immutable BEFORE UPDATE ON avatar_versions
+        BEGIN SELECT RAISE(ABORT,'Approved avatar versions are immutable'); END;
+        CREATE TRIGGER IF NOT EXISTS avatar_version_image_immutable BEFORE UPDATE OF image ON avatars
+        WHEN NEW.image <> OLD.image AND EXISTS(
+          SELECT 1 FROM avatar_versions WHERE account=OLD.account AND avatarId=OLD.id
+        )
+        BEGIN SELECT RAISE(ABORT,'Approved avatar PNGs are immutable'); END;`);
       const columns = this.db
         .prepare("PRAGMA table_info(looks)")
         .all()
@@ -383,7 +406,7 @@ export class AccountStore {
         `INSERT INTO avatars(id,account,name,profileId,heightCm,weightKg,source,savedAt,image,thumbnail,body_type,template_tone,customer,profile_selection,generation_provenance)
          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
          ON CONFLICT(account,id) DO UPDATE SET name=excluded.name,profileId=excluded.profileId,heightCm=excluded.heightCm,weightKg=excluded.weightKg,source=excluded.source,savedAt=excluded.savedAt,body_type=excluded.body_type,template_tone=excluded.template_tone,profile_selection=excluded.profile_selection,
-           generation_provenance=COALESCE(avatars.generation_provenance,excluded.generation_provenance),approved_at=NULL,approved_by=NULL,review_policy=0`,
+           generation_provenance=COALESCE(avatars.generation_provenance,excluded.generation_provenance),approved_at=NULL,approved_by=NULL,review_policy=0,approved_version=NULL`,
       )
       .run(
         id,
@@ -408,19 +431,65 @@ export class AccountStore {
   approveAvatar(account, id, review) {
     if (!validateAvatarApproval(review))
       throw error("Complete all six quality checks and obtain explicit customer approval.", 400);
-    const approvedAt = Date.now();
-    const changed = this.db
-      .prepare(
-        "UPDATE avatars SET approved_at=?,approved_by=?,review_policy=? WHERE account=? AND id=?",
+    return transaction(this.db, () => {
+      const avatar = this.db
+        .prepare("SELECT * FROM avatars WHERE account=? AND id=?")
+        .get(account.id, id);
+      if (!avatar) throw error("Avatar not found.", 404);
+      if (
+        avatar.approved_version &&
+        avatar.approved_at &&
+        avatar.review_policy === AVATAR_REVIEW_POLICY_VERSION
       )
-      .run(approvedAt, account.user.id, AVATAR_REVIEW_POLICY_VERSION, account.id, id);
-    if (!changed.changes) throw error("Avatar not found.", 404);
-    return { id, approvalStatus: "approved", approvedAt };
+        return {
+          id,
+          approvalStatus: "approved",
+          approvedAt: avatar.approved_at,
+          version: avatar.approved_version,
+        };
+
+      const approvedAt = Date.now();
+      const metadata = {
+        name: avatar.name,
+        profileId: avatar.profileId,
+        bodyType: avatar.body_type,
+        templateTone: avatar.template_tone,
+        heightCm: avatar.heightCm,
+        weightKg: avatar.weightKg,
+        source: avatar.source,
+        savedAt: avatar.savedAt,
+        profileSelection: avatar.profile_selection ? JSON.parse(avatar.profile_selection) : null,
+        generation: avatar.generation_provenance ? JSON.parse(avatar.generation_provenance) : null,
+      };
+      const { version } = this.db
+        .prepare(
+          `INSERT INTO avatar_versions(account,avatarId,version,image_sha256,metadata,approved_at,approved_by,review_policy)
+          VALUES(?,?,(SELECT COALESCE(MAX(version),0)+1 FROM avatar_versions WHERE account=? AND avatarId=?),?,?,?,?,?)
+          RETURNING version`,
+        )
+        .get(
+          account.id,
+          id,
+          account.id,
+          id,
+          digest(avatar.image),
+          JSON.stringify(metadata),
+          approvedAt,
+          account.user.id,
+          AVATAR_REVIEW_POLICY_VERSION,
+        );
+      this.db
+        .prepare(
+          "UPDATE avatars SET approved_at=?,approved_by=?,review_policy=?,approved_version=? WHERE account=? AND id=?",
+        )
+        .run(approvedAt, account.user.id, AVATAR_REVIEW_POLICY_VERSION, version, account.id, id);
+      return { id, approvalStatus: "approved", approvedAt, version };
+    });
   }
   revokeAvatarApproval(account, id) {
     const changed = this.db
       .prepare(
-        "UPDATE avatars SET approved_at=NULL,approved_by=NULL,review_policy=0 WHERE account=? AND id=?",
+        "UPDATE avatars SET approved_at=NULL,approved_by=NULL,review_policy=0,approved_version=NULL WHERE account=? AND id=?",
       )
       .run(account.id, id);
     if (!changed.changes) throw error("Avatar not found.", 404);
@@ -435,10 +504,38 @@ export class AccountStore {
     if (!row.approved_at || row.review_policy !== AVATAR_REVIEW_POLICY_VERSION)
       throw error("This avatar needs customer and quality review before it can be reused.", 409);
   }
+  avatarVersions(account, id, before) {
+    const upperBound = before === undefined ? Number.MAX_SAFE_INTEGER : Number(before);
+    if (
+      (before !== undefined && (typeof before !== "string" || !/^\d+$/.test(before))) ||
+      !Number.isSafeInteger(upperBound) ||
+      upperBound < 1
+    )
+      throw error("Use a valid avatar version number.");
+    this.requireAvatar(account, id);
+    const rows = this.db
+      .prepare(
+        `SELECT v.version,v.image_sha256 AS imageSha256,v.metadata,v.approved_at AS approvedAt,
+        v.approved_by AS approvedBy,v.review_policy AS reviewPolicy,
+        COALESCE(a.approved_version=v.version AND a.review_policy=?,0) AS current
+        FROM avatar_versions v JOIN avatars a ON a.account=v.account AND a.id=v.avatarId
+        WHERE v.account=? AND v.avatarId=? AND v.version<? ORDER BY v.version DESC LIMIT ?`,
+      )
+      .all(AVATAR_REVIEW_POLICY_VERSION, account.id, id, upperBound, avatarVersionsPageSize + 1);
+    const versions = rows.slice(0, avatarVersionsPageSize).map(({ metadata, current, ...row }) => ({
+      ...row,
+      ...JSON.parse(metadata),
+      current: Boolean(current),
+    }));
+    return {
+      versions,
+      nextBefore: rows.length > avatarVersionsPageSize ? versions.at(-1).version : null,
+    };
+  }
   list(account) {
     return this.db
       .prepare(
-        "SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,profile_selection,generation_provenance,CASE WHEN approved_at IS NOT NULL AND review_policy=1 THEN 'approved' ELSE 'draft' END AS approvalStatus,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC",
+        "SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,profile_selection,generation_provenance,approved_version AS approvedVersion,(SELECT max(v.version) FROM avatar_versions v WHERE v.account=avatars.account AND v.avatarId=avatars.id) AS latestVersion,CASE WHEN approved_at IS NOT NULL AND review_policy=1 THEN 'approved' ELSE 'draft' END AS approvalStatus,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC",
       )
       .all(account.id)
       .map(({ profile_selection, generation_provenance, ...row }) => ({
@@ -774,6 +871,13 @@ export function installAccountRoutes(
       if (!image) throw error("Avatar not found.", 404);
       res.type("png").send(image);
     }),
+  );
+  app.get(
+    "/api/avatars/:id/versions",
+    requireUser,
+    wrap((req, res) =>
+      res.json(store.avatarVersions(req.account, req.params.id, req.query.before)),
+    ),
   );
   app.post(
     "/api/avatars",
