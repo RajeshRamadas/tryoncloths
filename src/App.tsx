@@ -34,6 +34,7 @@ import {
 } from "./profiles";
 import { downloadAvatar, libraryForIndex, readPhoto } from "./images";
 import BodyPhotoHints from "./BodyPhotoHints";
+import FacePhotoHints from "./FacePhotoHints";
 import PhotoClarityHints from "./PhotoClarityHints";
 import { checkPhotoClarity } from "./photo-clarity-browser";
 import { analyseBodyPhoto, type BodyPhotoAnalysis } from "./body-pose";
@@ -1012,6 +1013,7 @@ export default function App() {
                           }}
                         />
                       </div>
+                      {face && <FacePhotoHints photo={face} />}
                       {face && <PhotoClarityHints photo={face} kind="face" />}
                       {body && <PhotoClarityHints photo={body} kind="body" />}
                       {body && <BodyPhotoHints photo={body} />}
