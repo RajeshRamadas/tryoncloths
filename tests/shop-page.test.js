@@ -135,7 +135,9 @@ test("try-on entry uses WhatsApp click-to-chat, else the store phone", () => {
   assert.equal(
     tryOnLink({ whatsapp: "+919876543210" }, brand, "Silk shirt"),
     "https://wa.me/919876543210?text=" +
-      encodeURIComponent(`Hi Lakshmi Silks, I'd like to try on "Silk shirt". When can I visit?`),
+      encodeURIComponent(
+        `Hi Lakshmi Silks, I'd like a virtual try-on for "Silk shirt". Can you help me arrange one?`,
+      ),
   );
   assert.equal(tryOnLink({ whatsapp: "" }, brand), "tel:+918000000000");
   assert.equal(tryOnLink({ whatsapp: "" }, { ...brand, phone: "" }), "");
@@ -147,6 +149,8 @@ test("a new shop page is private until the owner publishes it; staff can preview
     assert.equal(page.slug, "lakshmi-silks-sarees");
     assert.equal(page.published, false);
     assert.equal(page.path, "/shop/lakshmi-silks-sarees");
+    assert.equal(page.availableItems, 1);
+    assert.equal(page.storePhoneAvailable, true);
     assert.equal((await request(page.path, "GET", undefined, "")).status, 404);
     assert.equal((await request(page.path, "GET", undefined, cb)).status, 404);
     for (const cookie of [ca, cs]) {
@@ -154,7 +158,9 @@ test("a new shop page is private until the owner publishes it; staff can preview
       assert.equal(preview.status, 200);
       assert.equal(preview.headers.get("cache-control"), "private, no-store");
       assert.match(preview.headers.get("x-robots-tag"), /noindex/);
-      assert.match(await preview.text(), /Preview: only your store team/);
+      const html = await preview.text();
+      assert.match(html, /Private preview\. Publish the shop/);
+      assert.match(html, /href="tel:\+918000000000"[^>]*>Call for a try-on<\/a>/);
     }
     const published = await request("/api/shop-page", "PUT", {
       published: true,
@@ -164,7 +170,7 @@ test("a new shop page is private until the owner publishes it; staff can preview
     const live = await request(page.path, "GET", undefined, "");
     assert.equal(live.status, 200);
     assert.match(live.headers.get("cache-control"), /public/);
-    assert.doesNotMatch(await live.text(), /Preview:/);
+    assert.doesNotMatch(await live.text(), /Private preview/);
   }));
 
 test("the public page shows branding, escaped content, photos and only in-stock catalogue items", async () =>
@@ -195,6 +201,9 @@ test("the public page shows branding, escaped content, photos and only in-stock 
     assert.match(html, /Family run since 1998/);
     assert.match(html, /Mon–Sat 10–9/);
     assert.match(html, /https:\/\/wa\.me\/919876543210\?text=/);
+    assert.match(html, /href="#collection">Browse collection<\/a>/);
+    assert.match(html, /Try on via WhatsApp — Kanchipuram silk shirt — maroon/);
+    assert.ok(html.indexOf('id="collection"') < html.indexOf('id="shop-photos-heading"'));
     assert.match(html, /Kanchipuram silk shirt/);
     assert.match(html, /₹2,499/);
     assert.match(html, /<s>₹2,999<\/s>/);
@@ -223,6 +232,7 @@ test("the public page shows branding, escaped content, photos and only in-stock 
     await request("/api/shop-page", "PUT", { showCatalogue: false });
     const hidden = await (await request("/shop/lakshmi", "GET", undefined, "")).text();
     assert.doesNotMatch(hidden, /Kanchipuram silk shirt/);
+    assert.doesNotMatch(hidden, /Browse collection/);
     assert.equal(
       (await request(`/shop/lakshmi/items/${inStock.id}/image`, "GET", undefined, "")).status,
       404,
@@ -343,6 +353,8 @@ test("each shop publishes only its own valid Instagram and Facebook profiles", a
     assert.match(otherHtml, /instagram\.com\/otherbrand\//);
     assert.match(otherHtml, /facebook\.com\/p\/Other-Brand-100200300/);
     assert.doesNotMatch(otherHtml, /class="store-contact"/);
+    assert.match(otherHtml, /The shop hasn’t listed any products yet\./);
+    assert.doesNotMatch(otherHtml, /Browse collection|Message on WhatsApp|Call for a try-on/);
     assert.doesNotMatch(otherHtml, /lakshmi\.jewels|123456789/);
     const readPublic = async () =>
       (await (await request(settings.path + "/data.json", "GET", undefined, "")).json()).store;

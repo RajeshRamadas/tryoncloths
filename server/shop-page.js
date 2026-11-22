@@ -226,6 +226,8 @@ export class ShopPageStore {
       ...settings(row.settingsJson),
       revision: row.revision,
       updatedAt: row.updatedAt,
+      availableItems: this.catalogue(storeId).length,
+      storePhoneAvailable: Boolean(this.store.branding.read(storeId).phone),
       photoLimit: MAX_SHOP_PHOTOS,
       photos: this.photos(storeId).map((p) => ({
         id: p.id,
@@ -421,8 +423,8 @@ export class ShopPageStore {
 // WhatsApp click-to-chat when the store set a number, otherwise a phone call.
 export function tryOnLink(page, brand, itemName) {
   const message = itemName
-    ? `Hi ${brand.displayName}, I'd like to try on "${itemName}". When can I visit?`
-    : `Hi ${brand.displayName}, I'd like to book a try-on visit.`;
+    ? `Hi ${brand.displayName}, I'd like a virtual try-on for "${itemName}". Can you help me arrange one?`
+    : `Hi ${brand.displayName}, I'd like to arrange a virtual try-on. How does it work?`;
   if (page.whatsapp)
     return `https://wa.me/${page.whatsapp.slice(1)}?text=${encodeURIComponent(message)}`;
   if (brand.phone) return `tel:${brand.phone}`;
@@ -434,16 +436,16 @@ const css = [
   "main{max-width:1040px;margin:auto;padding:max(24px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(40px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}@media(min-width:1280px){main{max-width:1200px}}",
   "h2{font-size:22px;font-weight:700;letter-spacing:-.01em;margin:40px 0 12px}p{overflow-wrap:anywhere;white-space:pre-line}a{color:var(--brand)}",
   ".tagline{font-size:18px;color:#3a4641;margin:-4px 0 16px}",
-  ".shop-socials{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.shop-socials a{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid #cbd3ce;border-radius:999px;text-decoration:none;font-weight:600;color:#18211d}.shop-socials a:hover{text-decoration:underline}",
+  ".shop-actions,.shop-socials{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.shop-socials{margin:12px 0}.shop-socials a,.shop-actions .secondary{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid #cbd3ce;border-radius:999px;text-decoration:none;font-weight:600;color:#18211d}.shop-socials a:hover,.shop-actions .secondary:hover{text-decoration:underline}",
   ".cta{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 24px;border-radius:999px;background:var(--brand);color:var(--brand-ink);text-decoration:none;font-weight:600;box-shadow:0 1px 3px rgb(24 33 29/.12)}",
-  ".hero{display:block;width:100%;max-height:60vh;object-fit:cover;border-radius:16px;margin:20px 0}",
+  ".collection{scroll-margin-block-start:16px}.collection h2{margin-bottom:4px}.collection>p{max-width:58ch;margin:0 0 16px;color:#3a4641}.shop-cover{margin:0 0 16px}.hero{display:block;width:100%;max-height:52vh;object-fit:cover;border-radius:16px}",
   ".gallery,.items{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}@media(max-width:600px){.gallery,.items{gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.item{padding:8px}}",
   ".gallery figure{margin:0}.gallery img,.item img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:12px;background:#edf0ed}.item img{object-fit:contain;padding:8px}figcaption{font-size:14px;color:#535f59;margin-top:6px}",
   ".item{padding:12px;border:1px solid #e1e6e2;border-radius:14px;background:#fff;display:flex;flex-direction:column;gap:4px;box-shadow:0 1px 2px rgb(24 33 29/.05)}",
   ".item h3{font-size:16px;font-weight:600;margin:8px 0 0;overflow-wrap:anywhere}.item small{color:#535f59}.item .price{font-weight:700}.item s{color:#68746e;font-weight:400;margin-left:6px}.item .low{color:#93500b;font-size:14px;font-weight:500}",
-  ".item nav{display:flex;flex-direction:column;gap:2px;margin-top:auto;padding-top:8px;font-size:15px}",
-  ".item nav a{justify-content:center;font-weight:500}.item nav a.try{justify-content:center;border-radius:999px;background:var(--brand);color:var(--brand-ink);text-decoration:none;font-weight:600}",
-  ".item nav a,.store-contact nav a{display:inline-flex;align-items:center;min-height:44px}",
+  ".item-actions{display:flex;flex-direction:column;gap:2px;margin-top:auto;padding-top:8px;font-size:14px}",
+  ".item-actions a{justify-content:center;font-weight:500;text-align:center;padding:4px 8px}.item-actions a.try{border-radius:12px;background:var(--brand);color:var(--brand-ink);text-decoration:none;font-weight:600;line-height:1.25}",
+  ".item-actions a,.store-contact nav a{display:inline-flex;align-items:center;min-height:44px}",
   ".info{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}.info section{padding:20px 24px;border:1px solid #e1e6e2;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgb(24 33 29/.05)}.info h2{margin-top:0;font-size:18px}",
   ".powered{margin-top:32px;font-size:13px;color:#68746e}.preview{padding:10px 14px;border-radius:10px;background:#fdf6e7;color:#93500b}",
 ].join("");
@@ -453,18 +455,29 @@ const shopBrandCss =
 export function shopPageHtml({ page, brand, photos, items, slug, preview = false }) {
   const base = `/shop/${encodeURIComponent(slug)}`,
     [hero, ...rest] = photos,
+    hasItems = page.showCatalogue && items.length > 0,
     tryAll = tryOnLink(page, brand),
+    requestLabel = page.whatsapp ? "Message on WhatsApp" : "Call for a try-on",
+    itemRequestLabel = page.whatsapp ? "Try on via WhatsApp" : "Call for a try-on",
     external = (href) =>
       href.startsWith("https:") ? ' target="_blank" rel="noopener noreferrer"' : "";
-  const photo = (p, cls) =>
-    `<img${cls ? ` class="${cls}"` : ""} src="${base}/photos/${escape(p.id)}" alt="${escape(p.caption || `${brand.displayName} shop photo`)}" loading="lazy">`;
+  const photo = (p, cover = false) =>
+    `<figure${cover ? ' class="shop-cover"' : ""}><img${cover ? ' class="hero"' : ""} src="${base}/photos/${escape(p.id)}" alt="${escape(p.caption || `${brand.displayName} shop photo`)}" loading="lazy">${p.caption ? `<figcaption>${escape(p.caption)}</figcaption>` : ""}</figure>`;
   const item = (g) => {
     const label = [g.name, g.variant].filter(Boolean).join(" — "),
       link = tryOnLink(page, brand, label),
       online = httpsUrl(g.sourceUrl),
       price = page.showPrices ? money(g.priceInr) : "",
       mrp = page.showPrices && g.mrpInr > g.priceInr ? money(g.mrpInr) : "";
-    return `<article class="item"><img src="${base}/items/${encodeURIComponent(g.id)}/image" alt="${escape(label)}" loading="lazy"><h3>${escape(g.name)}</h3>${g.variant ? `<small>${escape(g.variant)}</small>` : ""}${price ? `<span class="price">${escape(price)}${mrp ? `<s>${escape(mrp)}</s>` : ""}</span>` : ""}${g.stock === "low" ? '<span class="low">Only a few left</span>' : ""}<nav>${link ? `<a class="try" href="${escape(link)}"${external(link)}>Try it on</a>` : ""}${online ? `<a href="${escape(online)}" target="_blank" rel="noopener noreferrer">View online</a>` : ""}</nav></article>`;
+    const actions = [
+      link
+        ? `<a class="try" href="${escape(link)}"${external(link)} aria-label="${itemRequestLabel} — ${escape(label)}">${itemRequestLabel}</a>`
+        : "",
+      online
+        ? `<a href="${escape(online)}" target="_blank" rel="noopener noreferrer" aria-label="View online — ${escape(label)}">View online</a>`
+        : "",
+    ].join("");
+    return `<article class="item"><img src="${base}/items/${encodeURIComponent(g.id)}/image" alt="${escape(label)}" loading="lazy"><h3>${escape(g.name)}</h3>${g.variant ? `<small>${escape(g.variant)}</small>` : ""}${price ? `<span class="price">${escape(price)}${mrp ? `<s>${escape(mrp)}</s>` : ""}</span>` : ""}${g.stock === "low" ? '<span class="low">Only a few left</span>' : ""}${actions ? `<div class="item-actions">${actions}</div>` : ""}</article>`;
   };
   const info = [
     page.about ? `<section><h2>About us</h2><p>${escape(page.about)}</p></section>` : "",
@@ -481,7 +494,35 @@ export function shopPageHtml({ page, brand, photos, items, slug, preview = false
     )
     .join("");
   const contact = brand.address || brand.phone || brand.mapUrl ? brandContact(brand) : "";
-  const body = `${preview ? '<p class="preview" role="status">Preview: only your store team can see this page until it is published.</p>' : ""}${brandHeader(brand, `${base}/logo`)}${page.tagline ? `<p class="tagline">${escape(page.tagline)}</p>` : ""}${tryAll ? `<a class="cta" href="${escape(tryAll)}"${external(tryAll)}>Book a try-on</a>` : ""}${socialLinks ? `<nav class="shop-socials" aria-label="Social links">${socialLinks}</nav>` : ""}${hero ? photo(hero, "hero") : ""}${info ? `<div class="info">${info}</div>` : ""}${rest.length ? `<h2>Inside our shop</h2><div class="gallery">${rest.map((p) => `<figure>${photo(p)}${p.caption ? `<figcaption>${escape(p.caption)}</figcaption>` : ""}</figure>`).join("")}</div>` : ""}${page.showCatalogue && items.length ? `<h2>In store now</h2><p>See a piece you like? Tap “Try it on” and the store will set up a virtual try-on on your own avatar.</p><div class="items">${items.map(item).join("")}</div>` : ""}${contact}<p class="powered">Virtual try-on by Forme. Try-on images are an approximate visual guide and do not predict size or fit.</p>`;
+  const actions = [
+    hasItems ? '<a class="cta" href="#collection">Browse collection</a>' : "",
+    tryAll
+      ? `<a class="${hasItems ? "secondary" : "cta"}" href="${escape(tryAll)}"${external(tryAll)} aria-label="${requestLabel}">${hasItems && page.whatsapp ? "WhatsApp" : requestLabel}</a>`
+      : "",
+  ].join("");
+  const collection = hasItems
+    ? `<section class="collection" id="collection" aria-labelledby="collection-heading" tabindex="-1"><h2 id="collection-heading">Shop the collection</h2>${tryAll ? `<p>${page.whatsapp ? "Choose a piece to open a WhatsApp message with its name. The shop will help you arrange a virtual try-on." : "Call the shop and mention the piece you’d like to try. The shop will help you arrange a virtual try-on."}</p>` : ""}<div class="items">${items.map(item).join("")}</div></section>`
+    : page.showCatalogue
+      ? `<p>${tryAll ? "Ask the shop what’s available and how to try it on." : "The shop hasn’t listed any products yet."}</p>`
+      : "";
+  const body = [
+    preview
+      ? '<p class="preview" role="status">Private preview. Publish the shop to share it with customers.</p>'
+      : "",
+    brandHeader(brand, `${base}/logo`),
+    page.tagline ? `<p class="tagline">${escape(page.tagline)}</p>` : "",
+    actions ? `<nav class="shop-actions" aria-label="Shop actions">${actions}</nav>` : "",
+    socialLinks ? `<nav class="shop-socials" aria-label="Social links">${socialLinks}</nav>` : "",
+    collection,
+    info ? `<div class="info">${info}</div>` : "",
+    hero
+      ? `<section aria-labelledby="shop-photos-heading"><h2 id="shop-photos-heading">Shop photos</h2>${photo(hero, true)}${rest.length ? `<div class="gallery">${rest.map((p) => photo(p)).join("")}</div>` : ""}</section>`
+      : "",
+    contact,
+    tryAll
+      ? '<p class="powered">Virtual try-on by Forme. Preview images show how pieces may look. Ask the shop about size and fit.</p>'
+      : "",
+  ].join("");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(brand.displayName)}</title><meta name="theme-color" content="${brand.primaryColor}"><link rel="manifest" href="${base}/manifest.webmanifest"><link rel="icon" type="image/png" sizes="192x192" href="${base}/icon-192.png"><link rel="apple-touch-icon" href="${base}/icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="${escape(brand.displayName.slice(0, 30))}">${page.tagline ? `<meta name="description" content="${escape(page.tagline)}">` : ""}<meta property="og:title" content="${escape(brand.displayName)}"><style>${css}${brandCss}${shopBrandCss}</style></head><body><main style="--brand:${brand.primaryColor};--brand-ink:${brandInk(brand.primaryColor)}">${body}</main></body></html>`;
 }
 
