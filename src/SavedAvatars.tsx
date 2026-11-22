@@ -1,5 +1,6 @@
 import PurchaseLook from "./PurchaseLook";
 import ShareLook from "./ShareLook";
+import AvatarMasterComparison from "./AvatarMasterComparison";
 import AvatarVersionHistory from "./AvatarVersionHistory";
 import { useRef, useState, useEffect } from "react";
 import { catalogueApi } from "./catalogue";
@@ -80,6 +81,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
   }
   function close() {
     dialog.current?.close();
+    setMasterFilter(null);
     trigger.current?.focus();
   }
   async function use(item: SavedAvatar) {
@@ -293,6 +295,14 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
           >
             Show all saved avatars
           </button>
+        )}
+        {masterFilter && visibleItems.length > 1 && (
+          <AvatarMasterComparison
+            key={visibleItems.map(({ id }) => id).join(":")}
+            versions={visibleItems}
+            disabled={busy}
+            onUse={(version) => void use(version)}
+          />
         )}
         {!busy && !visibleItems.length && (
           <p>

@@ -2390,6 +2390,74 @@ dialog::backdrop {
   list-style: none;
   padding: 8px 0;
 }
+.master-comparison-toggle {
+  margin: 8px 0;
+}
+.master-comparison {
+  margin: 8px 0 18px;
+  padding: 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  background: var(--gray-50);
+}
+.master-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.master-comparison-grid :is(article, label) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.master-comparison-grid label {
+  font-size: 13px;
+  color: var(--brand-700);
+}
+.master-comparison-grid select {
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  color: var(--gray-900);
+  background: var(--white);
+}
+.master-comparison-image {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 2 / 3;
+  padding: 6px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  overflow: hidden;
+  text-align: center;
+}
+.master-comparison-image img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: center top;
+}
+.master-comparison-grid h3 {
+  margin: 8px 0 4px;
+  font-size: 16px;
+}
+.master-comparison-grid p {
+  margin: 4px 0;
+  color: var(--gray-600);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.master-comparison-grid .button {
+  margin-top: 4px;
+  max-width: 100%;
+  padding: 8px;
+  white-space: normal;
+}
 .save-avatar-box,
 .avatar-import {
   border: 1px solid var(--gray-200);
