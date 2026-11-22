@@ -548,8 +548,9 @@ test("session expiry cancels a pending jewellery download before it can write a 
 
 test("free cut-out upload → anchored mobile editor → drag/scale/rotate/reset → labelled save/share/export/reopen without a paid route", async ({
   page,
-}) =>
-  fixture(
+}) => {
+  test.setTimeout(60_000);
+  await fixture(
     page,
     async ({ store, account, avatar, items, calls, portraits }) => {
       const paid = [];
@@ -581,6 +582,8 @@ test("free cut-out upload → anchored mobile editor → drag/scale/rotate/reset
       await item.getByRole("button", { name: "Save cut-out", exact: true }).click();
       await expect(item.getByText("Overlay ready · free placement", { exact: true })).toBeVisible();
       await page.goto("/jewellery?avatar=" + avatar.id);
+      // Exercise manual fallback with this fixture's authored positions.
+      await page.route("**/models/blaze_face_short_range.tflite", (route) => route.abort());
       await page.getByRole("button", { name: /^Gold drop earrings/ }).click();
       await expect(
         page.getByRole("button", { name: "Overlay · free", exact: true }),
@@ -601,6 +604,25 @@ test("free cut-out upload → anchored mobile editor → drag/scale/rotate/reset
       await expect(
         page.getByLabel("Selected overlay piece", { exact: true }).locator("option"),
       ).toHaveCount(2);
+      const zoom = page.getByLabel("Placement view zoom", { exact: true });
+      const horizontal = page.getByLabel("Overlay horizontal position", { exact: true });
+      const vertical = page.getByLabel("Overlay vertical position", { exact: true });
+      await page.getByRole("button", { name: "Zoom to left ear", exact: true }).click();
+      await expect(zoom).toHaveValue("4");
+      await expect(horizontal).toHaveValue("900");
+      await canvas.press("ArrowRight");
+      await expect(horizontal).toHaveValue("901");
+      await page.getByRole("button", { name: "Zoom to right ear", exact: true }).click();
+      await expect(horizontal).toHaveValue("235");
+      await page.getByRole("button", { name: "Set attachment point", exact: true }).click();
+      const size = await canvas.evaluate((c) => ({ w: c.clientWidth, h: c.clientHeight }));
+      await canvas.click({ position: { x: size.w * 0.6 + 1, y: size.h * 0.55 + 1 } });
+      expect(Math.abs(Number(await horizontal.inputValue()) - 264)).toBeLessThanOrEqual(2);
+      expect(Math.abs(Number(await vertical.inputValue()) - 834)).toBeLessThanOrEqual(2);
+      await page.getByRole("button", { name: "Full view", exact: true }).click();
+      await expect(zoom).toHaveValue("1");
+      await expect(page.getByLabel("Overlay scale", { exact: true })).toHaveValue("100");
+      await page.getByRole("button", { name: "Reset all placements", exact: true }).click();
       const originalX = await page
         .getByLabel("Overlay horizontal position", { exact: true })
         .inputValue();
@@ -718,8 +740,81 @@ test("free cut-out upload → anchored mobile editor → drag/scale/rotate/reset
       await page.screenshot({ path: "test-results/jewellery-overlay-desktop.png" });
     },
     { overlayOnly: true },
-  ));
+  );
+});
 
+test("bangle close-ups switch wrists and keep the scale of the applied pieces", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await fixture(
+    page,
+    async ({ store, account, items, avatar }) => {
+      const asset = await sharp(
+        Buffer.from(
+          '<svg width="240" height="240"><path d="M16 103 Q120 148 224 103" stroke="#c0c3ca" stroke-width="12" fill="none"/></svg>',
+        ),
+      )
+        .png()
+        .toBuffer();
+      await saveOverlayAsset(
+        store,
+        account,
+        items.find((item) => item.name === "Silver bangles").id,
+        {
+          overlayPng: "data:image/png;base64," + asset.toString("base64"),
+          overlayAnchor: "wrist",
+        },
+      );
+      await page.goto("/jewellery?avatar=" + avatar.id);
+      await page.getByRole("button", { name: "Hands view", exact: true }).click();
+      await page.getByRole("button", { name: /^Silver bangles/ }).click();
+      await page.getByLabel("Wrist", { exact: true }).selectOption("both");
+      await review(page).check();
+      const response = page.waitForResponse(
+        (res) => new URL(res.url()).pathname === "/api/jewellery/overlay/prepare",
+      );
+      await page.getByRole("button", { name: "Load overlay placement", exact: true }).click();
+      const { placements } = await (await response).json();
+      const expected = page.getByLabel("Overlay horizontal position", { exact: true });
+      await page.getByRole("button", { name: "Zoom to left wrist", exact: true }).click();
+      await expect(expected).toHaveValue(String(Math.round(placements[0].x)));
+      await page.getByRole("button", { name: "Zoom to right wrist", exact: true }).click();
+      await expect(expected).toHaveValue(String(Math.round(placements[2].x)));
+      await expect(page.getByLabel("Placement view zoom")).toHaveValue("3");
+      const apply = page.waitForRequest(
+        (req) => new URL(req.url()).pathname === "/api/jewellery/overlay",
+      );
+      await page.getByRole("button", { name: "Apply overlay — free", exact: true }).click();
+      expect((await apply).postDataJSON().placements).toEqual(placements);
+      await expect(
+        page.getByRole("img", { name: "Customer jewellery preview", exact: true }),
+      ).toBeVisible();
+      const closeUps = page.getByRole("group", { name: "Look close-ups" });
+      await closeUps.getByRole("button", { name: "Zoom to right wrist", exact: true }).click();
+      await expect
+        .poll(() =>
+          page.locator(".jewellery-image").evaluate((el, point) => {
+            const photo = el.querySelector("img");
+            const scale = Math.min(
+              photo.clientWidth / photo.naturalWidth,
+              photo.clientHeight / photo.naturalHeight,
+            );
+            const centreX = el.scrollLeft + el.clientWidth / 2;
+            const centreY = el.scrollTop + el.clientHeight / 2;
+            return Math.hypot(
+              (photo.clientWidth - photo.naturalWidth * scale) / 2 + point.x * scale - centreX,
+              point.y * scale - centreY,
+            );
+          }, placements[2]),
+        )
+        .toBeLessThan(2);
+      await closeUps.getByRole("button", { name: "Full look", exact: true }).click();
+      await expect(page.getByLabel("Preview zoom", { exact: true })).toHaveValue("1");
+    },
+    { overlayOnly: true },
+  );
+});
 test("a full-body necklace uses local avatar landmarks and can fall back to manual placement", async ({
   page,
 }) => {

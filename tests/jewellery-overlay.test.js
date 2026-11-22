@@ -17,6 +17,7 @@ import {
 } from "../server/jewellery-overlay.js";
 import {
   defaultOverlayPlacements,
+  refineEarringPlacements,
   refineFullBodyPlacements,
   validateOverlayPlacements,
   previewLabel,
@@ -280,6 +281,18 @@ test("template ring, 48 bangles and full body starts are bounded and cannot dist
     anchors: template.anchors,
   });
   assert.equal(bangles.length, 48);
+  // The second bangle advances perpendicular to the wrist band on each hand.
+  for (const [first, next] of [
+    [bangles[0], bangles[1]],
+    [bangles[24], bangles[25]],
+  ]) {
+    const radians = (first.angle * Math.PI) / 180;
+    const dx = next.x - first.x,
+      dy = next.y - first.y;
+    assert.ok(dy > 0);
+    assert.ok(Math.abs(dx * Math.cos(radians) + dy * Math.sin(radians)) < 1e-8);
+  }
+  assert.ok(bangles[1].x < bangles[0].x && bangles[25].x > bangles[24].x);
   validateOverlayPlacements(bangles, bangles, common);
   for (const type of ["waist_belt", "anklets"]) {
     const p = defaultOverlayPlacements({
@@ -306,6 +319,38 @@ test("template ring, 48 bangles and full body starts are bounded and cannot dist
     assert.throws(() =>
       validateOverlayPlacements([{ ...p[0], ...change }, p[1]], p, { width: 1152, height: 1536 }),
     );
+});
+test("ear landmarks refine both attachment points towards visible piercings without moving the cut-out pivot", () => {
+  const frame = { width: 1152, height: 1536 };
+  const original = defaults();
+  Object.assign(original[0], { x: 870, y: 723 });
+  Object.assign(original[1], { x: 296, y: 765 });
+  const keypoints = [
+    [466, 606],
+    [726, 588],
+    [597, 684],
+    [608, 842],
+    [341, 738],
+    [884, 702],
+  ].map(([x, y]) => ({ x: x / frame.width, y: y / frame.height }));
+  const { placements, matched } = refineEarringPlacements(original, keypoints, frame);
+  assert.equal(matched, 2);
+  // The two visible attachment points were marked on the synthetic fixture.
+  for (const [i, x, y] of [
+    [0, 892, 783],
+    [1, 307, 818],
+  ]) {
+    const old = original[i],
+      p = placements[i];
+    assert.ok(Math.hypot(p.x - x, p.y - y) < Math.hypot(old.x - x, old.y - y) * 0.2);
+    assert.deepEqual({ ...p, x: old.x, y: old.y }, old);
+  }
+  validateOverlayPlacements(placements, original, frame);
+  keypoints[4] = keypoints[0];
+  assert.deepEqual(refineEarringPlacements(original, keypoints, frame), {
+    placements: original,
+    matched: 0,
+  });
 });
 test("full-body placement follows the torso and each anatomical ankle at the image's scale", () => {
   const frame = { width: 1000, height: 1500, assetWidth: 200, assetHeight: 100 };

@@ -21,6 +21,32 @@ export const overlayAnchors = {
   waist_belt: "waist",
   anklets: "ankle",
 };
+const areaNames = {
+  earlobe: "ear",
+  nostril: "nostril",
+  hairParting: "hairline",
+  hairSide: "temple",
+  neckBase: "neck",
+  finger: "hand",
+  wrist: "wrist",
+  waist: "waist",
+  ankle: "ankle",
+};
+
+/** One close-up per body side, even when a wrist has several bangles. */
+export function overlayRegions(placements, anchor) {
+  const area = areaNames[anchor] || "piece";
+  const regions = new Map();
+  placements.forEach(({ id }, index) => {
+    const side = id.split(":")[0];
+    if (!regions.has(side))
+      regions.set(side, {
+        label: side === "centre" ? area : side + " " + area,
+        index,
+      });
+  });
+  return [...regions.values()];
+}
 // Above the temple on one side: between the hair parting and that side's earlobe.
 function hairSide(portrait, imageSide) {
   const parting = portrait.hairParting,
@@ -134,14 +160,27 @@ export function defaultOverlayPlacements({
     ph *= fit;
     if (pw > w || ph > h) bad();
     const count = type === "bangles" ? a.count || 1 : 1;
+    const bandAngle = band?.angle || 0;
+    const radians = (bandAngle * Math.PI) / 180;
+    const towardsForearm = Math.cos(radians) >= 0 ? 1 : -1;
+    const dx = -Math.sin(radians) * towardsForearm;
+    const dy = Math.cos(radians) * towardsForearm;
+    const room = (start, delta, limit) => {
+      if (Math.abs(delta) < 1e-6) return Infinity;
+      return ((delta > 0 ? limit : 0) - start) / delta;
+    };
+    const step = Math.min(
+      Math.max(3, Math.min(ph * 0.15, pw * 0.12)),
+      Math.min(room(point.x, dx, w), room(point.y, dy, h)) / Math.max(1, count - 1),
+    );
     for (let i = 0; i < count; i++)
       result.push({
         id: s + ":" + i,
-        x: point.x,
-        y: point.y + i * Math.min(Math.max(3, ph * 0.15), (h - point.y) / Math.max(1, count - 1)),
+        x: Math.min(w, Math.max(0, point.x + i * step * dx)),
+        y: Math.min(h, Math.max(0, point.y + i * step * dy)),
         width: pw,
         height: ph,
-        angle: band?.angle || 0,
+        angle: bandAngle,
         mirror:
           s === "right" && (anchor === "earlobe" || anchor === "hairSide" || type === "nath_chain"),
         pivotX: type === "nath_chain" ? 0 : 0.5,
@@ -150,6 +189,49 @@ export function defaultOverlayPlacements({
       });
   }
   return result;
+}
+
+/** Convert the two detected ear tragions into approximate piercing positions. */
+export function refineEarringPlacements(placements, keypoints, { width, height }) {
+  if (keypoints.length !== 6) return { placements, matched: 0 };
+  const pixels = keypoints.map(({ x, y }) => ({ x: x * width, y: y * height }));
+  const [eyeLeft, eyeRight] = pixels.slice(0, 2).sort((a, b) => a.x - b.x);
+  const [earLeft, earRight] = pixels.slice(4).sort((a, b) => a.x - b.x);
+  const dx = eyeRight.x - eyeLeft.x;
+  const dy = eyeRight.y - eyeLeft.y;
+  const earSpan = earRight.x - earLeft.x;
+  const span = Math.hypot(dx, dy);
+  if (
+    !pixels.every(({ x, y }) => Number.isFinite(x) && Number.isFinite(y)) ||
+    dx < width * 0.08 ||
+    earLeft.x >= eyeLeft.x ||
+    earRight.x <= eyeRight.x ||
+    earSpan < dx * 1.5 ||
+    earSpan > dx * 3.2 ||
+    Math.abs(dy) > dx * 0.4
+  )
+    return { placements, matched: 0 };
+  let matched = 0;
+  const refined = placements.map((piece) => {
+    const left = piece.id.startsWith("left:");
+    const tragion = left ? earRight : earLeft;
+    // Tragion estimates can fall inside the cheek. Blend their lateral position
+    // with the jaw's outside edge while locating the lobe below the ear point.
+    const outer = tragion.x + (left ? 1 : -1) * dx * 0.08 - dy * 0.31;
+    const x = piece.x * 0.65 + outer * 0.35;
+    const y = tragion.y + dx * 0.31;
+    if (
+      x < 0 ||
+      x > width ||
+      y < 0 ||
+      y > height ||
+      Math.hypot(x - piece.x, y - piece.y) > span * 0.6
+    )
+      return piece;
+    matched++;
+    return { ...piece, x, y };
+  });
+  return { placements: refined, matched };
 }
 
 // MediaPipe's landmark indices use the wearer's left and right. Distances and
