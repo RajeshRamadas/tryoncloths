@@ -99,6 +99,20 @@ preview — actual piece may differ in detail**.
 A PNG that already has transparency is used as supplied. The saved result still goes
 through the server validation below, so the stored asset format is unchanged.
 
+## Extract several pieces from one photo
+
+In **Jewellery catalogue**, open **Add several accessories from one photo**.
+Upload a PNG, JPEG or WebP up to 10 MB. The studio separates distinct pieces
+automatically from a plain or transparent backdrop. On a busy backdrop, use
+**Trace a piece** to mark its outside edge. Use **Trace an opening** for gaps
+such as the inside of a ring. Trace touching pieces individually.
+
+Review each cut-out and enter its name, jewellery type, and metal. Remove any
+cut-outs you do not want and save the reviewed pieces. Each saves as its own
+catalogue item with a free overlay for the matching avatar view. Successful
+items stay saved if another item needs a retry. The studio processes the group
+photo on the device and uploads the individual cut-outs when you save.
+
 ## API and storage
 
 - `POST /api/garments` can save a jewellery photo with its validated

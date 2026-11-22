@@ -4,15 +4,15 @@ import { removeBackground, transparentShare, cutoutSize } from "./jewellery-cuto
 export type Source = { rgba: Uint8ClampedArray; width: number; height: number };
 const PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
-export async function decodeCutoutPhoto(file: File): Promise<Source> {
+export async function decodeCutoutPhoto(file: File, minDimension = 200): Promise<Source> {
   if (!PHOTO_TYPES.includes(file.type) || file.size > 10 * 1024 * 1024 || !file.size)
     throw new Error("Choose a PNG, JPEG or WebP photo under 10 MB.");
   const bitmap = await createImageBitmap(file).catch(() => {
     throw new Error("The image could not be opened.");
   });
   try {
-    if (bitmap.width < 200 || bitmap.height < 200)
-      throw new Error("Use a photo at least 200 × 200 px.");
+    if (bitmap.width < minDimension || bitmap.height < minDimension)
+      throw new Error(`Use a photo at least ${minDimension} × ${minDimension} px.`);
     const { width, height } = cutoutSize(bitmap.width, bitmap.height);
     const canvas = document.createElement("canvas");
     canvas.width = width;
@@ -34,7 +34,8 @@ export async function encodeCutoutPng({ rgba, width, height }: Source): Promise<
   full
     .getContext("2d")!
     .putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0);
-  let scale = 1;
+  const limits = cutoutSize(width, height);
+  let scale = Math.min(limits.width / width, limits.height / height);
   for (let attempt = 0; attempt < 6; attempt++) {
     const w = Math.max(1, Math.round(width * scale)),
       h = Math.max(1, Math.round(height * scale));
