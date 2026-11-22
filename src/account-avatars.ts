@@ -46,9 +46,10 @@ export async function listAvatarVersions(
   return json(before === undefined ? path : `${path}?before=${before}`);
 }
 
-export async function accountAvatarImage(id: string): Promise<Blob> {
-  const r = await requestApi(`/api/avatars/${encodeURIComponent(id)}/image`, {}, 30000);
-  if (r.status === 401) window.dispatchEvent(new Event("forme-account-expired"));
+export async function accountAvatarImage(id: string, signal?: AbortSignal): Promise<Blob> {
+  const r = await requestApi(`/api/avatars/${encodeURIComponent(id)}/image`, { signal }, 30000);
+  if (r.status === 401 && !signal?.aborted)
+    window.dispatchEvent(new Event("forme-account-expired"));
   if (!r.ok) throw new Error("This avatar could not be opened. Sign in again and retry.");
   return r.blob();
 }

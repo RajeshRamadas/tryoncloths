@@ -64,6 +64,13 @@ and storage consent. Saving creates a new numbered master version with its own
 image, approval history and saved looks. Open **View master versions** to find the
 related images. Earlier approved images remain available with their original looks.
 
+Choose **Compare master versions** to see two saved PNGs side by side with their
+body profiles, measurements and approval status. The two latest versions open
+first. Use the version selectors when more versions are available, and zoom both
+previews together to inspect details. **Open version** returns to the normal
+customer review for that specific image. Comparing uses saved account images and
+makes no generation request.
+
 Master versions identify different PNGs. Approval revisions track reviews of a
 particular saved PNG. The `regenerateFromId` field identifies the approved source
 on both `/api/personalize` and `/api/avatars`. The generation receipt binds that

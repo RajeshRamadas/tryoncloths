@@ -1,11 +1,13 @@
-import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
+import { approveTestAvatar, saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { AccountStore } from "../helpers/pilot-accounts.js";
 import { createApp, standardAvatar } from "../../server/app.js";
+import { issueAvatarGenerationReceipt } from "../../server/avatar-generation.js";
 import { customerPhotos } from "../helpers/customer-photos.js";
 
 // Exercise the actual account routes/database, forwarding the dev browser's API
@@ -287,6 +289,150 @@ test("staff can switch member stores and the previous customer's preview is clea
     );
   } finally {
     await new Promise((r) => server.close(r));
+    store.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("staff compare saved master PNGs and reopen the chosen version for review", async ({
+  page,
+}) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "forme-master-compare-"));
+  const store = new AccountStore(directory);
+  const credentials = {
+    email: "master-compare@example.test",
+    name: "Comparison store",
+    password: "test-password-very-long",
+  };
+  const account = await store.register(credentials);
+  const image = async (profile) =>
+    `data:image/png;base64,${(await standardAvatar(profile)).toString("base64")}`;
+  const frame = { heightCm: 175, weightKg: 72 };
+  const original = await saveApprovedTestAvatar(store, account, {
+    ...frame,
+    name: "Original avatar",
+    image: await image("regular"),
+    profileId: "regular",
+    source: "imported",
+  });
+  async function addVersion(profileId, name) {
+    const nextImage = await image(profileId);
+    return store.save(account, {
+      ...frame,
+      name,
+      image: nextImage,
+      profileId,
+      source: "generated",
+      regenerateFromId: original.id,
+      generationReceipt: issueAvatarGenerationReceipt(store.views.key, account, null, nextImage, {
+        regenerateFromId: original.id,
+        requestId: randomUUID(),
+        generatedAt: Date.now(),
+        provider: "gemini",
+        model: "gemini-2.5-flash-image",
+        promptRevision: "customer-neck-v6",
+        profileId,
+        templateTone: "medium",
+        ...frame,
+      }),
+    });
+  }
+  const second = await addVersion("slim", "Alternative avatar");
+  approveTestAvatar(store, account, second.id);
+  const third = await addVersion("broad", "Latest avatar draft");
+  await saveApprovedTestAvatar(store, account, {
+    ...frame,
+    name: "Unrelated avatar",
+    image: await image("athletic"),
+    profileId: "athletic",
+    source: "imported",
+  });
+
+  const server = createApp({ accountStore: store, accessMode: "public", rateLimit: false }).listen(
+    0,
+    "127.0.0.1",
+  );
+  await new Promise((resolve) => server.once("listening", resolve));
+  const api = `http://127.0.0.1:${server.address().port}`;
+  const imageReads = [];
+  const generationRequests = [];
+  let failSecond = true;
+  try {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route("**/api/**", async (route) => {
+      const url = new URL(route.request().url());
+      if (["/api/personalize", "/api/tryon"].includes(url.pathname))
+        generationRequests.push(url.pathname);
+      if (/^\/api\/avatars\/[^/]+\/image$/.test(url.pathname)) {
+        imageReads.push(url.pathname);
+        if (url.pathname === `/api/avatars/${second.id}/image` && failSecond) {
+          await route.fulfill({ status: 503, json: { error: "Temporary image failure" } });
+          return;
+        }
+      }
+      const response = await route.fetch({
+        url: api + url.pathname + url.search,
+        headers: { ...route.request().headers(), host: new URL(api).host, origin: api },
+      });
+      await route.fulfill({ response });
+    });
+    await page.goto("/");
+    await page.getByLabel("Account email").fill(credentials.email);
+    await page.getByLabel("Account password").fill(credentials.password);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
+    await page
+      .getByRole("button", { name: "View master versions for Latest avatar draft" })
+      .click();
+    expect(imageReads).toEqual([]);
+    await page.getByRole("button", { name: "Compare master versions", exact: true }).click();
+
+    const compare = page.getByRole("region", { name: "Master avatar comparison" });
+    const left = compare.getByLabel("Left version");
+    const right = compare.getByLabel("Right version");
+    await expect(left).toHaveValue(second.id);
+    await expect(right).toHaveValue(third.id);
+    await expect(left.locator("option")).toHaveText([
+      "Version 2 · Alternative avatar",
+      "Version 1 · Original avatar",
+    ]);
+    const draft = compare.getByRole("article", { name: "Master version 3" });
+    await expect(draft).toContainText("Draft · Review required");
+    await expect(draft.getByRole("img")).toBeVisible();
+    await expect(compare.getByRole("alert")).toHaveText("Master version 2 could not load.");
+    failSecond = false;
+    await compare.getByRole("button", { name: "Retry master version 2" }).click();
+    await expect(compare.getByRole("img", { name: "Master version 2 avatar" })).toBeVisible();
+    await expect(compare.getByRole("alert")).toHaveCount(0);
+
+    await left.selectOption(original.id);
+    const originalCard = compare.getByRole("article", { name: "Master version 1" });
+    await expect(originalCard).toContainText("Approved · review 1");
+    await expect(originalCard.getByRole("img")).toBeVisible();
+    await expect(compare.getByRole("img", { name: "Master version 2 avatar" })).toHaveCount(0);
+    await expect(right.locator("option")).toHaveText([
+      "Version 3 · Latest avatar draft",
+      "Version 2 · Alternative avatar",
+    ]);
+    await compare.getByRole("slider", { name: "Preview zoom" }).fill("200");
+    for (const preview of await compare.getByRole("img").all())
+      await expect(preview).toHaveCSS("transform", "matrix(2, 0, 0, 2, 0, 0)");
+    const dialog = page.getByRole("dialog", { name: "Saved avatars" });
+    expect(await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+
+    const readsBeforeOpen = imageReads.length;
+    await originalCard.getByRole("button", { name: "Open version 1" }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(
+      page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
+    ).toBeVisible();
+    expect(imageReads.at(-1)).toBe(`/api/avatars/${original.id}/image`);
+    expect(imageReads).toHaveLength(readsBeforeOpen + 1);
+    expect(generationRequests).toEqual([]);
+    expect(store.list(account).find(({ id }) => id === third.id).approvalStatus).toBe("draft");
+  } finally {
+    await page.unrouteAll({ behavior: "wait" });
+    await new Promise((resolve) => server.close(resolve));
     store.close();
     await rm(directory, { recursive: true, force: true });
   }
