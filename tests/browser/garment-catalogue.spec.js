@@ -1,4 +1,4 @@
-import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
+import { approveTestAvatar, saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { approvePersonalizedAvatar } from "../helpers/avatar-quality-review.js";
 import { useProductSource, useSampleSource } from "../helpers/studio-navigation.js";
 import { test, expect } from "@playwright/test";
@@ -188,6 +188,55 @@ test("saved store clothes and reviewed adaptations reopen without another produc
       .click();
     await expect(page.getByText(/No saved clothes match/)).toBeVisible();
     expect(store.garments.list(owner)).toHaveLength(0);
+    expect(calls()).toEqual({ links: 1, generations: 1 });
+  }));
+
+test("an uploaded garment's approved avatar source stays visible when the saved outfit is reopened", async ({
+  page,
+}) =>
+  fixture(page, async ({ photo, store, owner, calls }) => {
+    await useProductSource(page);
+    await page.getByLabel("Upload product photo", { exact: true }).setInputFiles({
+      name: "oxford-shirt.jpg",
+      mimeType: "image/jpeg",
+      buffer: photo,
+    });
+    const consent = page.getByLabel(/send their avatar and this product photo/);
+    const putOn = page.getByRole("button", { name: "Put on avatar", exact: true });
+    const originalSource = page.getByText("Source avatar master version 1 · approval 1", {
+      exact: true,
+    });
+    await consent.check();
+    await putOn.click();
+    await expect(originalSource).toBeVisible();
+    await page
+      .getByLabel("I have checked clothing placement and approve this outfit preview.")
+      .check();
+    await page.getByLabel("Look name", { exact: true }).fill("Oxford outfit");
+    await page.getByLabel("The customer agrees to save this outfit to the store account.").check();
+    await page.getByRole("button", { name: "Save look to account", exact: true }).click();
+    await expect(page.getByText(/Look saved to your store account/)).toBeVisible();
+    expect(calls()).toEqual({ links: 0, generations: 1 });
+
+    const { id: avatarId } = store.list(owner)[0];
+    store.revokeAvatarApproval(owner, avatarId);
+    approveTestAvatar(store, owner, avatarId);
+    await page.reload();
+    await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
+    await page
+      .getByRole("button", { name: "View looks (1) for Customer One", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Open look Oxford outfit", exact: true }).click();
+    await approvePersonalizedAvatar(page);
+    await page.getByRole("button", { name: "Try clothes", exact: true }).click();
+    await expect(originalSource).toBeVisible();
+
+    await useProductSource(page);
+    await page.getByLabel("Product link", { exact: true }).fill("https://shop.example/p/42");
+    await page.getByRole("button", { name: "Find", exact: true }).click();
+    await consent.check();
+    await putOn.click();
+    await expect(page.getByRole("alert")).toContainText("The avatar approval changed.");
     expect(calls()).toEqual({ links: 1, generations: 1 });
   }));
 

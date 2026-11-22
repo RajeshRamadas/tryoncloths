@@ -18,6 +18,13 @@ See also: [requirements and design](LINK_TRYON_DESIGN.md) · [implementation gui
    becomes the base for the next. **Undo last garment** goes back one step without another AI request.
 6. Approve and download/share the outfit as before. Sample layers still work locally on top, with no AI calls.
 
+For product links and uploaded photos used with a saved store avatar, the studio
+checks the avatar approval before a paid request. The preview and its saved outfit
+show the source master version and approval revision. If the approval changes, an
+existing preview can still be viewed and downloaded. Reopen the approved avatar
+to add more products or save a new outfit. Previously saved outfits remain available
+in **Saved avatars → View looks**.
+
 ## API
 
 - `POST /api/product-link` `{ url }` → `{ title, url, images: [{ source, image }] }`. No AI call.

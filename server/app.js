@@ -716,12 +716,23 @@ export function createApp({
         error:
           "Choose what to put on: shirt, T-shirt, trousers, blazer, suit, shoes or another listed type. Sarees, dresses, skirts, lehengas and blouses need the female body library.",
       });
+    let directApproval;
     try {
       if (accountStore) validateSession(accountStore, owner, req.body);
+      if (owner && !req.body.garmentId && req.body.avatarId != null) {
+        const approved = accountStore.requireApprovedAvatar(
+          owner,
+          req.body.avatarId,
+          req.body.sourceApproval,
+        );
+        if (bodyType !== approved.bodyType)
+          return res.status(400).json({ error: "Use the saved avatar body library." });
+        directApproval = approved.sourceApproval;
+      }
     } catch (e) {
-      return res
-        .status(e.status || 500)
-        .json({ error: e.status ? e.message : "Fitting session could not be checked." });
+      return res.status(e.status || 500).json({
+        error: e.status ? e.message : "The fitting session or avatar could not be checked.",
+      });
     }
     let catalogueContext;
     if (req.body.garmentId) {
@@ -805,15 +816,22 @@ export function createApp({
         error: "Use a JPEG, PNG or WebP garment image under 5 MB and at least 160 × 160 pixels.",
       });
     }
-    if (catalogueContext) {
+    const sourceApproval = catalogueContext?.sourceApproval ?? directApproval;
+    if (sourceApproval) {
       try {
         // Decoding yielded to other requests. Respect deletion or an approval
         // saved in another tab before committing to a paid call.
-        accountStore.requireApprovedAvatar(
-          owner,
-          catalogueContext.avatarId,
-          catalogueContext.sourceApproval,
-        );
+        accountStore.requireApprovedAvatar(owner, sourceApproval.avatarId, sourceApproval);
+      } catch (error) {
+        return res.status(error.status || 500).json({
+          error: error.status
+            ? error.message
+            : "The avatar could not be checked. No generation was attempted.",
+        });
+      }
+    }
+    if (catalogueContext) {
+      try {
         accountStore.garments.row(owner, catalogueContext.garmentId);
         const cached = accountStore.garments.cached(owner, catalogueContext);
         if (cached) {
@@ -892,25 +910,35 @@ export function createApp({
           reuseReceipt = await accountStore.garments.receipt(owner, catalogueContext, image);
         } catch {}
       }
+      let approvalChanged = false;
+      if (sourceApproval) {
+        try {
+          accountStore.requireApprovedAvatar(owner, sourceApproval.avatarId, sourceApproval);
+        } catch {
+          approvalChanged = true;
+        }
+      }
       res.json({
         image,
         provider,
         kind: "garment-tryon",
         garmentType: req.body.garmentType,
         needsReview: true,
-        ...(catalogueContext
+        sourceApproval,
+        garmentId: catalogueContext?.garmentId,
+        reuseReceipt,
+        ...(approvalChanged
           ? {
-              garmentId: catalogueContext.garmentId,
-              sourceApproval: catalogueContext.sourceApproval,
-              reuseReceipt,
-              ...(!reuseReceipt
-                ? {
-                    reuseWarning:
-                      "The image was created but cannot be saved for automatic reuse. Save it as a look instead; do not regenerate.",
-                  }
-                : {}),
+              approvalChanged,
+              reuseWarning:
+                "The approved avatar changed during generation. You can review and download this preview. Reopen the approved avatar to continue fitting.",
             }
-          : {}),
+          : catalogueContext && !reuseReceipt
+            ? {
+                reuseWarning:
+                  "The image was created but cannot be saved for automatic reuse. Save it as a look instead; do not regenerate.",
+              }
+            : {}),
       });
     } catch (error) {
       if (billingFailure(res, error)) return;

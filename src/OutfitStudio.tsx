@@ -179,13 +179,18 @@ export default function OutfitStudio({
     1,
   );
   const lastAdaptation = dressed.at(-1);
-  const sourceApproval = lastAdaptation?.adaptation?.sourceApproval;
+  const sourceApproval = lastAdaptation?.fromSavedLook
+    ? openedLook?.sourceApproval
+    : lastAdaptation?.adaptation?.sourceApproval;
+  const approvalChanged = lastAdaptation?.adaptation?.approvalChanged;
+  const fittingNotice = approvalChanged ? lastAdaptation?.adaptation?.reuseWarning : notice;
   const canSaveAdaptation = Boolean(
     avatarId &&
     lastAdaptation?.adaptation?.reuseReceipt &&
     lastAdaptation.adaptation.garmentId &&
     !layers.length &&
-    !lastAdaptation.adaptationSaved,
+    !lastAdaptation.adaptationSaved &&
+    !approvalChanged,
   );
   useEffect(() => {
     if (active) heading.current?.focus();
@@ -342,7 +347,8 @@ export default function OutfitStudio({
       !storageConsent ||
       !lookName.trim() ||
       busy ||
-      rendering
+      rendering ||
+      approvalChanged
     )
       return;
     setBusy(true);
@@ -361,7 +367,11 @@ export default function OutfitStudio({
         ...dressed.slice(restored ? 1 : 0).map((x) => x.label),
         ...layers.map((x) => x.garment.name),
       ].map((x) => x.slice(0, 120));
-      const saved = await saveLook(result, avatarId, lookName, labels, { sessionId, garmentIds });
+      const saved = await saveLook(result, avatarId, lookName, labels, {
+        sessionId,
+        garmentIds,
+        sourceApproval,
+      });
       setSavedLook(saved.id);
       setNotice("Look saved to your store account. Open it under this avatar in Saved avatars.");
       if (canSaveAdaptation) {
@@ -495,7 +505,13 @@ export default function OutfitStudio({
           <button
             className="button secondary full-width"
             disabled={
-              !reviewed || !storageConsent || !result || busy || rendering || !lookName.trim()
+              !reviewed ||
+              !storageConsent ||
+              !result ||
+              busy ||
+              rendering ||
+              !lookName.trim() ||
+              approvalChanged
             }
             onClick={() => void keepLook()}
           >
@@ -534,7 +550,7 @@ export default function OutfitStudio({
           {error}
         </p>
       )}
-      {notice && <p role="status">{notice}</p>}
+      {fittingNotice && <p role="status">{fittingNotice}</p>}
     </section>
   );
   return (
@@ -776,9 +792,10 @@ export default function OutfitStudio({
               sessionId={sessionId}
               catalogueEnabled={catalogueEnabled}
               avatarId={avatarId}
+              sourceApproval={sourceApproval}
               bodyType={profile.id.startsWith("f-") ? "female" : "male"}
               base={result}
-              disabled={busy || rendering}
+              disabled={busy || rendering || !!approvalChanged}
               available={tryOn.available}
               providerLabel={tryOn.providerLabel}
               onBusy={(value) => {

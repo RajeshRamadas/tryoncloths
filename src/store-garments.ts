@@ -1,5 +1,6 @@
 import { requestApi } from "./api";
 import type { GarmentType } from "./garment-types";
+import type { AvatarSourceApproval } from "./saved-avatars";
 
 export type StoreGarment = {
   readOnly?: boolean;
@@ -34,7 +35,8 @@ export type Adaptation = {
   reuseReceipt?: string;
   reused?: boolean;
   reuseWarning?: string;
-  sourceApproval?: { masterVersion: number; approvalVersion: number | null };
+  sourceApproval?: AvatarSourceApproval;
+  approvalChanged?: boolean;
 };
 export async function catalogueRequest(
   path: string,
@@ -74,7 +76,13 @@ export const saveGarment = (input: {
   catalogueRequest("/api/garments", { ...input, storageConsent: true });
 export const findAdaptation = (
   id: string,
-  input: { avatar: string; avatarId: string; garmentType: GarmentType; bodyType: string },
+  input: {
+    avatar: string;
+    avatarId: string;
+    garmentType: GarmentType;
+    bodyType: string;
+    sourceApproval?: AvatarSourceApproval;
+  },
 ): Promise<{ match: boolean; id?: string; image?: string }> =>
   catalogueRequest(`/api/garments/${encodeURIComponent(id)}/reuse`, input);
 export const saveAdaptation = (id: string, image: string, receipt: string) =>
@@ -101,5 +109,6 @@ export const useAdaptation = (
     requestId: string;
     sessionId?: string;
     resultId?: string;
+    sourceApproval?: AvatarSourceApproval;
   },
 ) => catalogueRequest(`/api/garments/${encodeURIComponent(id)}/reuse/use`, input);

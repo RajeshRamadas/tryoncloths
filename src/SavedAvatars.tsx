@@ -195,6 +195,7 @@ export default function SavedAvatars({
           image,
           name: look.name,
           garments: look.garments,
+          sourceApproval: look.sourceApproval,
         },
       });
     } catch (e) {

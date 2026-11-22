@@ -4,6 +4,7 @@ import { Link2, Search, Sparkles, Upload } from "lucide-react";
 import { requestApi } from "./api";
 import { readPhoto } from "./images";
 import { readProductPhotos } from "./product-photos";
+import type { AvatarSourceApproval } from "./saved-avatars";
 
 import {
   femaleOnlyGarments,
@@ -30,6 +31,7 @@ const emptyMatches = (): GarmentMatches => ({ exact: [], linked: [], similar: []
 type Props = {
   catalogueEnabled?: boolean;
   avatarId?: string | null;
+  sourceApproval?: AvatarSourceApproval;
   sessionId?: string;
   bodyType?: "male" | "female";
   base: string;
@@ -43,6 +45,7 @@ type Props = {
 export default function LinkTryOn({
   catalogueEnabled = false,
   avatarId,
+  sourceApproval,
   sessionId,
   bodyType = "male",
   base,
@@ -74,6 +77,7 @@ export default function LinkTryOn({
     avatarId: string;
     garmentType: string;
     bodyType: string;
+    sourceApproval?: AvatarSourceApproval;
     image?: string;
     id?: string;
     error?: string;
@@ -89,7 +93,8 @@ export default function LinkTryOn({
     lookup?.garmentId === saved?.id &&
     lookup?.avatarId === avatarId &&
     lookup?.garmentType === garmentType &&
-    lookup?.bodyType === bodyType;
+    lookup?.bodyType === bodyType &&
+    lookup?.sourceApproval === sourceApproval;
   const cached = lookupCurrent && !lookup?.error ? lookup?.image : undefined;
   useEffect(() => {
     let cancelled = false;
@@ -97,10 +102,23 @@ export default function LinkTryOn({
     setLookup(null);
     setConsent(false);
     if (catalogueEnabled && saved && avatarId && base && garmentType === saved.garmentType) {
-      const context = { base, garmentId: saved.id, avatarId, garmentType, bodyType };
+      const context = {
+        base,
+        garmentId: saved.id,
+        avatarId,
+        garmentType,
+        bodyType,
+        sourceApproval,
+      };
       timer = setTimeout(
         () =>
-          void findAdaptation(saved.id, { avatar: base, avatarId, garmentType, bodyType })
+          void findAdaptation(saved.id, {
+            avatar: base,
+            avatarId,
+            garmentType,
+            bodyType,
+            sourceApproval,
+          })
             .then((result) => {
               if (!cancelled)
                 setLookup({
@@ -118,7 +136,16 @@ export default function LinkTryOn({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [catalogueEnabled, saved?.id, avatarId, base, garmentType, bodyType, lookupRevision]);
+  }, [
+    catalogueEnabled,
+    saved?.id,
+    avatarId,
+    base,
+    garmentType,
+    bodyType,
+    lookupRevision,
+    sourceApproval,
+  ]);
 
   function begin(next: "reading" | "generating") {
     setState(next);
@@ -302,6 +329,7 @@ export default function LinkTryOn({
         sessionId,
         requestId: crypto.randomUUID(),
         resultId: lookup?.id,
+        sourceApproval,
       });
       onResult(
         result.image,
@@ -340,6 +368,7 @@ export default function LinkTryOn({
             requestId: crypto.randomUUID(),
             sessionId,
             ...(avatarId ? { avatarId } : {}),
+            sourceApproval,
             avatar: base,
             bodyType,
             garmentType,
@@ -372,6 +401,7 @@ export default function LinkTryOn({
         reused: data.reused,
         reuseWarning: data.reuseWarning,
         sourceApproval: data.sourceApproval,
+        approvalChanged: data.approvalChanged,
       });
       setConsent(false);
     } catch (e) {

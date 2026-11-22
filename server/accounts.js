@@ -625,7 +625,7 @@ export class AccountStore {
     };
     if (
       expectedApproval !== undefined &&
-      JSON.stringify(expectedApproval) !== JSON.stringify(sourceApproval)
+      Object.keys(sourceApproval).some((key) => expectedApproval?.[key] !== sourceApproval[key])
     )
       throw error(
         "The avatar approval changed. Reopen the approved avatar before continuing.",
@@ -705,10 +705,10 @@ export class AccountStore {
     const { image, thumbnail } = await savedImage(input.image, view);
     // Recheck after decoding: the avatar may have been revoked or deleted meanwhile.
     return transaction(this.db, () => {
-      this.requireApprovedAvatar(account, input.avatarId, sourceApproval);
+      const approved = this.requireApprovedAvatar(account, input.avatarId, sourceApproval);
       guard?.();
       validateLookTracking(this, account, input);
-      const sourceKey = sourceApproval ? JSON.stringify(sourceApproval) : null;
+      const sourceKey = sourceApproval ? JSON.stringify(approved.sourceApproval) : null;
       const id = digest(Buffer.concat([image, Buffer.from(input.avatarId + (sourceKey ?? ""))])),
         savedAt = Date.now();
       const exists = this.db
@@ -756,16 +756,17 @@ export class AccountStore {
       avatarId === undefined
         ? this.db
             .prepare(
-              "SELECT id,avatarId,name,garments,thumbnail,savedAt,purchasedAt,purchasedSize,staffUser,view,itemsJson,previewMode FROM looks WHERE account=? ORDER BY savedAt DESC",
+              "SELECT id,avatarId,name,garments,thumbnail,savedAt,purchasedAt,purchasedSize,staffUser,view,itemsJson,previewMode,source_approval FROM looks WHERE account=? ORDER BY savedAt DESC",
             )
             .all(account.id)
         : this.db
             .prepare(
-              "SELECT id,avatarId,name,garments,thumbnail,savedAt,purchasedAt,purchasedSize,staffUser,view,itemsJson,previewMode FROM looks WHERE account=? AND avatarId=? ORDER BY savedAt DESC",
+              "SELECT id,avatarId,name,garments,thumbnail,savedAt,purchasedAt,purchasedSize,staffUser,view,itemsJson,previewMode,source_approval FROM looks WHERE account=? AND avatarId=? ORDER BY savedAt DESC",
             )
             .all(account.id, avatarId);
-    return rows.map((row) => ({
+    return rows.map(({ source_approval, ...row }) => ({
       ...row,
+      ...(source_approval && { sourceApproval: JSON.parse(source_approval) }),
       ...lookAttribution(this, account, row.id),
       itemsJson: JSON.parse(row.itemsJson),
       garments: JSON.parse(row.garments),
@@ -989,7 +990,9 @@ export function installAccountRoutes(
     wrap(async (req, res) => {
       if (req.body?.storageConsent !== true)
         throw error("Confirm customer agreement before saving this look to the store account.");
-      res.json(await store.saveLook(req.account, req.body));
+      res.json(
+        await store.saveLook(req.account, req.body, { sourceApproval: req.body.sourceApproval }),
+      );
     }),
   );
   app.delete(

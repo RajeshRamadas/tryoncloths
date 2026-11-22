@@ -1,5 +1,5 @@
 import { requestApi } from "./api";
-import { type AvatarDetails, type SavedAvatar } from "./saved-avatars";
+import { type AvatarDetails, type AvatarSourceApproval, type SavedAvatar } from "./saved-avatars";
 async function json(path: string, init?: RequestInit) {
   const response = await requestApi(path, init, 30000);
   const data = await response.json();
@@ -88,6 +88,7 @@ export type SavedLook = {
   avatarId: string;
   name: string;
   garments: string[];
+  sourceApproval?: AvatarSourceApproval;
   thumbnail: string;
   savedAt: number;
 };
@@ -99,7 +100,7 @@ export async function saveLook(
   avatarId: string,
   name: string,
   garments: string[],
-  tracking?: { sessionId: string; garmentIds: string[] },
+  tracking?: { sessionId: string; garmentIds: string[]; sourceApproval?: AvatarSourceApproval },
 ) {
   return json("/api/looks", {
     method: "POST",
