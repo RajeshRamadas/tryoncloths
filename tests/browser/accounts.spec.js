@@ -294,9 +294,10 @@ test("staff can switch member stores and the previous customer's preview is clea
   }
 });
 
-test("staff compare saved master PNGs and reopen the chosen version for review", async ({
+test("staff compare master versions, set the current master, and reopen an earlier version", async ({
   page,
 }) => {
+  test.setTimeout(60000);
   const directory = await mkdtemp(path.join(os.tmpdir(), "forme-master-compare-"));
   const store = new AccountStore(directory);
   const credentials = {
@@ -305,11 +306,16 @@ test("staff compare saved master PNGs and reopen the chosen version for review",
     password: "test-password-very-long",
   };
   const account = await store.register(credentials);
+  const customer = store.customers.save(account, {
+    name: "Avatar customer",
+    phoneE164: "+919000000061",
+  });
   const image = async (profile) =>
     `data:image/png;base64,${(await standardAvatar(profile)).toString("base64")}`;
   const frame = { heightCm: 175, weightKg: 72 };
   const original = await saveApprovedTestAvatar(store, account, {
     ...frame,
+    customerId: customer.id,
     name: "Original avatar",
     image: await image("regular"),
     profileId: "regular",
@@ -319,22 +325,29 @@ test("staff compare saved master PNGs and reopen the chosen version for review",
     const nextImage = await image(profileId);
     return store.save(account, {
       ...frame,
+      customerId: customer.id,
       name,
       image: nextImage,
       profileId,
       source: "generated",
       regenerateFromId: original.id,
-      generationReceipt: issueAvatarGenerationReceipt(store.views.key, account, null, nextImage, {
-        regenerateFromId: original.id,
-        requestId: randomUUID(),
-        generatedAt: Date.now(),
-        provider: "gemini",
-        model: "gemini-2.5-flash-image",
-        promptRevision: "customer-neck-v6",
-        profileId,
-        templateTone: "medium",
-        ...frame,
-      }),
+      generationReceipt: issueAvatarGenerationReceipt(
+        store.views.key,
+        account,
+        customer.id,
+        nextImage,
+        {
+          regenerateFromId: original.id,
+          requestId: randomUUID(),
+          generatedAt: Date.now(),
+          provider: "gemini",
+          model: "gemini-2.5-flash-image",
+          promptRevision: "customer-neck-v6",
+          profileId,
+          templateTone: "medium",
+          ...frame,
+        },
+      ),
     });
   }
   const second = await addVersion("slim", "Alternative avatar");
@@ -380,6 +393,15 @@ test("staff compare saved master PNGs and reopen the chosen version for review",
     await page.getByLabel("Account email").fill(credentials.email);
     await page.getByLabel("Account password").fill(credentials.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await page.getByLabel("Customer mobile number", { exact: true }).fill(customer.phoneE164);
+    await page.getByRole("button", { name: "Find customer", exact: true }).click();
+    await page
+      .getByRole("button", { name: `${customer.name} · ${customer.phoneE164}`, exact: true })
+      .click();
+    const customerAvatars = page.getByRole("region", {
+      name: `Saved avatars for ${customer.name}`,
+    });
+    await expect(customerAvatars.getByRole("listitem")).toHaveCount(3);
     await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
     await page
       .getByRole("button", { name: "View master versions for Latest avatar draft" })
@@ -398,6 +420,7 @@ test("staff compare saved master PNGs and reopen the chosen version for review",
     ]);
     const draft = compare.getByRole("article", { name: "Master version 3" });
     await expect(draft).toContainText("Draft · Review required");
+    await expect(draft.getByRole("button", { name: /Make version 3 current/ })).toHaveCount(0);
     await expect(draft.getByRole("img")).toBeVisible();
     await expect(compare.getByRole("alert")).toHaveText("Master version 2 could not load.");
     failSecond = false;
@@ -420,6 +443,29 @@ test("staff compare saved master PNGs and reopen the chosen version for review",
     const dialog = page.getByRole("dialog", { name: "Saved avatars" });
     expect(await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
 
+    await originalCard.getByRole("button", { name: "Make version 1 current" }).click();
+    await expect(originalCard.getByText("Current master", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Close saved avatars" }).click();
+    const preferred = customerAvatars.getByRole("listitem").first();
+    await expect(preferred).toContainText("Original avatar");
+    await expect(preferred).toContainText("Current master");
+
+    await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
+    await expect(
+      dialog.getByText("Master version 1 · Current master", { exact: true }),
+    ).toBeVisible();
+    await dialog.getByRole("button", { name: "Make Alternative avatar current master" }).click();
+    await expect(
+      dialog.getByText("Master version 2 · Current master", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByText("Master version 1 · Current master", { exact: true }),
+    ).toHaveCount(0);
+    await dialog.getByRole("button", { name: "View master versions for Original avatar" }).click();
+    await dialog.getByRole("button", { name: "Compare master versions", exact: true }).click();
+    await left.selectOption(original.id);
+    await expect(originalCard.getByRole("img")).toBeVisible();
+    await expect(draft.getByRole("img")).toBeVisible();
     const readsBeforeOpen = imageReads.length;
     await originalCard.getByRole("button", { name: "Open version 1" }).click();
     await expect(dialog).not.toBeVisible();

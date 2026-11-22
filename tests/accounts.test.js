@@ -310,8 +310,8 @@ test("explicit avatar save verifies generation provenance and preserves it acros
     assert.ok(!columns.includes("body"));
   }));
 
-test("a regenerated master keeps separate approved images and scoped, retryable version numbers", async () =>
-  fixture(async ({ request, store, calls }) => {
+test("a regenerated master keeps separate images and supports an explicit current version", async () =>
+  fixture(async ({ request, store, directory, calls }) => {
     const session = cookie(
       await request("/api/account/register", "POST", credentials("master@example.com")),
     );
@@ -329,6 +329,17 @@ test("a regenerated master keeps separate approved images and scoped, retryable 
     });
     const source = { ...(await avatar()), customerId: customer.id };
     const base = await store.save(owner, source);
+    const currentUrl = (id) => `/api/avatars/${id}/current-master`;
+    const select = (id) => request(currentUrl(id), "POST", undefined, session);
+    const current = () => store.list(owner).filter(({ isCurrentMaster }) => isCurrentMaster);
+    assert.equal((await request(currentUrl(base.id), "POST")).status, 401);
+    assert.equal((await request(currentUrl(base.id), "POST", undefined, foreign)).status, 404);
+    assert.equal(
+      (await request(currentUrl(base.id), "POST", undefined, session, "https://other.example"))
+        .status,
+      403,
+    );
+    assert.equal((await select(base.id)).status, 409);
     const input = {
       regenerateFromId: base.id,
       customerId: customer.id,
@@ -342,6 +353,8 @@ test("a regenerated master keeps separate approved images and scoped, retryable 
     };
     assert.equal((await request("/api/personalize", "POST", input, session)).status, 409);
     approveTestAvatar(store, owner, base.id);
+    assert.deepEqual(current(), []);
+    assert.equal((await select(base.id)).status, 200);
     assert.equal(
       (await request("/api/personalize", "POST", { ...input, customerId: other.id }, session))
         .status,
@@ -383,8 +396,11 @@ test("a regenerated master keeps separate approved images and scoped, retryable 
     ])
       assert.equal((await save(value)).status, 400);
     store.revokeAvatarApproval(owner, base.id);
+    assert.deepEqual(current(), []);
     assert.equal((await save(candidate)).status, 409);
     approveTestAvatar(store, owner, base.id);
+    assert.deepEqual(current(), []);
+    assert.equal((await select(base.id)).status, 200);
     const copies = await Promise.all([save(candidate), save(candidate)]);
     for (const response of copies) assert.equal(response.status, 200);
     const [next, duplicate] = await Promise.all(copies.map((r) => r.json()));
@@ -394,7 +410,50 @@ test("a regenerated master keeps separate approved images and scoped, retryable 
     assert.equal(next.approvalStatus, "draft");
     assert.notEqual(next.id, base.id);
     assert.throws(() => store.requireApprovedAvatar(owner, next.id), { status: 409 });
+    assert.equal((await select(next.id)).status, 409);
+    assert.deepEqual(
+      current().map(({ id }) => id),
+      [base.id],
+    );
     approveTestAvatar(store, owner, next.id);
+    assert.deepEqual(
+      current().map(({ id }) => id),
+      [base.id],
+    );
+    const selections = await Promise.all([select(next.id), select(next.id)]);
+    for (const response of selections) {
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { id: next.id, masterId: base.id });
+    }
+    assert.deepEqual(
+      current().map(({ id }) => id),
+      [next.id],
+    );
+    const reopened = new AccountStore(directory);
+    try {
+      assert.deepEqual(
+        reopened
+          .list(owner)
+          .filter(({ isCurrentMaster }) => isCurrentMaster)
+          .map(({ id }) => id),
+        [next.id],
+      );
+      const audit = reopened.db
+        .prepare(
+          "SELECT user,refJson FROM events WHERE store=? AND type='avatar_master_selected' ORDER BY rowid",
+        )
+        .all(owner.id);
+      assert.deepEqual(
+        audit.map(({ user, refJson }) => [user, JSON.parse(refJson).avatarId]),
+        [
+          [owner.user.id, base.id],
+          [owner.user.id, base.id],
+          [owner.user.id, next.id],
+        ],
+      );
+    } finally {
+      reopened.close();
+    }
     assert.equal((await (await save(candidate)).json()).approvalStatus, "approved");
     assert.deepEqual(store.image(owner, base.id), original);
     assert.equal(store.listLooks(owner, base.id)[0].id, previousLook.id);
@@ -404,14 +463,31 @@ test("a regenerated master keeps separate approved images and scoped, retryable 
       "an identical PNG cannot take over the original",
     );
 
+    const revised = await save({
+      ...candidate,
+      regenerateFromId: undefined,
+      generationReceipt: undefined,
+    });
+    assert.equal(revised.status, 200);
+    assert.deepEqual(current(), []);
+    assert.equal((await select(next.id)).status, 409);
+    approveTestAvatar(store, owner, next.id);
+    assert.equal((await select(next.id)).status, 200);
     store.remove(owner, next.id);
+    assert.deepEqual(current(), []);
     const third = await save(await generateVersion("broad"));
     assert.equal(third.status, 200);
     const renewed = await third.json();
     assert.equal(renewed.masterVersion, 3);
     assert.equal(renewed.masterId, base.id);
+    approveTestAvatar(store, owner, renewed.id);
+    assert.equal((await select(renewed.id)).status, 200);
     store.remove(owner, base.id);
     assert.equal(store.list(owner)[0].masterId, base.id);
+    assert.deepEqual(
+      current().map(({ id }) => id),
+      [renewed.id],
+    );
     store.customers.remove(owner, customer.id);
     assert.equal(store.list(owner).length, 0);
     assert.equal(

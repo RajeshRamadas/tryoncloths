@@ -62,12 +62,15 @@ type Props = {
   versions: SavedAvatar[];
   disabled: boolean;
   onUse: (avatar: SavedAvatar) => void;
+  onSelectCurrent: (avatar: SavedAvatar) => void;
 };
 
-function VersionPair({ versions, disabled, onUse }: Props) {
+function VersionPair({ versions, disabled, onUse, onSelectCurrent }: Props) {
   const [newest, previous] = versions;
-  const [left, setLeft] = useState(previous);
-  const [right, setRight] = useState(newest);
+  const [leftId, setLeft] = useState(previous.id);
+  const [rightId, setRight] = useState(newest.id);
+  const left = versions.find((avatar) => avatar.id === leftId) ?? previous;
+  const right = versions.find((avatar) => avatar.id === rightId) ?? newest;
   const [zoom, setZoom] = useState(100);
 
   return (
@@ -83,10 +86,7 @@ function VersionPair({ versions, disabled, onUse }: Props) {
               <select
                 value={selected.id}
                 disabled={disabled}
-                onChange={(event) => {
-                  const next = versions.find(({ id }) => id === event.target.value);
-                  if (next) select(next);
-                }}
+                onChange={(event) => select(event.target.value)}
               >
                 {versions
                   .filter(({ id }) => id !== other.id)
@@ -121,6 +121,11 @@ function VersionPair({ versions, disabled, onUse }: Props) {
               <VersionImage id={avatar.id} label={`Master version ${version}`} zoom={zoom} />
               <h3>Version {version}</h3>
               <p>{avatar.name}</p>
+              {avatar.isCurrentMaster && (
+                <p>
+                  <strong>Current master</strong>
+                </p>
+              )}
               <p>
                 {profiles.find(({ id }) => id === avatar.profileId)?.name} · {avatar.heightCm} cm ·{" "}
                 {avatar.weightKg} kg
@@ -138,6 +143,16 @@ function VersionPair({ versions, disabled, onUse }: Props) {
               >
                 Open version {version}
               </button>
+              {avatar.approvalStatus === "approved" && !avatar.isCurrentMaster && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={disabled}
+                  onClick={() => onSelectCurrent(avatar)}
+                >
+                  Make version {version} current
+                </button>
+              )}
             </article>
           );
         })}
@@ -146,7 +161,12 @@ function VersionPair({ versions, disabled, onUse }: Props) {
   );
 }
 
-export default function AvatarMasterComparison({ versions, disabled, onUse }: Props) {
+export default function AvatarMasterComparison({
+  versions,
+  disabled,
+  onUse,
+  onSelectCurrent,
+}: Props) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -164,6 +184,7 @@ export default function AvatarMasterComparison({ versions, disabled, onUse }: Pr
           versions={[...versions].sort((a, b) => versionNumber(b) - versionNumber(a))}
           disabled={disabled}
           onUse={onUse}
+          onSelectCurrent={onSelectCurrent}
         />
       )}
     </>

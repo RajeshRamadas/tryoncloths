@@ -1,5 +1,6 @@
 import { requestApi } from "./api";
 import { type AvatarDetails, type SavedAvatar } from "./saved-avatars";
+export const accountAvatarsChanged = "forme-account-avatars-changed";
 async function json(path: string, init?: RequestInit) {
   const response = await requestApi(path, init, 30000);
   const data = await response.json();
@@ -23,6 +24,13 @@ export async function approveAccountAvatar(id: string, review: AvatarReviewAttes
 
 export async function revokeAccountAvatarApproval(id: string) {
   return json(`/api/avatars/${encodeURIComponent(id)}/approval`, { method: "DELETE" });
+}
+export async function selectCurrentMaster(id: string): Promise<{ id: string; masterId: string }> {
+  const result = await json(`/api/avatars/${encodeURIComponent(id)}/current-master`, {
+    method: "POST",
+  });
+  window.dispatchEvent(new Event(accountAvatarsChanged));
+  return result;
 }
 
 export async function listAccountAvatars(): Promise<SavedAvatar[]> {
@@ -73,6 +81,7 @@ export async function saveAccountAvatar(
 }
 export async function deleteAccountAvatar(id: string) {
   await json(`/api/avatars/${encodeURIComponent(id)}`, { method: "DELETE" });
+  window.dispatchEvent(new Event(accountAvatarsChanged));
 }
 
 export type SavedLook = {

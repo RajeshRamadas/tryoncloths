@@ -26,6 +26,7 @@ import { installAdminSchema, claimTrial, trialKeys } from "./commercial-admin.js
 import { DatabaseSync } from "node:sqlite";
 import { AVATAR_REVIEW_POLICY_VERSION, validateAvatarApproval } from "./avatar-approval.js";
 import { verifyAvatarGenerationReceipt } from "./avatar-generation.js";
+import { recordEvent } from "./events.js";
 import { mkdirSync, chmodSync } from "node:fs";
 import path from "node:path";
 import { randomBytes, createHash, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
@@ -138,6 +139,8 @@ export class AccountStore {
         this.db.exec("ALTER TABLE avatars ADD COLUMN master_id TEXT");
       if (!avatarColumns.includes("master_version"))
         this.db.exec("ALTER TABLE avatars ADD COLUMN master_version INTEGER NOT NULL DEFAULT 1");
+      if (!avatarColumns.includes("master_selected_at"))
+        this.db.exec("ALTER TABLE avatars ADD COLUMN master_selected_at INTEGER");
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS avatar_master_sequences (
           account TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
@@ -146,6 +149,13 @@ export class AccountStore {
           PRIMARY KEY(account,masterId)
         );
         CREATE UNIQUE INDEX IF NOT EXISTS avatar_master_versions ON avatars(account,COALESCE(master_id,id),master_version);
+        CREATE UNIQUE INDEX IF NOT EXISTS avatar_current_masters
+          ON avatars(account,COALESCE(master_id,id)) WHERE master_selected_at IS NOT NULL;
+        CREATE TRIGGER IF NOT EXISTS avatar_current_master_requires_approval AFTER UPDATE OF approved_at ON avatars
+        WHEN NEW.approved_at IS NULL AND NEW.master_selected_at IS NOT NULL
+        BEGIN
+          UPDATE avatars SET master_selected_at=NULL WHERE account=NEW.account AND id=NEW.id;
+        END;
         CREATE TRIGGER IF NOT EXISTS avatar_master_sequence_cleanup AFTER DELETE ON avatars
         BEGIN
           DELETE FROM avatar_master_sequences WHERE account=OLD.account AND masterId=COALESCE(OLD.master_id,OLD.id)
@@ -572,6 +582,32 @@ export class AccountStore {
     this.views?.invalidate(account.id, id);
     return { id, approvalStatus: "draft" };
   }
+  selectCurrentMaster(account, id) {
+    return transaction(this.db, () => {
+      const { sourceApproval } = this.requireApprovedAvatar(account, id);
+      const { masterId } = sourceApproval;
+      const current = this.db
+        .prepare(
+          "SELECT id FROM avatars WHERE account=? AND COALESCE(master_id,id)=? AND master_selected_at IS NOT NULL",
+        )
+        .get(account.id, masterId);
+      if (current?.id === id) return { id, masterId };
+      if (current)
+        this.db
+          .prepare("UPDATE avatars SET master_selected_at=NULL WHERE account=? AND id=?")
+          .run(account.id, current.id);
+      this.db
+        .prepare("UPDATE avatars SET master_selected_at=? WHERE account=? AND id=?")
+        .run(Date.now(), account.id, id);
+      recordEvent(
+        this.db,
+        { org: account.org, store: account.id, user: account.user.id },
+        "avatar_master_selected",
+        { avatarId: id },
+      );
+      return { id, masterId };
+    });
+  }
   requireApprovedAvatar(account, id, expectedApproval) {
     const row =
       typeof id === "string" &&
@@ -642,11 +678,12 @@ export class AccountStore {
   list(account) {
     return this.db
       .prepare(
-        "SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,profile_selection,generation_provenance,COALESCE(master_id,id) AS masterId,master_version AS masterVersion,approved_version AS approvedVersion,(SELECT max(v.version) FROM avatar_versions v WHERE v.account=avatars.account AND v.avatarId=avatars.id) AS latestVersion,CASE WHEN approved_at IS NOT NULL AND review_policy=1 THEN 'approved' ELSE 'draft' END AS approvalStatus,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC",
+        "SELECT id,name,customer AS customerId,(SELECT name FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerName,(SELECT phoneE164 FROM customers c WHERE c.store=avatars.account AND c.id=avatars.customer) AS customerPhone,profileId,body_type AS bodyType,template_tone AS templateTone,heightCm,weightKg,source,savedAt,thumbnail,profile_selection,generation_provenance,COALESCE(master_id,id) AS masterId,master_version AS masterVersion,master_selected_at IS NOT NULL AS isCurrentMaster,approved_version AS approvedVersion,(SELECT max(v.version) FROM avatar_versions v WHERE v.account=avatars.account AND v.avatarId=avatars.id) AS latestVersion,CASE WHEN approved_at IS NOT NULL AND review_policy=1 THEN 'approved' ELSE 'draft' END AS approvalStatus,(SELECT count(*) FROM looks l WHERE l.account=avatars.account AND l.avatarId=avatars.id) AS looksCount FROM avatars WHERE account=? ORDER BY savedAt DESC",
       )
       .all(account.id)
       .map(({ profile_selection, generation_provenance, ...row }) => ({
         ...row,
+        isCurrentMaster: Boolean(row.isCurrentMaster),
         profileSelection: profile_selection ? JSON.parse(profile_selection) : null,
         generation: generation_provenance ? JSON.parse(generation_provenance) : null,
         thumbnail: `data:image/png;base64,${Buffer.from(row.thumbnail).toString("base64")}`,
@@ -1018,6 +1055,13 @@ export function installAccountRoutes(
     requireUser,
     requireRole("owner", "manager", "staff"),
     wrap((req, res) => res.json(store.revokeAvatarApproval(req.account, req.params.id))),
+  );
+  app.post(
+    "/api/avatars/:id/current-master",
+    sameOrigin,
+    requireUser,
+    requireRole("owner", "manager", "staff"),
+    wrap((req, res) => res.json(store.selectCurrentMaster(req.account, req.params.id))),
   );
   app.delete(
     "/api/avatars/:id",

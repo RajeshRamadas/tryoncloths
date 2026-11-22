@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
-import { accountAvatarImage, listAccountAvatars } from "./account-avatars";
+import { accountAvatarImage, accountAvatarsChanged, listAccountAvatars } from "./account-avatars";
 import { avatarDataUrl, type AvatarDetails, type SavedAvatar } from "./saved-avatars";
 import { profiles } from "./profiles";
 
@@ -17,21 +17,32 @@ export default function CustomerAvatars({ customerId, customerName, disabled, on
   const [items, setItems] = useState<SavedAvatar[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [revision, setRevision] = useState(0);
   useEffect(() => {
     let alive = true;
+    const refresh = () => setRevision((previous) => previous + 1);
+    window.addEventListener(accountAvatarsChanged, refresh);
     setItems(null);
     setError("");
     listAccountAvatars()
       .then((all) => {
-        if (alive) setItems(all.filter((a) => a.customerId === customerId));
+        if (alive)
+          setItems(
+            all
+              .filter((a) => a.customerId === customerId)
+              .sort(
+                (a, b) => Number(Boolean(b.isCurrentMaster)) - Number(Boolean(a.isCurrentMaster)),
+              ),
+          );
       })
       .catch((e) => {
         if (alive) setError((e as Error).message);
       });
     return () => {
       alive = false;
+      window.removeEventListener(accountAvatarsChanged, refresh);
     };
-  }, [customerId]);
+  }, [customerId, revision]);
   async function open(item: SavedAvatar) {
     setBusy(true);
     setError("");
@@ -56,6 +67,7 @@ export default function CustomerAvatars({ customerId, customerName, disabled, on
               <li key={item.id}>
                 <span>
                   <strong>{item.name}</strong>
+                  {item.isCurrentMaster && <small>Current master</small>}
                   <small>
                     {profiles.find((p) => p.id === item.profileId)?.name || "Custom"} ·{" "}
                     {item.heightCm} cm / {item.weightKg} kg
