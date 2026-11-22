@@ -180,9 +180,8 @@ test("jewellery sources hide unrelated fields and preserve links across source c
 }) =>
   storeSession(page, async ({ avatar, paid }) => {
     await page.goto("/jewellery?avatar=" + avatar.id);
-    await expect(
-      page.getByRole("list", { name: "Jewellery fitting steps", exact: true }),
-    ).toBeVisible();
+    await page.getByRole("button", { name: "Browse pieces", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Choose jewellery" })).toBeFocused();
     await page.getByRole("button", { name: "Full body view", exact: true }).click();
     await expect(
       page.getByRole("img", { name: "Approved full reference", exact: true }),
