@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 const types = new Set([
   "avatar_generated",
+  "avatar_master_selected",
   "tryon_generated",
   "tryon_reused",
   "look_saved",

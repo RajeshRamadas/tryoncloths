@@ -17,6 +17,7 @@ import {
   listAccountAvatars,
   accountAvatarImage,
   deleteAccountAvatar,
+  selectCurrentMaster,
   listLooks,
   lookImage,
   deleteLook,
@@ -55,6 +56,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
   const [localView, setLocalView] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [selectionNotice, setSelectionNotice] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [profileId, setProfileId] = useState("regular");
   const [templateTone, setTemplateTone] = useState(DEFAULT_TEMPLATE_TONE);
@@ -70,6 +72,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
     setItems([]);
     setBusy(true);
     setError("");
+    setSelectionNotice("");
     setConfirmDelete(null);
     try {
       setItems(await (cloud ? listAccountAvatars() : listAvatars()));
@@ -99,9 +102,28 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
       setBusy(false);
     }
   }
+  async function chooseCurrent(item: SavedAvatar) {
+    setBusy(true);
+    setError("");
+    setSelectionNotice("");
+    try {
+      const { masterId, id } = await selectCurrentMaster(item.id);
+      setItems((previous) =>
+        previous.map((avatar) =>
+          avatar.masterId === masterId ? { ...avatar, isCurrentMaster: avatar.id === id } : avatar,
+        ),
+      );
+      setSelectionNotice(`Master version ${item.masterVersion ?? 1} is now current.`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function remove(id: string) {
     setBusy(true);
     setError("");
+    setSelectionNotice("");
     try {
       await (cloud && !localView ? deleteAccountAvatar(id) : deleteAvatar(id));
       setItems(await (cloud && !localView ? listAccountAvatars() : listAvatars()));
@@ -263,6 +285,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
             onClick={async () => {
               setBusy(true);
               setError("");
+              setSelectionNotice("");
               setConfirmDelete(null);
               setLooksFor(null);
               setMasterFilter(null);
@@ -286,6 +309,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
           </p>
         )}
         {busy && <p role="status">Opening library…</p>}
+        {selectionNotice && <p role="status">{selectionNotice}</p>}
         {masterFilter && (
           <button
             type="button"
@@ -302,6 +326,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
             versions={visibleItems}
             disabled={busy}
             onUse={(version) => void use(version)}
+            onSelectCurrent={(version) => void chooseCurrent(version)}
           />
         )}
         {!busy && !visibleItems.length && (
@@ -332,7 +357,10 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
                       </p>
                     )}
                     {cloud && !localView && item.masterVersion != null && (
-                      <p>Master version {item.masterVersion}</p>
+                      <p>
+                        Master version {item.masterVersion}
+                        {item.isCurrentMaster && " · Current master"}
+                      </p>
                     )}
                     {cloud && !localView && (
                       <p>
@@ -348,6 +376,20 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
                     >
                       Use {item.name}
                     </button>
+                    {cloud &&
+                      !localView &&
+                      item.approvalStatus === "approved" &&
+                      !item.isCurrentMaster && (
+                        <button
+                          type="button"
+                          className="button secondary"
+                          disabled={busy}
+                          aria-label={`Make ${item.name} current master`}
+                          onClick={() => void chooseCurrent(item)}
+                        >
+                          Make current master
+                        </button>
+                      )}
                     {cloud && !localView && item.masterId && item.approvalStatus === "approved" && (
                       <button
                         type="button"

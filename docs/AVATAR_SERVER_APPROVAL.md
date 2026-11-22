@@ -79,6 +79,18 @@ and belongs to the same store and customer. Retrying the same save returns the
 existing version, and a different generation with identical bytes prompts staff
 to use the existing saved version.
 
+## Select the current master
+
+In **Saved avatars**, choose **Make current master** on an approved avatar. The
+comparison screen also lets you make either approved version current. Each group
+of related versions has one current master at a time. Returning-customer lookup
+lists current masters first and labels them. Earlier versions remain available
+for review and reuse with their original looks.
+
+Choosing a master records the store, staff member, selected avatar and time. It
+uses zero AI credits. Revoking approval, re-saving the selected avatar as a draft
+or deleting it clears the selection. The next choice is explicit.
+
 ## Compatibility and limitations
 
 - Applies to **saved store-account avatars** and the account-backed garment/jewellery/portrait/looks routes. It does not change the offline IndexedDB library, sample-avatar browsing, or raw image operations that have no account avatar identity.
