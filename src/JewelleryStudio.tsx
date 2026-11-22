@@ -5,7 +5,13 @@ import JewellerySizeHelp from "./JewellerySizeHelp";
 import JewelleryNecklaceGuide from "./JewelleryNecklaceGuide";
 import JewelleryCompare from "./JewelleryCompare";
 import JewelleryOverlay, { type OverlayPrepared, type OverlayPlacement } from "./JewelleryOverlay";
-import { previewLabel } from "./jewellery-overlay";
+import {
+  overlayAnchors,
+  overlayRegions,
+  previewLabel,
+  refineEarringPlacements,
+  refineFullBodyPlacements,
+} from "./jewellery-overlay";
 import AvatarViews from "./AvatarViews";
 import ShareLook from "./ShareLook";
 import { readPhoto } from "./images";
@@ -50,6 +56,7 @@ type Frame = {
   saved?: boolean;
   previewMode?: PreviewMode;
   sourceApproval?: JewelleryResult["sourceApproval"];
+  closeUps?: { label: string; x: number; y: number }[];
 };
 const emptyDraft = (): Draft => ({
   name: "",
@@ -103,9 +110,11 @@ export default function JewelleryStudio() {
     [loading, setLoading] = useState(false),
     [preparing, setPreparing] = useState(false),
     [zoom, setZoom] = useState(1),
+    [zoomFocus, setZoomFocus] = useState<{ resultId: string; x: number; y: number } | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const fittingSession = useRef(crypto.randomUUID());
+  const preview = useRef<HTMLDivElement>(null);
   const alive = useRef(true),
     epoch = useRef(0),
     controller = useRef<AbortController | null>(null),
@@ -114,12 +123,36 @@ export default function JewelleryStudio() {
   const selected = avatars.find((a) => a.id === avatar),
     frames = history[view],
     current = frames.at(-1),
+    activeResultId = current?.result?.resultId,
     image = current?.image || roots[view] || "",
     type = draft.type,
     definition = type ? jewelleryTypes[type] : null;
   const manager = role === "owner" || role === "manager",
     available = generation && bodies.includes(selected?.bodyType || "male");
   const valid = (version: number) => alive.current && epoch.current === version;
+  useEffect(() => {
+    const frame = preview.current;
+    const photo = frame?.querySelector("img");
+    if (!frame || !photo || !zoomFocus || zoomFocus.resultId !== activeResultId || zoom === 1)
+      return;
+    const { x, y } = zoomFocus;
+    function centrePhoto() {
+      if (!photo?.naturalWidth || !photo.naturalHeight || !frame) return;
+      // Match the preview's top-centred object-fit: contain.
+      const scale = Math.min(
+        photo.clientWidth / photo.naturalWidth,
+        photo.clientHeight / photo.naturalHeight,
+      );
+      const width = photo.naturalWidth * scale;
+      frame.scrollTo(
+        (photo.clientWidth - width) / 2 + x * width - frame.clientWidth / 2,
+        y * photo.naturalHeight * scale - frame.clientHeight / 2,
+      );
+    }
+    if (photo.complete) centrePhoto();
+    else photo.addEventListener("load", centrePhoto, { once: true });
+    return () => photo.removeEventListener("load", centrePhoto);
+  }, [activeResultId, zoom, zoomFocus]);
   const clearReview = () => {
     setConsent(false);
     setStorage(false);
@@ -542,12 +575,42 @@ export default function JewelleryStudio() {
   async function prepareOverlay(): Promise<OverlayPrepared | null> {
     const { version, abort } = begin("Loading overlay placement");
     try {
-      const result = await jewelleryApi(
+      const result: OverlayPrepared = await jewelleryApi(
         "/api/jewellery/overlay/prepare",
         overlayPayload(),
         abort.signal,
       );
-      return valid(version) ? result : null;
+      if (!valid(version)) return null;
+      const earrings = view === "portrait" && type && overlayAnchors[type] === "earlobe";
+      if (!type || (view !== "full" && !earrings)) return result;
+      const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(12000)]);
+      const detection = earrings
+        ? import("./face-photo").then(({ overlayFacePoints }) =>
+            overlayFacePoints(result.base, signal),
+          )
+        : import("./body-pose").then(({ singleBodyPose }) => singleBodyPose(result.base, signal));
+      const landmarks = await Promise.race([
+        detection.catch(() => null),
+        new Promise<null>((resolve) =>
+          signal.addEventListener("abort", () => resolve(null), { once: true }),
+        ),
+      ]);
+      if (!valid(version)) return null;
+      if (!landmarks) return result;
+      const { placements, matched } = earrings
+        ? refineEarringPlacements(result.placements, landmarks, result)
+        : refineFullBodyPlacements(result.placements, type, landmarks, result);
+      if (!matched) return result;
+      return {
+        ...result,
+        placements,
+        warning:
+          matched === placements.length
+            ? earrings
+              ? "Starting positions use detected ear points. Check the piercings in close-up."
+              : "Starting positions follow the avatar’s body landmarks. Check and adjust the placement."
+            : "Some pieces use approximate starting positions. Check and adjust each piece.",
+      };
     } catch (e) {
       if (valid(version)) setError((e as Error).message);
       return null;
@@ -580,6 +643,20 @@ export default function JewelleryStudio() {
         mode: "overlay",
         resultId: result.resultId,
       };
+      const placementCloseUps: NonNullable<Frame["closeUps"]> = overlayRegions(
+        placements,
+        overlayAnchors[piece.type],
+      ).map(({ label, index }: { label: string; index: number }) => ({
+        label,
+        x: placements[index].x / prepared.width,
+        y: placements[index].y / prepared.height,
+      }));
+      const closeUps = [
+        ...(current?.closeUps ?? []).filter((earlier) =>
+          placementCloseUps.every((latest) => latest.label !== earlier.label),
+        ),
+        ...placementCloseUps,
+      ];
       setHistory((h) => ({
         ...h,
         [view]: [
@@ -589,12 +666,15 @@ export default function JewelleryStudio() {
             items: [...(current?.items || []), piece],
             result,
             previewMode: result.previewMode,
+            closeUps,
           },
         ],
       }));
       setReviewed(false);
       clearReview();
       setSavedLook(null);
+      setZoom(1);
+      setZoomFocus(null);
       setNotice("Overlay preview ready — no AI credit used. Review its placement before saving.");
       return true;
     } catch (e) {
@@ -956,7 +1036,7 @@ export default function JewelleryStudio() {
                     </strong>
                     <span>{current ? "Jewellery look" : "Approved saved view"}</span>
                   </div>
-                  <div className="jewellery-image">
+                  <div className="jewellery-image" ref={preview}>
                     {image ? (
                       <img
                         src={image}
@@ -982,6 +1062,36 @@ export default function JewelleryStudio() {
                     <p className="small-footnote">
                       Tone-matched sample hands; these are not the customer’s own hands.
                     </p>
+                  )}
+                  {activeResultId && !!current?.closeUps?.length && (
+                    <div
+                      className="jewellery-overlay-views"
+                      role="group"
+                      aria-label="Look close-ups"
+                    >
+                      <button
+                        className="button secondary"
+                        onClick={() => {
+                          setZoom(1);
+                          setZoomFocus(null);
+                          preview.current?.scrollTo(0, 0);
+                        }}
+                      >
+                        Full look
+                      </button>
+                      {current.closeUps.map(({ label, x, y }) => (
+                        <button
+                          className="button secondary"
+                          key={label}
+                          onClick={() => {
+                            setZoomFocus({ resultId: activeResultId, x, y });
+                            setZoom(3);
+                          }}
+                        >
+                          Zoom to {label}
+                        </button>
+                      ))}
+                    </div>
                   )}
                   <label>
                     Preview zoom
@@ -1752,6 +1862,7 @@ export default function JewelleryStudio() {
                                 credit is required for an overlay.
                               </p>
                               <JewelleryOverlay
+                                anchor={overlayAnchors[draft.item.garmentType]}
                                 key={JSON.stringify([
                                   avatar,
                                   view,

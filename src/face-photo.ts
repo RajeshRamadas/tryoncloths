@@ -28,6 +28,15 @@ function faceDetector() {
   return detector;
 }
 
+/** The six BlazeFace points include both ear tragions. Keep them on the device. */
+export async function overlayFacePoints(photo: string, signal: AbortSignal) {
+  signal.throwIfAborted();
+  const [model, image] = await Promise.all([faceDetector(), loadImage(photo)]);
+  signal.throwIfAborted();
+  const { detections } = model.detect(image);
+  return detections.length === 1 ? detections[0].keypoints : null;
+}
+
 /** Advisory hints only. The image and detected boxes stay on the device. */
 export async function checkFacePhoto(photo: string): Promise<string[] | null> {
   try {

@@ -4394,6 +4394,19 @@ dialog::backdrop {
   color: var(--gray-600);
 }
 
+.jewellery-overlay-views {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.jewellery-overlay-zoom {
+  flex: 1 1 140px;
+}
+.jewellery-overlay-zoom input {
+  display: block;
+  width: 100%;
+}
 .jewellery-overlay-canvas {
   display: block;
   width: 100%;
@@ -4402,7 +4415,11 @@ dialog::backdrop {
   touch-action: none;
   border: 1px solid var(--gray-300);
   border-radius: var(--radius-md);
-  margin: 16px 0;
+  margin: 12px 0 6px;
+}
+.jewellery-overlay-canvas:focus-visible {
+  outline: 2px solid var(--brand-600);
+  outline-offset: 2px;
 }
 .jewellery-overlay fieldset {
   border: 0;

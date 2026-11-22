@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { loadImage } from "./images";
+import { overlayRegions } from "./jewellery-overlay";
 
 export type OverlayPlacement = {
   id: string;
@@ -22,18 +23,29 @@ export type OverlayPrepared = {
   warning: string;
 };
 type Props = {
+  anchor: string;
   disabled: boolean;
   onPrepare: () => Promise<OverlayPrepared | null>;
   onApply: (prepared: OverlayPrepared, placements: OverlayPlacement[]) => Promise<boolean>;
 };
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 const angle = (n: number) => ((n + 540) % 360) - 180;
-export default function JewelleryOverlay({ disabled, onPrepare, onApply }: Props) {
+const nudges: Record<string, [number, number]> = {
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+};
+export default function JewelleryOverlay({ anchor, disabled, onPrepare, onApply }: Props) {
   const [prepared, setPrepared] = useState<OverlayPrepared | null>(null),
     [pieces, setPieces] = useState<OverlayPlacement[]>([]),
     [selected, setSelected] = useState(0),
+    [zoom, setZoom] = useState(1),
+    [focus, setFocus] = useState<{ x: number; y: number } | null>(null),
+    [placing, setPlacing] = useState(false),
     [ready, setReady] = useState(false),
     [error, setError] = useState("");
+  const canvasHelp = useId();
   const canvas = useRef<HTMLCanvasElement>(null),
     images = useRef<HTMLImageElement[]>([]),
     alive = useRef(true),
@@ -46,6 +58,21 @@ export default function JewelleryOverlay({ disabled, onPrepare, onApply }: Props
       angle: number;
     } | null>(null);
   const piece = pieces[selected];
+  const overviewWidth = prepared?.width ?? 1;
+  const overviewHeight = prepared?.height ?? 1;
+  const viewWidth = overviewWidth / zoom;
+  const viewHeight = overviewHeight / zoom;
+  const originX = clamp(
+    (focus?.x ?? overviewWidth / 2) - viewWidth / 2,
+    0,
+    overviewWidth - viewWidth,
+  );
+  const originY = clamp(
+    (focus?.y ?? overviewHeight / 2) - viewHeight / 2,
+    0,
+    overviewHeight - viewHeight,
+  );
+  const regions: { label: string; index: number }[] = overlayRegions(pieces, anchor);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -80,32 +107,39 @@ export default function JewelleryOverlay({ disabled, onPrepare, onApply }: Props
   }, [prepared]);
   useEffect(() => {
     const c = canvas.current;
-    if (!c || !prepared || !ready) return;
+    const [base, asset] = images.current;
+    if (!c || !prepared || !ready || !base || !asset) return;
     const ctx = c.getContext("2d")!;
     c.width = prepared.width;
     c.height = prepared.height;
-    ctx.drawImage(images.current[0], 0, 0);
+    ctx.setTransform(zoom, 0, 0, zoom, -originX * zoom, -originY * zoom);
+    ctx.drawImage(base, 0, 0);
+    const screenPixel = prepared.width / Math.max(1, c.clientWidth) / zoom;
     pieces.forEach((p, i) => {
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate((p.angle * Math.PI) / 180);
       if (p.mirror) ctx.scale(-1, 1);
-      ctx.drawImage(
-        images.current[1],
-        -p.pivotX * p.width,
-        -p.pivotY * p.height,
-        p.width,
-        p.height,
-      );
+      ctx.drawImage(asset, -p.pivotX * p.width, -p.pivotY * p.height, p.width, p.height);
       if (i === selected) {
         ctx.strokeStyle = "#215b4a";
-        ctx.lineWidth = (2 * prepared.width) / c.getBoundingClientRect().width;
-        ctx.setLineDash([8, 5]);
+        ctx.lineWidth = 1.5 * screenPixel;
+        ctx.setLineDash([5 * screenPixel, 3 * screenPixel]);
         ctx.strokeRect(-p.pivotX * p.width, -p.pivotY * p.height, p.width, p.height);
+        if (zoom > 1 || placing) {
+          const radius = 7 * screenPixel;
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.moveTo(-radius, 0);
+          ctx.lineTo(radius, 0);
+          ctx.moveTo(0, -radius);
+          ctx.lineTo(0, radius);
+          ctx.stroke();
+        }
       }
       ctx.restore();
     });
-  }, [prepared, pieces, selected, ready]);
+  }, [prepared, pieces, selected, ready, zoom, originX, originY, placing]);
   function update(next: Partial<OverlayPlacement>) {
     setPieces((list) => list.map((p, i) => (i === selected ? { ...p, ...next } : p)));
   }
@@ -119,11 +153,30 @@ export default function JewelleryOverlay({ disabled, onPrepare, onApply }: Props
     return { width: source.width * f, height: source.height * f };
   }
   function position(e: PointerEvent<HTMLCanvasElement>) {
-    const r = e.currentTarget.getBoundingClientRect();
+    const c = e.currentTarget;
+    const r = c.getBoundingClientRect();
     return {
-      x: ((e.clientX - r.left) * prepared!.width) / r.width,
-      y: ((e.clientY - r.top) * prepared!.height) / r.height,
+      x: originX + ((e.clientX - r.left - c.clientLeft) * viewWidth) / c.clientWidth,
+      y: originY + ((e.clientY - r.top - c.clientTop) * viewHeight) / c.clientHeight,
     };
+  }
+  function target(x: number, y: number) {
+    update({ x: clamp(x, 0, overviewWidth), y: clamp(y, 0, overviewHeight) });
+  }
+  function focusPiece(index: number, magnification: number) {
+    const { x, y } = pieces[index];
+    setSelected(index);
+    setFocus({ x, y });
+    setZoom(magnification);
+  }
+  function onKeyDown(e: KeyboardEvent<HTMLCanvasElement>) {
+    if (disabled || !ready || !piece) return;
+    if (e.key === "Escape" && placing) setPlacing(false);
+    const nudge = nudges[e.key];
+    if (!nudge) return;
+    e.preventDefault();
+    const step = e.shiftKey ? 10 : 1;
+    target(piece.x + nudge[0] * step, piece.y + nudge[1] * step);
   }
   function resetGesture(index = selected) {
     const p = [...points.current.values()],
@@ -144,7 +197,13 @@ export default function JewelleryOverlay({ disabled, onPrepare, onApply }: Props
   function down(e: PointerEvent<HTMLCanvasElement>) {
     if (disabled || !ready || !prepared) return;
     e.preventDefault();
+    e.currentTarget.focus({ preventScroll: true });
     const q = position(e);
+    if (placing) {
+      target(q.x, q.y);
+      setPlacing(false);
+      return;
+    }
     let index = selected;
     if (points.current.size === 0) {
       let best = Infinity;
@@ -194,6 +253,8 @@ export default function JewelleryOverlay({ disabled, onPrepare, onApply }: Props
       setPrepared(value);
       setPieces(value.placements.map((p) => ({ ...p })));
       setSelected(0);
+      setZoom(1);
+      setPlacing(false);
     }
   }
   return (
@@ -213,16 +274,61 @@ export default function JewelleryOverlay({ disabled, onPrepare, onApply }: Props
             {prepared.warning} The cut-out keeps its product colours and does not simulate lighting
             or occlusion.
           </p>
+          <div className="jewellery-overlay-views" role="group" aria-label="Placement close-ups">
+            <button
+              className="button secondary"
+              disabled={disabled || !ready}
+              onClick={() => setZoom(1)}
+            >
+              Full view
+            </button>
+            {regions.map(({ label, index }) => (
+              <button
+                className="button secondary"
+                key={label}
+                disabled={disabled || !ready}
+                onClick={() => focusPiece(index, anchor === "earlobe" ? 4 : 3)}
+              >
+                Zoom to {label}
+              </button>
+            ))}
+            <label className="jewellery-overlay-zoom">
+              View zoom ({zoom}×)
+              <input
+                type="range"
+                aria-label="Placement view zoom"
+                min="1"
+                max="6"
+                step="0.5"
+                value={zoom}
+                disabled={disabled || !ready}
+                onChange={(e) => {
+                  if (!piece) return;
+                  const next = Number(e.target.value);
+                  if (zoom === 1) focusPiece(selected, next);
+                  else setZoom(next);
+                }}
+              />
+            </label>
+          </div>
           <canvas
             ref={canvas}
             className="jewellery-overlay-canvas"
             aria-label="Jewellery placement canvas"
+            aria-describedby={canvasHelp}
+            tabIndex={disabled || !ready ? -1 : 0}
+            onKeyDown={onKeyDown}
             onPointerDown={down}
             onPointerMove={move}
             onPointerUp={up}
             onPointerCancel={up}
             onLostPointerCapture={up}
           />
+          <p id={canvasHelp} className="small-footnote">
+            {placing
+              ? "Tap the attachment point for the selected piece."
+              : "Drag to adjust. Arrow keys move the selected piece by 1 pixel."}
+          </p>
           {piece && (
             <fieldset disabled={disabled || !ready}>
               <label>
@@ -230,7 +336,7 @@ export default function JewelleryOverlay({ disabled, onPrepare, onApply }: Props
                 <select
                   aria-label="Selected overlay piece"
                   value={selected}
-                  onChange={(e) => setSelected(Number(e.target.value))}
+                  onChange={(e) => focusPiece(Number(e.target.value), zoom)}
                 >
                   {pieces.map((p, i) => (
                     <option key={p.id} value={i}>
@@ -239,6 +345,13 @@ export default function JewelleryOverlay({ disabled, onPrepare, onApply }: Props
                   ))}
                 </select>
               </label>
+              <button
+                className="button secondary"
+                aria-pressed={placing}
+                onClick={() => setPlacing(!placing)}
+              >
+                {placing ? "Cancel placement" : "Set attachment point"}
+              </button>
               <div className="catalogue-filters">
                 <label>
                   Horizontal position
@@ -309,6 +422,8 @@ export default function JewelleryOverlay({ disabled, onPrepare, onApply }: Props
                 onClick={() => {
                   setPieces(prepared.placements.map((p) => ({ ...p })));
                   setSelected(0);
+                  setZoom(1);
+                  setPlacing(false);
                 }}
               >
                 Reset all placements

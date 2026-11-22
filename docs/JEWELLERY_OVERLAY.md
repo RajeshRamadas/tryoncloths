@@ -23,24 +23,35 @@ hands can be reused.
 3. Open and approve a saved avatar, choose **Jewellery**, select its approved
    portrait/hands/full-body view and a saved product with a cut-out.
 4. Select **Overlay · free**, review the starting view, and choose **Load overlay
-   placement**. The editor starts at the saved anchors. Select a piece, drag it,
-   pinch with two fingers to resize/rotate, or use the position/scale/rotation
-   controls. The second earring starts mirrored. **Reset all placements** restores
-   every starting position. **Reload starting placement** reads the current asset.
+   placement**. Use a close-up such as **Zoom to left ear** or **Zoom to right wrist**
+   to inspect the cut-out on the avatar, or vary **View zoom** up to 6×. These controls
+   magnify the view. **Overlay scale** resizes the product itself. Drag a piece,
+   pinch with two fingers to resize/rotate it, or use **Set attachment point** to
+   place the selected piece with a tap. With the canvas focused, the arrow keys
+   nudge by one image pixel. **Reset all placements** restores every starting
+   position. **Reload starting placement** reads the current asset.
 5. Choose **Apply overlay — free**, review the composite and save it with customer
-   storage agreement. Undo removes the latest addition; reset restores the saved
+   storage agreement. The applied look offers the same area shortcuts during
+   the fitting session. Undo removes the latest addition; reset restores the saved
    view. Add more pieces to the reviewed result in the same way.
 6. Download a full-resolution PNG or share the saved look. Both carry **Overlay
    preview**. Reopen from the avatar’s saved looks without generating again.
 
-Portrait ear/nose sides follow the wearer’s anatomy, with the J5 coordinates
-interpreted as image sides. Template hands use their anatomical hand/finger/wrist
-coordinates. Earring drop/stud width and forehead pendant dimensions use the
+Portrait ear/nose sides follow the wearer’s anatomy. Earrings use the portrait's
+jaw anchors and, when the on-device detector obtains compatible ear points, refine
+the position lower on the ear. Check each piercing before applying. Template and
+customer hands use their anatomical hand, finger and wrist coordinates. Bangle
+stacks advance along each wrist towards the forearm. Earring drop/stud width and
+forehead pendant dimensions use the
 portrait’s approximate eye-distance scale (63 mm reference). Hand bands start
-from template finger/wrist widths. Necklace width uses 40% of the catalogue chain
-length at the approximate portrait scale; other pieces use view proportions;
-full-body waist/ankle positions are manual starting suggestions, not measured
-customer anatomy. Staff can adjust all pieces without distorting the cut-out.
+from template finger/wrist widths. In Portrait view, necklace width uses 40% of
+the catalogue chain length at the approximate portrait scale. In Full body view,
+the on-device pose model estimates neckline, waist, and ankle positions from the
+currently displayed avatar. Starting size and rotation follow the corresponding
+shoulders, hips, or lower leg. If the model is unavailable or a landmark is
+unclear, the affected pieces use the adjustable manual defaults. The model
+needs no additional image upload or AI credits. Staff can adjust every piece
+without distorting the cut-out. These positions are for visual styling.
 
 The overlay preserves the cut-out’s design and colours. It adds pixels and does
 not infer lighting, depth, hidden chain sections, physical fit or occlusion. It

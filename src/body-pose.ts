@@ -1,4 +1,4 @@
-// On-device pose landmarks for the full-body photo check and the outfit arm masks. The
+// On-device pose landmarks for the full-body photo check, outfit arm masks and jewellery. The
 // MediaPipe runtime (~13.5 MB) and the pose model (~6 MB) load only when first needed, and
 // are cached by the browser afterwards. No image is uploaded for either use.
 import wasmLoaderPath from "@mediapipe/tasks-vision/vision_wasm_internal.js?url";
@@ -47,6 +47,22 @@ export async function checkBodyPhoto(photo: string): Promise<PoseHint[] | null> 
     return assessBodyPose(result.landmarks, image.naturalWidth, image.naturalHeight);
   } catch {
     return null;
+  }
+}
+
+/** The prepared overlay uses exactly one visible person's landmarks in the browser. */
+export async function singleBodyPose(
+  photo: string,
+  signal: AbortSignal,
+): Promise<Landmark[] | null> {
+  signal.throwIfAborted();
+  const [model, image] = await Promise.all([poseLandmarker(false), loadImage(photo)]);
+  signal.throwIfAborted();
+  const result = model.detect(image);
+  try {
+    return result.landmarks.length === 1 ? result.landmarks[0] : null;
+  } finally {
+    result.close();
   }
 }
 
