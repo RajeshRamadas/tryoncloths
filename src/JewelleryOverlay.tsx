@@ -80,23 +80,18 @@ export default function JewelleryOverlay({ disabled, onPrepare, onApply }: Props
   }, [prepared]);
   useEffect(() => {
     const c = canvas.current;
-    if (!c || !prepared || !ready) return;
+    const [base, asset] = images.current;
+    if (!c || !prepared || !ready || !base || !asset) return;
     const ctx = c.getContext("2d")!;
     c.width = prepared.width;
     c.height = prepared.height;
-    ctx.drawImage(images.current[0], 0, 0);
+    ctx.drawImage(base, 0, 0);
     pieces.forEach((p, i) => {
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate((p.angle * Math.PI) / 180);
       if (p.mirror) ctx.scale(-1, 1);
-      ctx.drawImage(
-        images.current[1],
-        -p.pivotX * p.width,
-        -p.pivotY * p.height,
-        p.width,
-        p.height,
-      );
+      ctx.drawImage(asset, -p.pivotX * p.width, -p.pivotY * p.height, p.width, p.height);
       if (i === selected) {
         ctx.strokeStyle = "#215b4a";
         ctx.lineWidth = (2 * prepared.width) / c.getBoundingClientRect().width;

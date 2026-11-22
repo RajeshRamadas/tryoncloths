@@ -23,7 +23,7 @@ hands can be reused.
 3. Open and approve a saved avatar, choose **Jewellery**, select its approved
    portrait/hands/full-body view and a saved product with a cut-out.
 4. Select **Overlay · free**, review the starting view, and choose **Load overlay
-   placement**. The editor starts at the saved anchors. Select a piece, drag it,
+   placement**. The editor suggests a starting position. Select a piece, drag it,
    pinch with two fingers to resize/rotate, or use the position/scale/rotation
    controls. The second earring starts mirrored. **Reset all placements** restores
    every starting position. **Reload starting placement** reads the current asset.
@@ -37,10 +37,14 @@ Portrait ear/nose sides follow the wearer’s anatomy, with the J5 coordinates
 interpreted as image sides. Template hands use their anatomical hand/finger/wrist
 coordinates. Earring drop/stud width and forehead pendant dimensions use the
 portrait’s approximate eye-distance scale (63 mm reference). Hand bands start
-from template finger/wrist widths. Necklace width uses 40% of the catalogue chain
-length at the approximate portrait scale; other pieces use view proportions;
-full-body waist/ankle positions are manual starting suggestions, not measured
-customer anatomy. Staff can adjust all pieces without distorting the cut-out.
+from template finger/wrist widths. In Portrait view, necklace width uses 40% of
+the catalogue chain length at the approximate portrait scale. In Full body view,
+the on-device pose model estimates neckline, waist, and ankle positions from the
+currently displayed avatar. Starting size and rotation follow the corresponding
+shoulders, hips, or lower leg. If the model is unavailable or a landmark is
+unclear, the affected pieces use the adjustable manual defaults. The model
+needs no additional image upload or AI credits. Staff can adjust every piece
+without distorting the cut-out. These positions are for visual styling.
 
 The overlay preserves the cut-out’s design and colours. It adds pixels and does
 not infer lighting, depth, hidden chain sections, physical fit or occlusion. It

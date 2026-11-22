@@ -151,6 +151,92 @@ export function defaultOverlayPlacements({
   }
   return result;
 }
+
+// MediaPipe's landmark indices use the wearer's left and right. Distances and
+// angles use pixels so a portrait canvas does not stretch the geometry.
+const bodyJoint = (landmarks, index, width, height) => {
+  const joint = landmarks[index];
+  if (
+    !joint ||
+    ![joint.x, joint.y, joint.visibility].every(Number.isFinite) ||
+    joint.visibility < 0.55 ||
+    joint.x < 0 ||
+    joint.x > 1 ||
+    joint.y < 0 ||
+    joint.y > 1
+  )
+    return null;
+  return { x: joint.x * width, y: joint.y * height };
+};
+const between = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+const degrees = (rise, run) => (Math.atan2(rise, run) * 180) / Math.PI;
+
+function bodyLine(a, b, minSpan) {
+  if (!a || !b) return null;
+  const [left, right] = a.x < b.x ? [a, b] : [b, a];
+  const dx = right.x - left.x,
+    dy = right.y - left.y;
+  const span = Math.hypot(dx, dy);
+  const angle = degrees(dy, dx);
+  if (dx < minSpan || Math.abs(angle) > 25) return null;
+  return { centre: between(left, right, 0.5), span, angle, dx, dy };
+}
+
+/** Refine the editor defaults in memory. Unclear joints keep their manual starting positions. */
+export function refineFullBodyPlacements(placements, type, landmarks, { width, height }) {
+  const joint = (i) => bodyJoint(landmarks, i, width, height);
+  const anchor = overlayAnchors[type];
+  const shoulders = bodyLine(joint(11), joint(12), width * 0.1);
+  const hips = bodyLine(joint(23), joint(24), width * 0.075);
+
+  function fittingPoint(id) {
+    if (anchor === "ankle") {
+      const left = id.startsWith("left:");
+      const knee = joint(left ? 25 : 26);
+      const ankle = joint(left ? 27 : 28);
+      if (!knee || !ankle || ankle.y - knee.y < height * 0.07) return null;
+      const angle = degrees(knee.x - ankle.x, ankle.y - knee.y);
+      if (Math.abs(angle) > 35) return null;
+      return {
+        ...between(ankle, knee, 0.05),
+        angle,
+        width: Math.hypot(ankle.x - knee.x, ankle.y - knee.y) * 0.24,
+      };
+    }
+    if (!shoulders) return null;
+    if (anchor === "waist" && hips && hips.centre.y - shoulders.centre.y >= height * 0.09) {
+      return {
+        ...between(shoulders.centre, hips.centre, 0.72),
+        angle: hips.angle,
+        width: Math.max(hips.span * 1.2, shoulders.span * 0.86),
+      };
+    }
+    if (anchor === "neckBase") {
+      // The necklace's top edge attaches above the shoulder line, with its
+      // visible width limited by the shoulders. Preserve the cut-out's drape.
+      return {
+        x: shoulders.centre.x + shoulders.dy * 0.16,
+        y: shoulders.centre.y - shoulders.dx * 0.16,
+        angle: shoulders.angle,
+        width: shoulders.span * 0.66,
+      };
+    }
+    return null;
+  }
+
+  let matched = 0;
+  const refined = placements.map((piece) => {
+    const point = fittingPoint(piece.id);
+    if (!point || point.x < 0 || point.x > width || point.y < 0 || point.y > height) return piece;
+    const ratio = piece.height / piece.width;
+    const fittedWidth = Math.min(point.width, width, height / ratio);
+    if (fittedWidth < 2 || fittedWidth * ratio < 2) return piece;
+    matched++;
+    return { ...piece, ...point, width: fittedWidth, height: fittedWidth * ratio };
+  });
+  return { placements: refined, matched };
+}
+
 export function validateOverlayPlacements(input, defaults, { width, height }) {
   if (!Array.isArray(input) || input.length !== defaults.length || input.length > 48) bad();
   let area = 0;

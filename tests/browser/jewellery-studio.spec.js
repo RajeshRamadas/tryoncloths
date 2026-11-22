@@ -8,6 +8,7 @@ import sharp from "sharp";
 import { handsTemplate } from "../../server/hands-templates.js";
 import { AccountStore } from "../helpers/pilot-accounts.js";
 import { createApp, standardAvatar } from "../../server/app.js";
+import { saveOverlayAsset } from "../../server/jewellery-overlay.js";
 
 const face = await readFile(new URL("../fixtures/customers/red-plaid-face.jpg", import.meta.url));
 const portrait = await sharp({
@@ -719,6 +720,81 @@ test("free cut-out upload → anchored mobile editor → drag/scale/rotate/reset
     { overlayOnly: true },
   ));
 
+test("a full-body necklace uses local avatar landmarks and can fall back to manual placement", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await fixture(
+    page,
+    async ({ store, account, avatar, calls }) => {
+      const png = await sharp(
+        Buffer.from(
+          '<svg width="240" height="240"><path d="M28 12 Q56 190 120 202 Q184 190 212 12" fill="none" stroke="#c49c3b" stroke-width="12"/></svg>',
+        ),
+      )
+        .png()
+        .toBuffer();
+      const image = "data:image/png;base64," + png.toString("base64");
+      const { garment } = await store.garments.save(
+        account,
+        {
+          category: "jewellery",
+          garmentType: "long_haar",
+          name: "Long gold necklace",
+          attributes: { lengthCm: 70, metal: "yellow_gold" },
+          image,
+        },
+        { jewelleryEnabled: true },
+      );
+      await saveOverlayAsset(store, account, garment.id, {
+        overlayPng: image,
+        overlayAnchor: "neckBase",
+      });
+      await page.goto("/jewellery?avatar=" + avatar.id);
+      await page.getByRole("button", { name: "Full body view", exact: true }).click();
+      await page.getByRole("button", { name: /^Long gold necklace/ }).click();
+      await review(page).check();
+
+      const model = "**/models/pose_landmarker_lite.task";
+      await page.route(model, (route) => route.abort());
+      await page.getByRole("button", { name: "Load overlay placement", exact: true }).click();
+      await expect(page.getByText(/Full-body placement is approximate/)).toBeVisible();
+      const y = page.getByLabel("Overlay vertical position", { exact: true });
+      await expect(y).toHaveValue("353");
+
+      await page.unroute(model);
+      const response = page.waitForResponse(
+        (res) => new URL(res.url()).pathname === "/api/jewellery/overlay/prepare",
+      );
+      await page.getByRole("button", { name: "Reload starting placement", exact: true }).click();
+      const fallback = (await (await response).json()).placements[0];
+      await expect(
+        page.getByText(/Starting positions follow the avatar’s body landmarks/),
+      ).toBeVisible({
+        timeout: 15_000,
+      });
+      const improvedY = Number(await y.inputValue());
+      expect(improvedY).toBeLessThan(fallback.y);
+      await page.getByLabel("Overlay vertical position", { exact: true }).fill("350");
+      await page.getByRole("button", { name: "Reset all placements", exact: true }).click();
+      await expect(y).toHaveValue(String(improvedY));
+      const applied = page.waitForRequest(
+        (req) => new URL(req.url()).pathname === "/api/jewellery/overlay",
+      );
+      const before = store.billing.balance(account.org);
+      await page.getByRole("button", { name: "Apply overlay — free", exact: true }).click();
+      const piece = (await applied).postDataJSON().placements[0];
+      expect(piece.width).toBeLessThan(fallback.width * 0.7);
+      expect(Math.round(piece.y)).toBe(improvedY);
+      await expect(
+        page.getByRole("img", { name: "Customer jewellery preview", exact: true }),
+      ).toBeVisible();
+      expect(store.billing.balance(account.org)).toBe(before);
+      expect(calls()).toBe(0);
+    },
+    { overlayOnly: true },
+  );
+});
 test("a JPEG product photo on a plain backdrop becomes a saved cut-out on the device with tolerance controls and no paid route", async ({
   page,
 }) =>

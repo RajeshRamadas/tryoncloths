@@ -17,6 +17,7 @@ import {
 } from "../server/jewellery-overlay.js";
 import {
   defaultOverlayPlacements,
+  refineFullBodyPlacements,
   validateOverlayPlacements,
   previewLabel,
   combinedMode,
@@ -305,6 +306,60 @@ test("template ring, 48 bangles and full body starts are bounded and cannot dist
     assert.throws(() =>
       validateOverlayPlacements([{ ...p[0], ...change }, p[1]], p, { width: 1152, height: 1536 }),
     );
+});
+test("full-body placement follows the torso and each anatomical ankle at the image's scale", () => {
+  const frame = { width: 1000, height: 1500, assetWidth: 200, assetHeight: 100 };
+  const landmarks = [];
+  for (const [i, x, y] of [
+    [11, 0.56, 0.28],
+    [12, 0.24, 0.26],
+    [23, 0.56, 0.56],
+    [24, 0.32, 0.54],
+    [25, 0.54, 0.68],
+    [26, 0.36, 0.7],
+    [27, 0.58, 0.88],
+    [28, 0.32, 0.9],
+  ])
+    landmarks[i] = { x, y, visibility: 0.95 };
+  const defaults = (type, side) =>
+    defaultOverlayPlacements({ ...frame, type, view: "full", attributes: { lengthCm: 70 }, side });
+  const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1);
+  const fit = (type, side) => {
+    const original = defaults(type, side);
+    const { placements, matched } = refineFullBodyPlacements(original, type, landmarks, frame);
+    assert.equal(matched, placements.length);
+    validateOverlayPlacements(placements, original, frame);
+    return placements;
+  };
+  const [necklace] = fit("long_haar");
+  close(necklace.x, 405);
+  close(necklace.y, 354);
+  close(necklace.width, 212);
+  close(necklace.angle, 5.35);
+  assert.equal(necklace.pivotY, 0);
+  const [belt] = fit("waist_belt");
+  close(belt.x, 429);
+  close(belt.y, 707);
+  close(belt.width, 290);
+  const [left, right] = fit("anklets", "both");
+  assert.equal(left.id, "left:0");
+  close(left.x, 578);
+  close(left.y, 1305);
+  close(right.x, 322);
+  close(right.y, 1335);
+  assert.ok(left.angle < 0 && right.angle > 0);
+
+  const original = defaults("anklets", "both");
+  landmarks[28].visibility = 0.1;
+  const partial = refineFullBodyPlacements(original, "anklets", landmarks, frame);
+  assert.equal(partial.matched, 1);
+  assert.deepEqual(partial.placements, [left, original[1]]);
+  const beltDefault = defaults("waist_belt");
+  landmarks[23].x = 1.03;
+  assert.deepEqual(refineFullBodyPlacements(beltDefault, "waist_belt", landmarks, frame), {
+    placements: beltDefault,
+    matched: 0,
+  });
 });
 test("Sharp compositing honours anchor pivots, mirror, clockwise rotation, off-edge crop and source resolution", async () => {
   const base = await sharp({

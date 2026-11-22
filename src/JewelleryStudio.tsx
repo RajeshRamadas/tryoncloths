@@ -5,7 +5,7 @@ import JewellerySizeHelp from "./JewellerySizeHelp";
 import JewelleryNecklaceGuide from "./JewelleryNecklaceGuide";
 import JewelleryCompare from "./JewelleryCompare";
 import JewelleryOverlay, { type OverlayPrepared, type OverlayPlacement } from "./JewelleryOverlay";
-import { previewLabel } from "./jewellery-overlay";
+import { previewLabel, refineFullBodyPlacements } from "./jewellery-overlay";
 import AvatarViews from "./AvatarViews";
 import ShareLook from "./ShareLook";
 import { readPhoto } from "./images";
@@ -542,12 +542,39 @@ export default function JewelleryStudio() {
   async function prepareOverlay(): Promise<OverlayPrepared | null> {
     const { version, abort } = begin("Loading overlay placement");
     try {
-      const result = await jewelleryApi(
+      const result: OverlayPrepared = await jewelleryApi(
         "/api/jewellery/overlay/prepare",
         overlayPayload(),
         abort.signal,
       );
-      return valid(version) ? result : null;
+      if (!valid(version)) return null;
+      if (view !== "full" || !type) return result;
+      const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(12000)]);
+      const landmarks = await Promise.race([
+        import("./body-pose")
+          .then(({ singleBodyPose }) => singleBodyPose(result.base, signal))
+          .catch(() => null),
+        new Promise<null>((resolve) =>
+          signal.addEventListener("abort", () => resolve(null), { once: true }),
+        ),
+      ]);
+      if (!valid(version)) return null;
+      if (!landmarks) return result;
+      const { placements, matched } = refineFullBodyPlacements(
+        result.placements,
+        type,
+        landmarks,
+        result,
+      );
+      if (!matched) return result;
+      return {
+        ...result,
+        placements,
+        warning:
+          matched === placements.length
+            ? "Starting positions follow the avatar’s body landmarks. Check and adjust the placement."
+            : "Some pieces use approximate starting positions. Check and adjust each piece.",
+      };
     } catch (e) {
       if (valid(version)) setError((e as Error).message);
       return null;
