@@ -1,4 +1,4 @@
-import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
+import { approveTestAvatar, saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -107,6 +107,7 @@ async function fixture(page, run, { partial = false, enabled = true } = {}) {
           },
         ],
         previewMode: "ai",
+        sourceApproval: store.requireApprovedAvatar(account, avatar.id).sourceApproval,
       },
     );
   let calls = 0;
@@ -330,13 +331,20 @@ test("a failed second comparison keeps the first paid image and presents it for 
 
 test("complete board uses saved same-customer looks, saves, exports, shares and opens through the avatar library without AI", async ({
   page,
-}) =>
-  fixture(page, async ({ store, account, avatar, calls }) => {
+}) => {
+  test.setTimeout(60_000);
+  await fixture(page, async ({ store, account, avatar, calls }) => {
     const before = store.billing.balance(account.org);
     await page.goto("/complete-look?avatar=" + avatar.id);
     await page.getByRole("button", { name: "Build complete look — free", exact: true }).click();
     await expect(
       page.getByRole("img", { name: "Complete outfit and jewellery preview", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Review against avatar master version 1 · approval 1", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Approval record unavailable for the saved clothing look.", { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Save complete look", exact: true }),
@@ -377,6 +385,8 @@ test("complete board uses saved same-customer looks, saves, exports, shares and 
     await page.getByRole("button", { name: "Create complete look link", exact: true }).click();
     const link = await page.getByLabel("Complete look share link", { exact: true }).inputValue();
     expect(await (await page.request.get(link)).text()).toContain("Your complete look");
+    store.revokeAvatarApproval(account, avatar.id);
+    approveTestAvatar(store, account, avatar.id);
     await page.goto("/");
     await page.getByRole("button", { name: "Saved avatars", exact: true }).click();
     await page.getByRole("button", { name: /^View looks \(\d+\) for Customer A$/ }).click();
@@ -389,6 +399,12 @@ test("complete board uses saved same-customer looks, saves, exports, shares and 
     await expect(
       page.getByRole("img", { name: "Complete outfit and jewellery preview", exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByText("Reviewed against avatar master version 1 · approval 1", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Approval record unavailable for the saved clothing look.", { exact: true }),
+    ).toBeVisible();
     expect(calls()).toBe(0);
     expect(store.billing.balance(account.org)).toBe(before);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
@@ -400,7 +416,8 @@ test("complete board uses saved same-customer looks, saves, exports, shares and 
     await page.screenshot({ path: "test-results/complete-look-mobile.png", fullPage: true });
     await page.setViewportSize({ width: 1440, height: 1100 });
     await page.screenshot({ path: "test-results/complete-look-desktop.png", fullPage: true });
-  }));
+  });
+});
 
 test("complete builder clears private content on session expiry and disabled pilots show no controls", async ({
   page,

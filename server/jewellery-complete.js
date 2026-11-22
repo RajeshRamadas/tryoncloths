@@ -11,8 +11,8 @@ const escape = (s) =>
     /[&<>"']/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c],
   );
-function sources(store, account, input) {
-  store.requireApprovedAvatar(account, input.avatarId);
+function sources(store, account, input, expectedApproval) {
+  const { sourceApproval } = store.requireApprovedAvatar(account, input.avatarId, expectedApproval);
   const find = (id) =>
     typeof id === "string" &&
     id.length <= 200 &&
@@ -33,23 +33,43 @@ function sources(store, account, input) {
       "Choose a saved clothing look and a saved portrait jewellery look for the same customer avatar.",
       404,
     );
+  const approvalKey = JSON.stringify(sourceApproval);
+  const reference = (look, label) => {
+    if (look.source_approval && look.source_approval !== approvalKey)
+      throw fail(
+        `The saved ${label} uses an earlier avatar approval. Choose a look reviewed against the current approval.`,
+        409,
+      );
+    return {
+      lookId: look.id,
+      imageSha256: hash(look.image),
+      sourceApproval: look.source_approval ? JSON.parse(look.source_approval) : null,
+    };
+  };
+  const references = {
+    outfit: reference(outfit, "clothing look"),
+    portrait: reference(portrait, "jewellery portrait"),
+  };
   const labels = [
     ...JSON.parse(outfit.garments).map((n) => "Outfit · " + n),
     ...JSON.parse(portrait.garments).map((n) => "Jewellery · " + n),
   ].map((n) => n.slice(0, 140));
   const sourceHash = hash(
     JSON.stringify([
-      outfit.id,
-      hash(outfit.image),
+      sourceApproval,
+      references,
       outfit.garments,
-      portrait.id,
-      hash(portrait.image),
       portrait.garments,
       portrait.itemsJson,
       portrait.previewMode,
     ]),
   );
-  return { outfit, portrait, labels, sourceHash };
+  return { outfit, portrait, labels, sourceHash, sourceApproval, references };
+}
+function checkSources(store, account, input, context, guard) {
+  guard();
+  if (sources(store, account, input, context.sourceApproval).sourceHash !== context.sourceHash)
+    throw fail("A source look changed. Rebuild the complete preview.", 409);
 }
 export async function prepareComplete(store, account, input, guard = () => {}) {
   const context = sources(store, account, input),
@@ -61,9 +81,7 @@ export async function prepareComplete(store, account, input, guard = () => {}) {
       .resize(1152, 1536)
       .png()
       .toBuffer();
-  guard();
-  if (sources(store, account, input).sourceHash !== context.sourceHash)
-    throw fail("A source look changed. Rebuild the complete preview.", 409);
+  checkSources(store, account, input, context, guard);
   const layout = completeLayout(context.labels, previewLabel(context.portrait.previewMode));
   return { ...context, outfitImage: outfit, portraitImage: portrait, layout };
 }
@@ -72,6 +90,8 @@ export function completePreview(context) {
     outfit: url(context.outfitImage),
     portrait: url(context.portraitImage),
     sourceHash: context.sourceHash,
+    sourceApproval: context.sourceApproval,
+    references: context.references,
     layout: context.layout,
     previewMode: context.portrait.previewMode,
   };
@@ -105,13 +125,12 @@ export async function saveComplete(store, account, input, guard = () => {}) {
   const c = await prepareComplete(store, account, input, guard);
   try {
     if (input.sourceHash !== c.sourceHash)
-      throw fail("The source looks changed. Rebuild and review this complete preview.", 409);
+      throw fail(
+        "The avatar approval or source looks changed. Rebuild and review this complete preview.",
+        409,
+      );
     const image = await renderComplete(c),
-      check = () => {
-        guard();
-        if (sources(store, account, input).sourceHash !== c.sourceHash)
-          throw fail("A source look changed. Rebuild the complete preview.", 409);
-      };
+      check = () => checkSources(store, account, input, c, guard);
     check();
     const ids = [
       ...new Set(
@@ -133,6 +152,8 @@ export async function saveComplete(store, account, input, guard = () => {}) {
         view: "complete",
         itemsJson: JSON.parse(c.portrait.itemsJson),
         previewMode: c.portrait.previewMode,
+        sourceApproval: c.sourceApproval,
+        completeReferences: c.references,
         guard: check,
       },
     );
@@ -141,6 +162,8 @@ export async function saveComplete(store, account, input, guard = () => {}) {
       image: url(image),
       view: "complete",
       previewMode: c.portrait.previewMode,
+      sourceApproval: c.sourceApproval,
+      references: c.references,
       creditsUsed: 0,
     };
   } finally {

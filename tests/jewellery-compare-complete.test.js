@@ -1,10 +1,10 @@
-import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
+import { approveTestAvatar, saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { AccountStore } from "./helpers/pilot-accounts.js";
 import { createApp, standardAvatar } from "../server/app.js";
@@ -459,6 +459,17 @@ test("complete boards use the same-avatar saved outfit and portrait, exact inset
     assert.equal(p.layout.width, 1024);
     assert.ok(p.layout.text.some((t) => t.text.includes("Gold")));
     assert.ok(p.layout.text.some((t) => t.text.includes("White")));
+    assert.deepEqual(p.sourceApproval, store.requireApprovedAvatar(a, avatar.id).sourceApproval);
+    for (const [reference, look] of [
+      [p.references.outfit, outfit],
+      [p.references.portrait, jewel],
+    ]) {
+      assert.deepEqual(reference, {
+        lookId: look.id,
+        imageSha256: createHash("sha256").update(store.lookImage(a, look.id)).digest("hex"),
+        sourceApproval: null,
+      });
+    }
     const context = await prepareComplete(store, a, complete),
       image = await renderComplete(context),
       pixel = async (x, y) => [
@@ -482,6 +493,8 @@ test("complete boards use the same-avatar saved outfit and portrait, exact inset
     const board = await saved.json();
     assert.equal(board.view, "complete");
     assert.equal(board.creditsUsed, 0);
+    assert.deepEqual(board.sourceApproval, p.sourceApproval);
+    assert.deepEqual(board.references, p.references);
     const row = store.listLooks(a, avatar.id).find((l) => l.id === board.id);
     assert.equal(row.view, "complete");
     assert.ok(row.garments.some((n) => n.includes("White")));
@@ -504,14 +517,73 @@ test("complete boards use the same-avatar saved outfit and portrait, exact inset
     assert.equal(activity.shareViews, 1);
     store.removeLook(a, outfit.id);
     store.removeLook(a, jewel.id);
-    assert.equal(
-      (await request("/api/jewellery/looks/" + board.id, undefined, undefined, undefined, "GET"))
-        .status,
-      200,
+    store.revokeAvatarApproval(a, avatar.id);
+    const reopened = await request(
+      "/api/jewellery/looks/" + board.id,
+      undefined,
+      undefined,
+      undefined,
+      "GET",
     );
+    assert.equal(reopened.status, 200);
+    const historical = await reopened.json();
+    assert.deepEqual(historical.sourceApproval, board.sourceApproval);
+    assert.deepEqual(historical.references, board.references);
     assert.equal(store.billing.balance(a.org), before);
     assert.equal(calls(), 0);
     assert.deepEqual(store.db.prepare("PRAGMA foreign_key_check").all(), []);
+  }));
+test("complete boards reject earlier approvals in either source and require a new preview after reapproval", async () =>
+  fixture(async ({ store, a, avatar, complete, request, outfit, jewel, calls }) => {
+    const endpoint = "/api/jewellery/complete";
+    const prepare = () => request(endpoint + "/prepare", complete);
+    const p = await (await prepare()).json();
+    await assert.rejects(
+      prepareComplete(store, a, complete, () => {
+        store.revokeAvatarApproval(a, avatar.id);
+        approveTestAvatar(store, a, avatar.id);
+      }),
+      { status: 409, message: /approval changed/ },
+    );
+    const saved = (sourceHash) =>
+      request(endpoint, {
+        ...complete,
+        sourceHash,
+        name: "Complete review",
+        reviewed: true,
+        storageConsent: true,
+      });
+    const stalePreview = await saved(p.sourceHash);
+    assert.equal(stalePreview.status, 409);
+    assert.match((await stalePreview.json()).error, /avatar approval or source looks changed/);
+
+    const setApproval = store.db.prepare(
+      "UPDATE looks SET source_approval=? WHERE account=? AND id=?",
+    );
+    const { sourceApproval } = store.requireApprovedAvatar(a, avatar.id);
+    for (const [look, label] of [
+      [outfit, "clothing look"],
+      [jewel, "jewellery portrait"],
+    ]) {
+      setApproval.run(JSON.stringify(p.sourceApproval), a.id, look.id);
+      const earlier = await prepare();
+      assert.equal(earlier.status, 409);
+      assert.ok((await earlier.json()).error.includes("saved " + label));
+      setApproval.run(JSON.stringify(sourceApproval), a.id, look.id);
+    }
+    assert.equal(
+      store.listLooks(a, avatar.id).filter((look) => look.view === "complete").length,
+      0,
+    );
+    const refreshed = await prepare();
+    assert.equal(refreshed.status, 200);
+    const next = await refreshed.json();
+    assert.notEqual(next.sourceHash, p.sourceHash);
+    assert.equal(next.sourceApproval.approvalVersion, 2);
+    assert.deepEqual(next.references.outfit.sourceApproval, sourceApproval);
+    assert.deepEqual(next.references.portrait.sourceApproval, sourceApproval);
+    assert.equal((await saved(next.sourceHash)).status, 200);
+    assert.equal(calls(), 0);
   }));
 test("complete preview/save enforce consent, tenant, source hashes, source kinds and disabled pilot flag", async () =>
   fixture(async ({ store, a, b, avatar, complete, request, cb, jewel, outfit }) => {

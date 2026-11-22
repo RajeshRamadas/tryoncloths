@@ -179,6 +179,9 @@ export function installJewelleryRoutes(
         avatarId: row.avatarId,
         view: row.view,
         sourceApproval: row.source_approval ? JSON.parse(row.source_approval) : null,
+        ...(row.view === "complete" && {
+          references: JSON.parse(row.complete_references ?? "null"),
+        }),
         previewMode: row.previewMode,
         name: row.name,
         itemsJson: JSON.parse(row.itemsJson),
