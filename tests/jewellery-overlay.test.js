@@ -235,6 +235,44 @@ test("cut-outs require actual PNG alpha, visible pixels, bounded bytes and dimen
     await assert.rejects(overlayAsset(value, "earlobe", "drop_earrings"), /transparent PNG/);
   await assert.rejects(overlayAsset(cutout, "wrist", "drop_earrings"), /anchor/);
 });
+test("catalogue upload saves the cut-out atomically and safely retries a previously saved product", async () =>
+  fixture(async ({ store, a, request }) => {
+    const photo = url(await sharp(png).flatten({ background: "#efe6d0" }).png().toBuffer());
+    const product = {
+      category: "jewellery",
+      name: "Uploaded pendant",
+      garmentType: "pendant",
+      attributes: { metal: "yellow_gold", lengthCm: 42 },
+      image: photo,
+      storageConsent: true,
+    };
+    const products = () =>
+      store.garments.list(a, { category: "jewellery", jewelleryEnabled: true });
+    const before = products().length;
+    const withCutout = { ...product, overlayPng: cutout, overlayAnchor: "neckBase" };
+    assert.equal(
+      (await request("/api/garments", { ...withCutout, overlayPng: photo })).status,
+      400,
+    );
+    assert.equal(products().length, before);
+    const onlyProduct = await request("/api/garments", product);
+    assert.equal(onlyProduct.status, 200);
+    const { garment } = await onlyProduct.json();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await request("/api/garments", withCutout);
+      assert.equal(response.status, 200, await response.clone().text());
+      const saved = await response.json();
+      assert.equal(saved.duplicate, true);
+      assert.equal(saved.garment.id, garment.id);
+      assert.equal(saved.garment.hasOverlay, true);
+    }
+    const edited = url(await sharp(png).flip().png().toBuffer());
+    assert.equal(
+      (await request("/api/garments", { ...withCutout, overlayPng: edited })).status,
+      409,
+    );
+    assert.equal(products().length, before + 1);
+  }));
 test("earrings begin exactly on image-side anchors, keep millimetre scale and mirror the second piece", () => {
   const p = defaults();
   assert.equal(p.length, 2);

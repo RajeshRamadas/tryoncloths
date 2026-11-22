@@ -88,7 +88,7 @@ origin; jewellery writes require an owner or manager. Examples:
 | --- | --- |
 | `GET /api/jewellery/types` | Shared definitions, metals and bangle sizes |
 | `GET /api/catalogue?category=jewellery` | Search, type/metal/stock filters and pagination |
-| `POST /api/garments` | Save with `category: "jewellery"`, `garmentType`, validated `attributes`, product photo and `storageConsent: true` |
+| `POST /api/garments` | Save with `category: "jewellery"`, `garmentType`, validated `attributes`, product photo and `storageConsent: true`. Optionally save a transparent `overlayPng` and type-compatible `overlayAnchor` with the product. |
 | `POST /api/garments/match` | Add `category: "jewellery"` to match a photo or canonical product URL |
 | `GET /api/garments/:id?category=jewellery` | Full saved product plus suggested view |
 | `PATCH /api/catalogue/:id?category=jewellery` | Update attributes, price, stock and existing catalogue fields |
@@ -103,8 +103,9 @@ Shopify sync are not implemented in J1.
 Guarded, transactional migrations add `category` (default `garment`),
 `attributesJson` (default `{}`) and nullable `overlayPng` to the existing table,
 and refresh older shared catalogue views. Existing photos and adaptations stay
-intact. The overlay column is reserved and cannot be supplied through this API;
-J9 implements cut-outs. Jewellery and clothing share the store's existing
+intact. A repeated product upload can attach a missing cut-out or reuse the same
+cut-out. To replace a saved cut-out, use the catalogue editor. Details are in the
+[free overlay guide](JEWELLERY_OVERLAY.md). Jewellery and clothing share the store's existing
 catalogue capacity. Shared-master metadata follows its category and remains
 read-only. Changed jewellery attributes invalidate any stored item adaptations.
 

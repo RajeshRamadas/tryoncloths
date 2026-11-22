@@ -483,7 +483,7 @@ export class GarmentStore {
       }
       const samePhotos = this.db
         .prepare(
-          "SELECT id,sourceUrl,attributesJson FROM garments WHERE account=? AND category=? AND source<>'master' AND imageHash=? AND garmentType=? AND lower(variant)=lower(?)",
+          "SELECT id,sourceUrl,attributesJson,overlayPng,overlayAnchor FROM garments WHERE account=? AND category=? AND source<>'master' AND imageHash=? AND garmentType=? AND lower(variant)=lower(?)",
         )
         .all(account.id, category, photo.imageHash, input.garmentType, variant);
       if (!sourceUrl && samePhotos.length > 1)
@@ -502,11 +502,22 @@ export class GarmentStore {
             "This jewellery photo/variant already has different attributes. Edit the saved item or use a distinct metal/stone/SKU variant.",
             409,
           );
-        if (overlay)
-          throw problem(
-            "This product is already saved. Use its cut-out editor to attach or replace an overlay.",
-            409,
-          );
+        if (overlay) {
+          if (!duplicate.overlayPng)
+            this.db
+              .prepare(
+                "UPDATE garments SET overlayPng=?,overlayAnchor=?,updatedAt=? WHERE account=? AND id=?",
+              )
+              .run(overlay, input.overlayAnchor, Date.now(), account.id, duplicate.id);
+          else if (
+            duplicate.overlayAnchor !== input.overlayAnchor ||
+            !Buffer.from(duplicate.overlayPng).equals(overlay)
+          )
+            throw problem(
+              "This product already has a cut-out. Select the saved piece or use the catalogue editor to replace its cut-out.",
+              409,
+            );
+        }
         this.addLink(account, duplicate.id, sourceUrl);
         return {
           garment: metadata(this.row(account, duplicate.id, { ...options, category })),

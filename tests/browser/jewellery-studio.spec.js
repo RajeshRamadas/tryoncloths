@@ -890,6 +890,114 @@ test("a full-body necklace uses local avatar landmarks and can fall back to manu
     { overlayOnly: true },
   );
 });
+test("uploading a product in the studio saves its cut-out and previews it on the approved avatar in one action", async ({
+  page,
+}) => {
+  test.setTimeout(75_000);
+  await fixture(
+    page,
+    async ({ store, account, avatar, calls }) => {
+      const before = store.billing.balance(account.org);
+      const photo = await sharp(
+        Buffer.from(
+          '<svg width="360" height="360"><rect width="360" height="360" fill="#f5f1e7"/><circle cx="180" cy="80" r="20" fill="#a17832"/><path d="M180 105C130 158 112 191 121 228a59 59 0 00118 0c9-37-9-70-59-123Z" fill="#b88732"/><circle cx="180" cy="213" r="29" fill="#9a2545"/></svg>',
+        ),
+      )
+        .jpeg()
+        .toBuffer();
+      const uploads = [];
+      page.on("request", (r) => {
+        const path = new URL(r.url()).pathname;
+        if (
+          r.method() === "POST" &&
+          [
+            "/api/garments",
+            "/api/jewellery/overlay/prepare",
+            "/api/jewellery/overlay",
+            "/api/jewellery/tryon",
+          ].includes(path)
+        )
+          uploads.push(path);
+      });
+      await page
+        .getByRole("group", { name: "Jewellery source" })
+        .getByRole("button", { name: "Upload photo", exact: true })
+        .click();
+      await page.getByLabel("Upload jewellery product photo", { exact: true }).setInputFiles({
+        name: "Amber drop earrings.jpg",
+        mimeType: "image/jpeg",
+        buffer: photo,
+      });
+      await expect(page.getByAltText("Automatic jewellery cut-out")).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Overlay · free", exact: true }),
+      ).toHaveAttribute("aria-pressed", "true");
+      await page.getByLabel("Jewellery type", { exact: true }).selectOption("drop_earrings");
+      await page.getByLabel("Metal", { exact: true }).selectOption("yellow_gold");
+      await page.getByLabel("Use a matched pair", { exact: true }).uncheck();
+      await page.getByLabel("Side", { exact: true }).selectOption("right");
+      await page.getByLabel("I confirm the jewellery type and selected product photo.").check();
+      const auto = page.getByRole("button", {
+        name: "Save to catalogue and preview — free",
+        exact: true,
+      });
+      await expect(auto).toBeDisabled();
+      expect(uploads).toEqual([]);
+      await review(page).check();
+      const request = page.waitForRequest(
+        (r) => new URL(r.url()).pathname === "/api/jewellery/overlay",
+      );
+      await auto.click();
+      const payload = (await request).postDataJSON();
+      expect(payload.side).toBe("right");
+      expect(payload.placements.map((piece) => piece.id)).toEqual(["right:0"]);
+      await expect(
+        page.getByRole("img", { name: "Customer jewellery preview", exact: true }),
+      ).toBeInViewport();
+      await expect(
+        page
+          .getByRole("group", { name: "Look close-ups" })
+          .getByRole("button", { name: "Zoom to right ear" }),
+      ).toBeVisible();
+      expect(uploads).toEqual([
+        "/api/garments",
+        "/api/jewellery/overlay/prepare",
+        "/api/jewellery/overlay",
+      ]);
+      const product = store.garments.get(account, payload.itemId, {
+        category: "jewellery",
+        jewelleryEnabled: true,
+      });
+      expect(product).toMatchObject({
+        name: "Amber drop earrings",
+        hasOverlay: true,
+        overlayAnchor: "earlobe",
+      });
+      const cutout = Buffer.from(product.overlayPng.split(",")[1], "base64");
+      expect((await sharp(cutout).metadata()).hasAlpha).toBe(true);
+      await page
+        .getByRole("group", { name: "Jewellery source" })
+        .getByRole("button", { name: "Saved jewellery", exact: true })
+        .click();
+      await expect(page.getByRole("button", { name: /Amber drop earrings/ })).toBeVisible();
+      await review(page).check();
+      await page
+        .getByLabel(/The customer agrees to save this jewellery look and its reviewed adaptations/)
+        .check();
+      await page.getByRole("button", { name: "Save jewellery look", exact: true }).click();
+      await expect(page.getByText(/Jewellery look saved to this avatar/)).toBeVisible();
+      const look = store.listLooks(account, avatar.id)[0];
+      expect(look).toMatchObject({ view: "portrait", previewMode: "overlay" });
+      await page.goto("/jewellery?avatar=" + avatar.id + "&look=" + look.id);
+      await expect(
+        page.getByRole("img", { name: "Customer jewellery preview", exact: true }),
+      ).toBeVisible();
+      expect(store.billing.balance(account.org)).toBe(before);
+      expect(calls()).toBe(0);
+    },
+    { overlayOnly: true },
+  );
+});
 test("a JPEG product photo on a plain backdrop becomes a saved cut-out on the device with tolerance controls and no paid route", async ({
   page,
 }) =>
