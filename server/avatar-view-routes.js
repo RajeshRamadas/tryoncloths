@@ -107,7 +107,13 @@ export function installAvatarViewRoutes(
   };
   app.get(
     "/api/avatars/:id/views",
-    wrap((req, res, account) => res.json({ views: views.list(account, req.params.id) })),
+    wrap((req, res, account) =>
+      res.json({
+        views: views.list(account, req.params.id, {
+          includeEarlier: req.query.includeEarlier === "1",
+        }),
+      }),
+    ),
   );
   app.get(
     "/api/avatars/:id/views/portrait/anchors",
@@ -122,13 +128,22 @@ export function installAvatarViewRoutes(
   app.get(
     "/api/avatars/:id/views/:kind",
     wrap((req, res, account) => {
-      const row = views.get(account, req.params.id, req.params.kind);
+      const row = views.get(account, req.params.id, req.params.kind, {
+        includeEarlier: req.query.includeEarlier === "1",
+      });
       res.type("png").send(row.image);
     }),
   );
   app.delete(
     "/api/avatars/:id/views/:kind",
     wrap((req, res, account) => res.json(views.remove(account, req.params.id, req.params.kind))),
+  );
+  app.post(
+    "/api/avatars/:id/views/:kind/review",
+    wrap((req, res, account) => {
+      fields(req.body ?? {}, []);
+      res.json(views.reviewSaved(account, req.params.id, req.params.kind));
+    }),
   );
   app.post(
     "/api/avatars/:id/views/:kind/approve",
@@ -199,6 +214,7 @@ export function installAvatarViewRoutes(
           tone: template.tone,
           sourceKind: "template",
           anchors: template.anchors,
+          reviewApproval: context.sourceApproval,
           warnings: template.warnings,
           needsReview: true,
           creditsUsed: 0,
@@ -350,6 +366,7 @@ export function installAvatarViewRoutes(
           kind,
           sourceKind: "generated",
           tone: context.avatar.template_tone,
+          reviewApproval: context.sourceApproval,
           needsReview: true,
           creditsUsed: 1,
           warnings: [],

@@ -598,6 +598,11 @@ test("reapproval invalidates jewellery previews, cached results and saved looks 
     );
     assert.equal(calls(), 1);
 
+    const needsReview = await create();
+    assert.equal(needsReview.status, 409);
+    assert.match((await needsReview.json()).error, /Review this saved view/);
+    const keepHands = store.views.reviewSaved(a, avatar.id, "hands");
+    await store.views.approve(a, avatar.id, "hands", approve(keepHands));
     const next = await (await create()).json();
     assert.equal(next.reused, false);
     assert.equal(next.sourceApproval.approvalVersion, 2);

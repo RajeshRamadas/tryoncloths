@@ -204,6 +204,7 @@ export function installCustomerHandsRoutes(
         tone,
         contract: CUSTOMER_HANDS_CONTRACT,
         anchors,
+        reviewApproval: context.sourceApproval,
         needsReview: true,
         creditsUsed: 1,
         warnings: [{ code: "hands_heuristic", message: customerHandsWarning }],

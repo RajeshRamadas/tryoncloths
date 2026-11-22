@@ -302,8 +302,10 @@ async function prepareHands(page) {
 
 test("mobile portrait → earrings → nose pin → undo → save/share/reopen a labelled jewellery look without more AI", async ({
   page,
-}) =>
-  fixture(page, async ({ store, account, avatar, calls, portraits, seen }) => {
+}) => {
+  // This flow processes a full-resolution portrait and two layers before export and reopening.
+  test.setTimeout(60_000);
+  await fixture(page, async ({ store, account, avatar, calls, portraits, seen }) => {
     const before = store.billing.balance(account.org);
     await preparePortrait(page);
     expect(portraits()).toBe(1);
@@ -379,7 +381,8 @@ test("mobile portrait → earrings → nose pin → undo → save/share/reopen a
     await page.setViewportSize({ width: 1440, height: 1050 });
     await page.evaluate(() => scrollTo(0, 0));
     await page.screenshot({ path: "test-results/jewellery-studio-desktop.png" });
-  }));
+  });
+});
 
 test("hands use selected ring finger and bangle count; product links guess a type but require confirmation and consent", async ({
   page,

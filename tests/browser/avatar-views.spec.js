@@ -1,4 +1,4 @@
-import { saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
+import { approveTestAvatar, saveApprovedTestAvatar } from "../helpers/approved-avatar.js";
 import { test, expect } from "@playwright/test";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -125,10 +125,11 @@ async function approve(page, kind) {
   await page.getByRole("button", { name: "Approve and save view", exact: true }).click();
 }
 
-test("mobile view workflow saves free hands and a reviewed portrait, reopens without AI and deletes only the selected view", async ({
+test("mobile saved views return to use after master reapproval and a free portrait review", async ({
   page,
-}) =>
-  setup(page, async ({ store, owner, avatar, calls }) => {
+}) => {
+  test.setTimeout(60000);
+  await setup(page, async ({ store, owner, avatar, calls }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const initial = store.billing.balance(owner.org);
     await open(page);
@@ -182,15 +183,46 @@ test("mobile view workflow saves free hands and a reviewed portrait, reopens wit
     await expect(
       page.getByRole("img", { name: "Approved portrait view for Customer A", exact: true }),
     ).toBeVisible();
+    await expect(
+      page.getByText("Reviewed for master version 1 · approval 1.", { exact: true }),
+    ).toBeVisible();
+    expect(calls()).toBe(1);
+    store.revokeAvatarApproval(owner, avatar.id);
+    approveTestAvatar(store, owner, avatar.id);
+    await page.reload();
+    await expect(
+      page.getByRole("img", { name: "Earlier portrait view for Customer A", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Download saved view", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Review saved view — free", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Review saved portrait view", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("Review against master version 1 · approval 2.", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Approve and save view", exact: true }),
+    ).toBeDisabled();
+    await approve(page, "portrait");
+    await expect(
+      page.getByText("Reviewed for master version 1 · approval 2.", { exact: true }),
+    ).toBeVisible();
+    expect(store.billing.balance(owner.org)).toBe(initial - 1);
     expect(calls()).toBe(1);
     page.once("dialog", (d) => d.accept());
     await page.getByRole("button", { name: "Delete saved view", exact: true }).click();
     await expect(
       page.getByText("No approved portrait view is saved for this avatar.", { exact: true }),
     ).toBeVisible();
-    expect(store.views.list(owner, avatar.id).map((v) => v.kind)).toEqual(["hands"]);
+    expect(store.views.list(owner, avatar.id, { includeEarlier: true }).map((v) => v.kind)).toEqual(
+      ["hands"],
+    );
     expect(store.image(owner, avatar.id)).toBeTruthy();
-  }));
+  });
+});
 
 test("an expired approval keeps the paid preview downloadable and never regenerates automatically", async ({
   page,

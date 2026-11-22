@@ -1,4 +1,4 @@
-import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
+import { approveTestAvatar, saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
@@ -136,14 +136,15 @@ async function fixture(run, { app: extra = {}, generate } = {}) {
   }
 }
 
-test("free hands preview requires review, persists in its account, survives restart and cascades with the avatar", async () =>
-  fixture(async ({ store, a, av, baseImage, create, endpoint, request, directory, calls }) => {
+test("free hands are bound to the master approval and can be reviewed again without AI", async () =>
+  fixture(async ({ store, a, av, baseImage, create, endpoint, request, directory, calls, cb }) => {
     const balance = store.billing.balance(a.org),
       response = await create(hands);
     assert.equal(response.status, 200);
     const preview = await response.json();
     assert.equal(preview.needsReview, true);
     assert.equal(preview.creditsUsed, 0);
+    assert.equal(preview.reviewApproval.approvalVersion, 1);
     assert.ok(preview.anchors.left.ring);
     assert.equal(store.db.prepare("SELECT count(*) n FROM avatar_views").get().n, 0);
     assert.equal(
@@ -190,7 +191,10 @@ test("free hands preview requires review, persists in its account, survives rest
       Buffer.from(await saved.arrayBuffer()),
       Buffer.from(preview.image.split(",")[1], "base64"),
     );
-    assert.equal((await (await request(endpoint)).json()).views.length, 1);
+    const [original] = (await (await request(endpoint)).json()).views;
+    assert.deepEqual(original.sourceApproval, preview.reviewApproval);
+    assert.deepEqual(original.reviewApproval, original.sourceApproval);
+    assert.equal(original.reviewRequired, false);
     assert.equal(store.billing.balance(a.org), balance);
     assert.equal(calls(), 0);
     await saveApprovedTestAvatar(store, a, {
@@ -201,16 +205,80 @@ test("free hands preview requires review, persists in its account, survives rest
       weightKg: 73,
       source: "imported",
     });
-    assert.equal(
-      store.views.list(a, av.id).length,
-      1,
-      "nonvisual metadata changes must preserve approved views",
+    assert.deepEqual((await (await request(endpoint)).json()).views, []);
+    const [earlier] = (await (await request(endpoint + "?includeEarlier=1")).json()).views;
+    assert.equal(earlier.reviewRequired, true);
+    assert.deepEqual(earlier.sourceApproval, original.sourceApproval);
+    assert.equal((await request(endpoint + "/hands")).status, 409);
+    assert.equal((await request(endpoint + "/hands/anchors")).status, 409);
+    const earlierImage = await request(endpoint + "/hands?includeEarlier=1");
+    assert.deepEqual(
+      Buffer.from(await earlierImage.arrayBuffer()),
+      Buffer.from(preview.image.split(",")[1], "base64"),
     );
+    const stale = await request(endpoint + "/hands/approve", "POST", approve(preview));
+    assert.equal(stale.status, 409);
+    assert.match((await stale.json()).error, /approval changed/);
+    assert.equal((await request(endpoint + "/hands/review", "POST", {}, cb)).status, 404);
+    const reviewed = await (await request(endpoint + "/hands/review", "POST")).json();
+    assert.equal(reviewed.image, preview.image);
+    assert.equal(reviewed.creditsUsed, 0);
+    assert.equal(reviewed.reviewApproval.approvalVersion, 2);
+    assert.equal(
+      (await request(endpoint + "/hands/approve", "POST", approve(reviewed))).status,
+      200,
+    );
+    assert.equal((await request(endpoint + "/hands/anchors")).status, 200);
+    const [updated] = store.views.list(a, av.id);
+    assert.equal(updated.createdAt, original.createdAt);
+    assert.deepEqual(updated.sourceApproval, original.sourceApproval);
+    assert.deepEqual(updated.reviewApproval, reviewed.reviewApproval);
+    assert.equal(updated.reviewRequired, false);
+
+    // Earlier databases have no recorded source approval. Review keeps that provenance unknown.
+    store.db
+      .prepare(
+        "UPDATE avatar_views SET source_approval=NULL,review_approval=NULL WHERE store=? AND avatarId=?",
+      )
+      .run(a.id, av.id);
+    const legacy = await (await request(endpoint + "/hands/review", "POST")).json();
+    assert.equal((await request(endpoint + "/hands/approve", "POST", approve(legacy))).status, 200);
+    assert.equal(store.views.list(a, av.id)[0].sourceApproval, null);
+    assert.deepEqual(store.views.list(a, av.id)[0].reviewApproval, reviewed.reviewApproval);
+    assert.equal(store.billing.balance(a.org), balance);
+    assert.equal(calls(), 0);
     store.remove(a, av.id);
     assert.equal(store.db.prepare("SELECT count(*) n FROM avatar_views").get().n, 0);
     assert.equal(store.db.prepare("SELECT count(*) n FROM avatar_view_epochs").get().n, 0);
     assert.equal((await request(endpoint + "/hands")).status, 404);
   }));
+
+test("reapproving the master during a paid portrait rejects the old result and refunds the app credit", async () => {
+  let changeApproval;
+  await fixture(
+    async ({ store, a, av, create, calls }) => {
+      changeApproval = () => {
+        store.revokeAvatarApproval(a, av.id);
+        approveTestAvatar(store, a, av.id);
+      };
+      const balance = store.billing.balance(a.org);
+      const response = await create();
+      assert.equal(response.status, 409);
+      const result = await response.json();
+      assert.match(result.error, /approval changed/);
+      assert.equal(result.image, undefined);
+      assert.equal(result.receipt, undefined);
+      assert.equal(store.billing.balance(a.org), balance);
+      assert.equal(calls(), 1);
+    },
+    {
+      generate: async () => {
+        changeApproval();
+        return portrait;
+      },
+    },
+  );
+});
 
 test("every view route isolates tenants, anonymous users, origins, selectors and preview ownership", async () =>
   fixture(async ({ store, a, b, endpoint, request, create, cb, ca, bv, calls }) => {
