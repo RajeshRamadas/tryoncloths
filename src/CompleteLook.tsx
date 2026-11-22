@@ -3,8 +3,15 @@ import { loadImage } from "./images";
 import { jewelleryApi, downloadJewellery, type PreviewMode } from "./jewellery-api";
 import { previewLabel } from "./jewellery-overlay";
 import ShareLook from "./ShareLook";
+import type { AvatarSourceApproval } from "./saved-avatars";
 type Look = { id: string; avatarId: string; name: string; view: string; itemsJson: unknown[] };
-type Prepared = {
+type Reference = { sourceApproval: AvatarSourceApproval | null };
+type BoardReview = {
+  sourceHash?: string;
+  sourceApproval: AvatarSourceApproval | null;
+  references: { outfit: Reference; portrait: Reference } | null;
+};
+type Prepared = BoardReview & {
   sourceHash: string;
   outfit: string;
   portrait: string;
@@ -64,7 +71,7 @@ export default function CompleteLook() {
     [portrait, setPortrait] = useState(""),
     [enabled, setEnabled] = useState<boolean | null>(null),
     [session, setSession] = useState(false),
-    [prepared, setPrepared] = useState<Prepared | null>(null),
+    [boardReview, setBoardReview] = useState<BoardReview | null>(null),
     [image, setImage] = useState(""),
     [mode, setMode] = useState<PreviewMode>("ai"),
     [name, setName] = useState("Customer complete look"),
@@ -81,7 +88,7 @@ export default function CompleteLook() {
     requested = useRef(params.get("look"));
   const valid = (n: number) => alive.current && epoch.current === n;
   function reset() {
-    setPrepared(null);
+    setBoardReview(null);
     setImage("");
     setReviewed(false);
     setStorage(false);
@@ -191,6 +198,10 @@ export default function CompleteLook() {
             setSaved(look.id);
             setMode(look.previewMode);
             setName(look.name);
+            setBoardReview({
+              sourceApproval: look.sourceApproval ?? null,
+              references: look.references ?? null,
+            });
           }
           requested.current = null;
         }
@@ -234,7 +245,11 @@ export default function CompleteLook() {
       const data: Prepared = await jewelleryApi("/api/jewellery/complete/prepare", body, signal),
         value = await composite(data);
       if (valid(v)) {
-        setPrepared(data);
+        setBoardReview({
+          sourceHash: data.sourceHash,
+          sourceApproval: data.sourceApproval,
+          references: data.references,
+        });
         setImage(value);
         setMode(data.previewMode);
         setNotice(
@@ -242,11 +257,13 @@ export default function CompleteLook() {
         );
       }
     });
-  const save = () =>
-    action("Saving complete look", async (signal, v) => {
+  const save = () => {
+    const sourceHash = boardReview?.sourceHash;
+    if (!sourceHash) return;
+    return action("Saving complete look", async (signal, v) => {
       const data = await jewelleryApi(
         "/api/jewellery/complete",
-        { ...body, sourceHash: prepared!.sourceHash, name, reviewed: true, storageConsent: true },
+        { ...body, sourceHash, name, reviewed: true, storageConsent: true },
         signal,
       );
       if (valid(v)) {
@@ -256,6 +273,7 @@ export default function CompleteLook() {
         setNotice("Complete look saved to this avatar. Reopen, export or share it without AI.");
       }
     });
+  };
   const download = () =>
     action("Preparing complete PNG", async (signal, v) => {
       await downloadJewellery(image, "complete", signal, () => valid(v), mode);
@@ -386,7 +404,7 @@ export default function CompleteLook() {
                       complete look.
                     </span>
                   </label>
-                  {prepared && (
+                  {boardReview?.sourceHash && (
                     <>
                       <label className="consent">
                         <input
@@ -433,6 +451,20 @@ export default function CompleteLook() {
                     {previewLabel(mode)} · Approximate visual styling; not a physical fit
                     measurement.
                   </p>
+                  {boardReview?.sourceApproval && (
+                    <p>
+                      {saved ? "Reviewed against" : "Review against"} avatar master version{" "}
+                      {boardReview.sourceApproval.masterVersion}
+                      {boardReview.sourceApproval.approvalVersion != null &&
+                        ` · approval ${boardReview.sourceApproval.approvalVersion}`}
+                    </p>
+                  )}
+                  {boardReview?.references && !boardReview.references.outfit.sourceApproval && (
+                    <p>Approval record unavailable for the saved clothing look.</p>
+                  )}
+                  {boardReview?.references && !boardReview.references.portrait.sourceApproval && (
+                    <p>Approval record unavailable for the saved jewellery portrait.</p>
+                  )}
                 </>
               ) : (
                 <p>

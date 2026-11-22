@@ -74,6 +74,14 @@ under the same avatar. It accepts source IDs and a source hash, not arbitrary
 client-supplied pixels. The saved board remains available if a source look is
 later removed; normal avatar/customer erasure still cascades to the board.
 
+The board preview and saved board show the avatar master version and approval
+used for review. Both references must belong to the selected avatar. A look with
+a recorded approval must match the current approval. The builder identifies
+references with unavailable approval records so staff can review those images
+explicitly before saving. An approval change calls for a new preview and review.
+The saved board keeps its review revision and the source look IDs and image
+fingerprints for later reference.
+
 Download the full-resolution board or share it with separate sharing consent.
 Existing branding/trial and share-expiry/revocation rules apply. It carries the
 portrait's AI/Overlay/mixed preview label once; the public share page identifies

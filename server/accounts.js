@@ -193,6 +193,8 @@ export class AccountStore {
         this.db.exec("ALTER TABLE looks ADD COLUMN handsGeometryJson TEXT");
       if (!columns.includes("source_approval"))
         this.db.exec("ALTER TABLE looks ADD COLUMN source_approval TEXT");
+      if (!columns.includes("complete_references"))
+        this.db.exec("ALTER TABLE looks ADD COLUMN complete_references TEXT");
     });
     this.garments = new GarmentStore(this);
     try {
@@ -687,6 +689,7 @@ export class AccountStore {
       itemsJson = [],
       previewMode = "ai",
       handsGeometry = null,
+      completeReferences = null,
       sourceApproval,
       guard,
     } = {},
@@ -709,7 +712,13 @@ export class AccountStore {
       guard?.();
       validateLookTracking(this, account, input);
       const sourceKey = sourceApproval ? JSON.stringify(approved.sourceApproval) : null;
-      const id = digest(Buffer.concat([image, Buffer.from(input.avatarId + (sourceKey ?? ""))])),
+      const referenceKey = completeReferences ? JSON.stringify(completeReferences) : null;
+      const id = digest(
+          Buffer.concat([
+            image,
+            Buffer.from(input.avatarId + (sourceKey ?? "") + (referenceKey ?? "")),
+          ]),
+        ),
         savedAt = Date.now();
       const exists = this.db
         .prepare("SELECT id FROM looks WHERE account=? AND id=?")
@@ -722,7 +731,10 @@ export class AccountStore {
         throw error("Your account holds up to 200 looks. Delete one before adding another.", 409);
       this.db
         .prepare(
-          `INSERT INTO looks(id,account,avatarId,name,garments,image,thumbnail,savedAt,view,itemsJson,previewMode,handsGeometryJson,source_approval) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET avatarId=excluded.avatarId,name=excluded.name,garments=excluded.garments,savedAt=excluded.savedAt,view=excluded.view,itemsJson=excluded.itemsJson,previewMode=excluded.previewMode,handsGeometryJson=excluded.handsGeometryJson`,
+          `INSERT INTO looks(id,account,avatarId,name,garments,image,thumbnail,savedAt,view,itemsJson,previewMode,handsGeometryJson,source_approval,complete_references)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(account,id) DO UPDATE SET
+          avatarId=excluded.avatarId,name=excluded.name,garments=excluded.garments,savedAt=excluded.savedAt,
+          view=excluded.view,itemsJson=excluded.itemsJson,previewMode=excluded.previewMode,handsGeometryJson=excluded.handsGeometryJson`,
         )
         .run(
           id,
@@ -738,6 +750,7 @@ export class AccountStore {
           previewMode,
           handsGeometry ? JSON.stringify(handsGeometry) : null,
           sourceKey,
+          referenceKey,
         );
       attributeLook(this, account, id, input);
       return { id, avatarId: input.avatarId, savedAt };
