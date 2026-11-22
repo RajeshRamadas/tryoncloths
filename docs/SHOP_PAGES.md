@@ -3,9 +3,9 @@
 Each store gets its own public page at `/shop/<address>` on the studio website, for
 example `https://studio.marketingadda.com/shop/lakshmi-silks`. The page shows the
 store's branding, shop photos, about text, opening hours, in-stock catalogue and
-contact details, with a **Try it on** entry point on every product. Owners and
-managers edit it from **Store tools → Shop page** (`/shop-page`). Editing the page
-uses no AI credits.
+contact details. When the store adds a contact method, each product offers a
+try-on request link. Owners and managers edit the page from **Store tools → Shop
+page** (`/shop-page`). Editing the page uses no AI credits.
 
 ## What customers see
 
@@ -19,17 +19,24 @@ uses no AI credits.
   of stock are not listed and their images are not served. Jewellery pieces appear the
   same way when the jewellery catalogue is enabled. A Chain store's page includes the
   shared master products it can see.
-- **Try it on** and **Book a try-on** open WhatsApp click-to-chat to the store's
-  WhatsApp number with a prefilled message naming the product. Without a WhatsApp
-  number they call the store phone from Branding. The store then creates the
-  customer's avatar and runs the try-on in the studio as usual. "View online" links to
-  the product's own HTTPS shop page when the item has one.
+- **Browse collection** jumps straight to the products. **Try on via WhatsApp**
+  opens a message naming the selected piece. When the shop uses phone calls,
+  **Call for a try-on** uses its number from Branding. The shop arranges the
+  virtual try-on and runs it in the studio. **View online** opens the product’s
+  HTTPS shop page when an item has one.
 
 Customer records, avatars, looks, staff names and account emails are never shown. All
 saved text is escaped, the page runs no scripts, and its Content-Security-Policy only
 allows same-origin images and inline styles.
 
 ## Editing the page
+
+**Get your shop ready** shows how many products are available and how customers
+can contact the store about a try-on. After editing the settings, choose **Save
+draft** to keep the page private and **Preview saved draft** to open it. An
+owner can choose **Publish shop** to save and publish together, then **Copy
+shop link** to share it. Existing live pages use **Save changes**. Owners can
+hide a live page with **Unpublish shop**.
 
 | Who | Can do |
 | --- | --- |
@@ -82,7 +89,7 @@ allows same-origin images and inline styles.
 
 | Route | Access | Purpose |
 | --- | --- | --- |
-| `GET /api/shop-page` | signed-in store staff+ | Settings, address, photo thumbnails and revision; creates the page on first use |
+| `GET /api/shop-page` | signed-in store staff+ | Settings, address, photo thumbnails, revision and setup status |
 | `PUT /api/shop-page` | owner/manager, same origin | Content and switches; `slug` and `published` are owner-only |
 | `POST /api/shop-page/photos` | owner/manager, same origin | `{image: data URL, caption?}` |
 | `PATCH /api/shop-page/photos/:id` | owner/manager, same origin | `{caption?, move?: "up" \| "down" \| "first"}` |
