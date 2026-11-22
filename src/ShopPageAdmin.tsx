@@ -11,6 +11,8 @@ export type ShopPageSettings = {
   about: string;
   hours: string;
   whatsapp: string;
+  instagramUrl: string;
+  facebookUrl: string;
   showCatalogue: boolean;
   showPrices: boolean;
   revision: string;
@@ -20,7 +22,16 @@ export type ShopPageSettings = {
 };
 type Fields = Pick<
   ShopPageSettings,
-  "slug" | "published" | "tagline" | "about" | "hours" | "whatsapp" | "showCatalogue" | "showPrices"
+  | "slug"
+  | "published"
+  | "tagline"
+  | "about"
+  | "hours"
+  | "whatsapp"
+  | "instagramUrl"
+  | "facebookUrl"
+  | "showCatalogue"
+  | "showPrices"
 >;
 const fields = (page: ShopPageSettings): Fields => ({
   slug: page.slug,
@@ -29,6 +40,8 @@ const fields = (page: ShopPageSettings): Fields => ({
   about: page.about,
   hours: page.hours,
   whatsapp: page.whatsapp,
+  instagramUrl: page.instagramUrl ?? "",
+  facebookUrl: page.facebookUrl ?? "",
   showCatalogue: page.showCatalogue,
   showPrices: page.showPrices,
 });
@@ -149,9 +162,25 @@ export default function ShopPageAdmin() {
             </p>
             <p>
               {page.published
-                ? "Share this link on WhatsApp, Instagram or a QR code at the counter."
+                ? "Share this link in your Instagram bio, on Facebook, or on WhatsApp."
                 : "Only signed-in staff of this store can preview it. The owner can publish it below."}
             </p>
+            {page.published && (
+              <button
+                className="button secondary"
+                disabled={busy}
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(link);
+                    setNotice("Shop link copied.");
+                  } catch {
+                    setNotice("Select and copy the shop link above.");
+                  }
+                }}
+              >
+                Copy shop link
+              </button>
+            )}
             <p>
               Name, logo, colour, phone, address and map link come from{" "}
               {owner ? <a href="/branding">Branding</a> : "Branding"}.
@@ -242,6 +271,28 @@ export default function ShopPageAdmin() {
                     Include the country code. Without a WhatsApp number, “Try it on” calls the store
                     phone from Branding.
                   </p>
+                  {(
+                    [
+                      [
+                        "instagramUrl",
+                        "Instagram profile link",
+                        "https://www.instagram.com/yourbrand/",
+                      ],
+                      ["facebookUrl", "Facebook page link", "https://www.facebook.com/yourbrand"],
+                    ] as const
+                  ).map(([key, label, placeholder]) => (
+                    <label key={key}>
+                      {label}
+                      <input
+                        type="url"
+                        maxLength={500}
+                        placeholder={placeholder}
+                        value={values[key]}
+                        disabled={busy}
+                        onChange={(e) => update(key, e.target.value)}
+                      />
+                    </label>
+                  ))}
                   <label className="consent">
                     <input
                       type="checkbox"

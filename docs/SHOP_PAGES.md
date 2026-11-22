@@ -11,6 +11,7 @@ uses no AI credits.
 
 - The store name, logo and colour from [Branding](STORE_BRANDING.md), with the address,
   phone and map link in the footer.
+- The brand’s Instagram and Facebook links when they have been added.
 - An optional tagline, a large cover photo (the first shop photo), **About us** and
   **Opening hours**, and the remaining photos in an "Inside our shop" gallery.
 - Up to 60 catalogue items that are in stock or low on stock, newest first. Each shows
@@ -33,7 +34,7 @@ allows same-origin images and inline styles.
 | Who | Can do |
 | --- | --- |
 | Owner | Everything below, plus change the page address and publish or unpublish |
-| Manager | Tagline, about, hours, WhatsApp number, catalogue/price switches, photos |
+| Manager | Tagline, about, hours, WhatsApp number, social links, catalogue/price switches, photos |
 | Staff | Open the editor read-only and preview the page |
 
 - **Page address:** 3–40 lowercase letters, numbers and single hyphens. It starts as
@@ -45,6 +46,9 @@ allows same-origin images and inline styles.
   Anyone else gets "This shop page is not available". Pages of suspended organisations
   are offline.
 - **WhatsApp number:** include the country code, e.g. `+91 98765 43210`.
+- Add the brand’s public Instagram profile and Facebook page as HTTPS links.
+  Visitors see only the links you fill in. After publishing, use **Copy shop
+  link** to share the brand’s own page on social media.
 - **Photos:** up to 12 JPEG, PNG or WebP photos of up to 5 MB, at least 320 pixels on the
   long side. Photos are rotated upright and re-encoded as JPEG (max 1600 px), which
   removes EXIF data such as camera and GPS location. Add a caption, move a photo up or
@@ -64,7 +68,7 @@ allows same-origin images and inline styles.
   brand colour, or the store's initial when there is no logo. Customers can install the
   shop from Safari's Share menu or Chrome's menu, and it opens full screen like an app.
 - **Native apps:** `GET /shop/<address>/data.json` returns the same public content as
-  the page as JSON (`version: 1`): store name, colours, logo, contacts, tagline, about,
+  the page as JSON (`version: 1`): store name, colours, logo, contacts, social links, tagline, about,
   hours, photos, catalogue items with prices (when shown), try-on links and image URLs
   relative to the studio. It allows any origin (`Access-Control-Allow-Origin: *`)
   without cookies, so the Forme Android app, a future iOS app or a counter tablet kiosk
