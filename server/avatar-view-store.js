@@ -65,13 +65,16 @@ export class AvatarViewStore {
       CREATE TABLE IF NOT EXISTS avatar_view_keys(id INTEGER PRIMARY KEY CHECK(id=1),secret BLOB NOT NULL CHECK(length(secret)=32));
       CREATE TABLE IF NOT EXISTS avatar_view_jobs(store TEXT NOT NULL,avatarId TEXT NOT NULL,kind TEXT NOT NULL,
         token TEXT NOT NULL,expiresAt INTEGER NOT NULL,PRIMARY KEY(store,avatarId,kind),FOREIGN KEY(store,avatarId) REFERENCES avatars(account,id) ON DELETE CASCADE);`);
-      if (
-        !this.db
+      const columns = new Set(
+        this.db
           .prepare("PRAGMA table_info(avatar_views)")
           .all()
-          .some((c) => c.name === "handPointsJson")
-      )
-        this.db.exec("ALTER TABLE avatar_views ADD COLUMN handPointsJson TEXT");
+          .map((c) => c.name),
+      );
+      for (const column of ["handPointsJson", "source_approval", "review_approval"]) {
+        if (!columns.has(column))
+          this.db.exec(`ALTER TABLE avatar_views ADD COLUMN ${column} TEXT`);
+      }
       this.db.prepare("INSERT OR IGNORE INTO avatar_view_keys VALUES(1,?)").run(randomBytes(32));
       // Feature-off stores with no views retain the legacy migration surface.
       // Install visual invalidation once a view context actually exists.
@@ -92,15 +95,21 @@ export class AvatarViewStore {
       throw fail("Sign in to an active store account.", 401);
     return current;
   }
-  avatar(account, id) {
+  approval(account, id, expected) {
     this.actor(account);
-    this.store.requireApprovedAvatar(account, id);
-    return this.db.prepare("SELECT * FROM avatars WHERE account=? AND id=?").get(account.id, id);
+    return this.store.requireApprovedAvatar(account, id, expected).sourceApproval;
   }
-  context(account, id, kind) {
+  avatar(account, id, expectedApproval) {
+    const sourceApproval = this.approval(account, id, expectedApproval);
+    return {
+      ...this.db.prepare("SELECT * FROM avatars WHERE account=? AND id=?").get(account.id, id),
+      sourceApproval,
+    };
+  }
+  context(account, id, kind, expectedApproval) {
     return transaction(this.db, () => {
       viewKind(kind);
-      const avatar = this.avatar(account, id);
+      const avatar = this.avatar(account, id, expectedApproval);
       installInvalidation(this.db);
       this.db
         .prepare("INSERT OR IGNORE INTO avatar_view_epochs(store,avatarId,nonce) VALUES(?,?,?)")
@@ -110,6 +119,7 @@ export class AvatarViewStore {
         .get(account.id, id);
       return {
         avatar,
+        sourceApproval: avatar.sourceApproval,
         nonce: epoch.nonce,
         revision: epoch[kind + "Revision"],
         baseHash: digest(
@@ -123,8 +133,7 @@ export class AvatarViewStore {
   }
   current(account, id, kind, context) {
     viewKind(kind);
-    this.actor(account);
-    this.store.requireApprovedAvatar(account, id);
+    this.approval(account, id, context.sourceApproval);
     // The avatar trigger changes the nonce on every visual/selector change.
     // Poll only this small row instead of reading/hashing the avatar BLOB.
     const epoch = this.db
@@ -134,7 +143,7 @@ export class AvatarViewStore {
       throw fail("This avatar or view changed. Reopen it before continuing.", 409);
     return context;
   }
-  receipt(account, id, kind, context, image, { tone, sourceKind, handPoints }) {
+  receipt(account, id, kind, context, image, { tone, sourceKind, handPoints, earlierView }) {
     const points = sourceKind === "photo" ? validateCustomerHandPoints(handPoints) : undefined;
     if (sourceKind === "photo" && kind !== "hands")
       throw fail("Customer photo geometry belongs to the hands view.");
@@ -147,11 +156,15 @@ export class AvatarViewStore {
         nonce: context.nonce,
         revision: context.revision,
         baseHash: context.baseHash,
+        sourceApproval: context.sourceApproval,
+        ...(earlierView && {
+          originalSourceApproval: JSON.parse(earlierView.source_approval ?? "null"),
+        }),
         imageHash: digest(Buffer.from(image.split(",")[1], "base64")),
         tone,
         sourceKind,
         ...(points ? { handPoints: points } : {}),
-        createdAt: Date.now(),
+        createdAt: earlierView?.createdAt ?? Date.now(),
         expires: Date.now() + 30 * 60000,
       }),
     ).toString("base64url");
@@ -176,6 +189,7 @@ export class AvatarViewStore {
         value.user !== account.user.id ||
         value.avatar !== id ||
         value.kind !== kind ||
+        !value.sourceApproval ||
         !Number.isFinite(value.expires) ||
         value.expires < Date.now()
       )
@@ -188,29 +202,73 @@ export class AvatarViewStore {
       );
     }
   }
-  list(account, id) {
-    this.avatar(account, id);
+  list(account, id, { includeEarlier = false } = {}) {
+    const approval = JSON.stringify(this.approval(account, id));
     return this.db
       .prepare(
-        "SELECT kind,tone,sourceKind,approvedAt,createdAt FROM avatar_views WHERE store=? AND avatarId=? ORDER BY kind",
+        "SELECT kind,tone,sourceKind,approvedAt,createdAt,source_approval,review_approval FROM avatar_views WHERE store=? AND avatarId=? ORDER BY kind",
       )
-      .all(account.id, id);
+      .all(account.id, id)
+      .filter(({ review_approval }) => includeEarlier || review_approval === approval)
+      .map(({ source_approval, review_approval, ...row }) => ({
+        ...row,
+        sourceApproval: JSON.parse(source_approval ?? "null"),
+        reviewApproval: JSON.parse(review_approval ?? "null"),
+        reviewRequired: review_approval !== approval,
+      }));
   }
-  get(account, id, kind) {
+  get(account, id, kind, { includeEarlier = false } = {}) {
     viewKind(kind);
-    this.avatar(account, id);
+    const approval = this.approval(account, id);
     const row = this.db
       .prepare("SELECT * FROM avatar_views WHERE store=? AND avatarId=? AND kind=?")
       .get(account.id, id, kind);
     if (!row) throw fail("Approved avatar view not found.", 404);
+    if (!includeEarlier && row.review_approval !== JSON.stringify(approval))
+      throw fail(
+        "Review this saved view against the current avatar approval before reusing it.",
+        409,
+      );
     return { ...row, image: Buffer.from(row.image) };
   }
+  reviewSaved(account, id, kind) {
+    return transaction(this.db, () => {
+      const context = this.context(account, id, kind);
+      const row = this.get(account, id, kind, { includeEarlier: true });
+      if (row.review_approval === JSON.stringify(context.sourceApproval))
+        throw fail("This saved view already has a current approval.", 409);
+      const handPoints = row.sourceKind === "photo" ? JSON.parse(row.handPointsJson) : undefined;
+      const image = "data:image/png;base64," + row.image.toString("base64");
+      return {
+        image,
+        receipt: this.receipt(account, id, kind, context, image, {
+          tone: row.tone,
+          sourceKind: row.sourceKind,
+          handPoints,
+          earlierView: row,
+        }),
+        kind,
+        tone: row.tone,
+        sourceKind: row.sourceKind,
+        reviewApproval: context.sourceApproval,
+        ...(handPoints && { anchors: customerHandAnchors(handPoints) }),
+        savedReview: true,
+        needsReview: true,
+        creditsUsed: 0,
+        warnings: [],
+      };
+    });
+  }
   async approve(account, id, kind, input, { guard } = {}) {
-    this.context(account, id, kind);
     if (input?.reviewed !== true || input?.storageConsent !== true)
       throw fail("Review this view and confirm saving it to the customer’s store account.");
-    const value = this.claims(account, id, kind, input.receipt),
-      png = await viewPng(input.image, kind);
+    const value = this.claims(account, id, kind, input.receipt);
+    this.context(account, id, kind, value.sourceApproval);
+    const png = await viewPng(input.image, kind);
+    const sourceApproval = Object.hasOwn(value, "originalSourceApproval")
+      ? value.originalSourceApproval
+      : value.sourceApproval;
+    const reviewApproval = JSON.stringify(value.sourceApproval);
     const points =
       value.sourceKind === "photo"
         ? JSON.stringify(validateCustomerHandPoints(value.handPoints))
@@ -219,23 +277,23 @@ export class AvatarViewStore {
       throw fail("The preview changed. Approve the original generated or template image.", 409);
     return transaction(this.db, () => {
       guard?.();
-      const latest = this.context(account, id, kind);
+      const latest = this.context(account, id, kind, value.sourceApproval);
       if (value.nonce !== latest.nonce || value.baseHash !== latest.baseHash)
         throw fail("The avatar changed. Reopen it before continuing.", 409);
       if (latest.revision !== value.revision) {
         const existing = this.db
           .prepare(
-            "SELECT image,approvedAt,handPointsJson,sourceKind,tone FROM avatar_views WHERE store=? AND avatarId=? AND kind=?",
+            "SELECT image,approvedAt,handPointsJson,sourceKind,tone,review_approval FROM avatar_views WHERE store=? AND avatarId=? AND kind=?",
           )
           .get(account.id, id, kind);
         if (
           latest.revision === value.revision + 1 &&
           existing &&
           digest(existing.image) === value.imageHash &&
-          (value.sourceKind !== "photo" ||
-            (existing.handPointsJson === points &&
-              existing.sourceKind === "photo" &&
-              existing.tone === value.tone))
+          existing.review_approval === reviewApproval &&
+          existing.handPointsJson === points &&
+          existing.sourceKind === value.sourceKind &&
+          existing.tone === value.tone
         )
           return { ok: true, approvedAt: existing.approvedAt };
         throw fail("A newer view action replaced this preview. Reopen the saved view.", 409);
@@ -243,7 +301,11 @@ export class AvatarViewStore {
       const approvedAt = Date.now();
       this.db
         .prepare(
-          `INSERT INTO avatar_views(store,avatarId,kind,image,tone,sourceKind,approvedAt,createdAt,handPointsJson) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(store,avatarId,kind) DO UPDATE SET image=excluded.image,tone=excluded.tone,sourceKind=excluded.sourceKind,approvedAt=excluded.approvedAt,createdAt=excluded.createdAt,handPointsJson=excluded.handPointsJson`,
+          `INSERT INTO avatar_views(store,avatarId,kind,image,tone,sourceKind,approvedAt,createdAt,handPointsJson,source_approval,review_approval)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(store,avatarId,kind) DO UPDATE SET
+          image=excluded.image,tone=excluded.tone,sourceKind=excluded.sourceKind,approvedAt=excluded.approvedAt,
+          createdAt=excluded.createdAt,handPointsJson=excluded.handPointsJson,
+          source_approval=excluded.source_approval,review_approval=excluded.review_approval`,
         )
         .run(
           account.id,
@@ -255,6 +317,8 @@ export class AvatarViewStore {
           approvedAt,
           value.createdAt,
           points,
+          sourceApproval ? JSON.stringify(sourceApproval) : null,
+          reviewApproval,
         );
       this.db
         .prepare(

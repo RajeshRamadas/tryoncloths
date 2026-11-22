@@ -31,6 +31,13 @@ for avatars in their active store.
    a view are free. Deleting one view leaves the full-body avatar and the other
    view intact; deleting the avatar or customer cascades to its views.
 
+Saved views show the master version and approval revision they were reviewed
+against. After the master is reapproved, an earlier view stays available in
+**Manage views** for download. Choose **Review saved view — free** to compare it
+with the current approved master and confirm reuse. This keeps the existing PNG
+and original generation provenance and costs zero AI credits. Views created
+before approval tracking can go through the same review.
+
 The page keeps references and previews in memory, clears a face reference after
 successful generation/cancellation, and clears private state when the session
 expires or changes. Changing the avatar/view clears the active inputs and review
@@ -73,10 +80,11 @@ never from request JSON. Another store's avatar returns 404 on every view route.
 
 | Method and path | Behaviour |
 | --- | --- |
-| `GET /api/avatars/:id/views` | Approved view metadata, without image BLOBs |
+| `GET /api/avatars/:id/views` | Metadata for views approved against the current master approval. Manage views uses `?includeEarlier=1` to include earlier saved views. |
 | `POST /api/avatars/:id/views` | Create a signed, unapproved portrait or hands preview |
 | `POST /api/avatars/:id/views/:kind/approve` | Review and save an authentic preview |
-| `GET /api/avatars/:id/views/:kind` | Private, no-store approved PNG |
+| `GET /api/avatars/:id/views/:kind` | Private, no-store PNG. Manage views uses `?includeEarlier=1` to open an earlier saved view. |
+| `POST /api/avatars/:id/views/:kind/review` | Open an earlier saved PNG and its placement markers for explicit review, with zero AI credits. |
 | `DELETE /api/avatars/:id/views/:kind` | Remove the view and invalidate outstanding previews |
 | `GET /api/avatars/:id/views/portrait/anchors` | Placement anchors for the approved portrait |
 
@@ -116,7 +124,7 @@ creditsUsed, warnings}`. Approval requires:
 ```
 
 The receipt binds the exact delivered image, initiating user, store, avatar,
-view kind, source, tone and current avatar/view revision. It expires after 30
+view kind, source, tone, current master approval and view revision. It expires after 30
 minutes. Altered images, foreign-user receipts and expired/stale previews fail
 without making another AI request. Repeating a successful approval is idempotent;
 an old preview cannot overwrite a newer approval or revive a deleted view/avatar.
@@ -160,9 +168,9 @@ when views are first used, preserving the legacy migration surface for stores
 that have never used the feature.
 
 Changing avatar image, profile, body library or template tone invalidates views
-and outstanding previews. Name/measurement edits that leave those visual inputs
-unchanged preserve approved views. Delete/recreate of the same content-derived
-avatar id starts a new epoch, so earlier receipts cannot be reused.
+and outstanding previews. Nonvisual edits that reset avatar approval preserve
+the saved PNGs for review against the next approval. Delete/recreate of the same
+content-derived avatar id starts a new epoch, so earlier receipts cannot be reused.
 
 The portrait anchor endpoint uses full 68-point landmarks: jaw points 2/14 with
 6% outward and 3% upward offsets for earlobes, points 31/35 for nostrils, nose bridge

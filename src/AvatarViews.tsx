@@ -15,12 +15,15 @@ type Avatar = {
   bodyType: string;
   templateTone: string;
 };
+type MasterApproval = { masterVersion: number; approvalVersion: number | null };
 type Saved = {
   kind: Kind;
   tone: string;
   sourceKind: string;
   approvedAt: number;
   createdAt: number;
+  reviewApproval?: MasterApproval | null;
+  reviewRequired?: boolean;
 };
 type Preview = {
   image: string;
@@ -30,11 +33,20 @@ type Preview = {
   tone: string;
   creditsUsed: number;
   warnings: { message: string }[];
+  reviewApproval?: MasterApproval;
+  savedReview?: boolean;
   anchors?: Record<
     string,
     Record<string, { x: number; y: number; angle: number; widthPx: number }>
   >;
 };
+function masterApprovalText(approval: MasterApproval) {
+  return (
+    "master version " +
+    approval.masterVersion +
+    (approval.approvalVersion == null ? "" : " · approval " + approval.approvalVersion)
+  );
+}
 async function asDataUrl(blob: Blob) {
   return new Promise<string>((resolve, reject) => {
     const r = new FileReader();
@@ -83,12 +95,18 @@ export default function AvatarViews({
     [handsConfirmed, setHandsConfirmed] = useState(false);
   const epoch = useRef(0),
     controller = useRef<AbortController | null>(null),
+    reviewingSaved = useRef(false),
     alive = useRef(true),
-    account = useRef("");
+    account = useRef(""),
+    previewReview = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (preview?.savedReview) previewReview.current?.focus();
+  }, [preview]);
   function clear(privateData = false) {
     epoch.current++;
     controller.current?.abort();
     controller.current = null;
+    reviewingSaved.current = false;
     setPreview(null);
     if (privateData) {
       setSavedImage("");
@@ -107,12 +125,11 @@ export default function AvatarViews({
     setNotice("");
   }
   async function refresh(id: string, selected: Kind, version: number) {
-    const data = await catalogueApi("/api/avatars/" + encodeURIComponent(id) + "/views");
+    const path = "/api/avatars/" + encodeURIComponent(id) + "/views";
+    const data = await catalogueApi(path + "?includeEarlier=1");
     let image = "";
     if (data.views.some((v: Saved) => v.kind === selected)) {
-      const response = await requestApi(
-        "/api/avatars/" + encodeURIComponent(id) + "/views/" + selected,
-      );
+      const response = await requestApi(path + "/" + selected + "?includeEarlier=1");
       if (response.status === 401) window.dispatchEvent(new Event("forme-account-expired"));
       if (!response.ok) throw new Error("The saved view could not be opened.");
       image = await asDataUrl(await response.blob());
@@ -223,11 +240,12 @@ export default function AvatarViews({
       if (alive.current && version === epoch.current) setError((e as Error).message);
     }
   }
-  async function create() {
+  async function create(reviewSaved = false) {
     if (busy || !avatar) return;
     const version = ++epoch.current,
       abort = new AbortController();
     controller.current = abort;
+    reviewingSaved.current = reviewSaved;
     setBusy(true);
     setError("");
     setNotice("");
@@ -235,8 +253,9 @@ export default function AvatarViews({
     setReviewed(false);
     setStorage(false);
     try {
-      const body =
-        kind === "hands"
+      const body = reviewSaved
+        ? undefined
+        : kind === "hands"
           ? handsSource === "template"
             ? { kind, source: "template", tone }
             : {
@@ -263,15 +282,20 @@ export default function AvatarViews({
               hairConsent: hair,
               requestId: crypto.randomUUID(),
             };
+      const path = "/api/avatars/" + encodeURIComponent(avatar) + "/views";
       const data = await catalogueApi(
-        "/api/avatars/" + encodeURIComponent(avatar) + "/views",
+        reviewSaved ? path + "/" + kind + "/review" : path,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           signal: abort.signal,
-          body: JSON.stringify(body),
+          ...(body === undefined
+            ? {}
+            : {
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+              }),
         },
-        195000,
+        reviewSaved ? 30000 : 195000,
       );
       if (alive.current && version === epoch.current) {
         setPreview(data);
@@ -282,18 +306,22 @@ export default function AvatarViews({
         setConsent(false);
         setAvatarReviewed(false);
         setNotice(
-          kind === "hands"
-            ? data.sourceKind === "photo"
-              ? "Customer hands cleanup created. Review all fingers, wrists and placement markers before saving; one AI credit was used."
-              : "Sample hands preview ready. No AI credits used."
-            : "Portrait created. Review it before saving; one AI credit was used.",
+          reviewSaved
+            ? "Saved view ready for review. No AI credits used."
+            : kind === "hands"
+              ? data.sourceKind === "photo"
+                ? "Customer hands cleanup created. Review all fingers, wrists and placement markers before saving; one AI credit was used."
+                : "Sample hands preview ready. No AI credits used."
+              : "Portrait created. Review it before saving; one AI credit was used.",
         );
       }
     } catch (e) {
       if (alive.current && version === epoch.current) {
         setError(
           (e as Error).name === "AbortError"
-            ? "The request stopped. No automatic retry was made; a provider charge may still apply."
+            ? reviewSaved
+              ? "Saved view review stopped."
+              : "The request stopped. No automatic retry was made; a provider charge may still apply."
             : (e as Error).message,
         );
         setConsent(false);
@@ -303,6 +331,7 @@ export default function AvatarViews({
       if (alive.current && version === epoch.current) {
         setBusy(false);
         controller.current = null;
+        reviewingSaved.current = false;
       }
     }
   }
@@ -653,9 +682,12 @@ export default function AvatarViews({
                 <button
                   className="button secondary"
                   onClick={() => {
+                    const stoppedReview = reviewingSaved.current;
                     clear();
                     setError(
-                      "Request stopped. No automatic retry was sent; a provider charge may still apply.",
+                      stoppedReview
+                        ? "Saved view review stopped."
+                        : "Request stopped. No automatic retry was sent; a provider charge may still apply.",
                     );
                   }}
                 >
@@ -668,14 +700,16 @@ export default function AvatarViews({
             )}
           </section>
           {preview && (
-            <section aria-label="Review view preview">
+            <section aria-label="Review view preview" ref={previewReview} tabIndex={-1}>
               <h2>
                 Review{" "}
-                {preview.sourceKind === "template"
-                  ? "sample hands"
-                  : preview.sourceKind === "photo"
-                    ? "customer hands"
-                    : "generated portrait"}
+                {preview.savedReview
+                  ? "saved " + kind + " view"
+                  : preview.sourceKind === "template"
+                    ? "sample hands"
+                    : preview.sourceKind === "photo"
+                      ? "customer hands"
+                      : "generated portrait"}
               </h2>
               {preview.sourceKind === "photo" ? (
                 <HandPhotoMarkers
@@ -695,9 +729,11 @@ export default function AvatarViews({
                   className="avatar-view-image"
                   src={preview.image}
                   alt={
-                    preview.sourceKind === "template"
-                      ? "Sample hands preview awaiting approval"
-                      : "Generated portrait awaiting customer approval"
+                    preview.savedReview
+                      ? "Saved " + kind + " view awaiting approval"
+                      : preview.sourceKind === "template"
+                        ? "Sample hands preview awaiting approval"
+                        : "Generated portrait awaiting customer approval"
                   }
                 />
               )}
@@ -709,7 +745,17 @@ export default function AvatarViews({
               {preview.warnings.map((w, i) => (
                 <p key={i}>{w.message}</p>
               ))}
-              <p>This preview has not been saved to the account.</p>
+              {preview.reviewApproval && (
+                <p>Review against {masterApprovalText(preview.reviewApproval)}.</p>
+              )}
+              {preview.savedReview && (
+                <img
+                  className="avatar-view-reference"
+                  src={selected.thumbnail}
+                  alt="Current full-body avatar reference"
+                />
+              )}
+              {!preview.savedReview && <p>This preview has not been saved to the account.</p>}
               <label className="consent">
                 <input
                   type="checkbox"
@@ -762,13 +808,20 @@ export default function AvatarViews({
             </section>
           )}
           <section>
-            <h2>Approved {kind} view</h2>
+            <h2>
+              {approved?.reviewRequired ? "Earlier" : "Approved"} {kind} view
+            </h2>
             {approved && savedImage ? (
               <>
                 <img
                   className="avatar-view-image"
                   src={savedImage}
-                  alt={"Approved " + kind + " view for " + selected.name}
+                  alt={
+                    (approved.reviewRequired ? "Earlier " : "Approved ") +
+                    kind +
+                    " view for " +
+                    selected.name
+                  }
                 />
                 <p>
                   {approved.sourceKind === "template"
@@ -778,13 +831,31 @@ export default function AvatarViews({
                       : "Generated portrait"}{" "}
                   · Approved {new Date(approved.approvedAt).toLocaleString()}
                 </p>
+                {approved.reviewApproval && (
+                  <p>Reviewed for {masterApprovalText(approved.reviewApproval)}.</p>
+                )}
+                {approved.reviewRequired && (
+                  <p>
+                    Review this saved view against the current avatar before using it for a new
+                    fitting.
+                  </p>
+                )}
                 <div className="customer-actions">
+                  {approved.reviewRequired && (
+                    <button
+                      className="button primary"
+                      disabled={busy}
+                      onClick={() => void create(true)}
+                    >
+                      Review saved view — free
+                    </button>
+                  )}
                   <a
                     className="button secondary"
                     href={savedImage}
-                    download={kind + "-approved.png"}
+                    download={kind + (approved.reviewRequired ? "-saved.png" : "-approved.png")}
                   >
-                    Download approved view
+                    {approved.reviewRequired ? "Download saved view" : "Download approved view"}
                   </a>
                   <button
                     className="button secondary"

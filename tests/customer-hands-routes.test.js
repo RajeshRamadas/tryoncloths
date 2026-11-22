@@ -1,4 +1,4 @@
-import { saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
+import { approveTestAvatar, saveApprovedTestAvatar } from "./helpers/approved-avatar.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -222,7 +222,19 @@ test("customer hands charge one credit, persist only after scoped review, surviv
       await request(endpoint + "/hands/anchors", undefined, undefined, undefined, "GET")
     ).json();
     assert.deepEqual(data.anchors, p.anchors);
+    store.revokeAvatarApproval(a, avatar.id);
+    approveTestAvatar(store, a, avatar.id);
+    const review = await request(endpoint + "/hands/review");
+    assert.equal(review.status, 200);
+    const saved = await review.json();
+    assert.equal(saved.sourceKind, "photo");
+    assert.equal(saved.image, p.image);
+    assert.deepEqual(saved.anchors, p.anchors);
+    assert.equal(saved.creditsUsed, 0);
+    assert.equal((await request(endpoint + "/hands/approve", approve(saved))).status, 200);
+    assert.deepEqual(await store.views.handAnchors(a, avatar.id), p.anchors);
     assert.equal(calls(), 1);
+    assert.equal(store.billing.balance(a.org), before - 1);
     store.remove(a, avatar.id);
     assert.equal(store.db.prepare("SELECT count(*) n FROM avatar_views").get().n, 0);
   }));
