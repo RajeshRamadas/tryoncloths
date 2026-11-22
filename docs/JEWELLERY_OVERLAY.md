@@ -9,6 +9,24 @@ hands can be reused.
 
 ## Staff workflow
 
+### Upload and preview from the studio
+
+1. Open an approved avatar view and choose **Jewellery → Upload photo**. Owners
+   and managers can upload a transparent PNG or a photo of one piece on a plain
+   backdrop. The studio prepares the cut-out on the device.
+2. Confirm the product type and metal, set any placement options such as the
+   earring side or ring finger, and review the avatar view.
+3. Choose **Save to catalogue and preview — free**. The product and cut-out are
+   saved together and the studio places the piece on the avatar. Review the
+   preview before saving the look. If placement is interrupted after the product
+   saves, choose **Preview on avatar — free** from the selected item.
+
+To adjust an automatic preview, choose **Undo last jewellery item**, review the
+view again and choose **Load overlay placement**. The catalogue editor also lets
+you adjust background removal.
+
+### Prepare a cut-out in the catalogue
+
 1. An owner or manager opens **Jewellery catalogue**, saves a product normally,
    then expands **Transparent cut-out** on its card.
 2. Upload a single jewellery piece as a transparent PNG, or a product photo on a
@@ -83,6 +101,8 @@ through the server validation below, so the stored asset format is unchanged.
 
 ## API and storage
 
+- `POST /api/garments` can save a jewellery photo with its validated
+  `overlayPng` and type-compatible `overlayAnchor` in the same transaction.
 - `POST /api/garments/:id/overlay?category=jewellery`: owner/manager writes a
   `overlayPng` data URL plus type-compatible `overlayAnchor` and
   `storageConsent: true`. `overlayPng: null` removes it. Shared master copies are
@@ -117,7 +137,9 @@ anatomical side selection, mirrored asymmetric products, rotation, crop, dimensi
 stale assets, saved-look provenance, labelled export/sharing and disabled flags.
 The mobile browser workflow uploads a cut-out, drags, pinches, rotates, resets,
 applies, saves, shares, downloads and reopens it with no paid try-on route request
-and no credit change. Tests use local fixtures and injected portrait anchors;
+and no credit change. The studio upload test also covers automatic cut-out
+preparation, catalogue saving and placement on the selected ear in one action.
+Tests use local fixtures and injected portrait anchors;
 no live provider call is made and no real product-fit quality claim is inferred.
 
 [Mobile editor and saved-look screenshots](testing/jewellery-overlay/README.md)

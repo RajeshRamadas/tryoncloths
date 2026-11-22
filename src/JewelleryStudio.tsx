@@ -15,6 +15,7 @@ import {
 import AvatarViews from "./AvatarViews";
 import ShareLook from "./ShareLook";
 import { readPhoto } from "./images";
+import { automaticJewelleryCutout } from "./jewellery-cutout-photo";
 import { readProductPhotos, type ProductPhoto } from "./product-photos";
 import {
   jewelleryTypes,
@@ -47,6 +48,7 @@ type Draft = {
   image: string;
   item: JewelleryItem | null;
   url: string;
+  cutout?: { png: string; error?: never } | { png?: never; error: string };
 };
 type Frame = {
   image: string;
@@ -65,6 +67,14 @@ const emptyDraft = (): Draft => ({
   image: "",
   item: null,
   url: "",
+});
+const savedDraft = (item: JewelleryItem): Draft => ({
+  item,
+  image: item.image || "",
+  name: item.name,
+  type: item.garmentType,
+  attributes: item.attributes,
+  url: item.sourceUrl,
 });
 const emptyFrames = (): Record<View, Frame[]> => ({ portrait: [], hands: [], full: [] });
 const viewNames: Record<View, string> = { portrait: "Portrait", hands: "Hands", full: "Full body" };
@@ -412,14 +422,7 @@ export default function JewelleryStudio() {
         abort.signal,
       );
       if (valid(version)) {
-        applyDraft({
-          item: result.garment,
-          image: result.garment.image,
-          name: result.garment.name,
-          type: result.garment.garmentType,
-          attributes: result.garment.attributes,
-          url: result.garment.sourceUrl,
-        });
+        applyDraft(savedDraft(result.garment));
         setPhotos([]);
         setNotice("Saved jewellery selected. No AI credit used.");
       }
@@ -492,21 +495,33 @@ export default function JewelleryStudio() {
   async function upload(file: File) {
     const { version, abort } = begin("Opening product photo");
     try {
-      const photo = await readPhoto(file),
-        name = file.name.replace(/\.[^.]+$/, "").slice(0, 100),
+      const prepareCutout = overlayEnabled && manager;
+      const [photo, cutout] = await Promise.all([
+        readPhoto(file),
+        prepareCutout
+          ? automaticJewelleryCutout(file).then(
+              (png) => ({ png }),
+              (e: Error) => ({ error: e.message }),
+            )
+          : undefined,
+      ]);
+      const name = file.name.replace(/\.[^.]+$/, "").slice(0, 100),
         guessed = guessJewelleryType(name);
       if (!valid(version)) return;
-      if (valid(version)) {
-        applyDraft({
-          name,
-          type: guessed,
-          attributes: { metal: "", pair: guessed ? jewelleryTypes[guessed].pair : false },
-          image: photo,
-          item: null,
-          url: "",
-        });
-        setPhotos([]);
+      applyDraft({
+        name,
+        type: guessed,
+        attributes: { metal: "", pair: guessed ? jewelleryTypes[guessed].pair : false },
+        image: photo,
+        item: null,
+        url: "",
+        cutout,
+      });
+      if (cutout && "png" in cutout) {
+        setMode("overlay");
+        setReplace(false);
       }
+      setPhotos([]);
       const found = await jewelleryApi(
         "/api/garments/match",
         { category: "jewellery", image: photo },
@@ -563,125 +578,141 @@ export default function JewelleryStudio() {
       : current?.result?.receipt
         ? { baseReceipt: current.result.receipt }
         : null;
-  const overlayPayload = () => ({
+  const overlayPayload = (itemId: string) => ({
     avatarId: avatar,
     view,
     sessionId: fittingSession.current,
     ...placement,
     ...(current ? { base: current.image, ...baseProof, baseReviewed: true } : {}),
-    itemId: draft.item?.id,
+    itemId,
     ...(type === "bangles" ? { count } : {}),
   });
+  async function requestOverlayPlacement(
+    item: JewelleryItem,
+    { version, abort }: ReturnType<typeof begin>,
+  ): Promise<OverlayPrepared | null> {
+    const result: OverlayPrepared = await jewelleryApi(
+      "/api/jewellery/overlay/prepare",
+      overlayPayload(item.id),
+      abort.signal,
+    );
+    if (!valid(version)) return null;
+    const earrings = view === "portrait" && overlayAnchors[item.garmentType] === "earlobe";
+    if (view !== "full" && !earrings) return result;
+    const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(12000)]);
+    const detection = earrings
+      ? import("./face-photo").then(({ overlayFacePoints }) =>
+          overlayFacePoints(result.base, signal),
+        )
+      : import("./body-pose").then(({ singleBodyPose }) => singleBodyPose(result.base, signal));
+    const landmarks = await Promise.race([
+      detection.catch(() => null),
+      new Promise<null>((resolve) =>
+        signal.addEventListener("abort", () => resolve(null), { once: true }),
+      ),
+    ]);
+    if (!valid(version)) return null;
+    if (!landmarks) return result;
+    const { placements, matched } = earrings
+      ? refineEarringPlacements(result.placements, landmarks, result)
+      : refineFullBodyPlacements(result.placements, item.garmentType, landmarks, result);
+    if (!matched) return result;
+    return {
+      ...result,
+      placements,
+      warning:
+        matched === placements.length
+          ? earrings
+            ? "Starting positions use detected ear points. Check the piercings in close-up."
+            : "Starting positions follow the avatar’s body landmarks. Check and adjust the placement."
+          : "Some pieces use approximate starting positions. Check and adjust each piece.",
+    };
+  }
   async function prepareOverlay(): Promise<OverlayPrepared | null> {
-    const { version, abort } = begin("Loading overlay placement");
+    if (!draft.item) return null;
+    const attempt = begin("Loading overlay placement");
     try {
-      const result: OverlayPrepared = await jewelleryApi(
-        "/api/jewellery/overlay/prepare",
-        overlayPayload(),
-        abort.signal,
-      );
-      if (!valid(version)) return null;
-      const earrings = view === "portrait" && type && overlayAnchors[type] === "earlobe";
-      if (!type || (view !== "full" && !earrings)) return result;
-      const signal = AbortSignal.any([abort.signal, AbortSignal.timeout(12000)]);
-      const detection = earrings
-        ? import("./face-photo").then(({ overlayFacePoints }) =>
-            overlayFacePoints(result.base, signal),
-          )
-        : import("./body-pose").then(({ singleBodyPose }) => singleBodyPose(result.base, signal));
-      const landmarks = await Promise.race([
-        detection.catch(() => null),
-        new Promise<null>((resolve) =>
-          signal.addEventListener("abort", () => resolve(null), { once: true }),
-        ),
-      ]);
-      if (!valid(version)) return null;
-      if (!landmarks) return result;
-      const { placements, matched } = earrings
-        ? refineEarringPlacements(result.placements, landmarks, result)
-        : refineFullBodyPlacements(result.placements, type, landmarks, result);
-      if (!matched) return result;
-      return {
-        ...result,
-        placements,
-        warning:
-          matched === placements.length
-            ? earrings
-              ? "Starting positions use detected ear points. Check the piercings in close-up."
-              : "Starting positions follow the avatar’s body landmarks. Check and adjust the placement."
-            : "Some pieces use approximate starting positions. Check and adjust each piece.",
-      };
+      return await requestOverlayPlacement(draft.item, attempt);
     } catch (e) {
-      if (valid(version)) setError((e as Error).message);
+      if (valid(attempt.version)) setError((e as Error).message);
       return null;
     } finally {
-      finish(version);
+      finish(attempt.version);
     }
   }
-  async function applyOverlay(prepared: OverlayPrepared, placements: OverlayPlacement[]) {
-    const { version, abort } = begin("Applying free overlay");
-    try {
-      const result: JewelleryResult = await jewelleryApi(
-        "/api/jewellery/overlay",
-        {
-          ...overlayPayload(),
-          assetHash: prepared.assetHash,
-          placements,
-          requestId: crypto.randomUUID(),
-        },
-        abort.signal,
-      );
-      if (!valid(version)) return false;
-      if (result.view !== view || !result.image?.startsWith("data:image/png;base64,"))
-        throw new Error("The studio returned an unsupported overlay preview.");
-      const piece: Piece = {
-        itemId: draft.item!.id,
-        name: draft.name,
-        type: type!,
-        attributes: attrs,
-        ...placement,
-        mode: "overlay",
-        resultId: result.resultId,
-      };
-      const placementCloseUps: NonNullable<Frame["closeUps"]> = overlayRegions(
+  async function renderOverlayPreview(
+    item: JewelleryItem,
+    prepared: OverlayPrepared,
+    placements: OverlayPlacement[],
+    { version, abort }: ReturnType<typeof begin>,
+  ) {
+    const result: JewelleryResult = await jewelleryApi(
+      "/api/jewellery/overlay",
+      {
+        ...overlayPayload(item.id),
+        assetHash: prepared.assetHash,
         placements,
-        overlayAnchors[piece.type],
-      ).map(({ label, index }: { label: string; index: number }) => ({
-        label,
-        x: placements[index].x / prepared.width,
-        y: placements[index].y / prepared.height,
-      }));
-      const closeUps = [
-        ...(current?.closeUps ?? []).filter((earlier) =>
-          placementCloseUps.every((latest) => latest.label !== earlier.label),
-        ),
-        ...placementCloseUps,
-      ];
-      setHistory((h) => ({
-        ...h,
-        [view]: [
-          ...h[view],
-          {
-            image: result.image,
-            items: [...(current?.items || []), piece],
-            result,
-            previewMode: result.previewMode,
-            closeUps,
-          },
-        ],
-      }));
-      setReviewed(false);
-      clearReview();
-      setSavedLook(null);
-      setZoom(1);
-      setZoomFocus(null);
-      setNotice("Overlay preview ready — no AI credit used. Review its placement before saving.");
-      return true;
+        requestId: crypto.randomUUID(),
+      },
+      abort.signal,
+    );
+    if (!valid(version)) return false;
+    if (result.view !== view || !result.image?.startsWith("data:image/png;base64,"))
+      throw new Error("The studio returned an unsupported overlay preview.");
+    const piece: Piece = {
+      itemId: item.id,
+      name: item.name,
+      type: item.garmentType,
+      attributes: attrs,
+      ...placement,
+      mode: "overlay",
+      resultId: result.resultId,
+    };
+    const placementCloseUps: NonNullable<Frame["closeUps"]> = overlayRegions(
+      placements,
+      overlayAnchors[piece.type],
+    ).map(({ label, index }: { label: string; index: number }) => ({
+      label,
+      x: placements[index].x / prepared.width,
+      y: placements[index].y / prepared.height,
+    }));
+    const closeUps = [
+      ...(current?.closeUps ?? []).filter((earlier) =>
+        placementCloseUps.every((latest) => latest.label !== earlier.label),
+      ),
+      ...placementCloseUps,
+    ];
+    setHistory((h) => ({
+      ...h,
+      [view]: [
+        ...h[view],
+        {
+          image: result.image,
+          items: [...(current?.items || []), piece],
+          result,
+          previewMode: result.previewMode,
+          closeUps,
+        },
+      ],
+    }));
+    setReviewed(false);
+    clearReview();
+    setSavedLook(null);
+    setZoom(1);
+    setZoomFocus(null);
+    setNotice("Overlay preview ready — no AI credit used. Review its placement before saving.");
+    return true;
+  }
+  async function applyOverlay(prepared: OverlayPrepared, placements: OverlayPlacement[]) {
+    if (!draft.item) return false;
+    const attempt = begin("Applying free overlay");
+    try {
+      return await renderOverlayPreview(draft.item, prepared, placements, attempt);
     } catch (e) {
-      if (valid(version)) setError((e as Error).message);
+      if (valid(attempt.version)) setError((e as Error).message);
       return false;
     } finally {
-      finish(version);
+      finish(attempt.version);
     }
   }
   async function comparisonRequest(label: string, path: string, body: unknown, timeout = 30000) {
@@ -810,45 +841,69 @@ export default function JewelleryStudio() {
       finish(version);
     }
   }
+  async function saveCatalogueProduct(garmentType: JewelleryType, signal: AbortSignal) {
+    const { garment } = await jewelleryApi(
+      "/api/garments",
+      {
+        category: "jewellery",
+        name: draft.name,
+        garmentType,
+        attributes: attrs,
+        image: draft.image,
+        sourceUrl: draft.url,
+        storageConsent: true,
+        ...(draft.cutout?.png && {
+          overlayPng: draft.cutout.png,
+          overlayAnchor: overlayAnchors[garmentType],
+        }),
+      },
+      signal,
+    );
+    return { ...garment, image: draft.image } as JewelleryItem;
+  }
   async function saveProduct() {
     if (!type) return;
     const { version, abort } = begin("Saving product");
     try {
-      const r = await jewelleryApi(
-        "/api/garments",
-        {
-          category: "jewellery",
-          name: draft.name,
-          garmentType: type,
-          attributes: attrs,
-          image: draft.image,
-          sourceUrl: draft.url,
-          storageConsent: true,
-        },
-        abort.signal,
-      );
+      const item = await saveCatalogueProduct(type, abort.signal);
       if (valid(version)) {
-        const full = await jewelleryApi(
-          "/api/garments/" + r.garment.id + "?category=jewellery",
-          undefined,
-          abort.signal,
+        applyDraft(savedDraft(item));
+        setNotice(
+          draft.cutout?.png
+            ? "Product and cut-out saved to your catalogue. No AI credit used."
+            : "Product saved to your catalogue. No AI credit used.",
         );
-        if (valid(version)) {
-          applyDraft({
-            name: full.garment.name,
-            type: full.garment.garmentType,
-            attributes: full.garment.attributes,
-            image: full.garment.image,
-            item: full.garment,
-            url: full.garment.sourceUrl,
-          });
-          setNotice("Product saved to your catalogue. No AI credit used.");
-        }
       }
     } catch (e) {
       if (valid(version)) setError((e as Error).message);
     } finally {
       finish(version);
+    }
+  }
+  async function previewAutomaticOverlay() {
+    if (!type || (!draft.item?.hasOverlay && !draft.cutout?.png)) return;
+    const attempt = begin(draft.item ? "Placing jewellery" : "Saving product and cut-out");
+    let saved = false;
+    try {
+      const item = draft.item ?? (await saveCatalogueProduct(type, attempt.abort.signal));
+      if (!valid(attempt.version)) return;
+      if (!draft.item) {
+        saved = true;
+        // Keep the view and the selected wrist, finger or side for the preview.
+        setDraft(savedDraft(item));
+        setMatches([]);
+        setPhotos([]);
+        setBusy("Placing jewellery");
+      }
+      const prepared = await requestOverlayPlacement(item, attempt);
+      if (!prepared || !valid(attempt.version)) return;
+      if (await renderOverlayPreview(item, prepared, prepared.placements, attempt))
+        preview.current?.scrollIntoView({ block: "center" });
+    } catch (e) {
+      if (valid(attempt.version))
+        setError((saved ? "The product and cut-out were saved. " : "") + (e as Error).message);
+    } finally {
+      finish(attempt.version);
     }
   }
   async function keep() {
@@ -947,6 +1002,16 @@ export default function JewelleryStudio() {
     !!attrs.metal &&
     !!draft.name.trim() &&
     consent &&
+    reviewed &&
+    (!current || !!baseProof) &&
+    (current?.items.length || 0) < 10;
+  const canSaveProduct =
+    manager && !busy && !loading && !!type && typeConfirmed && !!attrs.metal && !!draft.name.trim();
+  const canOverlay =
+    overlayEnabled &&
+    !busy &&
+    !loading &&
+    !!image &&
     reviewed &&
     (!current || !!baseProof) &&
     (current?.items.length || 0) < 10;
@@ -1264,7 +1329,10 @@ export default function JewelleryStudio() {
                           key={id}
                           disabled={loading || !!busy}
                           aria-pressed={source === id}
-                          onClick={() => setSource(id)}
+                          onClick={() => {
+                            setSource(id);
+                            if (id === "saved" && source !== "saved") void browse(offset);
+                          }}
                         >
                           {label}
                         </button>
@@ -1403,8 +1471,9 @@ export default function JewelleryStudio() {
                     </div>
                     <div hidden={source !== "photo"}>
                       <p>
-                        Choose a clear product photo or screenshot. You can save it for the next
-                        customer.
+                        {overlayEnabled && manager
+                          ? "For a free overlay, upload one piece as a transparent PNG or a photo on a plain backdrop."
+                          : "Choose a clear product photo or screenshot."}
                       </p>
                       <label>
                         Upload jewellery product photo
@@ -1639,18 +1708,13 @@ export default function JewelleryStudio() {
                           {manager && (
                             <button
                               className="button secondary"
-                              disabled={
-                                loading ||
-                                !!busy ||
-                                !type ||
-                                !draft.attributes.metal ||
-                                !typeConfirmed ||
-                                !draft.name.trim()
-                              }
+                              disabled={!canSaveProduct}
                               onClick={() => {
                                 if (
                                   window.confirm(
-                                    "Save this product photo and its details to your store catalogue? No AI credit is used.",
+                                    draft.cutout?.png
+                                      ? "Save this product photo and cut-out to your store catalogue? No AI credit is used."
+                                      : "Save this product photo and its details to your store catalogue? No AI credit is used.",
                                   )
                                 )
                                   void saveProduct();
@@ -1849,7 +1913,29 @@ export default function JewelleryStudio() {
                         </>
                       ) : (
                         <>
-                          {!draft.item?.hasOverlay ? (
+                          {!draft.item && draft.cutout ? (
+                            draft.cutout.png ? (
+                              <>
+                                <img
+                                  className="jewellery-product-reference cutout-checker"
+                                  src={draft.cutout.png}
+                                  alt="Automatic jewellery cut-out"
+                                />
+                                <p>
+                                  Check the cut-out and review the avatar view before placing it.
+                                </p>
+                                <button
+                                  className="button primary full-width"
+                                  disabled={!canSaveProduct || !canOverlay}
+                                  onClick={() => void previewAutomaticOverlay()}
+                                >
+                                  Save to catalogue and preview — free
+                                </button>
+                              </>
+                            ) : (
+                              <p role="status">{draft.cutout.error}</p>
+                            )
+                          ) : !draft.item?.hasOverlay ? (
                             <p>
                               Add a transparent cut-out to this saved piece in the{" "}
                               <a href="/jewellery-catalogue">jewellery catalogue</a> first. Owners
@@ -1861,6 +1947,13 @@ export default function JewelleryStudio() {
                                 Review the approved view before loading placement. No AI consent or
                                 credit is required for an overlay.
                               </p>
+                              <button
+                                className="button primary full-width"
+                                disabled={!canOverlay}
+                                onClick={() => void previewAutomaticOverlay()}
+                              >
+                                Preview on avatar — free
+                              </button>
                               <JewelleryOverlay
                                 anchor={overlayAnchors[draft.item.garmentType]}
                                 key={JSON.stringify([
@@ -1874,14 +1967,7 @@ export default function JewelleryStudio() {
                                   placement,
                                   count,
                                 ])}
-                                disabled={
-                                  loading ||
-                                  !!busy ||
-                                  !image ||
-                                  !reviewed ||
-                                  (!!current && !baseProof) ||
-                                  (current?.items.length || 0) >= 10
-                                }
+                                disabled={!canOverlay}
                                 onPrepare={prepareOverlay}
                                 onApply={applyOverlay}
                               />

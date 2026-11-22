@@ -4,59 +4,11 @@ import { overlayAnchors } from "./jewellery-overlay";
 import {
   removeBackground,
   transparentShare,
-  cutoutSize,
   CUTOUT_DEFAULT_TOLERANCE,
   CUTOUT_MIN_TOLERANCE,
   CUTOUT_MAX_TOLERANCE,
 } from "./jewellery-cutout";
-
-type Source = { rgba: Uint8ClampedArray; width: number; height: number };
-const PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
-
-async function decodePhoto(file: File): Promise<Source> {
-  const bitmap = await createImageBitmap(file).catch(() => {
-    throw new Error("The image could not be opened.");
-  });
-  try {
-    if (bitmap.width < 200 || bitmap.height < 200)
-      throw new Error("Use a photo at least 200 × 200 px.");
-    const { width, height } = cutoutSize(bitmap.width, bitmap.height);
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) throw new Error("The image could not be opened.");
-    ctx.drawImage(bitmap, 0, 0, width, height);
-    return { rgba: ctx.getImageData(0, 0, width, height).data, width, height };
-  } finally {
-    bitmap.close();
-  }
-}
-
-async function encodePng({ rgba, width, height }: Source): Promise<string> {
-  // Stay under the 2 MB catalogue limit by shrinking large, detailed cut-outs.
-  let scale = 1;
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const w = Math.max(200, Math.round(width * scale)),
-      h = Math.max(200, Math.round(height * scale));
-    const full = document.createElement("canvas");
-    full.width = width;
-    full.height = height;
-    full
-      .getContext("2d")!
-      .putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0);
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    canvas.getContext("2d")!.drawImage(full, 0, 0, w, h);
-    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/png"));
-    if (!blob) break;
-    if (blob.size <= 2 * 1024 * 1024) return blobData(blob);
-    scale *= 0.8;
-  }
-  throw new Error("The cut-out is too large. Crop the photo closer to the piece.");
-}
-
+import { decodeCutoutPhoto, encodeCutoutPng, type Source } from "./jewellery-cutout-photo";
 import type { JewelleryType } from "./jewellery-types";
 export default function JewelleryOverlayUpload({
   id,
@@ -99,7 +51,7 @@ export default function JewelleryOverlayUpload({
       tolerance: tol,
       clearEnclosed: enclosed,
     });
-    const data = await encodePng({ ...src, rgba: result.rgba });
+    const data = await encodeCutoutPng({ ...src, rgba: result.rgba });
     if (v === version.current) {
       setImage(data);
       setNotice("Background removed on this device. Check the edges before saving.");
@@ -113,9 +65,7 @@ export default function JewelleryOverlayUpload({
     setSource(null);
     setConsent(false);
     try {
-      if (!PHOTO_TYPES.includes(file.type) || file.size > 10 * 1024 * 1024 || !file.size)
-        throw new Error("Choose a PNG, JPEG or WebP photo under 10 MB.");
-      const decoded = await decodePhoto(file);
+      const decoded = await decodeCutoutPhoto(file);
       if (v !== version.current) return;
       if (file.type === "image/png" && transparentShare(decoded.rgba) >= 0.01) {
         // Already a transparent cut-out: keep it as supplied.
