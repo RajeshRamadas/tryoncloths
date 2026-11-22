@@ -604,6 +604,7 @@ export class GarmentStore {
     const { sourceApproval, bodyType: approvedBodyType } = this.accounts.requireApprovedAvatar(
       account,
       input.avatarId,
+      input.sourceApproval,
     );
     const garment = this.row(account, input.garmentId);
     if (garment.needsTypeReview)

@@ -7,12 +7,21 @@ import {
   parseProfileSelection,
 } from "./profiles";
 
+export type AvatarSourceApproval = {
+  avatarId: string;
+  masterId: string;
+  masterVersion: number;
+  approvalVersion: number | null;
+  approvedAt: number;
+  imageSha256: string;
+};
 export type OpenedLook = {
   garmentIds?: string[];
   id?: string;
   image: string;
   name: string;
   garments: string[];
+  sourceApproval?: AvatarSourceApproval;
 };
 export type ProfileSelection = NonNullable<ReturnType<typeof parseProfileSelection>>;
 export type AvatarDetails = {

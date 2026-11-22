@@ -156,6 +156,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
           image,
           name: look.name,
           garments: look.garments,
+          sourceApproval: look.sourceApproval,
         },
       });
     } catch (e) {

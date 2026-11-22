@@ -371,6 +371,58 @@ test("saved clothing adaptations and receipts are pinned to the approval that pr
     assert.equal(calls(), 2);
   }));
 
+test("product-photo try-ons and their saved outfits keep the source avatar approval", async () =>
+  fixture(async ({ store, a, request, ca, cb, input, garment, garmentInput, calls }) => {
+    const uploaded = { ...input, garmentId: undefined, garment: garmentInput.image };
+    assert.equal((await request("/api/tryon", uploaded, cb)).status, 404);
+    store.revokeAvatarApproval(a, input.avatarId);
+    assert.equal((await request("/api/tryon", uploaded, ca)).status, 409);
+    assert.equal(calls(), 0);
+    approveTestAvatar(store, a, input.avatarId);
+
+    const generated = await request("/api/tryon", uploaded, ca);
+    assert.equal(generated.status, 200);
+    const { image, sourceApproval } = await generated.json();
+    assert.deepEqual(sourceApproval, store.requireApprovedAvatar(a, input.avatarId).sourceApproval);
+    assert.equal(sourceApproval.approvalVersion, 2);
+    const outfit = {
+      image,
+      sourceApproval,
+      avatarId: input.avatarId,
+      name: "Uploaded shirt",
+      garments: ["Shirt"],
+      storageConsent: true,
+    };
+    const saved = await request("/api/looks", outfit, ca);
+    assert.equal(saved.status, 200);
+    const { id } = await saved.json();
+    const list = () => request(`/api/looks?avatar=${input.avatarId}`, undefined, ca);
+    assert.deepEqual((await (await list()).json()).looks[0].sourceApproval, sourceApproval);
+
+    store.revokeAvatarApproval(a, input.avatarId);
+    approveTestAvatar(store, a, input.avatarId);
+    assert.equal(
+      (await request("/api/tryon", { ...uploaded, avatar: image, sourceApproval }, ca)).status,
+      409,
+    );
+    assert.equal(
+      (await request("/api/tryon", { ...input, avatar: image, sourceApproval }, ca)).status,
+      409,
+    );
+    assert.equal(
+      (await request(`/api/garments/${garment.id}/reuse`, { ...input, sourceApproval }, ca)).status,
+      409,
+    );
+    assert.equal((await request("/api/looks", outfit, ca)).status, 409);
+    assert.equal(calls(), 1);
+    assert.equal((await request(`/api/looks/${id}/image`, undefined, ca)).status, 200);
+    assert.equal((await request(`/api/looks/${id}/image`, undefined, cb)).status, 404);
+    assert.deepEqual((await (await list()).json()).looks[0].sourceApproval, sourceApproval);
+    const fresh = await request("/api/tryon", uploaded, ca);
+    assert.equal(fresh.status, 200);
+    assert.equal((await fresh.json()).sourceApproval.approvalVersion, 3);
+  }));
+
 test("changed outfit, avatar, category, product or model cannot reuse a previous adaptation", async () =>
   fixture(async ({ store, a, request, ca, input, garment, garmentInput }) => {
     const result = await (await request("/api/tryon", input, ca)).json();
@@ -503,7 +555,37 @@ test("an approval change during generation preserves the paid image without a st
       assert.ok(result.image);
       assert.equal(result.sourceApproval.approvalVersion, 1);
       assert.equal(result.reuseReceipt, undefined);
-      assert.match(result.reuseWarning, /do not regenerate/);
+      assert.equal(result.approvalChanged, true);
+      assert.match(result.reuseWarning, /approved avatar changed during generation/);
+      assert.equal(calls(), 1);
+    },
+    {
+      generate: async ({ avatar }) => {
+        changeApproval();
+        return dataUrl(avatar);
+      },
+    },
+  );
+});
+test("an approval change during a product-photo try-on returns the paid preview with its original approval", async () => {
+  let changeApproval;
+  await fixture(
+    async ({ store, a, request, input, ca, garmentInput, calls }) => {
+      changeApproval = () => {
+        store.revokeAvatarApproval(a, input.avatarId);
+        approveTestAvatar(store, a, input.avatarId);
+      };
+      const response = await request(
+        "/api/tryon",
+        { ...input, garmentId: undefined, garment: garmentInput.image },
+        ca,
+      );
+      assert.equal(response.status, 200);
+      const result = await response.json();
+      assert.match(result.image, /^data:image\/png;base64,/);
+      assert.equal(result.approvalChanged, true);
+      assert.equal(result.sourceApproval.approvalVersion, 1);
+      assert.match(result.reuseWarning, /Reopen the approved avatar/);
       assert.equal(calls(), 1);
     },
     {
