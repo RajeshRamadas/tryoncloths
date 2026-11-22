@@ -20,7 +20,16 @@ export const MAX_SHOP_ITEMS = 60;
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
 const RESERVED = new Set(["admin", "api", "edit", "forme", "new", "settings", "shop", "www"]);
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
-const settingKeys = ["tagline", "about", "hours", "whatsapp", "showCatalogue", "showPrices"];
+const settingKeys = [
+  "tagline",
+  "about",
+  "hours",
+  "whatsapp",
+  "instagramUrl",
+  "facebookUrl",
+  "showCatalogue",
+  "showPrices",
+];
 
 export function slugify(name) {
   const base = String(name ?? "")
@@ -53,6 +62,44 @@ function whatsappNumber(value) {
     throw fail("Use a WhatsApp number with its country code, for example +91 98765 43210.");
   return result;
 }
+function socialProfile(value, platform) {
+  const label = platform === "instagram" ? "Instagram" : "Facebook";
+  const invalid = () =>
+    fail(`Enter a public ${label} profile or page URL beginning with https://.`);
+  const address = text(value, 500, `a ${label} URL`);
+  if (!address) return "";
+  const url = URL.parse(address);
+  const hosts =
+    platform === "instagram"
+      ? ["instagram.com", "www.instagram.com"]
+      : ["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"];
+  if (
+    !/^https:\/\//i.test(address) ||
+    !url ||
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.port ||
+    !hosts.includes(url.hostname)
+  )
+    throw invalid();
+  const profileId = url.searchParams.get("id");
+  const pathname = url.pathname.replace(/\/$/, "");
+  const origin = `https://www.${platform}.com`;
+  if (platform === "instagram" && /^\/[a-z\d._]{1,30}$/i.test(pathname))
+    return origin + pathname + "/";
+  if (platform === "facebook") {
+    if (pathname === "/profile.php" && /^\d{1,25}$/.test(profileId || ""))
+      return origin + "/profile.php?id=" + profileId;
+    if (
+      (/^\/[a-z\d._-]{1,100}$/i.test(pathname) && !pathname.toLowerCase().endsWith(".php")) ||
+      /^\/p\/[^/]+$/i.test(pathname) ||
+      /^\/(?:people|pages)\/[^/]+\/\d{1,25}$/i.test(pathname)
+    )
+      return origin + pathname;
+  }
+  throw invalid();
+}
 const settings = (json) => {
   let saved = {};
   try {
@@ -70,6 +117,8 @@ const settings = (json) => {
     about: safe((v) => text(v, 1200, "an about section", { lines: true }), saved.about ?? "", ""),
     hours: safe((v) => text(v, 300, "opening hours", { lines: true }), saved.hours ?? "", ""),
     whatsapp: safe(whatsappNumber, saved.whatsapp ?? "", ""),
+    instagramUrl: safe((v) => socialProfile(v, "instagram"), saved.instagramUrl ?? "", ""),
+    facebookUrl: safe((v) => socialProfile(v, "facebook"), saved.facebookUrl ?? "", ""),
     showCatalogue: saved.showCatalogue !== false,
     showPrices: saved.showPrices !== false,
   };
@@ -210,7 +259,7 @@ export class ShopPageStore {
       Object.keys(input).some((k) => ![...settingKeys, "slug", "published", "revision"].includes(k))
     )
       throw fail(
-        "Use the shop page address, publish choice, tagline, about, hours, WhatsApp and catalogue options.",
+        "Use the shop page address, publish choice, tagline, about, hours, WhatsApp, social links and catalogue options.",
       );
     if ((input.slug !== undefined || input.published !== undefined) && role !== "owner")
       this.actor(account, true);
@@ -226,6 +275,8 @@ export class ShopPageStore {
       about: text(value.about, 1200, "an about section", { lines: true }),
       hours: text(value.hours, 300, "opening hours", { lines: true }),
       whatsapp: whatsappNumber(value.whatsapp),
+      instagramUrl: socialProfile(value.instagramUrl, "instagram"),
+      facebookUrl: socialProfile(value.facebookUrl, "facebook"),
       showCatalogue: value.showCatalogue,
       showPrices: value.showPrices,
     };
@@ -383,6 +434,7 @@ const css = [
   "main{max-width:1040px;margin:auto;padding:max(24px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(40px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}@media(min-width:1280px){main{max-width:1200px}}",
   "h2{font-size:22px;font-weight:700;letter-spacing:-.01em;margin:40px 0 12px}p{overflow-wrap:anywhere;white-space:pre-line}a{color:var(--brand)}",
   ".tagline{font-size:18px;color:#3a4641;margin:-4px 0 16px}",
+  ".shop-socials{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.shop-socials a{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid #cbd3ce;border-radius:999px;text-decoration:none;font-weight:600;color:#18211d}.shop-socials a:hover{text-decoration:underline}",
   ".cta{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:12px 24px;border-radius:999px;background:var(--brand);color:var(--brand-ink);text-decoration:none;font-weight:600;box-shadow:0 1px 3px rgb(24 33 29/.12)}",
   ".hero{display:block;width:100%;max-height:60vh;object-fit:cover;border-radius:16px;margin:20px 0}",
   ".gallery,.items{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}@media(max-width:600px){.gallery,.items{gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.item{padding:8px}}",
@@ -418,7 +470,18 @@ export function shopPageHtml({ page, brand, photos, items, slug, preview = false
     page.about ? `<section><h2>About us</h2><p>${escape(page.about)}</p></section>` : "",
     page.hours ? `<section><h2>Opening hours</h2><p>${escape(page.hours)}</p></section>` : "",
   ].join("");
-  const body = `${preview ? '<p class="preview" role="status">Preview: only your store team can see this page until it is published.</p>' : ""}${brandHeader(brand, `${base}/logo`)}${page.tagline ? `<p class="tagline">${escape(page.tagline)}</p>` : ""}${tryAll ? `<a class="cta" href="${escape(tryAll)}"${external(tryAll)}>Book a try-on</a>` : ""}${hero ? photo(hero, "hero") : ""}${info ? `<div class="info">${info}</div>` : ""}${rest.length ? `<h2>Inside our shop</h2><div class="gallery">${rest.map((p) => `<figure>${photo(p)}${p.caption ? `<figcaption>${escape(p.caption)}</figcaption>` : ""}</figure>`).join("")}</div>` : ""}${page.showCatalogue && items.length ? `<h2>In store now</h2><p>See a piece you like? Tap “Try it on” and the store will set up a virtual try-on on your own avatar.</p><div class="items">${items.map(item).join("")}</div>` : ""}${brandContact(brand)}<p class="powered">Virtual try-on by Forme. Try-on images are an approximate visual guide and do not predict size or fit.</p>`;
+  const socialLinks = [
+    ["Instagram", page.instagramUrl],
+    ["Facebook", page.facebookUrl],
+  ]
+    .filter(([, href]) => href)
+    .map(
+      ([label, href]) =>
+        `<a href="${escape(href)}" target="_blank" rel="noopener noreferrer">${label}</a>`,
+    )
+    .join("");
+  const contact = brand.address || brand.phone || brand.mapUrl ? brandContact(brand) : "";
+  const body = `${preview ? '<p class="preview" role="status">Preview: only your store team can see this page until it is published.</p>' : ""}${brandHeader(brand, `${base}/logo`)}${page.tagline ? `<p class="tagline">${escape(page.tagline)}</p>` : ""}${tryAll ? `<a class="cta" href="${escape(tryAll)}"${external(tryAll)}>Book a try-on</a>` : ""}${socialLinks ? `<nav class="shop-socials" aria-label="Social links">${socialLinks}</nav>` : ""}${hero ? photo(hero, "hero") : ""}${info ? `<div class="info">${info}</div>` : ""}${rest.length ? `<h2>Inside our shop</h2><div class="gallery">${rest.map((p) => `<figure>${photo(p)}${p.caption ? `<figcaption>${escape(p.caption)}</figcaption>` : ""}</figure>`).join("")}</div>` : ""}${page.showCatalogue && items.length ? `<h2>In store now</h2><p>See a piece you like? Tap “Try it on” and the store will set up a virtual try-on on your own avatar.</p><div class="items">${items.map(item).join("")}</div>` : ""}${contact}<p class="powered">Virtual try-on by Forme. Try-on images are an approximate visual guide and do not predict size or fit.</p>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(brand.displayName)}</title><meta name="theme-color" content="${brand.primaryColor}"><link rel="manifest" href="${base}/manifest.webmanifest"><link rel="icon" type="image/png" sizes="192x192" href="${base}/icon-192.png"><link rel="apple-touch-icon" href="${base}/icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="${escape(brand.displayName.slice(0, 30))}">${page.tagline ? `<meta name="description" content="${escape(page.tagline)}">` : ""}<meta property="og:title" content="${escape(brand.displayName)}"><style>${css}${brandCss}${shopBrandCss}</style></head><body><main style="--brand:${brand.primaryColor};--brand-ink:${brandInk(brand.primaryColor)}">${body}</main></body></html>`;
 }
 
@@ -440,6 +503,8 @@ export function shopData({ page, brand, photos, items, slug }) {
       address: brand.address || null,
       mapUrl: brand.mapUrl || null,
       whatsapp: page.whatsapp || null,
+      instagramUrl: page.instagramUrl || null,
+      facebookUrl: page.facebookUrl || null,
     },
     tagline: page.tagline,
     about: page.about,

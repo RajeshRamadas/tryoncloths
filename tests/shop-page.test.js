@@ -295,6 +295,67 @@ test("slugs are unique, revisions detect stale editors and suspended stores go o
     assert.equal((await request("/shop/lakshmi-silks", "GET", undefined, "")).status, 404);
   }));
 
+test("each shop publishes only its own valid Instagram and Facebook profiles", async () =>
+  fixture(async ({ request, cb, cm, cs }) => {
+    const endpoint = "/api/shop-page";
+    const settings = await (await request(endpoint)).json();
+    assert.equal(settings.instagramUrl, "");
+    assert.equal(settings.facebookUrl, "");
+
+    for (const links of [
+      { instagramUrl: "http://instagram.com/ourbrand/" },
+      { instagramUrl: "https://instagram.com.example.test/ourbrand/" },
+      { instagramUrl: "https://user:secret@instagram.com/ourbrand/" },
+      { facebookUrl: "https://www.instagram.com/ourbrand/" },
+      { facebookUrl: "https://www.facebook.com/l.php?u=https://example.test" },
+    ])
+      assert.equal((await request(endpoint, "PUT", links)).status, 400);
+
+    const links = {
+      instagramUrl: "https://instagram.com/lakshmi.jewels/?igsh=tracking",
+      facebookUrl: "https://m.facebook.com/profile.php?id=123456789&ref=tracking",
+    };
+    assert.equal((await request(endpoint, "PUT", links, cs)).status, 403);
+    const edited = await request(endpoint, "PUT", { ...links, revision: settings.revision }, cm);
+    assert.equal(edited.status, 200);
+    assert.equal((await request(settings.path, "GET", undefined, "")).status, 404);
+    assert.equal((await request(endpoint, "PUT", { published: true })).status, 200);
+    const other = await request(
+      endpoint,
+      "PUT",
+      {
+        published: true,
+        instagramUrl: "https://www.instagram.com/otherbrand/",
+        facebookUrl: "https://www.facebook.com/p/Other-Brand-100200300/",
+      },
+      cb,
+    );
+    assert.equal(other.status, 200);
+    const otherPath = (await other.json()).path;
+
+    const instagram = "https://www.instagram.com/lakshmi.jewels/";
+    const facebook = "https://www.facebook.com/profile.php?id=123456789";
+    const html = await (await request(settings.path, "GET", undefined, "")).text();
+    assert.ok(html.includes(`href="${instagram}" target="_blank" rel="noopener noreferrer"`));
+    assert.ok(html.includes(`href="${facebook}" target="_blank" rel="noopener noreferrer"`));
+    assert.doesNotMatch(html, /otherbrand|tracking/);
+    const otherHtml = await (await request(otherPath, "GET", undefined, "")).text();
+    assert.match(otherHtml, /instagram\.com\/otherbrand\//);
+    assert.match(otherHtml, /facebook\.com\/p\/Other-Brand-100200300/);
+    assert.doesNotMatch(otherHtml, /class="store-contact"/);
+    assert.doesNotMatch(otherHtml, /lakshmi\.jewels|123456789/);
+    const readPublic = async () =>
+      (await (await request(settings.path + "/data.json", "GET", undefined, "")).json()).store;
+    const published = await readPublic();
+    assert.equal(published.instagramUrl, instagram);
+    assert.equal(published.facebookUrl, facebook);
+
+    assert.equal((await request(endpoint, "PUT", { instagramUrl: "" }, cm)).status, 200);
+    const updated = await readPublic();
+    assert.equal(updated.instagramUrl, null);
+    assert.equal(updated.facebookUrl, facebook);
+  }));
+
 test("photos can be captioned, reordered, made the cover and removed, up to the limit", async () =>
   fixture(async ({ request, store, a }) => {
     const ids = [];
