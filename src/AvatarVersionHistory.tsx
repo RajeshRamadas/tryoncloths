@@ -50,7 +50,7 @@ export default function AvatarVersionHistory({ id, name }: { id: string; name: s
                 <li key={entry.version}>
                   <strong>
                     Version {entry.version}
-                    {entry.current ? " · Active" : ""}
+                    {entry.current ? " · Active" : entry.revokedAt != null ? " · Revoked" : ""}
                   </strong>
                   {entry.name !== name && <p>{entry.name}</p>}
                   <p>
@@ -58,6 +58,9 @@ export default function AvatarVersionHistory({ id, name }: { id: string; name: s
                     {entry.weightKg} kg
                   </p>
                   <p>{new Date(entry.approvedAt).toLocaleString()}</p>
+                  {entry.revokedAt != null && (
+                    <p>Revoked {new Date(entry.revokedAt).toLocaleString()}</p>
+                  )}
                 </li>
               ))}
             </ul>

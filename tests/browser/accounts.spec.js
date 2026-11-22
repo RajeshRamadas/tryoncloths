@@ -161,6 +161,29 @@ test("store accounts save reviewed avatars and reopen them with generation detai
 
     await second.getByRole("button", { name: "Back to avatar", exact: true }).click();
     await second.getByRole("button", { name: "Saved avatars", exact: true }).click();
+    const revokeApproval = second.getByRole("button", {
+      name: "Revoke approval for Customer Anil",
+      exact: true,
+    });
+    second.once("dialog", (dialog) => dialog.dismiss());
+    await revokeApproval.click();
+    await expect(revokeApproval).toBeVisible();
+    second.once("dialog", (dialog) => dialog.accept());
+    await revokeApproval.click();
+    await expect(
+      second.getByText("Approval revoked for Customer Anil.", { exact: true }),
+    ).toBeVisible();
+    await expect(revokeApproval).toHaveCount(0);
+    await expect(
+      second.getByRole("button", { name: "View looks (1) for Customer Anil", exact: true }),
+    ).toBeVisible();
+    await second.getByRole("button", { name: "Version history for Customer Anil" }).click();
+    await expect(history).toContainText("Version 1 · Revoked");
+    await second.getByRole("button", { name: "Close saved avatars" }).click();
+    await expect(second.getByRole("button", { name: "Try clothes", exact: true })).toBeDisabled();
+    await approvePersonalizedAvatar(second);
+    await expect(second.getByRole("button", { name: "Try clothes", exact: true })).toBeEnabled();
+    await second.getByRole("button", { name: "Saved avatars", exact: true }).click();
     await second.getByRole("button", { name: "Regenerate Customer Anil as new version" }).click();
     await expect(second.getByText(/New master version for Customer Anil/)).toBeVisible();
     await expect(second.getByAltText("Customer face photo", { exact: true })).toHaveCount(0);

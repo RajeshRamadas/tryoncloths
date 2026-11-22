@@ -36,6 +36,7 @@ export type AvatarVersion = Pick<AvatarDetails, "name" | "profileId" | "heightCm
   version: number;
   approvedAt: number;
   current: boolean;
+  revokedAt?: number;
 };
 
 export async function listAvatarVersions(

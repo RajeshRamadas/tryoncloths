@@ -758,11 +758,22 @@ export default function App() {
       setError((e as Error).message);
     }
   }
+  function clearSessionApproval() {
+    setApproved(false);
+    setSaveConsent(false);
+    setOutfitOpen(false);
+  }
+  function savedAvatarApprovalRevoked(id: string) {
+    if (id !== avatarId) return;
+    clearSessionApproval();
+    setQualityReviewPassed(false);
+    setReviewAttestation(null);
+    setPortraitFor(null);
+    setSession((version) => version + 1);
+  }
   async function changeCustomerApproval(next: boolean) {
     if (!next) {
-      setApproved(false);
-      setSaveConsent(false);
-      setOutfitOpen(false);
+      clearSessionApproval();
       if (personalized && accountState.account && avatarId) {
         setApprovingAccount(true);
         try {
@@ -989,6 +1000,7 @@ export default function App() {
                 }
                 onUse={useSavedAvatar}
                 onRegenerate={startRegeneration}
+                onApprovalRevoked={savedAvatarApprovalRevoked}
               />
               <span>Already have an avatar? Reopen it here without generating again.</span>
             </div>
