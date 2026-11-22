@@ -118,7 +118,9 @@ test("account avatars remain draft until approved; reuse rejects drafts, revocat
     assert.equal(approved.version, 1);
     assert.deepEqual(duplicate, approved);
     assert.equal(await status(), "approved");
-    assert.equal((await request("/api/looks", "POST", look, owner)).status, 200);
+    const keptLook = await request("/api/looks", "POST", look, owner);
+    assert.equal(keptLook.status, 200);
+    const { id: lookId } = await keptLook.json();
 
     const dbRow = store.db
       .prepare("SELECT approved_at,approved_by,review_policy FROM avatars WHERE account=? AND id=?")
@@ -161,11 +163,40 @@ test("account avatars remain draft until approved; reuse rejects drafts, revocat
       /PNGs are immutable/,
     );
 
-    const revoked = await request(`/api/avatars/${id}/approval`, "DELETE", undefined, owner);
-    assert.equal(revoked.status, 200);
+    const approvalUrl = `/api/avatars/${id}/approval`;
+    assert.equal((await request(approvalUrl, "DELETE")).status, 401);
+    assert.equal((await request(approvalUrl, "DELETE", undefined, foreign)).status, 404);
+    assert.equal(
+      (await request(approvalUrl, "DELETE", undefined, owner, "https://other.example")).status,
+      403,
+    );
+    const revocations = await Promise.all(
+      Array.from({ length: 2 }, () => request(approvalUrl, "DELETE", undefined, owner)),
+    );
+    for (const response of revocations) {
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { id, approvalStatus: "draft" });
+    }
     assert.equal(await status(), "draft");
-    assert.deepEqual((await history()).versions, [{ ...first, current: false }]);
+    const [revokedVersion] = (await history()).versions;
+    assert.ok(revokedVersion.revokedAt >= first.approvedAt);
+    assert.deepEqual(revokedVersion, {
+      ...first,
+      current: false,
+      revokedAt: revokedVersion.revokedAt,
+      revokedBy: identity.user.id,
+    });
+    assert.equal((await request(approvalUrl, "DELETE", undefined, owner)).status, 200);
+    assert.deepEqual((await history()).versions, [revokedVersion]);
     assert.equal((await request("/api/looks", "POST", look, owner)).status, 409);
+    assert.equal(
+      (await request(`/api/looks/${lookId}/image`, "GET", undefined, owner)).status,
+      200,
+    );
+    assert.deepEqual(
+      await (await request(`/api/avatars/${id}/image`, "GET", undefined, owner)).arrayBuffer(),
+      committedImage,
+    );
 
     const reapproved = await request(`/api/avatars/${id}/approval`, "POST", review(), owner);
     assert.equal(reapproved.status, 200);
@@ -191,7 +222,8 @@ test("account avatars remain draft until approved; reuse rejects drafts, revocat
       assert.equal(newest.imageSha256, first.imageSha256);
       assert.equal(previous.name, avatar.name);
       assert.equal(previous.current, false);
-      assert.deepEqual(original, { ...first, current: false });
+      assert.equal(previous.revokedAt, undefined, "a draft save is not an explicit revocation");
+      assert.deepEqual(original, revokedVersion);
     } finally {
       persisted.close();
     }
@@ -203,13 +235,21 @@ test("account avatars remain draft until approved; reuse rejects drafts, revocat
     assert.equal(latest.versions.length, 20);
     assert.equal(latest.nextBefore, 2);
     assert.deepEqual(await history("?before=2"), {
-      versions: [{ ...first, current: false }],
+      versions: [revokedVersion],
       nextBefore: null,
     });
     assert.equal((await request(`/api/avatars/${id}`, "DELETE", undefined, owner)).status, 200);
     assert.equal(
       store.db
         .prepare("SELECT count(*) AS n FROM avatar_versions WHERE account=? AND avatarId=?")
+        .get(identity.id, id).n,
+      0,
+    );
+    assert.equal(
+      store.db
+        .prepare(
+          "SELECT count(*) AS n FROM avatar_approval_revocations WHERE account=? AND avatarId=?",
+        )
         .get(identity.id, id).n,
       0,
     );

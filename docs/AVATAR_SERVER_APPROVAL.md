@@ -13,7 +13,7 @@ This feature makes each saved **store-account avatar** carry a persisted **draft
 3. Complete all six human scores (each 4 or 5), confirm customer permission, confirm the reviewer compared the images, and obtain separate final customer approval.
 4. The authenticated same-origin `POST /api/avatars/:id/approval` validates the complete attestation and marks the **exact account-owned saved avatar** approved. The server returns the approval timestamp and version number. A repeated approval while that version is active returns the same version.
 5. Only approved account avatars can be used to create saved looks, run account-backed clothing adaptation, create jewellery previews and generate portrait/hands views. Both preflight and post-image-processing checks reject a newly revoked or replaced avatar before reuse.
-6. `DELETE /api/avatars/:id/approval` revokes approval. Resaving an avatar resets it to **draft**, including metadata updates; a fresh review is required. Reopening the avatar in the UI also requires the current human approval workflow.
+6. In **Saved avatars**, choose **Revoke approval** to make the avatar a draft and pause new fittings until a fresh review. Staff can still open the saved avatar and its earlier looks. Resaving an avatar also resets it to **draft**, including metadata updates.
 
 The account library shows the state. Previously saved avatars migrate to **draft** (reviewable and downloadable by their owner) rather than being automatically grandfathered in. Users can reopen and approve legacy avatars without a new paid image-generation request.
 
@@ -45,6 +45,11 @@ revisions and identify the active one. Revoking approval or re-saving the avatar
 clears the active version. The next successful review adds a new version with
 the reviewed frame and measurements, generation provenance when available, and
 the SHA-256 of the account PNG that was approved.
+
+`DELETE /api/avatars/:id/approval` records one revocation per approval, with the
+authenticated staff member and time. **Version history** marks that revision as
+revoked. A retry preserves the original record. Resaving metadata closes the
+active approval through the draft flow, and the history still shows the prior review.
 
 Versions share the account PNG. Once an approval version exists, the database
 guards its PNG and historical records against updates. Deleting the avatar or

@@ -16,6 +16,7 @@ import {
 import {
   listAccountAvatars,
   accountAvatarImage,
+  revokeAccountAvatarApproval,
   deleteAccountAvatar,
   listLooks,
   lookImage,
@@ -29,8 +30,15 @@ type Props = {
   cloud?: boolean;
   onUse: (image: string, details: AvatarDetails) => void;
   onRegenerate: (item: SavedAvatar) => Promise<void>;
+  onApprovalRevoked: (id: string) => void;
 };
-export default function SavedAvatars({ disabled, cloud = false, onUse, onRegenerate }: Props) {
+export default function SavedAvatars({
+  disabled,
+  cloud = false,
+  onUse,
+  onRegenerate,
+  onApprovalRevoked,
+}: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const [items, setItems] = useState<SavedAvatar[]>([]);
@@ -56,6 +64,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [revocationNotice, setRevocationNotice] = useState("");
   const [profileId, setProfileId] = useState("regular");
   const [templateTone, setTemplateTone] = useState(DEFAULT_TEMPLATE_TONE);
   const [height, setHeight] = useState("175");
@@ -67,6 +76,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
     setLooks([]);
     setLocalView(false);
     setMasterFilter(null);
+    setRevocationNotice("");
     setItems([]);
     setBusy(true);
     setError("");
@@ -107,6 +117,33 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
       setItems(await (cloud && !localView ? listAccountAvatars() : listAvatars()));
       setConfirmDelete(null);
       if (looksFor?.id === id) setLooksFor(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function revokeApproval(item: SavedAvatar) {
+    if (
+      !window.confirm(
+        `Revoke approval for ${item.name}? The avatar and saved looks stay in the library. New fittings require a fresh review.`,
+      )
+    )
+      return;
+    setBusy(true);
+    setError("");
+    setRevocationNotice("");
+    try {
+      await revokeAccountAvatarApproval(item.id);
+      setItems((previous) =>
+        previous.map((avatar) =>
+          avatar.id === item.id
+            ? { ...avatar, approvalStatus: "draft", approvedVersion: null }
+            : avatar,
+        ),
+      );
+      onApprovalRevoked(item.id);
+      setRevocationNotice(`Approval revoked for ${item.name}.`);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -266,6 +303,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
               setConfirmDelete(null);
               setLooksFor(null);
               setMasterFilter(null);
+              setRevocationNotice("");
               try {
                 setItems(await (localView ? listAccountAvatars() : listAvatars()));
                 setLocalView(!localView);
@@ -285,6 +323,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
             avatar for reuse to copy it to your store account.
           </p>
         )}
+        {revocationNotice && <p role="status">{revocationNotice}</p>}
         {busy && <p role="status">Opening library…</p>}
         {masterFilter && (
           <button
@@ -298,7 +337,7 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
         )}
         {masterFilter && visibleItems.length > 1 && (
           <AvatarMasterComparison
-            key={visibleItems.map(({ id }) => id).join(":")}
+            key={visibleItems.map(({ id, approvalStatus }) => id + "-" + approvalStatus).join(":")}
             versions={visibleItems}
             disabled={busy}
             onUse={(version) => void use(version)}
@@ -358,6 +397,17 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
                         Regenerate {item.name} as new version
                       </button>
                     )}
+                    {cloud && !localView && item.approvalStatus === "approved" && (
+                      <button
+                        type="button"
+                        className="button secondary"
+                        disabled={busy}
+                        aria-label={`Revoke approval for ${item.name}`}
+                        onClick={() => void revokeApproval(item)}
+                      >
+                        Revoke approval
+                      </button>
+                    )}
                     {cloud &&
                       !localView &&
                       item.masterId &&
@@ -384,7 +434,11 @@ export default function SavedAvatars({ disabled, cloud = false, onUse, onRegener
                       </button>
                     )}
                     {cloud && !localView && item.latestVersion != null && (
-                      <AvatarVersionHistory id={item.id} name={item.name} />
+                      <AvatarVersionHistory
+                        key={item.approvalStatus}
+                        id={item.id}
+                        name={item.name}
+                      />
                     )}
                     {cloud && !localView && viewsAvailable && !busy && (
                       <a

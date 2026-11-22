@@ -163,6 +163,15 @@ export class AccountStore {
           PRIMARY KEY(account,avatarId,version),
           FOREIGN KEY(account,avatarId) REFERENCES avatars(account,id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS avatar_approval_revocations (
+          account TEXT NOT NULL,
+          avatarId TEXT NOT NULL,
+          version INTEGER NOT NULL,
+          revoked_at INTEGER NOT NULL,
+          revoked_by TEXT NOT NULL,
+          PRIMARY KEY(account,avatarId,version),
+          FOREIGN KEY(account,avatarId) REFERENCES avatars(account,id) ON DELETE CASCADE
+        );
         CREATE TRIGGER IF NOT EXISTS avatar_versions_immutable BEFORE UPDATE ON avatar_versions
         BEGIN SELECT RAISE(ABORT,'Approved avatar versions are immutable'); END;
         CREATE TRIGGER IF NOT EXISTS avatar_version_image_immutable BEFORE UPDATE OF image ON avatars
@@ -563,14 +572,27 @@ export class AccountStore {
     });
   }
   revokeAvatarApproval(account, id) {
-    const changed = this.db
-      .prepare(
-        "UPDATE avatars SET approved_at=NULL,approved_by=NULL,review_policy=0,approved_version=NULL WHERE account=? AND id=?",
-      )
-      .run(account.id, id);
-    if (!changed.changes) throw error("Avatar not found.", 404);
-    this.views?.invalidate(account.id, id);
-    return { id, approvalStatus: "draft" };
+    return transaction(this.db, () => {
+      const avatar = this.db
+        .prepare("SELECT approved_at,approved_version FROM avatars WHERE account=? AND id=?")
+        .get(account.id, id);
+      if (!avatar) throw error("Avatar not found.", 404);
+      if (avatar.approved_at !== null) {
+        // Version zero identifies an approval from before version history.
+        this.db
+          .prepare(
+            "INSERT INTO avatar_approval_revocations(account,avatarId,version,revoked_at,revoked_by) VALUES(?,?,?,?,?)",
+          )
+          .run(account.id, id, avatar.approved_version ?? 0, Date.now(), account.user.id);
+        this.db
+          .prepare(
+            "UPDATE avatars SET approved_at=NULL,approved_by=NULL,review_policy=0,approved_version=NULL WHERE account=? AND id=?",
+          )
+          .run(account.id, id);
+        this.views?.invalidate(account.id, id);
+      }
+      return { id, approvalStatus: "draft" };
+    });
   }
   requireApprovedAvatar(account, id, expectedApproval) {
     const row =
@@ -623,17 +645,22 @@ export class AccountStore {
     const rows = this.db
       .prepare(
         `SELECT v.version,v.image_sha256 AS imageSha256,v.metadata,v.approved_at AS approvedAt,
-        v.approved_by AS approvedBy,v.review_policy AS reviewPolicy,
+          v.approved_by AS approvedBy,v.review_policy AS reviewPolicy,
+          r.revoked_at AS revokedAt,r.revoked_by AS revokedBy,
         COALESCE(a.approved_version=v.version AND a.review_policy=?,0) AS current
         FROM avatar_versions v JOIN avatars a ON a.account=v.account AND a.id=v.avatarId
+        LEFT JOIN avatar_approval_revocations r ON r.account=v.account AND r.avatarId=v.avatarId AND r.version=v.version
         WHERE v.account=? AND v.avatarId=? AND v.version<? ORDER BY v.version DESC LIMIT ?`,
       )
       .all(AVATAR_REVIEW_POLICY_VERSION, account.id, id, upperBound, avatarVersionsPageSize + 1);
-    const versions = rows.slice(0, avatarVersionsPageSize).map(({ metadata, current, ...row }) => ({
-      ...row,
-      ...JSON.parse(metadata),
-      current: Boolean(current),
-    }));
+    const versions = rows
+      .slice(0, avatarVersionsPageSize)
+      .map(({ metadata, current, revokedAt, revokedBy, ...row }) => ({
+        ...row,
+        ...JSON.parse(metadata),
+        current: Boolean(current),
+        ...(revokedAt !== null ? { revokedAt, revokedBy } : {}),
+      }));
     return {
       versions,
       nextBefore: rows.length > avatarVersionsPageSize ? versions.at(-1).version : null,
