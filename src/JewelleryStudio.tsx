@@ -124,7 +124,10 @@ export default function JewelleryStudio() {
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const fittingSession = useRef(crypto.randomUUID());
+  const catalogueVersion = useRef(0);
   const preview = useRef<HTMLDivElement>(null);
+  const picker = useRef<HTMLElement>(null);
+  const viewSetup = useRef<HTMLElement>(null);
   const alive = useRef(true),
     epoch = useRef(0),
     controller = useRef<AbortController | null>(null),
@@ -324,15 +327,16 @@ export default function JewelleryStudio() {
   useEffect(() => {
     if (!enabled || !role) return;
     let mounted = true;
+    const version = ++catalogueVersion.current;
     void jewelleryApi("/api/catalogue?category=jewellery&limit=12")
       .then((d) => {
-        if (mounted) {
+        if (mounted && version === catalogueVersion.current) {
           setItems(d.garments);
           setTotal(d.total);
         }
       })
       .catch((e) => {
-        if (mounted) setError(e.message);
+        if (mounted && version === catalogueVersion.current) setError(e.message);
       });
     return () => {
       mounted = false;
@@ -408,6 +412,7 @@ export default function JewelleryStudio() {
       const nextView = jewelleryView(next.type, next.attributes.lengthCm) as View;
       if (nextView !== view) {
         setView(nextView);
+        setPreparing(false);
         setReviewed(false);
         setZoom(1);
       }
@@ -422,9 +427,25 @@ export default function JewelleryStudio() {
         abort.signal,
       );
       if (valid(version)) {
-        applyDraft(savedDraft(result.garment));
+        const chosen = savedDraft(result.garment);
+        const requiredView = jewelleryView(
+          result.garment.garmentType,
+          chosen.attributes.lengthCm,
+        ) as View;
+        const free = overlayEnabled && chosen.item?.hasOverlay;
+        applyDraft(chosen);
+        if (free) setMode("overlay");
+        else if (available) setMode("ai");
         setPhotos([]);
-        setNotice("Saved jewellery selected. No AI credit used.");
+        setNotice(
+          roots[requiredView]
+            ? `${chosen.name} selected for the ${viewNames[requiredView].toLowerCase()} view.`
+            : `Prepare the ${viewNames[requiredView].toLowerCase()} view to fit ${chosen.name}.`,
+        );
+        if (!roots[requiredView] && requiredView !== "full")
+          requestAnimationFrame(() => {
+            if (valid(version)) viewSetup.current?.scrollIntoView({ block: "start" });
+          });
       }
     } catch (e) {
       if (valid(version)) setError((e as Error).message);
@@ -432,14 +453,15 @@ export default function JewelleryStudio() {
       finish(version);
     }
   }
-  async function browse(page = 0) {
+  async function browse(page = 0, { type = filterType, selectedMetal = metal } = {}) {
+    catalogueVersion.current++;
     const { version, abort } = begin("Searching jewellery");
     try {
       const q = new URLSearchParams({
           category: "jewellery",
           search,
-          type: filterType,
-          metal,
+          type,
+          metal: selectedMetal,
           stock: "available",
           offset: String(page),
           limit: "12",
@@ -455,6 +477,14 @@ export default function JewelleryStudio() {
     } finally {
       finish(version);
     }
+  }
+  function browsePieces() {
+    if (source !== "saved") {
+      setSource("saved");
+      void browse(0);
+    }
+    picker.current?.focus({ preventScroll: true });
+    picker.current?.scrollIntoView({ block: "start" });
   }
   async function readLink(force = false) {
     if (!url.trim()) return;
@@ -485,6 +515,7 @@ export default function JewelleryStudio() {
           item: null,
           url: data.url,
         });
+        if (available) setMode("ai");
       }
     } catch (e) {
       if (valid(version)) setError((e as Error).message);
@@ -1031,7 +1062,7 @@ export default function JewelleryStudio() {
       </nav>
       <span className="eyebrow">YOUR JEWELLERY STUDIO</span>
       <h1>Try jewellery.</h1>
-      <p>Choose a piece for your saved avatar. Keep the looks you love.</p>
+      <p>Choose a piece to open the fitting view it needs.</p>
       {enabled === null && <p role="status">Opening jewellery studio…</p>}
       {enabled === false && <p>Jewellery try-on is not enabled on this studio.</p>}
       {error && (
@@ -1042,17 +1073,6 @@ export default function JewelleryStudio() {
       {notice && <p role="status">{notice}</p>}
       {enabled && role && (
         <>
-          <ol className="fitting-guide" aria-label="Jewellery fitting steps">
-            <li>
-              <span>1</span> Choose a view
-            </li>
-            <li>
-              <span>2</span> Add jewellery
-            </li>
-            <li>
-              <span>3</span> Review & save
-            </li>
-          </ol>
           <label>
             Saved customer avatar
             <select
@@ -1074,6 +1094,14 @@ export default function JewelleryStudio() {
           {!avatars.length && <p>Save a full-body customer avatar from Forme first.</p>}
           {selected && (
             <>
+              <button
+                type="button"
+                className="button secondary jewellery-browse"
+                disabled={loading || !!busy}
+                onClick={browsePieces}
+              >
+                Browse pieces
+              </button>
               <div className="outfit-tabs" role="group" aria-label="Jewellery view">
                 {(["portrait", "hands", "full"] as View[]).map((v) => (
                   <button
@@ -1193,6 +1221,7 @@ export default function JewelleryStudio() {
                   {image && (
                     <label className="consent">
                       <input
+                        id="jewellery-view-review"
                         type="checkbox"
                         checked={reviewed}
                         disabled={loading || !!busy}
@@ -1233,6 +1262,14 @@ export default function JewelleryStudio() {
                         ))}
                       </ol>
                       <button
+                        type="button"
+                        className="button secondary"
+                        disabled={loading || !!busy}
+                        onClick={browsePieces}
+                      >
+                        Try another piece
+                      </button>
+                      <button
                         className="button secondary"
                         disabled={loading || !!busy || !!current?.baseLookId}
                         onClick={() => {
@@ -1264,7 +1301,11 @@ export default function JewelleryStudio() {
                 </section>
                 <div className="jewellery-controls">
                   {view !== "full" && (
-                    <section>
+                    <section
+                      id="jewellery-view-setup"
+                      className="jewellery-view-setup"
+                      ref={viewSetup}
+                    >
                       <h2>
                         {roots[view]
                           ? "Saved " + viewNames[view].toLowerCase() + " reference"
@@ -1303,14 +1344,23 @@ export default function JewelleryStudio() {
                             setPreparing(false);
                             setReviewed(false);
                             clearReview();
-                            setNotice("Approved view ready. Select a jewellery item to begin.");
+                            setNotice(
+                              draft.image
+                                ? "Approved view ready. Review it to fit your selected piece."
+                                : "Approved view ready. Browse pieces to start fitting.",
+                            );
                           }}
                         />
                       )}
                     </section>
                   )}
-                  <section>
-                    <h2>
+                  <section
+                    className="jewellery-picker"
+                    ref={picker}
+                    tabIndex={-1}
+                    aria-labelledby="jewellery-picker-title"
+                  >
+                    <h2 id="jewellery-picker-title">
                       <Gem size={20} /> Choose jewellery
                     </h2>
                     <div
@@ -1361,7 +1411,10 @@ export default function JewelleryStudio() {
                             aria-label="Filter jewellery type"
                             value={filterType}
                             disabled={loading || !!busy}
-                            onChange={(e) => setFilterType(e.target.value)}
+                            onChange={(e) => {
+                              setFilterType(e.target.value);
+                              void browse(0, { type: e.target.value });
+                            }}
                           >
                             <option value="all">All types</option>
                             {jewelleryChoices.map(([id, label]) => (
@@ -1377,7 +1430,10 @@ export default function JewelleryStudio() {
                             aria-label="Filter metal"
                             value={metal}
                             disabled={loading || !!busy}
-                            onChange={(e) => setMetal(e.target.value)}
+                            onChange={(e) => {
+                              setMetal(e.target.value);
+                              void browse(0, { selectedMetal: e.target.value });
+                            }}
                           >
                             <option value="all">All metals</option>
                             {jewelleryMetals.map(([id, label]) => (
@@ -1402,6 +1458,7 @@ export default function JewelleryStudio() {
                           >
                             <img src={i.thumbnail} alt="" />
                             <strong>{i.name}</strong>
+                            {overlayEnabled && i.hasOverlay && <small>Free overlay</small>}
                             <small>
                               {jewelleryMetals.find(([id]) => id === i.attributes.metal)?.[1]}{" "}
                               {i.attributes.purity || ""}
@@ -1530,6 +1587,20 @@ export default function JewelleryStudio() {
                   {draft.image && (
                     <section>
                       <h2>Fit this piece</h2>
+                      {!image && !loading && view !== "full" && (
+                        <p>
+                          <a href="#jewellery-view-setup">
+                            Prepare the {viewNames[view].toLowerCase()} view
+                          </a>{" "}
+                          to fit this piece.
+                        </p>
+                      )}
+                      {image && !reviewed && (
+                        <p>
+                          <a href="#jewellery-view-review">Review the avatar view</a> to start
+                          fitting this piece.
+                        </p>
+                      )}
                       <div className="outfit-tabs" role="group" aria-label="Jewellery fitting mode">
                         <button
                           aria-pressed={mode === "ai"}

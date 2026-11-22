@@ -169,7 +169,7 @@ test("public Gemini website generates with independent photos without a store co
     expect(calls[0].profileId).toBe("broad");
     expect(calls[0].face.equals(calls[0].body)).toBe(false);
     expect(calls[0].avatar.equals(calls[0].body)).toBe(false);
-    await page.getByRole("button", { name: "Review avatar" }).click();
+    await expect(page.getByRole("heading", { name: "Ready for review" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Download avatar" })).toBeDisabled();
     await expect(page.getByAltText("Original customer face for skin-tone review")).toBeVisible();
     await expect(page.getByAltText("Original customer body for skin-tone review")).toBeVisible();

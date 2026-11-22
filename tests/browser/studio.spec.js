@@ -167,7 +167,7 @@ test("personalization is explicit, generates only on request, and approval reset
     page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
   ).toBeVisible();
   expect(calls).toBe(1);
-  await page.getByRole("button", { name: "Review avatar" }).click();
+  await expect(page.getByRole("heading", { name: "Ready for review" })).toBeVisible();
   await expect(
     page.getByText(/Automated face screening flagged a possible identity mismatch/),
   ).toBeVisible();

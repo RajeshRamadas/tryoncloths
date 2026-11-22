@@ -6,6 +6,7 @@ import os from "node:os";
 import sharp from "sharp";
 import { AccountStore } from "../helpers/pilot-accounts.js";
 import { createApp, standardAvatar } from "../../server/app.js";
+import { saveOverlayAsset } from "../../server/jewellery-overlay.js";
 import { customerPhotos } from "../helpers/customer-photos.js";
 
 const face = await readFile(customerPhotos[0].face);
@@ -99,7 +100,7 @@ async function saveAvatar(page, { portraitWithAvatar }, run) {
       .getByRole("checkbox", { name: /The customer agrees to send their face photo/ })
       .check();
     await page.getByRole("button", { name: "Generate customer avatar", exact: true }).click();
-    await page.getByRole("button", { name: "Review avatar", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Ready for review" })).toBeVisible();
     await approvePersonalizedAvatar(page);
     await page.getByLabel("Avatar name", { exact: true }).fill("Customer P");
     await page
@@ -169,5 +170,109 @@ test("with the store setting off, staff can still start the portrait from the sa
     await panel.getByRole("button", { name: "Not now" }).click();
     await expect(panel).toHaveCount(0);
     expect(faces).toHaveLength(0);
+  });
+});
+
+test("a new avatar opens for review and can try shoes and two accessories from the same fitting", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await saveAvatar(page, { portraitWithAvatar: false }, async ({ store, owner, faces }) => {
+    for (const [garmentType, name, anchor, radius] of [
+      ["ring", "Gold ring", "finger", 55],
+      ["bangles", "Gold bangles", "wrist", 85],
+    ]) {
+      const png = await sharp(
+        Buffer.from(
+          `<svg width="240" height="240"><circle cx="120" cy="120" r="${radius}" fill="none" stroke="#b58b41" stroke-width="17"/></svg>`,
+        ),
+      )
+        .png()
+        .toBuffer();
+      const image = "data:image/png;base64," + png.toString("base64");
+      const { garment } = await store.garments.save(
+        owner,
+        {
+          category: "jewellery",
+          garmentType,
+          name,
+          image,
+          attributes: { metal: "yellow_gold" },
+        },
+        { jewelleryEnabled: true },
+      );
+      await saveOverlayAsset(store, owner, garment.id, {
+        overlayPng: image,
+        overlayAnchor: anchor,
+      });
+    }
+    const balance = store.billing.balance(owner.org);
+    const paid = [];
+    page.on("request", (r) => {
+      if (
+        ["/api/personalize", "/api/tryon", "/api/jewellery/tryon"].includes(
+          new URL(r.url()).pathname,
+        )
+      )
+        paid.push(r.url());
+    });
+    await page.getByRole("button", { name: "Try shoes", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Try shoes.", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Shoes", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    const outfit = page.getByRole("img", { name: "Avatar wearing the selected outfit" });
+    const startingImage = await outfit.getAttribute("src");
+    await page.getByRole("button", { name: "White sneakers Sample" }).click();
+    await expect(outfit).not.toHaveAttribute("src", startingImage);
+    await expect(outfit).toBeVisible();
+    await page.getByRole("button", { name: "Back to avatar", exact: true }).click();
+    await page.getByRole("button", { name: "Jewellery", exact: true }).click();
+    await expect(page.getByLabel("Saved customer avatar", { exact: true })).toHaveValue(
+      store.list(owner)[0].id,
+    );
+    await page.getByRole("button", { name: "Browse pieces", exact: true }).click();
+    const picker = page.getByRole("region", { name: "Choose jewellery", exact: true });
+    await expect(picker).toBeFocused();
+    await picker.getByLabel("Filter jewellery type", { exact: true }).selectOption("ring");
+    await expect(picker.getByRole("button", { name: /^Gold bangles/ })).toHaveCount(0);
+    await picker.getByRole("button", { name: /^Gold ring/ }).click();
+    await expect(page.getByRole("button", { name: "Hands view", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await page.getByRole("button", { name: "Prepare sample hands — free", exact: true }).click();
+    await page.getByRole("button", { name: "Preview sample hands — free", exact: true }).click();
+    await page.getByLabel("The customer reviewed the sample hands, tone and proportions.").check();
+    await page
+      .getByLabel(
+        "The customer agrees to save this approved view with this avatar in the store account.",
+      )
+      .check();
+    await page.getByRole("button", { name: "Approve and save view", exact: true }).click();
+    const review = page.getByLabel(
+      "I have checked the customer, complexion, proportions and jewellery placement in this preview.",
+    );
+    await expect(page.getByRole("button", { name: "Overlay · free", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await review.check();
+    await page.getByRole("button", { name: "Preview on avatar — free", exact: true }).click();
+    await expect(page.getByText(/^Gold ring · ring/)).toBeVisible({ timeout: 15_000 });
+
+    await page.getByRole("button", { name: "Try another piece", exact: true }).click();
+    await expect(picker).toBeFocused();
+    await picker.getByLabel("Filter jewellery type", { exact: true }).selectOption("bangles");
+    await picker.getByRole("button", { name: /^Gold bangles/ }).click();
+    await review.check();
+    await page.getByRole("button", { name: "Preview on avatar — free", exact: true }).click();
+    await expect(page.getByText(/^Gold bangles · bangles/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/^Gold ring · ring/)).toBeVisible();
+    expect(paid).toHaveLength(0);
+    expect(faces).toHaveLength(0);
+    expect(store.billing.balance(owner.org)).toBe(balance);
   });
 });

@@ -178,7 +178,7 @@ test("imported clothes follow a generated avatar whose body drifted from the tem
     .getByRole("checkbox", { name: /The customer agrees to send their face photo/ })
     .check();
   await page.getByRole("button", { name: "Generate customer avatar", exact: true }).click();
-  await page.getByRole("button", { name: "Review avatar", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Ready for review" })).toBeVisible();
   await approvePersonalizedAvatar(page);
   await page.getByRole("button", { name: "Try clothes" }).click();
   const tee = await sharp(
@@ -373,7 +373,7 @@ test("customer outfit reuses the approved generated image without another provid
   await expect(
     page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Review avatar", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Ready for review" })).toBeVisible();
   await approvePersonalizedAvatar(page);
   await page.getByRole("button", { name: "Try clothes" }).click();
   await page.getByRole("button", { name: "Cream T-shirt Sample" }).click();

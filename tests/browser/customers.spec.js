@@ -95,7 +95,7 @@ test("customer mobile lookup, generated avatar grouping, reopen and profile eras
     await expect(
       page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Review avatar" }).click();
+    await expect(page.getByRole("heading", { name: "Ready for review" })).toBeVisible();
     expect(store.list(owner)).toHaveLength(0);
     await approvePersonalizedAvatar(page);
     await page

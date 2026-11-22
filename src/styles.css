@@ -1953,9 +1953,6 @@ dialog::backdrop {
 [hidden] {
   display: none !important;
 }
-.try-clothes-button {
-  margin-top: 12px;
-}
 .outfit-studio {
   max-width: 1260px;
   margin: auto;
@@ -2841,30 +2838,6 @@ dialog::backdrop {
 #outfit-result {
   scroll-margin-top: 70px;
 }
-.fitting-guide {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding: 0;
-  margin: 24px 0;
-  list-style: none;
-  color: var(--brand-700);
-  font-size: 13px;
-}
-.fitting-guide li {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.fitting-guide li span {
-  display: grid;
-  place-items: center;
-  width: 25px;
-  height: 25px;
-  background: var(--brand-100);
-  border-radius: 50%;
-  font-weight: 600;
-}
 .jewellery-source {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 18px 0;
@@ -2890,6 +2863,14 @@ dialog::backdrop {
 .jewellery-view-help {
   font-size: 13px;
   color: var(--gray-500);
+}
+.jewellery-browse {
+  margin: 8px 0 12px;
+}
+.jewellery-picker,
+.jewellery-view-setup,
+#jewellery-view-review {
+  scroll-margin-block-start: 76px;
 }
 @media (max-width: 750px) {
   .store-account {
@@ -2939,13 +2920,6 @@ dialog::backdrop {
     text-decoration: none;
     color: var(--brand-700);
     font-size: 13px;
-  }
-  .fitting-guide {
-    gap: 10px;
-    font-size: 13px;
-  }
-  .fitting-guide li {
-    gap: 5px;
   }
 }
 
@@ -4143,6 +4117,12 @@ dialog::backdrop {
 }
 
 /* Jewellery keeps its own canvases; clothing layout and crop rules stay intact. */
+.fitting-next {
+  margin-top: 18px;
+}
+.fitting-next h3 {
+  margin: 0 0 10px;
+}
 .fitting-room-actions {
   display: flex;
   gap: 10px;
@@ -4151,14 +4131,6 @@ dialog::backdrop {
 .fitting-room-actions > button {
   flex: 1;
   min-width: 130px;
-}
-/* Trying on is the main next step; downloading a PNG is a secondary option below it. */
-.fitting-room-actions {
-  margin-top: 16px;
-}
-.fitting-room-actions .try-clothes-button {
-  flex: 2 1 200px;
-  margin-top: 0;
   min-height: 44px;
 }
 .frame-summary {

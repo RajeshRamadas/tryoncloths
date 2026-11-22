@@ -9,6 +9,13 @@ hands can be reused.
 
 ## Staff workflow
 
+After customer avatar generation, Forme opens the review so the customer can
+approve the result before fitting. Choose **Try shoes** to open footwear in
+the clothing studio, or save the approved avatar and choose **Jewellery**.
+In the jewellery studio, **Browse pieces** takes you to the catalogue. Selecting
+a piece opens the view it needs, such as Hands for rings or bangles. If that
+view needs preparation, the studio shows how to prepare it.
+
 ### Upload and preview from the studio
 
 1. Open an approved avatar view and choose **Jewellery → Upload photo**. Owners
@@ -38,10 +45,12 @@ you adjust background removal.
    and 2 MB. The server checks the decoded image for visible content and genuine
    transparency, trims transparent margins and removes metadata. A solid
    background or empty image is rejected. Upload one earring, rather than a pair.
-3. Open and approve a saved avatar, choose **Jewellery**, select its approved
-   portrait/hands/full-body view and a saved product with a cut-out.
-4. Select **Overlay · free**, review the starting view, and choose **Load overlay
-   placement**. Use a close-up such as **Zoom to left ear** or **Zoom to right wrist**
+3. Open and approve a saved avatar, choose **Jewellery**, then select a saved
+   product with a cut-out. The studio selects **Overlay · free** and opens the
+   view for that piece.
+4. Review the starting view and choose **Preview on avatar — free** for automatic
+   placement or **Load overlay placement** for manual adjustments.
+   Use a close-up such as **Zoom to left ear** or **Zoom to right wrist**
    to inspect the cut-out on the avatar, or vary **View zoom** up to 6×. These controls
    magnify the view. **Overlay scale** resizes the product itself. Drag a piece,
    pinch with two fingers to resize/rotate it, or use **Set attachment point** to
@@ -51,7 +60,8 @@ you adjust background removal.
 5. Choose **Apply overlay — free**, review the composite and save it with customer
    storage agreement. The applied look offers the same area shortcuts during
    the fitting session. Undo removes the latest addition; reset restores the saved
-   view. Add more pieces to the reviewed result in the same way.
+   view. **Try another piece** returns to the catalogue and keeps the current
+   preview. Review the preview before adding the next piece.
 6. Download a full-resolution PNG or share the saved look. Both carry **Overlay
    preview**. Reopen from the avatar’s saved looks without generating again.
 
