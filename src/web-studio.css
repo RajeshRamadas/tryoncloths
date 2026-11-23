@@ -250,7 +250,7 @@
     border-top: 1px solid var(--gray-200);
   }
 }
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .web-app .page-heading,
   .web-app .studio-workflow {
     align-items: stretch;
@@ -289,6 +289,13 @@
   }
   .web-app .studio-preview-jump {
     align-self: flex-start;
+  }
+  .web-app .studio-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .web-app .profiles-column {
+    grid-column: auto;
+    display: block;
   }
   .web-app .customer-card {
     padding: 18px;

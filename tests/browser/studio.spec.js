@@ -108,6 +108,12 @@ test("invalid input blocks continuation and dialogs work on a narrow screen", as
   await page.getByRole("button", { name: "Expand avatar preview" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("button", { name: "Close dialog" }).click();
+  for (const width of [320, 601, 768]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  }
 });
 
 test("personalization is explicit, generates only on request, and approval resets after changes", async ({
