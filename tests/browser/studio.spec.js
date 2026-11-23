@@ -9,7 +9,7 @@ test("sample workflow matches, allows correction, reviews and exports the select
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "A great look starts here." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Avatar studio" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Select Regular profile/ })).toHaveAttribute(
     "aria-pressed",
     "true",
@@ -86,6 +86,16 @@ test("photos require consent, can be removed, and are cleared in a new session",
 test("invalid input blocks continuation and dialogs work on a narrow screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
+  const steps = page.getByRole("navigation", { name: "Avatar creation steps" });
+  await expect(steps.getByText("Match & personalize")).toBeVisible();
+  await expect(steps.getByRole("button", { name: "Customer details" })).toHaveAttribute(
+    "aria-current",
+    "step",
+  );
+  await page.getByRole("link", { name: "View preview", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Avatar preview" })).toBeInViewport();
+  await page.getByRole("link", { name: "Back to avatar steps" }).click();
+  await expect(steps).toBeInViewport();
   await page.getByRole("spinbutton", { name: "Height in centimeters" }).fill("0");
   await expect(page.getByRole("button", { name: "Continue to match" })).toBeDisabled();
   await page.getByRole("button", { name: "How it works" }).click();

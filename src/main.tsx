@@ -17,12 +17,14 @@ import ToolHeader from "./ToolHeader";
 import InviteAcceptance from "./InviteAcceptance";
 import Billing from "./Billing";
 import "./styles.css";
+import "./web-studio.css";
 import { isNative } from "./native";
 
 const CompleteLook = React.lazy(() => import("./CompleteLook"));
 const JewelleryStudio = React.lazy(() => import("./JewelleryStudio"));
 
 document.documentElement.classList.toggle("native-app", isNative);
+document.documentElement.classList.toggle("web-app", !isNative);
 
 // Staff pages reached from Store tools (and the try-on studios) share one header.
 const toolPages = new Set([
