@@ -24,6 +24,7 @@ export default function AvatarQualityReview({
   profileId,
   facePhoto,
   bodyPhoto,
+  customHairstyle = false,
   onCompleteChange,
 }: {
   disabled?: boolean;
@@ -31,6 +32,7 @@ export default function AvatarQualityReview({
   profileId: string;
   facePhoto: string | null;
   bodyPhoto: string | null;
+  customHairstyle?: boolean;
   onCompleteChange: (complete: boolean, review?: AvatarReviewAttestation) => void;
 }) {
   const id = useId();
@@ -167,7 +169,11 @@ export default function AvatarQualityReview({
       <div className="avatar-quality-grid">
         {AVATAR_REVIEW_CRITERIA.map((criterion) => (
           <label className="avatar-quality-row" key={criterion} htmlFor={id + criterion}>
-            <span>{labels[criterion]}</span>
+            <span>
+              {criterion === "faceLikeness" && customHairstyle
+                ? "Face resembles the customer and hair matches the requested style"
+                : labels[criterion]}
+            </span>
             <select
               id={id + criterion}
               value={scores[criterion] ?? 0}

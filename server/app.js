@@ -29,6 +29,7 @@ import {
   DEFAULT_TEMPLATE_TONE,
 } from "../src/profiles.js";
 import { assessPhotoClarity } from "../src/photo-clarity.js";
+import { avatarHairstyles } from "../src/avatar-hairstyles.js";
 import { ProviderError, providerErrorDetails } from "./provider-errors.js";
 import {
   parseAvatarIdentityMax,
@@ -271,11 +272,13 @@ export function createApp({
     }
     next();
   });
-  // Two <=5 MB photos, base64-encoded, plus small metadata. Each is checked below.
+  // Avatar generation accepts two required photos and one optional hairstyle photo.
+  // Each is capped at 5 MB before base64 encoding.
   app.use("/api/account", express.json({ limit: "4kb" }));
   app.use("/api/branding", express.json({ limit: "750kb" }));
   app.use("/api/shopper-settings", express.json({ limit: "4kb" }));
   app.use("/api/shopify-shopper", express.json({ limit: "4kb" }));
+  app.use("/api/personalize", express.json({ limit: "21mb" }));
   app.use(express.json({ limit: "15mb" }));
   const staffGenerate = (fn, input) =>
     accountStore?.imageSlots
@@ -346,6 +349,7 @@ export function createApp({
         jewelleryEnabled && accountStore && provider === "gemini" && apiKey,
       ),
       personalizationAvailable: Boolean(apiKey),
+      avatarHairstylesAvailable: Boolean(apiKey),
       avatarIdentityScreenAvailable: Boolean(identityScreenEnabled && apiKey),
       avatarIdentityMode: identityMode,
       provider,
@@ -421,13 +425,25 @@ export function createApp({
     } catch {
       return res.status(403).json({ error: "Invalid request origin." });
     }
+    const { hairstylePreset, hairstylePhoto: hairstyleInput } = req.body;
+    const hasHairstylePhoto = hairstyleInput !== undefined;
+    if (
+      hairstylePreset !== undefined &&
+      (hasHairstylePhoto ||
+        typeof hairstylePreset !== "string" ||
+        !Object.hasOwn(avatarHairstyles, hairstylePreset))
+    )
+      return res.status(400).json({ error: "Choose one hairstyle preset or one reference photo." });
     if (
       req.body?.consent !== true ||
-      req.body?.consentScope !== "face-and-body" ||
+      req.body?.consentScope !==
+        (hasHairstylePhoto ? "face-body-and-hairstyle" : "face-and-body") ||
       req.body?.consentProvider !== provider
     )
       return res.status(400).json({
-        error: `Customer consent to send both photos and measurements to ${providerLabel} is required. Refresh or update the app before generating.`,
+        error: hasHairstylePhoto
+          ? `Customer consent to send the face, full-body and hairstyle photos and measurements to ${providerLabel} is required.`
+          : `Customer consent to send both photos and measurements to ${providerLabel} is required. Refresh or update the app before generating.`,
       });
     if (identityScreenEnabled && req.body.identityCheckConsent !== true)
       return res.status(400).json({
@@ -481,14 +497,17 @@ export function createApp({
       return res.status(429).json({
         error: "Please wait before generating again. This pilot allows up to 20 attempts per hour.",
       });
-    let face, body, avatar;
+    let face, body, avatar, hairstylePhoto;
     avatarPreflights++;
     try {
       face = await normalizePhoto(req.body.face);
       body = await normalizePhoto(req.body.body, "full-body");
+      if (hasHairstylePhoto)
+        hairstylePhoto = await normalizePhoto(hairstyleInput, "hairstyle reference");
       for (const [label, photo] of [
         ["Face photo", face],
         ["Full-body photo", body],
+        ...(hairstylePhoto ? [["Hairstyle reference", hairstylePhoto]] : []),
       ]) {
         const issue = await blankPhotoIssue(photo);
         if (issue)
@@ -542,6 +561,8 @@ export function createApp({
             apiKey,
             model,
             quality,
+            ...(hairstylePreset !== undefined && { hairstylePreset }),
+            ...(hairstylePhoto && { hairstylePhoto }),
           });
           if (identityScreenEnabled) {
             try {
@@ -591,7 +612,10 @@ export function createApp({
                 {
                   provider,
                   model,
-                  promptRevision: generationRevision,
+                  promptRevision:
+                    hairstylePreset || hairstylePhoto
+                      ? `${generationRevision}-hairstyle-v1`
+                      : generationRevision,
                   generatedAt: Date.now(),
                   profileId: req.body.profileId,
                   templateTone,

@@ -10,6 +10,8 @@ export async function openaiPersonalize({
   avatar,
   profileId,
   measurements,
+  hairstylePreset,
+  hairstylePhoto,
   apiKey,
   model = "gpt-image-1.5",
   quality = "low",
@@ -34,7 +36,7 @@ export async function openaiPersonalize({
 
   const form = new FormData();
   form.set("model", model);
-  form.set("prompt", avatarPrompt(profileId, measurements));
+  form.set("prompt", avatarPrompt(profileId, measurements, { hairstylePreset, hairstylePhoto }));
   form.set("n", "1");
   form.set("size", "1024x1536");
   form.set("quality", quality);
@@ -44,6 +46,8 @@ export async function openaiPersonalize({
   form.append("image[]", new Blob([avatar], { type: "image/png" }), "standard-body.png");
   form.append("image[]", new Blob([face], { type: "image/jpeg" }), "customer-face.jpg");
   form.append("image[]", new Blob([body], { type: "image/jpeg" }), "customer-body.jpg");
+  if (hairstylePhoto)
+    form.append("image[]", new Blob([hairstylePhoto], { type: "image/jpeg" }), "hairstyle.jpg");
 
   const response = await providerRequest(
     "https://api.openai.com/v1/images/edits",

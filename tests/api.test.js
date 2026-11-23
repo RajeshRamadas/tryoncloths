@@ -78,6 +78,141 @@ test("the selected provider is advertised and only matching provider consent can
   }
 });
 
+test("avatar hairstyle requests require one valid style source and consent for the extra photo", async () => {
+  const reference = await readFile(customerPhotos[2].face);
+  const hairstylePhoto = `data:image/jpeg;base64,${reference.toString("base64")}`;
+  const calls = [];
+  await withServer(
+    {
+      provider: "gemini",
+      apiKey: "test-only",
+      rateLimit: false,
+      personalize: async (input) => {
+        calls.push(input);
+        return face;
+      },
+    },
+    async (base) => {
+      const health = await (await fetch(`${base}/api/health`)).json();
+      assert.equal(health.avatarHairstylesAvailable, true);
+      const input = { consent: true, profileId: "regular", face };
+      for (const invalid of [
+        { hairstylePreset: "constructor" },
+        { hairstylePreset: "high-bun", hairstylePhoto, consentScope: "face-body-and-hairstyle" },
+        { hairstylePhoto },
+        { hairstylePhoto: "invalid", consentScope: "face-body-and-hairstyle" },
+      ]) {
+        assert.equal((await post(base, { ...input, ...invalid })).status, 400);
+      }
+      assert.equal(calls.length, 0);
+
+      assert.equal((await post(base, { ...input, hairstylePreset: "high-bun" })).status, 200);
+      assert.equal(calls[0].hairstylePreset, "high-bun");
+      assert.equal(calls[0].hairstylePhoto, undefined);
+
+      const response = await post(base, {
+        ...input,
+        hairstylePhoto,
+        consentScope: "face-body-and-hairstyle",
+      });
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).kind, "customer-avatar");
+      assert.equal(calls[1].hairstylePreset, undefined);
+      assert.equal((await sharp(calls[1].hairstylePhoto).metadata()).format, "jpeg");
+      assert.notDeepEqual(calls[1].hairstylePhoto, calls[1].face);
+    },
+  );
+});
+
+test("Gemini and OpenAI keep the customer photos separate from the hairstyle instruction", async () => {
+  const avatar = await standardAvatar("regular");
+  const hairstylePhoto = await readFile(customerPhotos[2].face);
+  for (const useReference of [false, true]) {
+    const style = useReference ? { hairstylePhoto } : { hairstylePreset: "curly-bob" };
+    const inputs = {
+      face: faceBytes,
+      body: bodyBytes,
+      avatar,
+      profileId: "regular",
+      measurements,
+      apiKey: "test-only",
+      ...style,
+    };
+    const checkPrompt = (prompt, referencePosition) => {
+      assert.match(prompt, /Change only the scalp hairstyle/);
+      assert.match(prompt, /natural hair colour, facial features, facial hair, glasses/);
+      assert.ok(
+        prompt.includes(
+          useReference ? referencePosition + " = HAIRSTYLE REFERENCE ONLY" : "Curly bob",
+        ),
+      );
+      assert.doesNotMatch(prompt, /Do not substitute a different face or hairstyle/);
+    };
+    await geminiPersonalize({
+      ...inputs,
+      fetchImpl: async (_url, { body }) => {
+        const parts = JSON.parse(body).contents[0].parts;
+        checkPrompt(parts[0].text, "Image 2 right panel");
+        const images = parts.filter((part) => part.inlineData).map((part) => part.inlineData);
+        assert.equal(images.length, 3);
+        assert.equal(images[0].data, faceBytes.toString("base64"));
+        if (useReference) {
+          assert.match(parts[0].text, /Image 2 left panel = CUSTOMER FULL-BODY PHOTO/);
+          assert.equal(images[1].mimeType, "image/png");
+          const combined = Buffer.from(images[1].data, "base64");
+          for (const [left, photo] of [
+            [0, bodyBytes],
+            [492, hairstylePhoto],
+          ]) {
+            const panel = await sharp(combined)
+              .extract({ left, top: 0, width: 480, height: 720 })
+              .removeAlpha()
+              .raw()
+              .toBuffer();
+            const expected = await sharp(photo)
+              .resize(480, 720, { fit: "contain", background: "#eeece9" })
+              .raw()
+              .toBuffer();
+            assert.deepEqual(panel, expected);
+          }
+        } else {
+          assert.equal(images[1].data, bodyBytes.toString("base64"));
+        }
+        return Response.json({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  { inlineData: { mimeType: "image/jpeg", data: faceBytes.toString("base64") } },
+                ],
+              },
+            },
+          ],
+        });
+      },
+    });
+    await openaiPersonalize({
+      ...inputs,
+      fetchImpl: async (_url, { body }) => {
+        checkPrompt(body.get("prompt"), "Image 4");
+        const images = body.getAll("image[]");
+        assert.deepEqual(
+          images.map((image) => image.name),
+          [
+            "standard-body.png",
+            "customer-face.jpg",
+            "customer-body.jpg",
+            ...(useReference ? ["hairstyle.jpg"] : []),
+          ],
+        );
+        if (useReference)
+          assert.deepEqual(Buffer.from(await images[3].arrayBuffer()), hairstylePhoto);
+        return Response.json({ data: [{ b64_json: faceBytes.toString("base64") }] });
+      },
+    });
+  }
+});
+
 test("Gemini uses the chosen body template and both customer photos for face and whole-body complexion", async () => {
   const avatar = await standardAvatar("broad");
   let calls = 0;
