@@ -52,6 +52,14 @@ test("a brand can save, preview and publish on mobile before a customer requests
     await page.getByLabel("Account password").fill("test-password-long");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Products", exact: true })).toHaveAttribute(
+      "href",
+      "/catalogue",
+    );
+    await expect(page.getByRole("link", { name: "Shop setup", exact: true })).toHaveAttribute(
+      "href",
+      "/shop-page",
+    );
     await openStoreTools(page);
     await page.getByRole("link", { name: "Shop page", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Your shop is a draft" })).toBeVisible();
@@ -100,6 +108,9 @@ test("a brand can save, preview and publish on mobile before a customer requests
     await expect(page.getByRole("status")).toHaveText("Shop link copied.");
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(shop);
     expect((await customer.goto(shop)).status()).toBe(200);
+    const cover = customer.getByRole("img", { name: "Copper Finch shop photo" });
+    await expect(cover).toBeVisible();
+    await expect.poll(() => cover.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
     await expect(customer.getByRole("link", { name: "Instagram" })).toHaveAttribute(
       "href",
       "https://www.instagram.com/copperfinch.example/",

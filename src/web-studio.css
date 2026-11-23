@@ -1,0 +1,309 @@
+/* The web palette builds on the shared studio tokens. Native builds keep the base theme. */
+.web-app {
+  --brand-900: #18372c;
+  --brand-800: #1e4436;
+  --brand-700: #275644;
+  --brand-600: #356a54;
+  --brand-100: #e6eee7;
+  --brand-50: #eff4ed;
+  --gray-900: #202821;
+  --gray-600: #525d54;
+  --gray-500: #616d62;
+  --gray-300: #d0d3c7;
+  --gray-200: #e5e5da;
+  --gray-100: #eeeee5;
+  --gray-50: #f7f6f0;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --control-height: 44px;
+  --font-editorial: Georgia, "Times New Roman", serif;
+}
+
+.web-app .topbar {
+  padding-inline: max(20px, calc((100vw - 1280px) / 2));
+  background: var(--white);
+}
+.web-app .brand {
+  gap: 8px;
+}
+.web-app .brand-symbol {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px 4px 11px 4px;
+}
+.web-app .workspace-name {
+  color: var(--brand-700);
+}
+
+.web-app .app-shell > main {
+  max-width: 1344px;
+  padding-inline: clamp(16px, 3vw, 32px);
+}
+.web-app .page-heading {
+  align-items: center;
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(ellipse at 85% 10%, rgb(90 128 98 / 52%), transparent 64%), var(--brand-900);
+  color: var(--white);
+  padding: clamp(22px, 4vw, 40px);
+}
+.web-app .page-heading h1 {
+  font: 400 clamp(36px, 4vw, 56px) / 1.05 var(--font-editorial);
+  letter-spacing: -0.035em;
+  color: inherit;
+}
+.web-app .page-heading p {
+  max-width: 43ch;
+  margin-top: 12px;
+  color: #e1ebe2;
+  font-size: 15px;
+}
+
+.studio-heading-actions,
+.store-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.web-app .studio-heading-actions .button {
+  box-shadow: none;
+}
+.web-app .studio-heading-actions > .secondary:not(.new-session) {
+  background: transparent;
+  border-color: #8da89a;
+  color: var(--white);
+}
+.web-app .studio-heading-actions > .secondary:not(.new-session):hover:not(:disabled) {
+  background: rgb(255 255 255 / 14%);
+}
+.web-app .studio-heading-actions > .new-session {
+  background: #faf9f2;
+  border-color: #faf9f2;
+  color: var(--brand-900);
+}
+.web-app .studio-heading-actions > .new-session:hover:not(:disabled) {
+  background: #e3eee5;
+  border-color: #e3eee5;
+}
+
+.web-app .store-account {
+  margin-top: 16px;
+  padding: 14px 18px;
+}
+.web-app .store-identity strong {
+  font: 700 15px / 1.4 var(--font-display);
+  overflow-wrap: anywhere;
+}
+.web-app .store-account-actions {
+  flex-wrap: wrap;
+}
+.web-app .store-account-actions .button[aria-haspopup="dialog"] {
+  color: var(--brand-900);
+  border-color: var(--brand-200);
+  background: var(--brand-50);
+}
+.web-app .store-account-actions .button[aria-haspopup="dialog"]:hover:not(:disabled) {
+  background: var(--brand-100);
+}
+.web-app .store-tools-dialog {
+  width: min(720px, calc(100% - 24px));
+}
+.web-app .store-tools-dialog h2 {
+  font-family: var(--font-editorial);
+  font-size: 30px;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+}
+
+.web-app .studio-workflow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 16px;
+  scroll-margin-top: 76px;
+}
+.web-app .steps {
+  flex: 1;
+  max-width: none;
+  min-width: 0;
+  gap: 5px;
+  margin: 0;
+  padding: 5px;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+}
+.web-app .step {
+  min-width: 0;
+  min-height: 44px;
+  flex: 1;
+  gap: 8px;
+  color: var(--gray-500);
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+}
+.web-app .step > span:nth-child(2) {
+  display: block;
+  min-width: 0;
+  white-space: normal;
+}
+.web-app .step.current {
+  background: var(--brand-100);
+  color: var(--brand-900);
+}
+.web-app .step.complete:not(:disabled):hover {
+  background: var(--brand-50);
+}
+.web-app .step-line {
+  display: none;
+}
+.web-app .step-number {
+  width: 25px;
+  height: 25px;
+}
+.studio-preview-jump,
+.studio-preview-return {
+  display: none;
+}
+
+.web-app .studio-grid {
+  gap: 18px;
+}
+.web-app .card-heading h2 {
+  font-size: 19px;
+}
+.web-app .preview-card {
+  scroll-margin-top: 76px;
+}
+.web-app .preview-top {
+  background: var(--brand-900);
+  color: var(--white);
+  min-height: 52px;
+  height: auto;
+  padding-inline: 16px 8px;
+}
+.web-app .preview-top > span {
+  color: var(--white);
+  letter-spacing: 0;
+  font-size: 14px;
+}
+.web-app .preview-top .icon-button {
+  color: inherit;
+}
+.web-app .preview-top .icon-button:hover {
+  background: rgb(255 255 255 / 14%);
+}
+.web-app .avatar-stage {
+  height: 535px;
+  background: radial-gradient(ellipse at 65% 20%, #edebe3, #d9d9ce);
+}
+.web-app .avatar-stage > .avatar-crop {
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 24px rgb(34 49 34 / 12%);
+}
+.web-app .avatar-stage.pending-stage {
+  height: auto;
+  min-height: 435px;
+  background: var(--brand-50);
+}
+.web-app .sample-badge {
+  background: var(--gray-50);
+  border-color: var(--gray-200);
+  color: var(--gray-700);
+}
+.web-app .preview-bottom {
+  background: var(--white);
+  min-height: 48px;
+  height: auto;
+  padding-block: 10px;
+}
+.web-app .preview-bottom > div,
+.web-app .preview-ratio {
+  font-size: 12px;
+  letter-spacing: 0;
+}
+.web-app .preview-ratio {
+  text-align: right;
+}
+
+.web-app .billing-page > h1 {
+  font: 400 clamp(32px, 4vw, 45px) / 1.1 var(--font-editorial);
+  letter-spacing: -0.03em;
+}
+
+@media (min-width: 1101px) and (min-height: 760px) {
+  .web-app .preview-card {
+    position: sticky;
+    top: 82px;
+  }
+}
+
+@media (max-width: 900px) {
+  .web-app .studio-preview-jump {
+    display: inline-flex;
+  }
+  .web-app .studio-preview-return {
+    display: block;
+    padding: 0 8px 4px;
+    background: var(--white);
+    border-top: 1px solid var(--gray-200);
+  }
+}
+@media (max-width: 640px) {
+  .web-app .page-heading,
+  .web-app .studio-workflow {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .web-app .page-heading p {
+    margin-top: 8px;
+  }
+  .web-app .studio-heading-actions > .new-session {
+    width: auto;
+    padding-inline: 14px;
+    gap: 7px;
+    font-size: 14px;
+  }
+  .web-app .step {
+    align-items: center;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 5px;
+    padding: 7px 4px;
+    text-align: center;
+    font-size: 12px;
+    line-height: 1.3;
+  }
+  .web-app .step:not(.current) > span:nth-child(2) {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+  .web-app .studio-workflow {
+    gap: 8px;
+  }
+  .web-app .studio-preview-jump {
+    align-self: flex-start;
+  }
+  .web-app .studio-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .web-app .profiles-column {
+    grid-column: auto;
+    display: block;
+  }
+  .web-app .customer-card {
+    padding: 18px;
+  }
+  .web-app .avatar-stage {
+    height: clamp(380px, 110vw, 535px);
+  }
+  .web-app .store-account-actions {
+    width: 100%;
+  }
+}

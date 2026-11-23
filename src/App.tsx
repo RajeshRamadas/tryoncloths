@@ -989,6 +989,16 @@ export default function App() {
   ) : (
     <AvatarImage index={profile.index} templateTone={templateTone} />
   );
+  const savedAvatars = (
+    <SavedAvatars
+      key={accountState.account?.id || "local"}
+      cloud={accountState.enabled}
+      disabled={generating || exporting || (accountState.enabled && !accountState.account)}
+      onUse={useSavedAvatar}
+      onRegenerate={startRegeneration}
+      onApprovalRevoked={savedAvatarApprovalRevoked}
+    />
+  );
 
   return (
     <>
@@ -1005,9 +1015,11 @@ export default function App() {
             <span className="workspace-name">STORE STUDIO</span>
             <div className="topbar-right">
               <StudioConnection disabled={generating || exporting} onChange={checkService} />
-              <span className="pilot-pill">
-                <span /> Level 1 · Pilot
-              </span>
+              {isNative && (
+                <span className="pilot-pill">
+                  <span /> Level 1 · Pilot
+                </span>
+              )}
               <button
                 className="icon-button help-button"
                 aria-label="How it works"
@@ -1015,27 +1027,30 @@ export default function App() {
               >
                 <CircleHelp size={20} />
               </button>
-              <span className="store-avatar">ST</span>
+              {isNative && <span className="store-avatar">ST</span>}
             </div>
           </header>
           <main>
             <section className="page-heading">
               <div>
-                <div className="eyebrow">YOUR FITTING STUDIO</div>
-                <h1>A great look starts here.</h1>
+                {isNative && <div className="eyebrow">YOUR FITTING STUDIO</div>}
+                <h1>{isNative ? "A great look starts here." : "Avatar studio"}</h1>
                 <p>
                   {jewelleryAvailable
                     ? "Open a saved avatar or create one, then try clothes and jewellery."
                     : "Open a saved avatar or create one, then try clothes."}
                 </p>
               </div>
-              <button
-                className="button secondary new-session"
-                disabled={generating || exporting}
-                onClick={() => setConfirmReset(true)}
-              >
-                <Plus size={16} /> New session
-              </button>
+              <div className="studio-heading-actions">
+                {!isNative && savedAvatars}
+                <button
+                  className="button secondary new-session"
+                  disabled={generating || exporting}
+                  onClick={() => setConfirmReset(true)}
+                >
+                  <Plus size={16} /> New session
+                </button>
+              </div>
             </section>
             {!isNative && (
               <StoreAccount
@@ -1045,36 +1060,37 @@ export default function App() {
                 onChange={accountChanged}
               />
             )}
-            <div className="saved-avatars-entry">
-              <SavedAvatars
-                key={accountState.account?.id || "local"}
-                cloud={accountState.enabled}
-                disabled={
-                  generating || exporting || (accountState.enabled && !accountState.account)
-                }
-                onUse={useSavedAvatar}
-                onRegenerate={startRegeneration}
-                onApprovalRevoked={savedAvatarApprovalRevoked}
-              />
-              <span>Already have an avatar? Reopen it here without generating again.</span>
+            {isNative && (
+              <div className="saved-avatars-entry">
+                {savedAvatars}
+                <span>Already have an avatar? Reopen it here without generating again.</span>
+              </div>
+            )}
+            <div className="studio-workflow" id="avatar-workflow" tabIndex={-1}>
+              <nav className="steps" aria-label="Avatar creation steps">
+                {["Customer details", "Match & personalize", "Review & save"].map((label, i) => (
+                  <button
+                    key={label}
+                    className={`step ${step === i + 1 ? "current" : ""} ${step > i + 1 ? "complete" : ""}`}
+                    disabled={generating || i + 1 > step}
+                    aria-label={label}
+                    aria-current={step === i + 1 ? "step" : undefined}
+                    onClick={() => goTo(i + 1)}
+                  >
+                    <span className="step-number" aria-hidden="true">
+                      {step > i + 1 ? <Check size={14} /> : `0${i + 1}`}
+                    </span>
+                    <span>{label}</span>
+                    {i < 2 && <span className="step-line" />}
+                  </button>
+                ))}
+              </nav>
+              {!isNative && (
+                <a className="button secondary studio-preview-jump" href="#avatar-preview">
+                  <Expand size={15} aria-hidden="true" /> View preview
+                </a>
+              )}
             </div>
-            <nav className="steps" aria-label="Avatar creation steps">
-              {["Customer details", "Match & personalize", "Review & save"].map((label, i) => (
-                <button
-                  key={label}
-                  className={`step ${step === i + 1 ? "current" : ""} ${step > i + 1 ? "complete" : ""}`}
-                  disabled={generating || i + 1 > step}
-                  aria-current={step === i + 1 ? "step" : undefined}
-                  onClick={() => goTo(i + 1)}
-                >
-                  <span className="step-number">
-                    {step > i + 1 ? <Check size={14} /> : `0${i + 1}`}
-                  </span>
-                  <span>{label}</span>
-                  {i < 2 && <span className="step-line" />}
-                </button>
-              ))}
-            </nav>
             <div className="studio-grid">
               <aside className="details-column">
                 <section className="card customer-card">
@@ -1089,7 +1105,7 @@ export default function App() {
                           ? "Personalize the avatar"
                           : "Ready for review"}
                     </h2>
-                    <span className="tiny-label">{`0${step}`}</span>
+                    {isNative && <span className="tiny-label">{`0${step}`}</span>}
                   </div>
                   {customer && step !== 1 && (
                     <p className="selected-customer-summary">
@@ -1822,7 +1838,9 @@ export default function App() {
                 <div className="privacy-note">
                   <ShieldCheck size={20} />
                   <div>
-                    <strong>A little care goes a long way.</strong>
+                    <strong>
+                      {isNative ? "A little care goes a long way." : "Customer photo privacy"}
+                    </strong>
                     <p>
                       Photos stay in this session until you explicitly generate. Generation sends
                       the head and full-body photos, approximate measurements and any selected
@@ -1831,15 +1849,20 @@ export default function App() {
                   </div>
                 </div>
               </aside>
-              <section className="preview-card" aria-label="Avatar preview">
+              <section
+                className="preview-card"
+                id="avatar-preview"
+                aria-label="Avatar preview"
+                tabIndex={-1}
+              >
                 <div className="preview-top">
                   <span>
                     <span className="live-dot" />{" "}
                     {personalized
-                      ? "PERSONALIZED PREVIEW"
+                      ? "Personalized preview"
                       : needsCustomerGeneration
-                        ? "CUSTOMER AVATAR · NOT GENERATED"
-                        : "AVATAR PREVIEW"}
+                        ? "Customer avatar preview"
+                        : "Avatar preview"}
                   </span>
                   <button
                     className="icon-button"
@@ -1856,7 +1879,7 @@ export default function App() {
                       {personalized ? "Review required" : "Sample avatar"}
                     </span>
                   )}
-                  {!needsCustomerGeneration && (
+                  {!needsCustomerGeneration && isNative && (
                     <div className="avatar-meta">
                       <span>{profile.name} profile</span>
                       <strong>
@@ -1892,8 +1915,17 @@ export default function App() {
                             : "Standard avatar · face not personalized"}
                     </span>
                   </div>
-                  <span className="preview-ratio">FULL BODY</span>
+                  <span className="preview-ratio">
+                    {isNative ? "FULL BODY" : `${profile.name} frame`}
+                  </span>
                 </div>
+                {!isNative && (
+                  <div className="studio-preview-return">
+                    <a className="button back-button" href="#avatar-workflow">
+                      <ArrowLeft size={15} aria-hidden="true" /> Back to avatar steps
+                    </a>
+                  </div>
+                )}
               </section>
               <aside className="profiles-column">
                 <section className="card profile-card">

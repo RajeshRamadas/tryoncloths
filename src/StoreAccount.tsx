@@ -206,6 +206,18 @@ export default function StoreAccount({
             )}
           </div>
           <div className="store-account-actions">
+            {!disabled && !busy && (
+              <nav className="store-shortcuts" aria-label="Store shortcuts">
+                <a className="button secondary" href="/catalogue">
+                  <Shirt size={15} aria-hidden="true" /> Products
+                </a>
+                {["owner", "manager"].includes(state.account.user?.role || "") && (
+                  <a className="button secondary" href="/shop-page">
+                    <Store size={15} aria-hidden="true" /> Shop setup
+                  </a>
+                )}
+              </nav>
+            )}
             <button
               className="button secondary"
               disabled={disabled || busy}
