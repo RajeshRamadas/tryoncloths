@@ -146,6 +146,9 @@ test("mobile jewellery inventory guesses Indian types, saves photos and dimensio
     await expect(page.getByRole("button", { name: "Edit Gold jhumka", exact: true })).toHaveCount(
       0,
     );
+    await expect(
+      page.getByText("Add several accessories from one photo", { exact: true }),
+    ).toHaveCount(0);
     store.db
       .prepare("UPDATE memberships SET role='owner' WHERE user=? AND store=?")
       .run(owner.user.id, owner.id);
@@ -173,3 +176,151 @@ test("jewellery feature stays hidden and cannot open when disabled", async ({ pa
     },
     false,
   ));
+
+async function openGroupImport(page) {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("link", { name: "Jewellery catalogue", exact: true }).click();
+  await page.getByText("Add several accessories from one photo", { exact: true }).click();
+  const importer = page.locator(".accessory-photo-import");
+  await expect(importer.getByLabel("Group accessory photo")).toBeVisible();
+  return importer;
+}
+
+async function describePiece(importer, id, name, type) {
+  const piece = importer.getByRole("group", { name: `Piece ${id}`, exact: true });
+  await piece.getByLabel("Item name", { exact: true }).fill(name);
+  await piece.getByRole("combobox", { name: "Jewellery type", exact: true }).selectOption(type);
+  await piece.getByRole("combobox", { name: "Metal", exact: true }).selectOption("yellow_gold");
+}
+
+test("one group photo separates two accessories and retries only the failed catalogue save", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await setup(page, async ({ store, owner, ai }) => {
+    const importer = await openGroupImport(page);
+    const photo = await sharp(
+      Buffer.from(
+        '<svg width="640" height="400"><rect width="640" height="400" fill="#f5f0e4"/><circle cx="170" cy="144" r="73" fill="none" stroke="#a6742c" stroke-width="19"/><path d="M446 132 L524 205 L446 287 L369 205 Z" fill="#945231"/><circle cx="446" cy="206" r="34" fill="#1e6557"/></svg>',
+      ),
+    )
+      .jpeg()
+      .toBuffer();
+    await importer.getByLabel("Group accessory photo").setInputFiles({
+      name: "ring-and-pendant.jpg",
+      mimeType: "image/jpeg",
+      buffer: photo,
+    });
+    await expect(importer.getByRole("status")).toContainText("2 cut-outs ready to review.");
+    await expect(importer.getByRole("img", { name: /^Cut-out for piece/ })).toHaveCount(2);
+    await describePiece(importer, 1, "Extracted gold ring", "ring");
+    await describePiece(importer, 2, "Extracted green pendant", "pendant");
+    const save = importer.getByRole("button", { name: "Save 2 pieces", exact: true });
+    await expect(save).toBeDisabled();
+    const attempted = [];
+    await page.route("**/api/garments", (route) => {
+      const { name } = route.request().postDataJSON();
+      attempted.push(name);
+      if (attempted.length === 2)
+        return route.fulfill({ status: 503, json: { error: "Temporary save issue." } });
+      return route.fallback();
+    });
+    await importer
+      .getByLabel("I agree to save these reviewed cut-outs in the store catalogue.")
+      .check();
+    await save.click();
+    await expect(importer.getByText("Temporary save issue.", { exact: true })).toBeVisible();
+    await expect(importer.getByText("Extracted gold ring · Saved for try-on")).toBeVisible();
+    await importer.getByRole("button", { name: "Save 1 piece", exact: true }).click();
+    await expect(importer.getByText("Extracted green pendant · Saved for try-on")).toBeVisible();
+    expect(attempted).toEqual([
+      "Extracted gold ring",
+      "Extracted green pendant",
+      "Extracted green pendant",
+    ]);
+    const items = store.garments.list(owner, { category: "jewellery", jewelleryEnabled: true });
+    expect(items).toHaveLength(2);
+    expect(items.map(({ hasOverlay }) => hasOverlay)).toEqual([true, true]);
+    expect(ai()).toBe(0);
+  });
+});
+
+test("tracing several pieces in a busy photo keeps their original pixels and clears a traced opening", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await setup(page, async ({ store, owner }) => {
+    const importer = await openGroupImport(page);
+    const photo = await sharp(
+      Buffer.from(
+        '<svg width="600" height="420"><defs><pattern id="bg" width="60" height="60" patternUnits="userSpaceOnUse"><rect width="60" height="60" fill="#243a57"/><rect x="30" width="30" height="30" fill="#894452"/><rect y="30" width="30" height="30" fill="#acbd88"/></pattern></defs><rect width="600" height="420" fill="url(#bg)"/><path d="M80 110 H230 V270 H80 Z M118 150 H192 V230 H118 Z" fill="#c69a45" fill-rule="evenodd"/><rect x="340" y="125" width="135" height="140" fill="#3e8a72"/></svg>',
+      ),
+    )
+      .png()
+      .toBuffer();
+    await importer.getByLabel("Group accessory photo").setInputFiles({
+      name: "mixed-background.png",
+      mimeType: "image/png",
+      buffer: photo,
+    });
+    await expect(importer.getByRole("status")).toContainText("Trace each accessory");
+    const canvas = importer.getByLabel("Group photo with marked accessories");
+    const bounds = await canvas.boundingBox();
+    const trace = async (points) => {
+      for (const [x, y] of points)
+        await canvas.click({
+          position: { x: (x * bounds.width) / 600, y: (y * bounds.height) / 420 },
+        });
+    };
+    const start = importer.getByRole("button", { name: "Trace a piece", exact: true });
+    const finish = importer.getByRole("button", { name: "Finish outline", exact: true });
+    await start.click();
+    await trace([
+      [81, 111],
+      [229, 111],
+      [229, 269],
+      [81, 269],
+    ]);
+    await importer.getByRole("button", { name: "Trace an opening", exact: true }).click();
+    await trace([
+      [117, 149],
+      [193, 149],
+      [193, 231],
+      [117, 231],
+    ]);
+    await finish.click();
+    await expect(importer.getByAltText("Cut-out for piece 1")).toBeVisible();
+    await start.click();
+    await trace([
+      [342, 127],
+      [473, 127],
+      [473, 263],
+      [342, 263],
+    ]);
+    await finish.click();
+    await expect(importer.getByAltText("Cut-out for piece 2")).toBeVisible();
+    await describePiece(importer, 1, "Traced signet", "ring");
+    await describePiece(importer, 2, "Traced stone", "pendant");
+    await importer
+      .getByLabel("I agree to save these reviewed cut-outs in the store catalogue.")
+      .check();
+    await importer.getByRole("button", { name: "Save 2 pieces", exact: true }).click();
+    await expect(importer.getByRole("status")).toContainText(
+      "2 pieces ready in the jewellery catalogue.",
+    );
+    const items = store.garments.list(owner, { category: "jewellery", jewelleryEnabled: true });
+    const ring = store.garments.get(owner, items.find(({ name }) => name === "Traced signet").id, {
+      category: "jewellery",
+      jewelleryEnabled: true,
+    });
+    const { data, info } = await sharp(Buffer.from(ring.overlayPng.split(",")[1], "base64"))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    expect(ring.overlayAnchor).toBe("finger");
+    expect(
+      data[(Math.floor(info.height / 2) * info.width + Math.floor(info.width / 2)) * 4 + 3],
+    ).toBe(0);
+    expect(items).toHaveLength(2);
+  });
+});

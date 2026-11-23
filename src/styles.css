@@ -4408,6 +4408,50 @@ dialog::backdrop {
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-md);
 }
+.accessory-photo-import summary {
+  cursor: pointer;
+  min-height: 44px;
+  font-weight: 650;
+}
+.accessory-photo-import canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  margin: 12px 0;
+  background: var(--gray-100);
+  touch-action: manipulation;
+}
+.accessory-photo-import canvas:focus-visible {
+  outline: 3px solid var(--brand-500);
+  outline-offset: 3px;
+}
+.accessory-import-pieces {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(245px, 100%), 1fr));
+  gap: 12px;
+  margin-block: 18px;
+}
+.accessory-import-pieces fieldset {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+}
+.accessory-import-pieces legend {
+  padding: 0 6px;
+  font-weight: 650;
+}
+.accessory-import-pieces img {
+  display: block;
+  width: 100%;
+  height: 128px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+.accessory-photo-import .customer-actions {
+  flex-wrap: wrap;
+}
 .cutout-checker {
   background: repeating-conic-gradient(var(--gray-200) 0% 25%, var(--white) 0% 50%) 50% / 20px 20px;
 }

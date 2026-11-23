@@ -1,6 +1,6 @@
 import JewelleryVariantLink from "./JewelleryVariantLink";
 import JewelleryOverlayUpload from "./JewelleryOverlayUpload";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { catalogueApi } from "./catalogue";
 import { catalogueRequest } from "./store-garments";
 import {
@@ -13,6 +13,8 @@ import {
   type JewelleryType,
   type JewelleryAttributes,
 } from "./jewellery-types";
+
+const AccessoryPhotoImport = lazy(() => import("./AccessoryPhotoImport"));
 
 type Item = {
   id: string;
@@ -298,6 +300,11 @@ export default function JewelleryCatalogue() {
       {notice && <p role="status">{notice}</p>}
       {enabled && role && (
         <>
+          {manager && (
+            <Suspense fallback={<p role="status">Opening the accessory importer…</p>}>
+              <AccessoryPhotoImport disabled={busy} onSaved={() => void load()} />
+            </Suspense>
+          )}
           {manager ? (
             <section id="jewellery-editor">
               <h2>{editing ? "Edit jewellery details" : "Add a jewellery item"}</h2>
