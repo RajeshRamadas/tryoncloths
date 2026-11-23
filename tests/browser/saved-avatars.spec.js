@@ -42,7 +42,7 @@ async function generate(page) {
   await expect(
     page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Review avatar", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Ready for review" })).toBeVisible();
   return { png, calls: () => calls };
 }
 async function approve(page) {

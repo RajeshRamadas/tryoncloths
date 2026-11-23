@@ -252,6 +252,7 @@ export default function App() {
   const [replacement, setReplacement] = useState<{ id: string; name: string } | null>(null);
   const [openedLook, setOpenedLook] = useState<OpenedLook | undefined>();
   const [outfitOpen, setOutfitOpen] = useState(false);
+  const [startWithShoes, setStartWithShoes] = useState(false);
   const [restoredAvatar, setRestoredAvatar] = useState(false);
   const [avatarSource, setAvatarSource] = useState<"generated" | "imported">("generated");
   const [avatarName, setAvatarName] = useState("Customer avatar");
@@ -265,6 +266,7 @@ export default function App() {
     null,
   );
   const generationReceipt = useRef<string | null>(null);
+  const generationAttempt = useRef(0);
   const [face, setFace] = useState<string | null>(null);
   // Jewellery portrait for a just-saved avatar: open for, and approved for, which avatar id.
   const [portraitFor, setPortraitFor] = useState<string | null>(null);
@@ -299,7 +301,6 @@ export default function App() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [session, setSession] = useState(0);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const previewRef = useRef<HTMLElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [dialogFocus, setDialogFocus] = useState<HTMLElement | null>(null);
   const bodyType = selected.startsWith("f-") ? "female" : "male";
@@ -430,6 +431,7 @@ export default function App() {
     setAccountState(next);
   }
   function invalidate() {
+    generationAttempt.current++;
     reviewRevokedIdRef.current = null;
     generationReceipt.current = null;
     setAvatarId(null);
@@ -570,6 +572,7 @@ export default function App() {
       setError(readiness.issues.map((issue) => issue.message).join(" "));
       return;
     }
+    const attempt = ++generationAttempt.current;
     setGenerating(true);
     generationReceipt.current = null;
     setRestoredAvatar(false);
@@ -590,6 +593,7 @@ export default function App() {
         checkPhotoClarity(face),
         checkPhotoClarity(body),
       ]);
+      if (attempt !== generationAttempt.current) return;
       const photoReadiness = assessAvatarReadiness({
         consent: consent && aiConsent,
         facePhoto: face,
@@ -628,6 +632,7 @@ export default function App() {
         200000,
       );
       const data = await response.json();
+      if (attempt !== generationAttempt.current) return;
       if (!response.ok && data.code === "credits_required") setCreditsRequired(true);
       if (!response.ok && data.code === "account_required")
         window.dispatchEvent(new Event("forme-account-expired"));
@@ -656,14 +661,16 @@ export default function App() {
       setAvatarProfileSelection({ source: profileSource, comparison: profileComparison });
       setAvatarId(data.avatarId || null);
       setAiConsent(false);
+      setStep(3);
       if (data.accountSaveError) setError(data.accountSaveError);
       setNotice(
         "Customer avatar created as a draft. Review the face, body and skin tone before approval and saving.",
       );
-      requestAnimationFrame(() =>
-        previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
-      );
+      requestAnimationFrame(() => {
+        if (attempt === generationAttempt.current) titleRef.current?.focus();
+      });
     } catch (e) {
+      if (attempt !== generationAttempt.current) return;
       setGenerationFailed(true);
       setError(
         e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")
@@ -738,7 +745,7 @@ export default function App() {
     setRestoredAvatar(true);
     setAvatarSource(details.source);
     setStep(3);
-    setNotice("Avatar opened without an AI request. Review it, then choose Try clothes.");
+    setNotice("Avatar opened without an AI request. Review it, then choose a fitting.");
     requestAnimationFrame(() => titleRef.current?.focus());
   }
   async function saveGirths() {
@@ -1192,8 +1199,8 @@ export default function App() {
                   ) : step === 2 ? (
                     <>
                       <p className="section-copy">
-                        Generate the customer’s face and matching skin tone on the selected standard
-                        body using both customer photos.
+                        Check the body profile and photos. After generation, the avatar opens for
+                        review before you fit any items.
                       </p>
                       <div className="summary-row">
                         <span>Selected profile</span>
@@ -1545,24 +1552,52 @@ export default function App() {
                           </p>
                         </div>
                       )}
-                      <div className="fitting-room-actions">
-                        <button
-                          className="button primary full-width try-clothes-button"
-                          disabled={!avatarApproved || exporting || needsCustomerGeneration}
-                          onClick={() => setOutfitOpen(true)}
-                        >
-                          Try clothes <ArrowRight size={16} />
-                        </button>
-                        {jewelleryAvailable && accountState.account && avatarId && (
+                      <div className="fitting-next" role="group" aria-label="Choose a fitting">
+                        <h3>Choose a fitting</h3>
+                        <div className="fitting-room-actions">
+                          <button
+                            className="button primary"
+                            disabled={!avatarApproved || exporting || needsCustomerGeneration}
+                            onClick={() => {
+                              setStartWithShoes(false);
+                              setOutfitOpen(true);
+                            }}
+                          >
+                            Try clothes <ArrowRight size={16} />
+                          </button>
                           <button
                             className="button secondary"
                             disabled={!avatarApproved || exporting || needsCustomerGeneration}
-                            onClick={() =>
-                              location.assign("/jewellery?avatar=" + encodeURIComponent(avatarId))
-                            }
+                            onClick={() => {
+                              setStartWithShoes(true);
+                              setOutfitOpen(true);
+                            }}
                           >
-                            Jewellery <ArrowRight size={16} />
+                            Try shoes
                           </button>
+                          {jewelleryAvailable && accountState.account && (
+                            <button
+                              className="button secondary"
+                              disabled={
+                                !avatarApproved || !avatarId || exporting || needsCustomerGeneration
+                              }
+                              onClick={() => {
+                                if (avatarId)
+                                  location.assign(
+                                    "/jewellery?avatar=" + encodeURIComponent(avatarId),
+                                  );
+                              }}
+                            >
+                              Jewellery <ArrowRight size={16} />
+                            </button>
+                          )}
+                        </div>
+                        {jewelleryAvailable && accountState.account && !avatarId && (
+                          <p className="small-footnote">
+                            {personalized
+                              ? "Save the approved avatar for reuse to open the jewellery fitting room."
+                              : "Create and save a customer avatar to try jewellery."}
+                          </p>
                         )}
                       </div>
                       {jewelleryAvailable &&
@@ -1677,7 +1712,7 @@ export default function App() {
                   </div>
                 </div>
               </aside>
-              <section ref={previewRef} className="preview-card" aria-label="Avatar preview">
+              <section className="preview-card" aria-label="Avatar preview">
                 <div className="preview-top">
                   <span>
                     <span className="live-dot" />{" "}
@@ -2075,6 +2110,7 @@ export default function App() {
         <OutfitStudio
           key={`${session}-${selected}-${templateTone}`}
           active={outfitOpen}
+          startWithShoes={startWithShoes}
           jewelleryEnabled={jewelleryAvailable}
           templateTone={templateTone}
           customerId={customer?.id}

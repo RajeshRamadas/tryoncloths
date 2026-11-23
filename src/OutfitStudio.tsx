@@ -86,6 +86,7 @@ function GarmentThumbnail({ garment }: { garment: Garment }) {
 
 type Props = {
   active: boolean;
+  startWithShoes?: boolean;
   templateTone?: string;
   catalogueEnabled?: boolean;
   jewelleryEnabled?: boolean;
@@ -108,6 +109,7 @@ type Dressed = {
 };
 export default function OutfitStudio({
   active,
+  startWithShoes = false,
   templateTone = "medium",
   catalogueEnabled = false,
   jewelleryEnabled = false,
@@ -171,6 +173,7 @@ export default function OutfitStudio({
     if (!categories.includes(category)) setCategory("shirt");
   }, [female, category]);
   const selected = layers.find((item) => item.garment.category === category);
+  const fittingShoes = startWithShoes && category === "shoes";
   const sampleMatches = catalogue.filter(
     (g) => g.category === category && g.name.toLowerCase().includes(search.trim().toLowerCase()),
   );
@@ -193,8 +196,14 @@ export default function OutfitStudio({
     !approvalChanged,
   );
   useEffect(() => {
-    if (active) heading.current?.focus();
-  }, [active]);
+    if (!active) return;
+    if (startWithShoes) {
+      setCategory("shoes");
+      setSearch("");
+      setSource("samples");
+    }
+    heading.current?.focus();
+  }, [active, startWithShoes]);
   useEffect(() => {
     let cancelled = false;
     baseAvatar(profile.index, personalized, templateTone)
@@ -567,12 +576,16 @@ export default function OutfitStudio({
       <div className="outfit-intro">
         <span className="eyebrow">YOUR FITTING ROOM</span>
         <h1 ref={heading} tabIndex={-1}>
-          Try a new look.
+          {fittingShoes ? "Try shoes." : "Try a new look."}
         </h1>
-        <p>Choose clothes, check the preview, then save your favourite look.</p>
+        <p>
+          {fittingShoes
+            ? "Choose a pair, then check its placement on the avatar."
+            : "Choose clothes, check the preview, then save your favourite look."}
+        </p>
       </div>
       <nav className="fitting-mobile-nav" aria-label="Fitting room shortcuts">
-        <a href="#outfit-choices">Choose clothes</a>
+        <a href="#outfit-choices">{fittingShoes ? "Choose shoes" : "Choose clothes"}</a>
         <a href="#outfit-result">View avatar & save</a>
       </nav>
       <div className="outfit-layout">

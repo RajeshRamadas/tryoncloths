@@ -75,7 +75,7 @@ test("store accounts save reviewed avatars and reopen them with generation detai
     await expect(
       page.getByAltText("Customer’s personalized avatar, awaiting visual review"),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Review avatar" }).click();
+    await expect(page.getByRole("heading", { name: "Ready for review" })).toBeVisible();
     await approvePersonalizedAvatar(page);
     await page
       .getByLabel(
@@ -208,7 +208,7 @@ test("store accounts save reviewed avatars and reopen them with generation detai
     await expect(
       second.getByAltText("Customer’s personalized avatar, awaiting visual review"),
     ).toBeVisible();
-    await second.getByRole("button", { name: "Review avatar" }).click();
+    await expect(second.getByRole("heading", { name: "Ready for review" })).toBeVisible();
     await approvePersonalizedAvatar(second);
     await second
       .getByLabel(

@@ -102,7 +102,7 @@ test("Android sends both photos once with consent; failures block export; approv
     page.getByRole("heading", { name: "Customer avatar not generated yet" }),
   ).toHaveCount(0);
   expect(requests).toHaveLength(2);
-  await page.getByRole("button", { name: "Review avatar" }).click();
+  await expect(page.getByRole("heading", { name: "Ready for review" })).toBeVisible();
   await expect(page.getByAltText("Original customer face for skin-tone review")).toBeVisible();
   await expect(page.getByAltText("Original customer body for skin-tone review")).toBeVisible();
   const share = page.getByRole("button", { name: "Save or share avatar" });
