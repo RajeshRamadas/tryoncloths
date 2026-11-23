@@ -7,12 +7,35 @@ import { ProviderError, providerRequest, providerJson } from "./provider-errors.
 
 export const GEMINI_REFERENCE_VERSION = "customer-neck-v6";
 
+// Gemini 2.5 Flash Image accepts three inputs. Keep the head and aligned
+// template separate and put the two supporting photos side by side.
+async function combineSupportingPhotos(body, hairstyle) {
+  const width = 480;
+  const height = 720;
+  const gap = 12;
+  const background = "#eeece9";
+  const [left, right] = await Promise.all(
+    [body, hairstyle].map((photo) =>
+      sharp(photo).resize(width, height, { fit: "contain", background }).png().toBuffer(),
+    ),
+  );
+  return sharp({ create: { width: width * 2 + gap, height, channels: 3, background } })
+    .composite([
+      { input: left, left: 0, top: 0 },
+      { input: right, left: width + gap, top: 0 },
+    ])
+    .png()
+    .toBuffer();
+}
+
 export async function geminiPersonalize({
   face,
   body,
   avatar,
   profileId,
   measurements,
+  hairstylePreset,
+  hairstylePhoto,
   apiKey,
   model = "gemini-2.5-flash-image",
   fetchImpl = fetch,
@@ -33,6 +56,9 @@ export async function geminiPersonalize({
   )
     throw new Error("Customer photos, measurements and a standard profile are required.");
   const bodyReference = await geminiBodyReference(avatar, profileId, face);
+  const supportingPhoto = hairstylePhoto
+    ? await combineSupportingPhotos(body, hairstylePhoto)
+    : body;
   signal?.throwIfAborted();
   const response = await providerRequest(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -44,13 +70,30 @@ export async function geminiPersonalize({
         contents: [
           {
             parts: [
-              { text: geminiAvatarPrompt(profileId, measurements) },
-              { text: "Image 1 — CUSTOMER FACE. Preserve this face, hair and glasses." },
+              {
+                text: geminiAvatarPrompt(profileId, measurements, {
+                  hairstylePreset,
+                  hairstylePhoto,
+                }),
+              },
+              {
+                text:
+                  hairstylePreset || hairstylePhoto
+                    ? "Image 1 — CUSTOMER FACE. Preserve this face and glasses. Change only the requested scalp hairstyle."
+                    : "Image 1 — CUSTOMER FACE. Preserve this face, hair and glasses.",
+              },
               { inlineData: { mimeType: "image/jpeg", data: face.toString("base64") } },
               {
-                text: "Image 2 — CUSTOMER FULL-BODY PHOTO. Supporting customer complexion reference.",
+                text: hairstylePhoto
+                  ? "Image 2 — two supporting photos. LEFT: customer full-body and complexion reference. RIGHT: hairstyle reference only."
+                  : "Image 2 — CUSTOMER FULL-BODY PHOTO. Supporting customer complexion reference.",
               },
-              { inlineData: { mimeType: "image/jpeg", data: body.toString("base64") } },
+              {
+                inlineData: {
+                  mimeType: hairstylePhoto ? "image/png" : "image/jpeg",
+                  data: supportingPhoto.toString("base64"),
+                },
+              },
               {
                 text: "Image 3 — CUSTOMER FACE ALIGNED TO SELECTED BODY. Keep this visible customer face and head position. Blend the face, hair, neck and skin naturally; preserve body proportions.",
               },

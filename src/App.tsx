@@ -42,6 +42,7 @@ import { checkPhotoClarity } from "./photo-clarity-browser";
 import { analyseBodyPhoto, type BodyPhotoAnalysis } from "./body-pose";
 import { suggestBuild } from "./body-build";
 import { assessAvatarReadiness } from "./avatar-readiness.js";
+import { avatarHairstyles } from "./avatar-hairstyles.js";
 import { isNative, capturePhoto, clearNativeExports } from "./native";
 import { requestApi } from "./api";
 import StudioConnection from "./StudioConnection";
@@ -69,7 +70,21 @@ import {
 } from "./saved-avatars";
 import { App as NativeApp } from "@capacitor/app";
 
-type PhotoKind = "face" | "body";
+type PhotoKind = "face" | "body" | "hairstyle";
+type HairstyleChoice = keyof typeof avatarHairstyles | "original" | "reference";
+const photoLabels = {
+  face: { title: "Face photo", visibleTitle: "Head photo", hint: "Full head, facing forward" },
+  body: {
+    title: "Full-body photo",
+    visibleTitle: "Full-body photo",
+    hint: "Head to toe, standing",
+  },
+  hairstyle: {
+    title: "Hairstyle reference photo",
+    visibleTitle: "Hairstyle reference photo",
+    hint: "Show the entire hairstyle clearly",
+  },
+};
 type ServiceState = "checking" | "available" | "unavailable" | "unauthorized";
 type IdentityReview = {
   status: "screen_pass" | "needs_review";
@@ -117,18 +132,20 @@ function PhotoInput({
   kind,
   value,
   onChange,
+  onReadStart,
   disabled,
 }: {
   kind: PhotoKind;
   value: string | null;
   onChange: (value: string | null) => void;
+  onReadStart?: () => void;
   disabled: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [reading, setReading] = useState(false);
   const version = useRef(0);
-  const title = kind === "face" ? "Face photo" : "Full-body photo";
+  const { title, visibleTitle, hint } = photoLabels[kind];
   useEffect(
     () => () => {
       version.current++;
@@ -140,6 +157,7 @@ function PhotoInput({
     const request = ++version.current;
     setError("");
     setReading(true);
+    onReadStart?.();
     try {
       const photo = await readPhoto(file);
       if (request === version.current) onChange(photo);
@@ -160,6 +178,7 @@ function PhotoInput({
     try {
       const file = await capturePhoto();
       if (file && request === version.current) {
+        onReadStart?.();
         const photo = await readPhoto(file);
         if (request === version.current) onChange(photo);
       }
@@ -196,9 +215,13 @@ function PhotoInput({
       >
         {value ? (
           <>
-            <img src={value} alt={`Customer ${title.toLowerCase()}`} />
+            <img
+              src={value}
+              alt={kind === "hairstyle" ? title : `Customer ${title.toLowerCase()}`}
+            />
             <span className="photo-replace">
-              <Camera size={14} /> Replace
+              <strong>{visibleTitle}</strong>
+              <span>· Replace</span>
             </span>
           </>
         ) : (
@@ -212,8 +235,8 @@ function PhotoInput({
                 <UserRound size={25} />
               )}
             </span>
-            <strong>{title}</strong>
-            <span>{kind === "face" ? "Look straight ahead" : "Head to toe, standing"}</span>
+            <strong>{visibleTitle}</strong>
+            <span>{hint}</span>
             <span className="upload-caption">
               <Plus size={12} /> Add photo
             </span>
@@ -272,6 +295,9 @@ export default function App() {
   const [portraitFor, setPortraitFor] = useState<string | null>(null);
   const [portraitDoneFor, setPortraitDoneFor] = useState<string | null>(null);
   const [body, setBody] = useState<string | null>(null);
+  const [hairstyle, setHairstyle] = useState<HairstyleChoice>("original");
+  const [hairstylePhoto, setHairstylePhoto] = useState<string | null>(null);
+  const [hairstylesAvailable, setHairstylesAvailable] = useState(false);
   const [consent, setConsent] = useState(false);
   const [aiConsent, setAiConsent] = useState(false);
   const [identityScreenAvailable, setIdentityScreenAvailable] = useState(false);
@@ -323,8 +349,13 @@ export default function App() {
   const bodyGenerationAllowed = bodyType === "male" || femaleEnabled;
   const profile = profiles.find((p) => p.id === selected)!;
   const validMeasurements = recommendation !== null;
+  const selectedHairstyle = hairstylesAvailable && bodyGenerationAllowed ? hairstyle : "original";
+  const hairstyleRequired = selectedHairstyle === "reference";
+  const hairstylePreset =
+    selectedHairstyle === "original" || hairstyleRequired ? undefined : selectedHairstyle;
   const needsCustomerGeneration =
-    Boolean(face || body || restoredAvatar || replacement) && !personalized;
+    Boolean(face || body || restoredAvatar || replacement || selectedHairstyle !== "original") &&
+    !personalized;
   const approvalReady = canApproveAvatar({
     hasPersonalizedResult: Boolean(personalized),
     needsCustomerGeneration,
@@ -335,6 +366,7 @@ export default function App() {
 
   function checkService() {
     setService("checking");
+    setHairstylesAvailable(false);
     setTryOnAvailable(false);
     setJewelleryAvailable(false);
     setAiConsent(false);
@@ -358,6 +390,7 @@ export default function App() {
           data.personalizationContract === "customer-avatar-v4" &&
           ["gemini", "openai"].includes(data.provider);
         setProvider(supported ? data.provider : null);
+        setHairstylesAvailable(supported && data.avatarHairstylesAvailable === true);
         setIdentityScreenAvailable(supported && data.avatarIdentityScreenAvailable === true);
         setTryOnAvailable(
           data.tryOnAvailable === true && data.tryOnContract === "garment-tryon-v1",
@@ -399,13 +432,13 @@ export default function App() {
         return;
       }
       if (step > 1) goTo(step - 1);
-      else if (face || body) setConfirmReset(true);
+      else if (face || body || hairstylePhoto) setConfirmReset(true);
       else void NativeApp.minimizeApp();
     });
     return () => {
       void listener.then((handle) => handle.remove());
     };
-  }, [step, face, body, generating, exporting, outfitOpen]);
+  }, [step, face, body, hairstylePhoto, generating, exporting, outfitOpen]);
   useEffect(() => {
     const dialog = dialogRef.current;
     if ((help || expanded || confirmReset) && dialog && !dialog.open) {
@@ -529,6 +562,8 @@ export default function App() {
     );
     setFace(null);
     setBody(null);
+    setHairstyle("original");
+    setHairstylePhoto(null);
     setConsent(false);
     setAiConsent(false);
     setIdentityCheckConsent(false);
@@ -549,6 +584,7 @@ export default function App() {
     if (
       !face ||
       !body ||
+      (hairstyleRequired && !hairstylePhoto) ||
       !aiConsent ||
       !consent ||
       (identityScreenAvailable && !identityCheckConsent) ||
@@ -589,11 +625,18 @@ export default function App() {
     try {
       // A small, local scan must finish before any billable provider request.
       // Near-blank photos block; uncertain sharpness and lighting are advisory.
-      const [faceClarity, bodyClarity] = await Promise.all([
+      const [faceClarity, bodyClarity, hairstyleClarity] = await Promise.all([
         checkPhotoClarity(face),
         checkPhotoClarity(body),
+        hairstyleRequired && hairstylePhoto ? checkPhotoClarity(hairstylePhoto) : null,
       ]);
       if (attempt !== generationAttempt.current) return;
+      if (hairstyleClarity?.status === "blocked") {
+        setError(
+          "Hairstyle reference: " + hairstyleClarity.issues.map((issue) => issue.message).join(" "),
+        );
+        return;
+      }
       const photoReadiness = assessAvatarReadiness({
         consent: consent && aiConsent,
         facePhoto: face,
@@ -622,8 +665,10 @@ export default function App() {
             templateTone,
             measurements: { heightCm: Number(height), weightKg: Number(weight) },
             consent: true,
-            consentScope: "face-and-body",
+            consentScope: hairstyleRequired ? "face-body-and-hairstyle" : "face-and-body",
             consentProvider: provider,
+            ...(hairstylePreset ? { hairstylePreset } : {}),
+            ...(hairstyleRequired ? { hairstylePhoto } : {}),
             ...(identityScreenAvailable ? { identityCheckConsent: true } : {}),
             ...(accountState.enabled ? { customerId: customer?.id } : {}),
             ...(replacement ? { regenerateFromId: replacement.id } : {}),
@@ -735,6 +780,8 @@ export default function App() {
     setReplacement(null);
     setFace(null);
     setBody(null);
+    setHairstyle("original");
+    setHairstylePhoto(null);
     setConsent(false);
     setSession((s) => s + 1);
     setAvatarId(details.avatarId || null);
@@ -1073,7 +1120,7 @@ export default function App() {
                       )}
                       <div className="field-label-row">
                         <h3>Customer photos</h3>
-                        <span>Optional for a sample</span>
+                        <span>Both needed to personalize</span>
                       </div>
                       <label className="consent photo-consent">
                         <input
@@ -1085,6 +1132,8 @@ export default function App() {
                             if (!e.target.checked) {
                               setFace(null);
                               changeBodyPhoto(null);
+                              setHairstyle("original");
+                              setHairstylePhoto(null);
                               setAiConsent(false);
                               setSession((s) => s + 1);
                               invalidate();
@@ -1213,8 +1262,8 @@ export default function App() {
                         </strong>
                       </div>
                       <div className="summary-row">
-                        <span>Face and hair</span>
-                        <strong>From the customer’s face photo</strong>
+                        <span>Face</span>
+                        <strong>From the customer’s head photo</strong>
                       </div>
                       <div className="summary-row">
                         <span>Skin tone</span>
@@ -1242,11 +1291,58 @@ export default function App() {
                           <strong>{face && body ? "Photos ready" : "Photos not added"}</strong>
                           <p>
                             {face && body
-                              ? "Both photos are sent only when you generate."
+                              ? "Head and full-body photos stay here until you generate."
                               : "Both photos are needed to personalize."}
                           </p>
                         </div>
                       </div>
+                      {hairstylesAvailable && bodyGenerationAllowed && (
+                        <fieldset className="hairstyle-settings" disabled={generating || exporting}>
+                          <legend>Hairstyle</legend>
+                          <label>
+                            Hairstyle option
+                            <select
+                              value={selectedHairstyle}
+                              onChange={(e) => {
+                                invalidate();
+                                setHairstyle(e.target.value as HairstyleChoice);
+                                setHairstylePhoto(null);
+                              }}
+                            >
+                              <option value="original">Keep the customer’s hairstyle</option>
+                              <optgroup label="Choose a preset">
+                                {Object.entries(avatarHairstyles).map(([value, label]) => (
+                                  <option key={value} value={value}>
+                                    {label}
+                                  </option>
+                                ))}
+                              </optgroup>
+                              <option value="reference">Use a hairstyle reference photo</option>
+                            </select>
+                          </label>
+                          {hairstyleRequired && (
+                            <>
+                              <p className="small-footnote">
+                                Choose a photo you have permission to use. The generator will use it
+                                for the hairstyle and use the customer’s head photo for likeness.
+                              </p>
+                              <PhotoInput
+                                kind="hairstyle"
+                                disabled={!consent || generating || exporting}
+                                value={hairstylePhoto}
+                                onReadStart={() => {
+                                  invalidate();
+                                  setHairstylePhoto(null);
+                                }}
+                                onChange={(value) => {
+                                  invalidate();
+                                  setHairstylePhoto(value);
+                                }}
+                              />
+                            </>
+                          )}
+                        </fieldset>
+                      )}
                       <div
                         className={`service-note ${service === "available" && bodyGenerationAllowed ? "available" : ""}`}
                       >
@@ -1297,11 +1393,14 @@ export default function App() {
                           <input
                             type="checkbox"
                             checked={aiConsent}
-                            disabled={generating || exporting}
+                            disabled={
+                              generating || exporting || (hairstyleRequired && !hairstylePhoto)
+                            }
                             onChange={(e) => setAiConsent(e.target.checked)}
                           />
                           <span>
-                            The customer agrees to send their face photo, full-body photo and
+                            The customer agrees to send their face photo, full-body photo
+                            {hairstyleRequired ? ", hairstyle reference photo and" : " and"}{" "}
                             approximate height/weight to {providerLabel}’s image-generation service
                             to generate their avatar and match skin tone. Provider retention terms
                             apply.
@@ -1333,6 +1432,7 @@ export default function App() {
                           !bodyGenerationAllowed ||
                           !face ||
                           !body ||
+                          (hairstyleRequired && !hairstylePhoto) ||
                           !aiConsent ||
                           (identityScreenAvailable && !identityCheckConsent) ||
                           (accountState.enabled && !accountState.account) ||
@@ -1385,8 +1485,8 @@ export default function App() {
                       <p className="section-copy">Check the result together before keeping it.</p>
                       {needsCustomerGeneration && (
                         <p className="error-banner" role="alert">
-                          The photos or body profile changed. Go back and generate a new customer
-                          avatar before approving or exporting.
+                          The photos, hairstyle or body profile changed. Go back and generate a new
+                          customer avatar before approving or exporting.
                         </p>
                       )}
                       <div className="review-type">
@@ -1449,7 +1549,10 @@ export default function App() {
                       )}
                       <ul className="review-list">
                         <li>
-                          <Check size={15} /> Check the customer’s face and hair
+                          <Check size={15} />{" "}
+                          {selectedHairstyle === "original"
+                            ? "Check the customer’s face and hair"
+                            : "Check the customer’s face and the requested hairstyle"}
                         </li>
                         <li>
                           <Check size={15} /> Confirm the approximate body profile
@@ -1458,6 +1561,20 @@ export default function App() {
                           <Check size={15} /> Confirm consistent skin tone across face and body
                         </li>
                       </ul>
+                      {personalized && selectedHairstyle !== "original" && (
+                        <div className="mini-photos">
+                          {hairstyleRequired && hairstylePhoto && (
+                            <img src={hairstylePhoto} alt="Hairstyle reference for review" />
+                          )}
+                          <div>
+                            <strong>
+                              {hairstylePreset
+                                ? avatarHairstyles[hairstylePreset]
+                                : "Requested hairstyle reference"}
+                            </strong>
+                          </div>
+                        </div>
+                      )}
                       {personalized && (
                         <AvatarQualityReview
                           key={session}
@@ -1465,6 +1582,7 @@ export default function App() {
                           profileId={selected}
                           facePhoto={face}
                           bodyPhoto={body}
+                          customHairstyle={selectedHairstyle !== "original"}
                           disabled={exporting || generating || approvingAccount}
                           onCompleteChange={(passed, review) => {
                             setQualityReviewPassed(passed);
@@ -1707,7 +1825,8 @@ export default function App() {
                     <strong>A little care goes a long way.</strong>
                     <p>
                       Photos stay in this session until you explicitly generate. Generation sends
-                      both photos and approximate measurements to the AI service.
+                      the head and full-body photos, approximate measurements and any selected
+                      hairstyle reference photo to the AI service.
                     </p>
                   </div>
                 </div>
